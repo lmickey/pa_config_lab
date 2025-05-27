@@ -4,8 +4,6 @@ from panos.network import EthernetInterface, Zone, TunnelInterface, VirtualRoute
 from panos.objects import AddressObject, AddressGroup
 from panos.policies import Rulebase, SecurityRule, NatRule
 
-######## WORKS AND DONE  ############
-
 ##### Establish connection
 firewall = Firewall(fwData["mgmtUrl"],fwData['mgmtUser'],fwData["mgmtPass"],vsys=None, is_virtual=True)
 firewall.vsys = None
@@ -198,3 +196,147 @@ for i in rule:
 firewall.commit()
 
 ####### Configure NAT Policy #############
+# Get existing rule base
+base = Rulebase()
+firewall.add(base)
+
+# Define rule attributes
+internetNAT = NatRule(
+    name='Outbound Internet',
+    description='Allow internal systems on Trust zone to internet with PAT',
+    nat_type='ipv4',
+    fromzone=['trust'],
+    tozone=['untrust'],
+    to_interface=fwData['untrustInt'],
+    source=['Trust-Network'],
+    source_translation_type='dynamic-ip-and-port',
+    source_translation_address_type='interface-address',
+    source_translation_interface=fwData['untrustInt'],
+)
+panoramaNAT = NatRule(
+    name='Panorama Management',
+    description='Allow external management of Panorama on Trust Network',
+    nat_type='ipv4',
+    fromzone=['untrust'],
+    tozone=['trust'],
+    to_interface=fwData['untrustInt'],
+    service='service-https',
+    source=['any'],
+    destination=[fwData['untrustAddr'][:-3]],
+    source_translation_type='dynamic-ip-and-port',
+    source_translation_address_type='interface-address',
+    source_translation_interface=fwData['trustInt'],
+    destination_translated_address='Panorama-Server'
+)
+
+# Create the NAT rule using the SDK
+configFail=False
+try:
+    base.add(internetNAT)
+    internetNAT.create()
+    print("Outbound NAT rule created successfully!")
+except Exception as e:
+    print(f"Error creating Outbound NAT rule: {e}")
+    configFail=True
+
+# Create the NAT rule using the SDK
+try:
+    base.add(panoramaNAT)
+    panoramaNAT.create()
+    print("Panorama NAT rule created successfully!")
+except Exception as e:
+    print(f"Error creating Panorama NAT rule: {e}")
+    configFail=True
+
+# Commit Changes
+if not configFail:
+  firewall.commit()
+
+
+####### Configure Security Policy #############
+  # Get existing rule base
+base = Rulebase()
+firewall.add(base)
+
+# Define rule attributes
+rule=[]
+rule.append( SecurityRule(
+    name='Outbound Internet',
+    description='Allow trust zone to internet',
+    fromzone=['trust'],
+    tozone=['untrust'],
+    source=["Trust-Network"],
+    destination=['any'],
+    application=['ssl','web-browsing'],
+    action='allow',
+    log_end=True
+))
+rule.append( SecurityRule(
+    name='Allow SC Tunnel',
+    description='Allow the service connection VPN traffic',
+    fromzone=['vpn'],
+    tozone=['vpn'],
+    source=[fwData['untrustAddr'],fwData['paSCEndpoint']],
+    destination=[fwData['untrustAddr'],fwData['paSCEndpoint']],
+    application=['ike','ipsec-esp','ipsec-esp-udp'],
+    action='allow',
+    log_end=True
+))
+rule.append( SecurityRule(
+    name='Outbound to Prisma Access',
+    description='Allow traffic across the service connection',
+    fromzone=['trust'],
+    tozone=['vpn'],
+    source=["Trust-Network"],
+    destination=['Prisma-Trust-Networks'],
+    application=['any'],
+    action='allow',
+    log_end=True
+))
+rule.append( SecurityRule(
+    name='Inbound from Prisma Access',
+    description='Allow traffic across the service connection',
+    fromzone=['vpn'],
+    tozone=['trust'],
+    source=['Prisma-Trust-Networks'],
+    destination=['Trust-Network'],
+    application=['any'],
+    action='allow',
+    log_end=True
+))
+rule.append( SecurityRule(
+    name='Allow Panorama Management',
+    description='Allow Panorama Management from the Internet',
+    fromzone=['untrust'],
+    tozone=['trust'],
+    source=['any'],
+    destination=[fwData['panoramaAddr']],
+    application=['ssl','web-browsing','ssh'],
+    action='allow',
+    log_end=True
+))
+rule.append( SecurityRule(
+    name='Deny All',
+    description='Deny All',
+    fromzone=['any'],
+    tozone=['any'],
+    source=['any'],
+    destination=['any'],
+    application=['any'],
+    action='deny',
+    log_end=True
+))
+
+# Add the rules and create
+for i in rule:
+    try:
+        base.add(i)
+        i.create()
+        print("Security Policy created successfully!")
+    except Exception as e:
+        print(f"Error creating Security Policy: {e}")
+        configFail=True
+
+# Commit Changes
+if not configFail:
+    firewall.commit()
