@@ -1,12 +1,19 @@
-from fwdata import fwData
 from panos.firewall import Firewall
 from panos.device import NTPServerPrimary, NTPServerSecondary, SystemSettings
 from panos.ha import HighAvailability
+import load_settings, sys, getpass
 
-######## WORKS AND DONE  ############
+# Get Settings encryption password
+encryptPass = load_settings.derive_key(getpass.getpass("Enter password for encryption: "))
+
+# Example usage
+data = load_settings(encryptPass)
+if not data:
+    print("Failed to decrypt data.")
+    sys.exit()
 
 ##### Establish connection
-firewall = Firewall(fwData["mgmtUrl"],fwData['mgmtUser'],fwData["mgmtPass"],vsys=None, is_virtual=True)
+firewall = Firewall(data['fwData']["mgmtUrl"],data['fwData']['mgmtUser'],data['fwData']["mgmtPass"],vsys=None, is_virtual=True)
 
 # Configure HA disabled
 haConf = HighAvailability(enabled=False,config_sync=False,state_sync=False)
