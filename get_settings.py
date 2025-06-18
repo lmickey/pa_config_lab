@@ -53,17 +53,22 @@ def get_pa_config(token):
 
     return paConfig
 
-def get_config_from_file(fileName=None):
-    if not fileName:
+# Load and decrypt data if existing config file
+def get_config_from_file(cipher,filePath=None):
+    if not filePath:
         fileName = 'fwdata.bin.example'
+        scriptDir = os.getcwd()
+        filePath = os.path.join(scriptDir, fileName)
 
-    # Load config from file
+    with open(filePath, 'rb') as f:
+        encrypted_data = f.read()
     try:
-        with open(fileName, "rb") as f:
-            loaded_dict = pickle.load(f)
-            return loaded_dict
+        decrypted_data = cipher.decrypt(encrypted_data)
+        data = pickle.loads(decrypted_data)
+        return data
     except Exception as e:
-        print ('Unable to load config from file: ',e)
+        print("Decryption failed:", e)
+        return None
 
 def load_defaults():
     return {
@@ -97,7 +102,6 @@ def load_defaults():
             'paSCEndpoint':'',
             'scName': 'SPOV_Serivce_Connection',
             'scLocation':'US East',
-            'scSubnet':'10.10.10.0/24',
             'scTunnelName':'SC-Tunnel',
             'scAuthKey': 'VY8D;8eQMi(W)s2'
         }
@@ -114,10 +118,10 @@ def save_config_to_file(cipher,firewallConfig=None,prismaAccessConfig=None):
 
     # Verify file exists
     if os.path.exists(fileName):
-        savedConfiguration = get_config_from_file(filePath)
+        savedConfiguration = get_config_from_file(cipher,filePath)
         configFile = True
     elif os.path.exists(fileName+'.example'):
-        savedConfiguration = get_config_from_file(filePath+'.example')
+        savedConfiguration = get_config_from_file(cipher, filePath+'.example')
     else:
         savedConfiguration = load_defaults()
 
