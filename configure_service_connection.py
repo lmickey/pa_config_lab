@@ -1,19 +1,29 @@
 from panos.firewall import Firewall
-from panos.network import Zone, TunnelInterface, VirtualRouter, StaticRoute
+from panos.network import Zone, TunnelInterface, VirtualRouter, StaticRoute, IkeCryptoProfile, IkeGateway, IpsecCryptoProfile, IpsecTunnel
 from panos.objects import AddressObject, AddressGroup
 from panos.policies import Rulebase, SecurityRule
-import load_settings, sys, getpass, datetime, requests, time
-
-# Get Settings encryption password
-encryptPass = load_settings.derive_key(getpass.getpass("Enter password for encryption: "))
+import load_settings, sys, datetime, requests, time, json
 
 # Load settings from config file
-data = load_settings(encryptPass)
-if not data:
-    print("Failed to decrypt data.")
+configFile = load_settings.load_settings()
+if not configFile:
+    print("Failed to load configuration file.")
     sys.exit()
-fwData = data['fwData']
-paData = data['paData']
+fwData = configFile['fwData']
+paData = configFile['paData']
+
+
+#### Verify all variables are configured before starting
+requiredFWVariables = ['untrustURL','untrustAddr','untrustInt','tunnelInt']
+requiredPAVariables = ['paManagedBy','paSCPsk','paMobUserSubnet','paInfraSubnet','paInfraSubnet','paApiUser','paApiSecret','scLocation']
+for key in requiredFWVariables:
+    if key not in fwData or not str(fwData[key]) > '':
+        print("Missing required Variable: " + key + " - run get_settings.py")
+        sys.exit()
+for key in requiredPAVariables:
+    if key not in paData or not str(paData[key]) > '':
+        print("Missing required Variable: " + key + " - run get_settings.py")
+        sys.exit()
 
 ###################################
 ##### Configure Prisma Access #####
@@ -21,12 +31,63 @@ paData = data['paData']
 
 def pa_post_request(url,headers,body,folder='shared'):
     url += '?folder='+folder
-    return requests.request("POST", url, headers=headers, data=body)
+    response = requests.request("POST", url, headers=headers, data=body)
+    print(json.dumps(response.json(), indent=4))
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return False
 
 def pa_get_request(url,headers,folder=None):
     if folder: url += '?folder='+folder
-    return requests.request("GET", url, headers=headers)
+    response = requests.request("GET", url, headers=headers)
+    print(json.dumps(response.json(), indent=4))
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return False
+    
+def pa_del_request(url,headers,folder=None):
+    if folder: url += '?folder='+folder
+    response = requests.request("DELETE", url, headers=headers)
+    print(json.dumps(response.json(), indent=4))
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return False
 
+def create_ike_crypto_profile(config,headers):
+    # First, get list of profiles
+    ikeCryptoList = pa_get_request(baseURL+'ike-crypto-profiles',headers,'Service Connections')
+    matched = ''
+
+    ## Check if profile already exists, confirm if user wants to overwrite
+    for crypto in ikeCryptoList['data']:
+        if crypto.name == config.name:
+            while True:
+                try:
+                    overwrite = input(config.name + " Crypto Profile Alread Exists, overwrite? (y/n):")
+                    if configPrisma.lower() in ['n','y']:
+                        if overwrite.lower() == 'n':
+                            ## @TODO allow entry of different crypto profile name or base it off SC name somehow
+                            print("Please delete IDKE Crypto Profile manually before continuing")
+                            sys.exit()
+                        else:
+                            matched = crypto.id
+                            break
+                    else:
+                        raise ValueError("Invalid value Please enter a valid option")
+                except ValueError:
+                    print("Invalid value Please enter a valid option")
+        if matched != '': break
+    
+    ## If profile was found, delete it first before creating
+    if matched != '':
+        if not pa_del_request(baseURL+'ike-crypto-profiles/'+matched,headers,'Service Connections'):
+            print ("Unable to delete IKE Crypto Profile duplicate, please delete manually before continuing")
+            sys.exit()
+    
+            
 # Default encryption settings:
 cryptoAuth = 'sha256'
 cryptoEncryp = 'aes-256-cbc'
@@ -35,21 +96,43 @@ ikeTime = 28800 #8 hours
 ipsecTime = 3600 #1 hour
 
 #Check what to configure (SCM or Panorama)
-if 'paManagedBy' in paData and paData['paManagedBy'] == 'scm':
+while True:
+    try:
+        configPrisma = input("Configure the Prisma Access end of the SC Tunnel? (y/n):")
+        if configPrisma.lower() in ['n','y']:
+            break
+        else:
+            raise ValueError("Invalid value Please enter a valid option")
+    except ValueError:
+        print("Invalid value Please enter a valid option")
+
+if 'paManagedBy' in paData and paData['paManagedBy'] == 'scm' and configPrisma.lower() == 'y':
     ######### Configure the Service Connection in SCM #####################
     
+    # Confirm all required fields are configured
+    requiredFWConfig = ['untrustURL','trustSubnet']
+    requiredPAConfig = ['paSCPsk','scLocation','paTSGID','paApiUser','paApiSecret']
+    for key in requiredFWConfig:
+        if key not in fwData:
+            print ("Required FW information - " + key + " - to configure SC in SCM is missing, please rerun get_settings.py to add this setting")
+            sys.exit()
+    for key in requiredPAConfig:
+        if key not in paData:
+            print ("Required PA information - " + key + " - to configure SC in SCM is missing, please rerun get_settings.py to add this setting")
+            sys.exit()
+
     #URL info
     baseURL = 'https://api.sase.paloaltonetworks.com/sse/config/v1/'
-    ikeCryptoUrl = 'ike-crypto-profiles'
-    ipsecCryptoUrl = 'ipsec-crypto-profiles'
-    ikeGatewayUrl = 'ike-gateways'
-    ipsecTunnelUrl = 'ipsec-tunnels'
+    ikeCryptoUrl = baseURL+'ike-crypto-profiles'
+    ipsecCryptoUrl = baseURL+'ipsec-crypto-profiles'
+    ikeGatewayUrl = baseURL+'ike-gateways'
+    ipsecTunnelUrl = baseURL+'ipsec-tunnels'
     serviceConnectionUrl = 'service-connections'
     # Setup the body for all requests to be made
     ikeCrypto = {"authentication_multiple": 0,"dh_group": [cryptoDHGroup],"encryption": [cryptoEncryp],"hash": [cryptoAuth],"lifetime": {"seconds": ikeTime},"name": "SC-IKE-Crypto"}
     ipsecCrypto = {"dh_group": cryptoDHGroup,"lifesize": {"kb": 0},"lifetime": {"seconds": ipsecTime},"name": "SC-IPSec-Crypto","esp": {"authentication": [cryptoAuth],"encryption": [cryptoEncryp]}}
     ikeGateway = {
-        "authentication": {"pre_shared_key": {"key": paData['psk']}},
+        "authentication": {"pre_shared_key": {"key": paData['paSCPsk']}},
         "local_id": {"id": "prisma","type": "string"},
         "name": "SC-IKE-Gateway",
         "peer_address": {"fqdn": fwData['untrustURL']},
@@ -58,11 +141,11 @@ if 'paManagedBy' in paData and paData['paManagedBy'] == 'scm':
         "protocol_common": {"fragmentation": {"enable": False},"nat_traversal": {"enable": True},"passive_mode": True}
     }
     ipsecTunnel = {"name": 'SC-Tunnel',"anti_replay": True,"auto_key": {"ike_gateway": [{"name": "SC-IKE-Gateway"}],"ipsec_crypto_profile": "SC-IPSec-Crypto"},"enable_gre_encapsulation": False}
-    serviceConnection = {"ipsec_tunnel": 'SC-Tunnel','name':paData['scName'],"onboarding_type": "classic","region": [paData['scLocation']],"subnets": [fwData['trustSubnet']]}
+    serviceConnection = {"ipsec_tunnel": 'SC-Tunnel','name':'SC-Datacenter',"onboarding_type": "classic","region": [paData['scLocation']],"subnets": [fwData['trustSubnet']]}
 
     #Token is only good for 15min, we will probably need to reauth at some point
     authTokenTimer = datetime.datetime.now()
-    authToken = load_settings.prisma_access_auth(paData['tsg'],paData['user'],paData['pass'])
+    authToken = load_settings.prisma_access_auth(paData['paTSGID'],paData['paApiUser'],paData['paApiSecret'])
     if not authToken:
         print ("Unable to login to SCM, please check credentials using get_settings.py and try again")
         sys.exit()
@@ -71,39 +154,56 @@ if 'paManagedBy' in paData and paData['paManagedBy'] == 'scm':
 
     #@TODO add checks to see if they already exist instead of just blindly creating
     # First create the crypto profiles
-    if not pa_post_request(baseURL+ikeCryptoUrl,headers,ikeCrypto,paFolder):
+    
+    ikeCryptoData = pa_post_request(ikeCryptoUrl,headers,json.dumps(ikeCrypto),paFolder)
+    if 'id' not in ikeCryptoData:
         print('Unable to create IKE Crypto Profile, exiting')
         sys.exit()
-    if not pa_post_request(baseURL+ipsecCryptoUrl,headers,ipsecCrypto,paFolder):
+    print(json.dumps(ipsecCrypto, indent=4))
+    if not pa_post_request(ipsecCryptoUrl,headers,json.dumps(ipsecCrypto),paFolder):
         print('Unable to create IPSEC Crypto Profile, exiting')
         sys.exit()
     
     # Create IKE Gateway
-    if not pa_post_request(baseURL+ikeGatewayUrl,headers,ikeGateway,paFolder):
+    print(json.dumps(ikeGateway, indent=4))
+    if not pa_post_request(ikeGatewayUrl,headers,json.dumps(ikeGateway),paFolder):
         print('Unable to create IKE Gateway, exiting')
         sys.exit()
 
     # Create IPSEC Tunnel
-    if not pa_post_request(baseURL+ipsecTunnelUrl,headers,ipsecTunnel,paFolder):
+    print(json.dumps(ipsecTunnel, indent=4))
+    if not pa_post_request(ipsecTunnelUrl,headers,json.dumps(ipsecTunnel),paFolder):
         print('Unable to create IPSEC Tunnel, exiting')
         sys.exit()
 
     # Add Service Connection
-    if not pa_post_request(baseURL+serviceConnectionUrl,headers,serviceConnection,paFolder):
+    print(json.dumps(serviceConnection, indent=4))
+    if not pa_post_request(serviceConnectionUrl,headers,json.dumps(serviceConnection),paFolder):
         print('Unable to create Service Connection, exiting')
         sys.exit()
+
+    print("Successfully Configured Service Connection, Commiting Configuration")
 
     # If everything was created successfully then push config
     jobInfo = pa_post_request(baseURL+'config-versions/candidate:push',headers,{'description':'Pushing Service Connection Setup', "folders": [paFolder]})
     commitFinished = False
+    waitCount = 0
 
     # Wait until the push is complete, if authToken expires get a new one
     while True:
-        # Wait 1 minute
-        time.sleep(60)
+        # Every 10 seconds print update to user, every 30 seconds, get job status
+        waitCount += 1        
+        time.sleep(10)
+        if waitCount / 6 or waitCount == 0:
+            print(f"\rChecking Push Status ", end="")
+            sys.stdout.flush()
+        else:
+            print('.', end="")
+            sys.stdout.flush()
 
         # Get job status
-        jobStatus = pa_get_request(baseURL+'jobs/'+jobInfo['job_id'],headers)
+        if waitCount / 3:
+            jobStatus = pa_get_request(baseURL+'jobs/'+jobInfo['job_id'],headers)
 
         # If job is complete, exit loop
         if jobStatus['data'][0]['job_status'] == '2' and jobStatus['data'][0]['status_str'] == 'FIN':
@@ -115,22 +215,43 @@ if 'paManagedBy' in paData and paData['paManagedBy'] == 'scm':
             diffTime = currentTime - authTokenTimer
             if diffTime.total_seconds > 825:
                 authTokenTimer = datetime.datetime.now()
-                authToken = load_settings.prisma_access_auth(paData['tsg'],paData['user'],paData['pass'])
+                authToken = load_settings.prisma_access_auth(paData['tsg'],paData['paApiUser'],paData['paApiSecret'])
     
     # Verify commit was successful
     if jobStatus['data'][0]['job_result'] == '2' and jobStatus['data'][0]['result_str'] == 'OK':
-        print ('Service Connection configuration Successful')
+        print ('Commit Successful, Service Connection configuration complete')
+
+        # Get the list of service connections and find the one we just created
+        scList = pa_get_request(baseURL+'service-connections',headers,'Service Connections')
+        for scmSC in scList['data'].items():
+            if scmSC['name'] == 'SC-Tunnel':
+                # This is the correct tunnel, get the endpoint information
+                scTunnel = pa_get_request(baseURL+'service-connections/'+scmSC['id'],headers)
+
+
+
     else:
         print ('Service Connection configuration error, please check SCM and try again')
         sys.exit()
 
-else:
+elif 'paManagedBy' in paData and paData['paManagedBy'] == 'pan' and configPrisma.lower() == 'y':
     ######### Configure the Service Connection in Panorama #####################
     nextTask = 'not done yet'
-   
+
 ##################################
 ##### Configure the Firewall #####
 ##################################
+#Check what to configure (SCM or Panorama)
+while True:
+    try:
+        configFirewall = input("Configure the Firewall end of the SC Tunnel? (y/n):")
+        if configFirewall.lower() in ['n','y']:
+            if configFirewall.lower() == 'n': sys.exit()
+            break
+        else:
+            raise ValueError("Invalid value Please enter a valid option")
+    except ValueError:
+        print("Invalid value Please enter a valid option")
 
 ##### Establish connection
 firewall = Firewall(fwData["mgmtUrl"],fwData['mgmtUser'],fwData["mgmtPass"],vsys=None, is_virtual=True)
@@ -141,17 +262,19 @@ zoneVPN = Zone(name='vpn', mode='layer3')
 firewall.add(zoneVPN)
 zoneVPN.create()
 
-##### NEED TO ADD CHECK THAT THE INTERFACE DOESN'T EXIST
-##### get list of current interfaces and add next number
+##### @todo check that the tunnel interface doesn't exist first before creating it
+##### @todo or get list of current interfaces and add next number
 # Configure the tunnel interface (default: tunnel.1 vpn)
-tun1 = TunnelInterface(fwData['tunnelInt'], fwData['tunnelAddr'])
+if 'tunnelAddr' in fwData and fwData['tunnelAddr']:
+    tun1 = TunnelInterface(fwData['tunnelInt'], fwData['tunnelAddr'])
+else:
+    tun1 = TunnelInterface(fwData['tunnelInt'])
 firewall.add(tun1)
 tun1.set_zone('vpn', mode='layer3', refresh=True, update=True)
 tun1.set_virtual_router('default', refresh=True, update=True)
 tun1.create()
 
 firewall.commit()
-
 
 ######### Configure Static Routes ###################
 # Get the default virtual router
@@ -160,7 +283,7 @@ vrouter = VirtualRouter(name='default')
 #Create a static route for mobile users
 mobileUsers = StaticRoute(
     name='Prisma-Access-Mobile-Users',
-    destination=fwData['paMobUserSubnet'],
+    destination=paData['paMobUserSubnet'],
     interface=fwData['tunnelInt'],
     nexthop_type='None'
 )
@@ -168,7 +291,7 @@ mobileUsers = StaticRoute(
 #Create a static route for prisma infrastructure
 prismaInfra = StaticRoute(
     name='Prisma-Access-Infrastructure',
-    destination=fwData["paInfraSubnet"],
+    destination=paData["paInfraSubnet"],
     interface=fwData["tunnelInt"],
     nexthop_type='None'
 )
@@ -186,8 +309,8 @@ firewall.commit()
 
 # Define basic address objects
 addr = {}
-addr['paMU'] = AddressObject("Prisma-Mobile-Users", fwData['paMobUserSubnet'], description="Company web server")
-addr['paInfra'] = AddressObject("Prisma-Infrastructure", fwData['paInfraSubnet'], description="Company web server")
+addr['paMU'] = AddressObject("Prisma-Mobile-Users", paData['paMobUserSubnet'], description="Prisma Access Mobile Users")
+addr['paInfra'] = AddressObject("Prisma-Infrastructure", paData['paInfraSubnet'], description="Prisma Access Infrastructure")
 
 # Create objects
 for i in addr:
@@ -196,7 +319,7 @@ for i in addr:
 
 # Define basic address objects
 grp = {}
-grp['paMU'] = AddressGroup("Prisma-Trust-Networks", ["Prisma-Mobile-Users","Prisma-Infrastructure"], description="Company web server")
+grp['paMU'] = AddressGroup("Prisma-Trust-Networks", ["Prisma-Mobile-Users","Prisma-Infrastructure"], description="Prisma Access Networks")
 
 # Create objects
 for i in grp:
@@ -205,8 +328,76 @@ for i in grp:
 
 firewall.commit()
 
-####### Configure Firewall Policy #############
+####### Setup the Crypto Policies #############
+# Defaults from above
+#cryptoAuth = 'sha256'
+#cryptoEncryp = 'aes-256-cbc'
+#cryptoDHGroup = 'group20'
+#ikeTime = 28800 #8 hours
+#ipsecTime = 3600 #1 hour
+fwIkeCrypto = IkeCryptoProfile(
+    name='SC-IKE-Crypto',
+    dh_group=cryptoDHGroup,
+    authentication=cryptoAuth,
+    encryption=cryptoEncryp,
+    lifetime_seconds=ikeTime,
+    authentication_multiple=0
+)
 
+fwIpsecCrypto = IpsecCryptoProfile(
+    name='SC-IPSec-Crypto',
+    dh_group=cryptoDHGroup,
+    esp_authentication=cryptoAuth,
+    esp_encryption=cryptoEncryp,
+    lifetime_seconds=ipsecTime,
+    authentication_multiple=0
+)
+
+firewall.add(fwIkeCrypto)
+firewall.add(fwIpsecCrypto)
+
+####### Configure IKE Gateway #################
+fwIkeGateway = IkeGateway(
+    name='SC-IKE-Gateway',
+    version='ikev2-prefered',
+    peer_ip_type='fqdn',
+    peer_ip_value=paData['paSCEndpoint'],
+    interface=fwData['untrustInt'],
+    local_ip_address_type='ip',
+    local_ip_address=fwData['untrustAddr'],
+    auth_type='pre-shared-key',
+    pre_shared_key=paData['paSCPsk'],
+    local_id_type='fqdn',
+    local_id_value='untrustURL',
+    peer_id_type='fqdn',
+    peer_id_value=paData['paSCEndpoint'],
+    enable_passive_mode=False,
+    enable_nat_traversal=True,
+    ikev1_crypto_profile='SC-IKE-Crypto',
+    ikev2_crypto_profile='SC-IKE-Crypto',
+)
+
+firewall.add(fwIkeGateway)
+
+####### Create IPSec Tunnel Config ############
+fwIPSecTunnel = IpsecTunnel(
+    name='SC-IPSec-Tunnel',
+    tunnel_interface=fwData['tunnelInt'],
+    type='auto-key',
+    ak_ike_gateway='SC-IKE-Gateway',
+    ak_ipsec_crypto_profile='SC-IPSec-Crypto',
+    anti_replay=True,
+    enable_tunnel_monitor=False,
+    #tunnel_monitor_dest_ip - @todo add in tunnel monitor configuration
+    #tunnel_monitor_profile
+)
+
+firewall.add(fwIPSecTunnel)
+
+# Commit Crypto/gateway/tunnel configuraiton
+firewall.commit()
+
+####### Configure Firewall Policy #############
 # Get existing rule base
 base = Rulebase()
 firewall.add(base)

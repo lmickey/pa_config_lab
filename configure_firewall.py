@@ -2,17 +2,15 @@ from panos.firewall import Firewall
 from panos.network import EthernetInterface, Zone, TunnelInterface, VirtualRouter, StaticRoute
 from panos.objects import AddressObject, AddressGroup
 from panos.policies import Rulebase, SecurityRule, NatRule
-import load_settings, sys, getpass
+import load_settings, sys
 
-# Get Settings encryption password
-encryptPass = load_settings.derive_key(getpass.getpass("Enter password for encryption: "))
-
-# Example usage
-data = load_settings(encryptPass)
-if not data:
-    print("Failed to decrypt data.")
+# Load settings from config file
+configFile = load_settings.load_settings()
+if not configFile:
+    print("Failed to load configuration file.")
     sys.exit()
-fwData = data['fwData']
+fwData = configFile['fwData']
+paData = configFile['paData']
 
 ##### Establish connection
 firewall = Firewall(fwData["mgmtUrl"],fwData['mgmtUser'],fwData["mgmtPass"],vsys=None, is_virtual=True)
