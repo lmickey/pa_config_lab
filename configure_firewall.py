@@ -123,6 +123,7 @@ rule.append( SecurityRule(
 ))
 
 # Add the rules and create
+configFail = False
 for i in rule:
     try:
         base.add(i)

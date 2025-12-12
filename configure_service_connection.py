@@ -67,7 +67,7 @@ def create_ike_crypto_profile(config,headers):
             while True:
                 try:
                     overwrite = input(config.name + " Crypto Profile Alread Exists, overwrite? (y/n):")
-                    if configPrisma.lower() in ['n','y']:
+                    if overwrite.lower() in ['n','y']:
                         if overwrite.lower() == 'n':
                             ## @TODO allow entry of different crypto profile name or base it off SC name somehow
                             print("Please delete IDKE Crypto Profile manually before continuing")
@@ -190,11 +190,12 @@ if 'paManagedBy' in paData and paData['paManagedBy'] == 'scm' and configPrisma.l
     waitCount = 0
 
     # Wait until the push is complete, if authToken expires get a new one
+    jobStatus = None
     while True:
         # Every 10 seconds print update to user, every 30 seconds, get job status
         waitCount += 1        
         time.sleep(10)
-        if waitCount / 6 or waitCount == 0:
+        if waitCount % 6 == 0 or waitCount == 1:
             print(f"\rChecking Push Status ", end="")
             sys.stdout.flush()
         else:
@@ -202,41 +203,78 @@ if 'paManagedBy' in paData and paData['paManagedBy'] == 'scm' and configPrisma.l
             sys.stdout.flush()
 
         # Get job status
-        if waitCount / 3:
+        if waitCount % 3 == 0:
             jobStatus = pa_get_request(baseURL+'jobs/'+jobInfo['job_id'],headers)
 
         # If job is complete, exit loop
-        if jobStatus['data'][0]['job_status'] == '2' and jobStatus['data'][0]['status_str'] == 'FIN':
-            commitFinished = True
-            break
+        if jobStatus and 'data' in jobStatus and len(jobStatus['data']) > 0:
+            if jobStatus['data'][0]['job_status'] == '2' and jobStatus['data'][0]['status_str'] == 'FIN':
+                commitFinished = True
+                break
         else:
             # Check if token will expire before next run
             currentTime = datetime.datetime.now()
             diffTime = currentTime - authTokenTimer
-            if diffTime.total_seconds > 825:
+            if diffTime.total_seconds() > 825:
                 authTokenTimer = datetime.datetime.now()
-                authToken = load_settings.prisma_access_auth(paData['tsg'],paData['paApiUser'],paData['paApiSecret'])
+                authToken = load_settings.prisma_access_auth(paData['paTSGID'],paData['paApiUser'],paData['paApiSecret'])
+                headers = {'Content-Type': 'application/json','Authorization': 'Bearer '+authToken}
     
     # Verify commit was successful
-    if jobStatus['data'][0]['job_result'] == '2' and jobStatus['data'][0]['result_str'] == 'OK':
-        print ('Commit Successful, Service Connection configuration complete')
+    if jobStatus and 'data' in jobStatus and len(jobStatus['data']) > 0:
+        if jobStatus['data'][0]['job_result'] == '2' and jobStatus['data'][0]['result_str'] == 'OK':
+            print ('Commit Successful, Service Connection configuration complete')
 
         # Get the list of service connections and find the one we just created
         scList = pa_get_request(baseURL+'service-connections',headers,'Service Connections')
-        for scmSC in scList['data'].items():
-            if scmSC['name'] == 'SC-Tunnel':
-                # This is the correct tunnel, get the endpoint information
-                scTunnel = pa_get_request(baseURL+'service-connections/'+scmSC['id'],headers)
-
-
-
-    else:
-        print ('Service Connection configuration error, please check SCM and try again')
-        sys.exit()
+        if scList and 'data' in scList:
+            for scmSC in scList['data']:
+                if scmSC.get('name') == 'SC-Datacenter':
+                    # This is the correct service connection, get the endpoint information
+                    scTunnel = pa_get_request(baseURL+'service-connections/'+scmSC['id'],headers)
+                    if scTunnel and 'data' in scTunnel:
+                        # Extract endpoint information and save to config if needed
+                        print(f"Service Connection endpoint information retrieved for {scmSC['name']}")
+                        # @TODO: Save endpoint information to paData if needed for firewall configuration
+        else:
+            print ('Service Connection configuration error, please check SCM and try again')
+            sys.exit()
 
 elif 'paManagedBy' in paData and paData['paManagedBy'] == 'pan' and configPrisma.lower() == 'y':
     ######### Configure the Service Connection in Panorama #####################
-    nextTask = 'not done yet'
+    from panos.panorama import Panorama
+    
+    # Confirm all required fields are configured
+    requiredFWConfig = ['untrustURL','trustSubnet']
+    requiredPAConfig = ['paSCPsk','scLocation','panMgmtUrl','panUser','panPass']
+    for key in requiredFWConfig:
+        if key not in fwData:
+            print ("Required FW information - " + key + " - to configure SC in Panorama is missing, please rerun get_settings.py to add this setting")
+            sys.exit()
+    for key in requiredPAConfig:
+        if key not in paData:
+            print ("Required PA/Panorama information - " + key + " - to configure SC in Panorama is missing, please rerun get_settings.py to add this setting")
+            sys.exit()
+    
+    # Establish connection to Panorama
+    panorama = Panorama(paData['panMgmtUrl'], paData['panUser'], paData['panPass'])
+    
+    # Note: Service Connection configuration in Panorama requires Prisma Access plugin
+    # This typically involves configuring through the Panorama UI or using REST API
+    # The pan-os-python SDK doesn't have direct support for Prisma Access Service Connections
+    # This would need to be done via Panorama REST API calls similar to SCM approach
+    
+    print("Panorama Service Connection configuration requires:")
+    print("1. Prisma Access plugin installed on Panorama")
+    print("2. Service Connection configured through Panorama UI or REST API")
+    print("3. The following configuration values:")
+    print(f"   - Service Connection Name: {paData.get('scName', 'SC-Datacenter')}")
+    print(f"   - Location: {paData.get('scLocation', 'US East')}")
+    print(f"   - Subnet: {fwData['trustSubnet']}")
+    print(f"   - Pre-shared Key: {paData['paSCPsk']}")
+    print(f"   - Firewall FQDN: {fwData['untrustURL']}")
+    print("\nPlease configure the Service Connection manually in Panorama or use the Panorama REST API.")
+    print("After configuration, ensure paSCEndpoint is set in your configuration file.")
 
 ##################################
 ##### Configure the Firewall #####

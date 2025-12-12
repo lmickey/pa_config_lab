@@ -7,7 +7,7 @@ import load_settings, sys, getpass
 encryptPass = load_settings.derive_key(getpass.getpass("Enter password for encryption: "))
 
 # Example usage
-data = load_settings(encryptPass)
+data = load_settings.load_settings(encryptPass)
 if not data:
     print("Failed to decrypt data.")
     sys.exit()

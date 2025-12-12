@@ -137,7 +137,7 @@ def save_config_to_file(configName,cipher,firewallConfig=None,prismaAccessConfig
             except ValueError:
                 print("Invalid option Please enter a valid option")
     else:
-        savedConfiguration = load_defaults(sc)
+        savedConfiguration = load_defaults()
 
     # See if there's any updates to make
     if firewallConfig:
@@ -324,7 +324,7 @@ if runReason == 'edit':
                         try:
                             fwOrPa = input ("Firewall (f) or Prisma Access (p) Setting? (f/p)")
                             if fwOrPa.lower() in ['f','p']:
-                                if fwOrPa.lower == 'f':
+                                if fwOrPa.lower() == 'f':
                                     fwData[newKey] = newVal
                                     break
                                 else:
