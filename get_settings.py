@@ -244,250 +244,251 @@ def load_spov_questionnaire(fileName):
     return paConfig
 
 ########### Section to see if i need to add/edit existing config or create new #######################
-while True:
-    try:
-        runReason = input("Create new configuration? (y/n):")
-        if runReason.lower() in ['n','y']:
-            if runReason in ['N','n']:
-                runReason = 'edit'
-            else:
-                runReason = 'new'
-            break
-        else:
-            raise ValueError("Invalid value Please enter a valid option")
-    except ValueError:
-        print("Invalid value Please enter a valid option")
-
-if runReason == 'edit':
-    # Load list of configurations, have user pick one
-    # Load settings from config file
-    configFile = load_settings.load_settings()
-    if not configFile:
-        print("Failed to load configuration file.")
-        sys.exit()
-    fwData = configFile['fwData']
-    paData = configFile['paData']
-    #Protected fields
-    protectedFields = ['paSCPsk','pass','mgmtPass','scmPass','paApiSecret']
-
-
+if __name__ == "__main__":
     while True:
-        # Reset vars if we edited/added and need to re-print/re-number all config settings again
-        configKeys = []
-        configNum = 0        
-        settingCount = 0
-    
-        # Print firewall/Panorama data
-        print ("\nFirewall & Panorama Configuration Settings")
-        for key,value in fwData.items():
-            settingCount += 1
-            configKeys.append(key)
-            tabs = "\t\t" if (len(key) < 11 and settingCount < 10) or (len(key) < 10 and settingCount > 9) else '\t'
-            if key not in protectedFields: 
-                print (str(settingCount) + " - " + str(key) + ":" + tabs + str(value))
-            else:
-                print (str(settingCount) + " - " + str(key) + ":" + tabs + "************")
-
-        # How to know if it's FW config or PA config setting to update
-        configNum = settingCount
-
-        # Prisma Access Configuration
-        print ("\nPrisma Access Configuration Settings")
-        for key,value in paData.items():
-            settingCount += 1
-            configKeys.append(key)
-            tabs = "\t\t" if (len(key) < 11 and settingCount < 10) or (len(key) < 10 and settingCount > 9) else '\t'
-            if key not in protectedFields: 
-                print (str(settingCount) + " - " + str(key) + ":" + tabs + str(value))
-            else:
-                print (str(settingCount) + " - " + str(key) + ":" + tabs + "************")
-        
-        # Pause and ask what the user wants to do
         try:
-            editOption = input("\nChoose Setting to edit 1-" + str(settingCount) +"\na to add a setting | s to save/quit | q to quit\nSelection:")
-            if editOption.lower() in ['a','s','q'] or int(editOption)-1 in range(settingCount):
-                # Quit updating the configuration
-                if editOption.lower() == 'q':
-                    sys.exit()
-                # Save the config, then quit
-                elif editOption.lower() == 's':
-                    if save_config_to_file(configFile['configName'],configFile['configCipher'],fwData,paData):
-                        print ("Config values Saved to file, run 'python configure_firewally.py' to configure firewall")
-                    else:
-                        print ("Unable to save configuration to file, please try again")
-                    sys.exit()
-                # Add a new configuration setting
-                elif editOption.lower() == 'a':
-                    newKey = input ("Enter Name of new setting:")
-                    newVal = input ("Enter Value for " + newKey + ":")
-                    while True:
-                        try:
-                            fwOrPa = input ("Firewall (f) or Prisma Access (p) Setting? (f/p)")
-                            if fwOrPa.lower() in ['f','p']:
-                                if fwOrPa.lower() == 'f':
-                                    fwData[newKey] = newVal
-                                    break
-                                else:
-                                    paData[newKey] = newVal
-                                    break
-                            else:
-                                raise ValueError("Invalid value Please enter a valid option")
-                        except ValueError:
-                            print ("Invalid value Please enter a valid option")
-                # Update a setting, based on the number entered
+            runReason = input("Create new configuration? (y/n):")
+            if runReason.lower() in ['n','y']:
+                if runReason in ['N','n']:
+                    runReason = 'edit'
                 else:
-                    newVal = input ("Enter new value for " + configKeys[int(editOption)-1] + ":")
-                    if int(editOption)-1 < configNum:
-                        fwData[configKeys[int(editOption)-1]] = newVal
-                    else:
-                        paData[configKeys[int(editOption)-1]] = newVal
+                    runReason = 'new'
+                break
             else:
                 raise ValueError("Invalid value Please enter a valid option")
         except ValueError:
             print("Invalid value Please enter a valid option")
 
-########### Initial questions to determine if SCM/Panorama and if Terraform deployed  ################
-configName = input("Enter a name for this configuration: ")
-encryptPass = derive_key(getpass.getpass("Enter password for encryption: "))
-while True:
-    try:
-        scmOrPan = input("Is this Panorama Managed PA? (y/n):")
-        if scmOrPan in ['N','n','Y','y']:
-            if scmOrPan in ['N','n']:
-                scmOrPan = 'scm'
-            else:
-                scmOrPan = 'pan'
-            break
-        else:
-            raise ValueError("Invalid value Please enter a valid option")
-    except ValueError:
-        print("Invalid value Please enter a valid option")
+    if runReason == 'edit':
+        # Load list of configurations, have user pick one
+        # Load settings from config file
+        configFile = load_settings.load_settings()
+        if not configFile:
+            print("Failed to load configuration file.")
+            sys.exit()
+        fwData = configFile['fwData']
+        paData = configFile['paData']
+        #Protected fields
+        protectedFields = ['paSCPsk','pass','mgmtPass','scmPass','paApiSecret']
 
-while True:
-    try:
-        spovOrPA = input("Do you have a SPOV Questionnaire for Configuration? (y/n):")
-        if spovOrPA in ['N','n','Y','y']:
-            if spovOrPA in ['N','n']:
-                spovOrPA = 'pa'
-            else:
-                spovOrPA = 'spov'
-            break
-        else:
-            raise ValueError("Invalid value Please enter a valid option")
-    except ValueError:
-        print("Invalid value Please enter a valid option")
 
-while True:
-    try:
-        terraformDeploy = input("Is the lab deployed by Terraform? (y/n):")
-        if terraformDeploy in ['N','n','Y','y']:
-            break
-        else:
-            raise ValueError("Invalid value Please enter a valid option")
-    except ValueError:
-        print("Invalid value Please enter a valid option")
-
-########### Get SCM information if SCM managed ###########
-if scmOrPan == 'scm':
-    scmCreds = {}
-    scmCreds['paTSGID'] = input("Prisma Access Tenant TSG:").strip()
-    scmCreds['paApiUser'] = input("Prisma Access Tenant Client ID:").strip()
-    scmCreds['paApiSecret'] = getpass.getpass("Prisma Access Tenant Client Secret:").strip()
-
-    # Authenticate and get token
-    accessToken = prisma_access_auth(scmCreds['paTSGID'],scmCreds['paApiUser'], scmCreds['paApiSecret'])
-    if accessToken:
-        print ("Loading Configuration from Prisma Access")
-    else:
-        print ("Error Authenticating to SCM, check credentials and TSG and try again")
-        sys.exit()
-
-    # Check for SPOV config or do we load from SCM
-    if spovOrPA == 'spov':
-        # Load the SPOV Questionnaire for PA Config
-        spovFile = input("Input full path to SPOV Questionnaire JSON File:").strip()
-        paConfig = load_spov_questionnaire(spovFile)
-    else:
-        # Get all available information from Prisma Access
-        paConfig = get_pa_config(accessToken)
-    
-    # Save TSG/Credentials to paConfig var
-    paConfig.update(scmCreds)
-
-    # Once SCM config or SPOV file have been loaded, confirm details and save to file
-    if paConfig and len(paConfig) > 3:
-        paConfig['paManagedBy'] = scmOrPan
-        print ("PA configuration Loaded successfully, please review the following for accuracy")
-        for key, value in paConfig.items():
-            print(f"{key}: {value}")
         while True:
-            try:
-                paConfigValid = input("PA Configuration Above is Accurate? (y/n):")
-                if paConfigValid in ['Y','y']:
-                    break
-                elif paConfigValid in ['N','n']:
-                    print ("Configuration not accurate, please restart the script")
-                    sys.exit()
+            # Reset vars if we edited/added and need to re-print/re-number all config settings again
+            configKeys = []
+            configNum = 0        
+            settingCount = 0
+        
+            # Print firewall/Panorama data
+            print ("\nFirewall & Panorama Configuration Settings")
+            for key,value in fwData.items():
+                settingCount += 1
+                configKeys.append(key)
+                tabs = "\t\t" if (len(key) < 11 and settingCount < 10) or (len(key) < 10 and settingCount > 9) else '\t'
+                if key not in protectedFields: 
+                    print (str(settingCount) + " - " + str(key) + ":" + tabs + str(value))
                 else:
-                    raise ValueError
+                    print (str(settingCount) + " - " + str(key) + ":" + tabs + "************")
+
+            # How to know if it's FW config or PA config setting to update
+            configNum = settingCount
+
+            # Prisma Access Configuration
+            print ("\nPrisma Access Configuration Settings")
+            for key,value in paData.items():
+                settingCount += 1
+                configKeys.append(key)
+                tabs = "\t\t" if (len(key) < 11 and settingCount < 10) or (len(key) < 10 and settingCount > 9) else '\t'
+                if key not in protectedFields: 
+                    print (str(settingCount) + " - " + str(key) + ":" + tabs + str(value))
+                else:
+                    print (str(settingCount) + " - " + str(key) + ":" + tabs + "************")
+            
+            # Pause and ask what the user wants to do
+            try:
+                editOption = input("\nChoose Setting to edit 1-" + str(settingCount) +"\na to add a setting | s to save/quit | q to quit\nSelection:")
+                if editOption.lower() in ['a','s','q'] or int(editOption)-1 in range(settingCount):
+                    # Quit updating the configuration
+                    if editOption.lower() == 'q':
+                        sys.exit()
+                    # Save the config, then quit
+                    elif editOption.lower() == 's':
+                        if save_config_to_file(configFile['configName'],configFile['configCipher'],fwData,paData):
+                            print ("Config values Saved to file, run 'python configure_firewally.py' to configure firewall")
+                        else:
+                            print ("Unable to save configuration to file, please try again")
+                        sys.exit()
+                    # Add a new configuration setting
+                    elif editOption.lower() == 'a':
+                        newKey = input ("Enter Name of new setting:")
+                        newVal = input ("Enter Value for " + newKey + ":")
+                        while True:
+                            try:
+                                fwOrPa = input ("Firewall (f) or Prisma Access (p) Setting? (f/p)")
+                                if fwOrPa.lower() in ['f','p']:
+                                    if fwOrPa.lower() == 'f':
+                                        fwData[newKey] = newVal
+                                        break
+                                    else:
+                                        paData[newKey] = newVal
+                                        break
+                                else:
+                                    raise ValueError("Invalid value Please enter a valid option")
+                            except ValueError:
+                                print ("Invalid value Please enter a valid option")
+                    # Update a setting, based on the number entered
+                    else:
+                        newVal = input ("Enter new value for " + configKeys[int(editOption)-1] + ":")
+                        if int(editOption)-1 < configNum:
+                            fwData[configKeys[int(editOption)-1]] = newVal
+                        else:
+                            paData[configKeys[int(editOption)-1]] = newVal
+                else:
+                    raise ValueError("Invalid value Please enter a valid option")
             except ValueError:
                 print("Invalid value Please enter a valid option")
-    else:
-        print ("Error loading configuration from SCM, check credentials and TSG and try again")
-        sys.exit()
-else:
-    ## If it's panorama managed, confirm if panorama is already configured or should we get configuration from spov
-    # @todo - ask for panorama mgmt url and credentials
 
-    # Check on where we're loading the configuration from, SPOV questionnaire or live Panorama
-    if spovOrPA == 'spov':
-        # Load the SPOV Questionnaire for PA Config
-        spovFile = input("Input full path to SPOV Questionnaire JSON File:").strip()
-        paConfig = load_spov_questionnaire(spovFile)
-    else:
-        panConf = {'panMgmtUrl':'','panUser':'','panPass':''}
-        # Panorama is already configured? So must not be deployed by terraform
-        # @todo - create new def to login to panorama (api/cli?) and get PA Config
-
-########### Get Firewall information ###########
-if terraformDeploy in ['Y','y']:
-    # Get all FW Data values from Terraform configuration deployment
-    lines = []
-    print("Paste Terraform Data here (press Enter twice after paste):")
+    ########### Initial questions to determine if SCM/Panorama and if Terraform deployed  ################
+    configName = input("Enter a name for this configuration: ")
+    encryptPass = derive_key(getpass.getpass("Enter password for encryption: "))
     while True:
-        line = input()
-        if not line:
-            break
-        lines.append(line)
-    print("Config received")
-    
-    fwConf = load_terraform_config(lines)
-else:
-    # Get all FW Data values from user input
-    print ("\n\nEnter Firewall Configuration\n\n")
-    fwConf = {}
-    fwConf['mgmtUrl'] = input("Firewall Management Public URL:").strip()
-    fwConf['mgmtUser'] = input("Firewall User:").strip()
-    fwConf['mgmtPass'] = getpass.getpass("Firewall Password:").strip()
-    fwConf['untrustURL'] = input("Firewall Untrust Public URL:").strip()
-    fwConf['untrustAddr'] = input("Firewall Untrust Interface IP:").strip()
-    fwConf['untrustSubnet'] = str(ipaddress.IPv4Interface(fwConf['untrustAddr']).network)
-    fwConf['untrustInt'] = input("Untrust Interface (default: ethernet1/1):").strip()
-    if fwConf['untrustInt'] == '': fwConf['untrustInt'] = "ethernet1/1"
-    fwConf['untrustDFGW'] = str(ipaddress.IPv4Network(ipaddress.IPv4Interface(fwConf['untrustAddr']).network)[1])
-    fwConf['trustAddr'] = input("Firewall Trust Interface IP:").strip()
-    fwConf['trustSubnet'] = str(ipaddress.IPv4Interface(fwConf['trustAddr']).network)
-    fwConf['trustInt'] = input("Trust Interface (default: ethernet1/2):").strip()
-    if fwConf['trustInt'] == '': fwConf['trustInt'] = "ethernet1/2"
-    fwConf['tunnelInt'] = input("Tunnel Interface (default: tunnel.1):").strip()
-    if fwConf['tunnelInt'] == '': fwConf['tunnelInt'] = "tunnel.1"
-    fwConf['tunnelAddr'] = input("Optional - IP address for tunnel interface:").strip()
-    if scmOrPan == 'pan':
-        fwConf['panoramaAddr'] = input("Panorama IP Address (default: " + str(ipaddress.IPv4Network(fwConf['trustSubnet'])[5]) + "):").strip()
-    if fwConf['panoramaAddr'] == '': fwConf['panoramaAddr'] = str(ipaddress.IPv4Network(fwConf['trustSubnet'])[5])
+        try:
+            scmOrPan = input("Is this Panorama Managed PA? (y/n):")
+            if scmOrPan in ['N','n','Y','y']:
+                if scmOrPan in ['N','n']:
+                    scmOrPan = 'scm'
+                else:
+                    scmOrPan = 'pan'
+                break
+            else:
+                raise ValueError("Invalid value Please enter a valid option")
+        except ValueError:
+            print("Invalid value Please enter a valid option")
 
-# After getting all values save the config
-if save_config_to_file(configName,encryptPass,fwConf,paConfig):
-    print ("Config values Saved to file, run 'python configure_firewally.py' to configure firewall")
-else:
-    print ("Unable to save configuration to file, please try again")
+    while True:
+        try:
+            spovOrPA = input("Do you have a SPOV Questionnaire for Configuration? (y/n):")
+            if spovOrPA in ['N','n','Y','y']:
+                if spovOrPA in ['N','n']:
+                    spovOrPA = 'pa'
+                else:
+                    spovOrPA = 'spov'
+                break
+            else:
+                raise ValueError("Invalid value Please enter a valid option")
+        except ValueError:
+            print("Invalid value Please enter a valid option")
+
+    while True:
+        try:
+            terraformDeploy = input("Is the lab deployed by Terraform? (y/n):")
+            if terraformDeploy in ['N','n','Y','y']:
+                break
+            else:
+                raise ValueError("Invalid value Please enter a valid option")
+        except ValueError:
+            print("Invalid value Please enter a valid option")
+
+    ########### Get SCM information if SCM managed ###########
+    if scmOrPan == 'scm':
+        scmCreds = {}
+        scmCreds['paTSGID'] = input("Prisma Access Tenant TSG:").strip()
+        scmCreds['paApiUser'] = input("Prisma Access Tenant Client ID:").strip()
+        scmCreds['paApiSecret'] = getpass.getpass("Prisma Access Tenant Client Secret:").strip()
+
+        # Authenticate and get token
+        accessToken = prisma_access_auth(scmCreds['paTSGID'],scmCreds['paApiUser'], scmCreds['paApiSecret'])
+        if accessToken:
+            print ("Loading Configuration from Prisma Access")
+        else:
+            print ("Error Authenticating to SCM, check credentials and TSG and try again")
+            sys.exit()
+
+        # Check for SPOV config or do we load from SCM
+        if spovOrPA == 'spov':
+            # Load the SPOV Questionnaire for PA Config
+            spovFile = input("Input full path to SPOV Questionnaire JSON File:").strip()
+            paConfig = load_spov_questionnaire(spovFile)
+        else:
+            # Get all available information from Prisma Access
+            paConfig = get_pa_config(accessToken)
+        
+        # Save TSG/Credentials to paConfig var
+        paConfig.update(scmCreds)
+
+        # Once SCM config or SPOV file have been loaded, confirm details and save to file
+        if paConfig and len(paConfig) > 3:
+            paConfig['paManagedBy'] = scmOrPan
+            print ("PA configuration Loaded successfully, please review the following for accuracy")
+            for key, value in paConfig.items():
+                print(f"{key}: {value}")
+            while True:
+                try:
+                    paConfigValid = input("PA Configuration Above is Accurate? (y/n):")
+                    if paConfigValid in ['Y','y']:
+                        break
+                    elif paConfigValid in ['N','n']:
+                        print ("Configuration not accurate, please restart the script")
+                        sys.exit()
+                    else:
+                        raise ValueError
+                except ValueError:
+                    print("Invalid value Please enter a valid option")
+        else:
+            print ("Error loading configuration from SCM, check credentials and TSG and try again")
+            sys.exit()
+    else:
+        ## If it's panorama managed, confirm if panorama is already configured or should we get configuration from spov
+        # @todo - ask for panorama mgmt url and credentials
+
+        # Check on where we're loading the configuration from, SPOV questionnaire or live Panorama
+        if spovOrPA == 'spov':
+            # Load the SPOV Questionnaire for PA Config
+            spovFile = input("Input full path to SPOV Questionnaire JSON File:").strip()
+            paConfig = load_spov_questionnaire(spovFile)
+        else:
+            panConf = {'panMgmtUrl':'','panUser':'','panPass':''}
+            # Panorama is already configured? So must not be deployed by terraform
+            # @todo - create new def to login to panorama (api/cli?) and get PA Config
+
+    ########### Get Firewall information ###########
+    if terraformDeploy in ['Y','y']:
+        # Get all FW Data values from Terraform configuration deployment
+        lines = []
+        print("Paste Terraform Data here (press Enter twice after paste):")
+        while True:
+            line = input()
+            if not line:
+                break
+            lines.append(line)
+        print("Config received")
+        
+        fwConf = load_terraform_config(lines)
+    else:
+        # Get all FW Data values from user input
+        print ("\n\nEnter Firewall Configuration\n\n")
+        fwConf = {}
+        fwConf['mgmtUrl'] = input("Firewall Management Public URL:").strip()
+        fwConf['mgmtUser'] = input("Firewall User:").strip()
+        fwConf['mgmtPass'] = getpass.getpass("Firewall Password:").strip()
+        fwConf['untrustURL'] = input("Firewall Untrust Public URL:").strip()
+        fwConf['untrustAddr'] = input("Firewall Untrust Interface IP:").strip()
+        fwConf['untrustSubnet'] = str(ipaddress.IPv4Interface(fwConf['untrustAddr']).network)
+        fwConf['untrustInt'] = input("Untrust Interface (default: ethernet1/1):").strip()
+        if fwConf['untrustInt'] == '': fwConf['untrustInt'] = "ethernet1/1"
+        fwConf['untrustDFGW'] = str(ipaddress.IPv4Network(ipaddress.IPv4Interface(fwConf['untrustAddr']).network)[1])
+        fwConf['trustAddr'] = input("Firewall Trust Interface IP:").strip()
+        fwConf['trustSubnet'] = str(ipaddress.IPv4Interface(fwConf['trustAddr']).network)
+        fwConf['trustInt'] = input("Trust Interface (default: ethernet1/2):").strip()
+        if fwConf['trustInt'] == '': fwConf['trustInt'] = "ethernet1/2"
+        fwConf['tunnelInt'] = input("Tunnel Interface (default: tunnel.1):").strip()
+        if fwConf['tunnelInt'] == '': fwConf['tunnelInt'] = "tunnel.1"
+        fwConf['tunnelAddr'] = input("Optional - IP address for tunnel interface:").strip()
+        if scmOrPan == 'pan':
+            fwConf['panoramaAddr'] = input("Panorama IP Address (default: " + str(ipaddress.IPv4Network(fwConf['trustSubnet'])[5]) + "):").strip()
+        if fwConf['panoramaAddr'] == '': fwConf['panoramaAddr'] = str(ipaddress.IPv4Network(fwConf['trustSubnet'])[5])
+
+    # After getting all values save the config
+    if save_config_to_file(configName,encryptPass,fwConf,paConfig):
+        print ("Config values Saved to file, run 'python configure_firewally.py' to configure firewall")
+    else:
+        print ("Unable to save configuration to file, please try again")
