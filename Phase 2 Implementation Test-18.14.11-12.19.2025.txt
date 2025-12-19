@@ -1,0 +1,351 @@
+
+============================================================
+Phase 2 Implementation Tests
+============================================================
+
+Output will be saved to: Phase 2 Implementation Test-18.14.11-12.19.2025.txt
+Error log will be saved to: /home/lindsay/Code/pa_config_lab/api_errors.log
+
+
+============================================================
+Prisma Access Credentials
+============================================================
+Enter credentials to test against a real tenant.
+Press Enter to skip and run structure tests only.
+
+Note: For testing, use tenant tsg: 1570970024
+      Use 'Mobile Users' folder for security policy testing.
+
+Test against real tenant? (y/n): Enter TSG ID: Enter API Client ID: 
+Credentials provided. Testing against real tenant...
+
+Initializing API client...
+✓ API client initialized successfully
+
+============================================================
+Test 1: Folder Capture
+============================================================
+✓ Folder capture module structure correct
+
+  Testing against real tenant...
+  ✓ Discovered 13 folders
+    - ngfw-shared (default: False)
+    - Mobile Users (default: False)
+    - Mobile Users Explicit Proxy (default: False)
+    - Mobile Users Container (default: False)
+    - Colo Connect (default: False)
+    - Remote Networks (default: False)
+    - Service Connections (default: False)
+    - Prisma Access (default: False)
+    - All (default: False)
+    - Mobile User Container (default: False)
+    - Access Agent (default: False)
+    - GlobalProtect (default: False)
+    - Explicit Proxy (default: False)
+
+  Selected test folder: Mobile Users
+    (This folder will be used for subsequent tests)
+  ✓ Built folder hierarchy (13 folders)
+  ✓ Listed 13 non-default folders for capture
+
+============================================================
+Test 2: Snippet Capture
+============================================================
+✓ Snippet capture module structure correct
+
+  Testing against real tenant...
+  ✓ Discovered 27 snippets
+
+  Snippet discovery validation:
+    ✓ Successfully discovered 27 snippet(s)
+
+  Discovered snippets:
+    - predefined-snippet (type: Unknown)
+    - default (type: predefined)
+    - optional-default (type: predefined)
+    - office365 (type: predefined)
+    - proxy (type: predefined)
+    ... and 22 more
+
+============================================================
+Test 3: Rule Capture
+============================================================
+✓ Rule capture module structure correct
+
+  Testing against real tenant...
+  Testing with folder: Mobile Users
+  ✓ Captured 22 rules from Mobile Users
+
+  Rule capture validation:
+    ✓ Successfully captured 22 rule(s)
+
+  Example rule details:
+    Name: Default Category Block
+    Action: allow
+    Position: pre
+    Source: ['any']
+    Destination: []
+
+============================================================
+Test 4: Object Capture
+============================================================
+✓ Object capture module structure correct
+
+  Testing against real tenant...
+  Testing with folder: Mobile Users
+  ✓ Captured 5 address objects
+  ✓ Captured 1 address groups
+Capturing objects from folder: Mobile Users
+  Captured 211 objects
+    address_objects: 5
+    address_groups: 1
+    service_objects: 5
+    applications: 200
+  ✓ Captured 211 total objects
+
+  Object capture breakdown:
+    address_objects: 5
+    address_groups: 1
+    service_objects: 5
+    service_groups: 0
+    applications: 200
+    application_groups: 0
+    application_filters: 0
+    url_filtering_categories: 0
+    external_dynamic_lists: 0
+    fqdn_objects: 0
+
+  Example address_objects object:
+    Name: Palo Alto Networks Sinkhole
+    Type: ip_netmask
+    Description: Palo Alto Networks sinkhole
+
+============================================================
+Test 5: Profile Capture
+============================================================
+✓ Profile capture module structure correct
+
+  Testing against real tenant...
+  Testing with folder: Mobile Users
+  ✓ Captured 5 authentication profiles
+
+  Example authentication profile:
+    Name: CIE-Okta
+    Type: 
+Capturing profiles from folder: Mobile Users
+Capturing anti_spyware profiles...
+  Captured 2 anti_spyware profiles
+Capturing dns_security profiles...
+  Captured 3 dns_security profiles
+Capturing file_blocking profiles...
+  Captured 1 file_blocking profiles
+Capturing http_header profiles...
+  Captured 1 http_header profiles
+Capturing profile_groups profiles...
+  Captured 6 profile_groups profiles
+Capturing url_access profiles...
+  Captured 5 url_access profiles
+Capturing vulnerability_protection profiles...
+  Captured 4 vulnerability_protection profiles
+Capturing wildfire_anti_virus profiles...
+  Captured 2 wildfire_anti_virus profiles
+  Captured 32 profiles
+    Authentication: 5
+    Security: 24
+    Decryption: 3
+
+  Profile capture validation:
+    ✓ Authentication profiles: 5
+    ✓ Security profiles: 24
+    ✓ Decryption profiles: 3
+    ✓ Total profiles: 32
+
+  Security profile breakdown:
+    anti_spyware: 2
+    dns_security: 3
+    file_blocking: 1
+    http_header: 1
+    profile_groups: 6
+    url_access: 5
+    vulnerability_protection: 4
+    wildfire_anti_virus: 2
+
+============================================================
+Test 6: Pull Orchestrator
+============================================================
+✓ Pull orchestrator module structure correct
+
+  Testing against real tenant...
+  Testing pull with folder: Mobile Users
+    [1/3] Capturing rules from Mobile Users
+    [2/3] Capturing objects from Mobile Users
+Capturing objects from folder: Mobile Users
+  Captured 211 objects
+    address_objects: 5
+    address_groups: 1
+    service_objects: 5
+    applications: 200
+    [3/3] Capturing profiles from Mobile Users
+Capturing profiles from folder: Mobile Users
+Capturing anti_spyware profiles...
+  Captured 2 anti_spyware profiles
+Capturing dns_security profiles...
+  Captured 3 dns_security profiles
+Capturing file_blocking profiles...
+  Captured 1 file_blocking profiles
+Capturing http_header profiles...
+  Captured 1 http_header profiles
+Capturing profile_groups profiles...
+  Captured 6 profile_groups profiles
+Capturing url_access profiles...
+  Captured 5 url_access profiles
+Capturing vulnerability_protection profiles...
+  Captured 4 vulnerability_protection profiles
+Capturing wildfire_anti_virus profiles...
+  Captured 2 wildfire_anti_virus profiles
+  Captured 32 profiles
+    Authentication: 5
+    Security: 24
+    Decryption: 3
+    [4/4] Capturing snippets
+Capturing snippet: predefined-snippet (ID: 71bcabcb-ccb2-479a-8ec0-c02276295de7)
+  ⚠ WARNING: Could not retrieve snippet details for ID 71bcabcb-ccb2-479a-8ec0-c02276295de7
+Capturing snippet: default (ID: 4fcb7572-2053-427e-8d4e-ce6a5b9b0f66)
+  ⚠ WARNING: Could not retrieve snippet details for ID 4fcb7572-2053-427e-8d4e-ce6a5b9b0f66
+Capturing snippet: optional-default (ID: d85c1ed9-7d31-4892-ba16-0475cef5571c)
+  ⚠ WARNING: Could not retrieve snippet details for ID d85c1ed9-7d31-4892-ba16-0475cef5571c
+Capturing snippet: office365 (ID: 277d2f13-5282-411b-a98c-afd414e4bd22)
+  ⚠ WARNING: Could not retrieve snippet details for ID 277d2f13-5282-411b-a98c-afd414e4bd22
+Capturing snippet: proxy (ID: 09fa1d33-3102-4fc7-8c56-92523ba29a80)
+  ⚠ WARNING: Could not retrieve snippet details for ID 09fa1d33-3102-4fc7-8c56-92523ba29a80
+Capturing snippet: rbi (ID: 92bcb468-2b21-4e10-a8b5-8ed66f66e9d1)
+  ⚠ WARNING: Could not retrieve snippet details for ID 92bcb468-2b21-4e10-a8b5-8ed66f66e9d1
+Capturing snippet: saas-tenant-restrictions (ID: a4a36654-cf29-4a8f-aac9-fe85780d8e53)
+  ⚠ WARNING: Could not retrieve snippet details for ID a4a36654-cf29-4a8f-aac9-fe85780d8e53
+Capturing snippet: Auto-VPN-Default-Snippet (ID: eb47bfb9-5a83-4220-af06-50e92112f73b)
+  ⚠ WARNING: Could not retrieve snippet details for ID eb47bfb9-5a83-4220-af06-50e92112f73b
+Capturing snippet: ZTP-Default-Snippet (ID: 4c449730-a6f4-4a91-95b7-853c2d5972aa)
+  ⚠ WARNING: Could not retrieve snippet details for ID 4c449730-a6f4-4a91-95b7-853c2d5972aa
+Capturing snippet: Web-Security-Default (ID: 26bb3fcb-103f-445e-948f-8064c71357f3)
+  ⚠ WARNING: Could not retrieve snippet details for ID 26bb3fcb-103f-445e-948f-8064c71357f3
+Capturing snippet: hip-default (ID: 3fc115ab-cdf7-4a54-8073-dc6de42318d2)
+  ⚠ WARNING: Could not retrieve snippet details for ID 3fc115ab-cdf7-4a54-8073-dc6de42318d2
+Capturing snippet: Gen-AI-Best-Practice (ID: a19e4841-d781-4df3-9118-5405c262bd6c)
+  ⚠ WARNING: Could not retrieve snippet details for ID a19e4841-d781-4df3-9118-5405c262bd6c
+Capturing snippet: app-tagging (ID: 3f177dbd-f6e5-43ce-935a-4d5abab7eb3c)
+  ⚠ WARNING: Could not retrieve snippet details for ID 3f177dbd-f6e5-43ce-935a-4d5abab7eb3c
+Capturing snippet: Basic Internet Access (ID: 1350c7a1-b3ec-46c8-944c-65920a0509d3)
+  ⚠ WARNING: Could not retrieve snippet details for ID 1350c7a1-b3ec-46c8-944c-65920a0509d3
+Capturing snippet: dlp-predefined-snippet (ID: 2b97e183-2013-4b4a-8fea-dba61771eec5)
+  ⚠ WARNING: Could not retrieve snippet details for ID 2b97e183-2013-4b4a-8fea-dba61771eec5
+Capturing snippet: SAAS-Inline-Pol-Recommendation (ID: 7e0096a6-f34e-49bb-b23f-e89fdf92517e)
+  ⚠ WARNING: Could not retrieve snippet details for ID 7e0096a6-f34e-49bb-b23f-e89fdf92517e
+Capturing snippet: Internet-Access-Best-Practice (ID: b34c71da-b184-44eb-bb49-e0ef48456fc5)
+  ⚠ WARNING: Could not retrieve snippet details for ID b34c71da-b184-44eb-bb49-e0ef48456fc5
+Capturing snippet: DNS-Best-Practice (ID: 78154d92-3f27-4ea3-8626-b454f69ca9e3)
+  ⚠ WARNING: Could not retrieve snippet details for ID 78154d92-3f27-4ea3-8626-b454f69ca9e3
+Capturing snippet: AIRS-SLR-AWS-Default (ID: 8d6738c9-79d5-4027-b17b-5d68130e9fc4)
+  ⚠ WARNING: Could not retrieve snippet details for ID 8d6738c9-79d5-4027-b17b-5d68130e9fc4
+Capturing snippet: AIRS-Best-Practice (ID: e8246da3-b8b4-4952-99c3-4c610d4fb43f)
+  ⚠ WARNING: Could not retrieve snippet details for ID e8246da3-b8b4-4952-99c3-4c610d4fb43f
+Capturing snippet: GCP-VM-Default (ID: 9f47b682-bae3-4025-9a89-2bcc0da0c578)
+  ⚠ WARNING: Could not retrieve snippet details for ID 9f47b682-bae3-4025-9a89-2bcc0da0c578
+Capturing snippet: Azure-VM-Default (ID: f9bddd98-c13d-4795-a70a-e3e89a8be8af)
+  ⚠ WARNING: Could not retrieve snippet details for ID f9bddd98-c13d-4795-a70a-e3e89a8be8af
+Capturing snippet: AWS-VM-Single-Arm-Default (ID: 759a8fb8-54af-41b2-bcb6-2921eaa80915)
+  ⚠ WARNING: Could not retrieve snippet details for ID 759a8fb8-54af-41b2-bcb6-2921eaa80915
+Capturing snippet: AWS-VM-Dual-Arm-Default (ID: 5df1b0dc-c3be-4dd8-9867-670f55f48927)
+  ⚠ WARNING: Could not retrieve snippet details for ID 5df1b0dc-c3be-4dd8-9867-670f55f48927
+Capturing snippet: AWS-VM-MCN-Default (ID: 0ba32db4-5ace-4f5d-8b14-cadf8c047378)
+  ⚠ WARNING: Could not retrieve snippet details for ID 0ba32db4-5ace-4f5d-8b14-cadf8c047378
+Capturing snippet: Azure-VM-MCN-Default (ID: b4503649-9882-48b4-b42f-a8398481416a)
+  ⚠ WARNING: Could not retrieve snippet details for ID b4503649-9882-48b4-b42f-a8398481416a
+Capturing snippet: Shared Internet (ID: 2af71204-1c51-498f-9533-cd83213347cc)
+  ⚠ WARNING: Could not retrieve snippet details for ID 2af71204-1c51-498f-9533-cd83213347cc
+    ✓ Captured 0 snippets
+
+  Pull configuration validation:
+    ✓ Folder: Mobile Users
+    ✓ Security rules: 22
+    ✓ Objects: 211
+    ✓ Profiles: 32 (Auth: 5, Security: 24, Decryption: 3)
+    ✓ Snippets: 0
+
+  ✗ FAILED: Snippet count mismatch
+    Expected: 27 (from Test 2)
+    Actual: 0
+    This indicates snippets were not captured correctly by the orchestrator
+
+  ✗ FAILED: Configuration counts do not match expected values
+    The orchestrator may not be capturing data correctly
+
+⚠ Test test_pull_orchestrator returned False
+
+============================================================
+Test 7: Config Pull
+============================================================
+✓ Config pull module structure correct
+
+  Testing against real tenant...
+  Testing pull_folders_only...
+  Pulling 1 folder(s)...
+  Using folder: Mobile Users
+[1/1] Pulling folder Mobile Users
+[1/3] Capturing rules from Mobile Users
+
+  Config pull validation:
+    ✓ Successfully pulled 1 folder configuration(s)
+
+  Folder configuration details:
+    Folder: Mobile Users
+    Security rules: 22
+    Objects: 0
+    Profiles: 0 (Auth: 0, Security: 0, Decryption: 0)
+
+============================================================
+Test 8: Module Integration
+============================================================
+✓ All modules integrate correctly
+
+  Testing orchestrator integration...
+
+  Module integration validation:
+    ✓ FolderCapture initialized
+    ✓ RuleCapture initialized
+    ✓ ObjectCapture initialized
+    ✓ ProfileCapture initialized
+    ✓ SnippetCapture initialized
+
+  ✓ All capture modules initialized in orchestrator
+
+============================================================
+Test Summary
+============================================================
+Passed: 7/8
+
+Note: Tests were run against a real tenant
+
+✗ 1 test(s) failed
+
+Full test output saved to: Phase 2 Implementation Test-18.14.11-12.19.2025.txt
+
+📋 Detailed error log available at: /home/lindsay/Code/pa_config_lab/api_errors.log
+
+============================================================
+Error Log Summary
+============================================================
+====================================================================================================
+API ERROR LOG - Test Run Started
+Test: Phase 2 Implementation Tests
+Timestamp: 2025-12-19 18:14:11
+====================================================================================================
+
+
+====================================================================================================
+Test Run Ended
+Timestamp: 2025-12-19 18:15:28
+Duration: 76.81 seconds
+Summary: Tests: 7/8 passed
+====================================================================================================
+
+

@@ -1,0 +1,116 @@
+
+============================================================
+Phase 2 Implementation Tests
+============================================================
+
+Output will be saved to: Phase 2 Implementation Test-17.35.57-12.19.2025.txt
+Error log will be saved to: /home/lindsay/Code/pa_config_lab/api_errors.log
+
+
+============================================================
+Prisma Access Credentials
+============================================================
+Enter credentials to test against a real tenant.
+Press Enter to skip and run structure tests only.
+
+Note: For testing, use tenant tsg: 1570970024
+      Use 'Mobile Users' folder for security policy testing.
+
+Test against real tenant? (y/n): Enter TSG ID: Enter API Client ID: 
+Credentials provided. Testing against real tenant...
+
+Initializing API client...
+✓ API client initialized successfully
+
+============================================================
+Test 1: Folder Capture
+============================================================
+✓ Folder capture module structure correct
+
+  Testing against real tenant...
+  ✓ Discovered 13 folders
+    - ngfw-shared (default: False)
+    - Mobile Users (default: False)
+    - Mobile Users Explicit Proxy (default: False)
+    - Mobile Users Container (default: False)
+    - Colo Connect (default: False)
+    - Remote Networks (default: False)
+    - Service Connections (default: False)
+    - Prisma Access (default: False)
+    - All (default: False)
+    - Mobile User Container (default: False)
+    - Access Agent (default: False)
+    - GlobalProtect (default: False)
+    - Explicit Proxy (default: False)
+
+  Selected test folder: Mobile Users
+    (This folder will be used for subsequent tests)
+  ✓ Built folder hierarchy (13 folders)
+  ✓ Listed 13 non-default folders for capture
+
+============================================================
+Test 2: Rule Capture
+============================================================
+✓ Rule capture module structure correct
+
+  Testing against real tenant...
+  Testing with folder: Mobile Users
+  ✓ Captured 22 rules from Mobile Users
+
+  Rule capture validation:
+    ✓ Successfully captured 22 rule(s)
+
+  Example rule details:
+    Name: Default Category Block
+    Action: allow
+    Position: pre
+    Source: ['any']
+    Destination: []
+
+============================================================
+Test 3: Object Capture
+============================================================
+✓ Object capture module structure correct
+
+  Testing against real tenant...
+  Testing with folder: Mobile Users
+  ✓ Captured 5 address objects
+  ✓ Captured 1 address groups
+Capturing objects from folder: Mobile Users
+  Captured 211 objects
+    address_objects: 5
+    address_groups: 1
+    service_objects: 5
+    applications: 200
+  ✓ Captured 211 total objects
+
+  Object capture breakdown:
+    address_objects: 5
+    address_groups: 1
+    service_objects: 5
+    service_groups: 0
+    applications: 200
+    application_groups: 0
+    application_filters: 0
+    url_filtering_categories: 0
+    external_dynamic_lists: 0
+    fqdn_objects: 0
+
+  Example address_objects object:
+    Name: Palo Alto Networks Sinkhole
+    Type: ip_netmask
+    Description: Palo Alto Networks sinkhole
+
+============================================================
+Test Summary
+============================================================
+Passed: 3/3
+
+Note: Tests were run against a real tenant
+
+✓ All tests passed!
+
+Full test output saved to: Phase 2 Implementation Test-17.35.57-12.19.2025.txt
+
+⚠ Note: Some errors were logged to: /home/lindsay/Code/pa_config_lab/api_errors.log
+  (Errors may have been handled gracefully)

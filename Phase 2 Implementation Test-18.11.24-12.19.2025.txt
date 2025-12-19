@@ -1,0 +1,1252 @@
+
+============================================================
+Phase 2 Implementation Tests
+============================================================
+
+Output will be saved to: Phase 2 Implementation Test-18.11.24-12.19.2025.txt
+Error log will be saved to: /home/lindsay/Code/pa_config_lab/api_errors.log
+
+
+============================================================
+Prisma Access Credentials
+============================================================
+Enter credentials to test against a real tenant.
+Press Enter to skip and run structure tests only.
+
+Note: For testing, use tenant tsg: 1570970024
+      Use 'Mobile Users' folder for security policy testing.
+
+Test against real tenant? (y/n): Enter TSG ID: Enter API Client ID: 
+Credentials provided. Testing against real tenant...
+
+Initializing API client...
+✓ API client initialized successfully
+
+============================================================
+Test 1: Folder Capture
+============================================================
+✓ Folder capture module structure correct
+
+  Testing against real tenant...
+  ✓ Discovered 13 folders
+    - ngfw-shared (default: False)
+    - Mobile Users (default: False)
+    - Mobile Users Explicit Proxy (default: False)
+    - Mobile Users Container (default: False)
+    - Colo Connect (default: False)
+    - Remote Networks (default: False)
+    - Service Connections (default: False)
+    - Prisma Access (default: False)
+    - All (default: False)
+    - Mobile User Container (default: False)
+    - Access Agent (default: False)
+    - GlobalProtect (default: False)
+    - Explicit Proxy (default: False)
+
+  Selected test folder: Mobile Users
+    (This folder will be used for subsequent tests)
+  ✓ Built folder hierarchy (13 folders)
+  ✓ Listed 13 non-default folders for capture
+
+============================================================
+Test 2: Snippet Capture
+============================================================
+✓ Snippet capture module structure correct
+
+  Testing against real tenant...
+  ✓ Discovered 27 snippets
+
+  Snippet discovery validation:
+    ✓ Successfully discovered 27 snippet(s)
+
+  Discovered snippets:
+    - predefined-snippet (type: Unknown)
+    - default (type: predefined)
+    - optional-default (type: predefined)
+    - office365 (type: predefined)
+    - proxy (type: predefined)
+    ... and 22 more
+
+============================================================
+Test 3: Rule Capture
+============================================================
+✓ Rule capture module structure correct
+
+  Testing against real tenant...
+  Testing with folder: Mobile Users
+  ✓ Captured 22 rules from Mobile Users
+
+  Rule capture validation:
+    ✓ Successfully captured 22 rule(s)
+
+  Example rule details:
+    Name: Default Category Block
+    Action: allow
+    Position: pre
+    Source: ['any']
+    Destination: []
+
+============================================================
+Test 4: Object Capture
+============================================================
+✓ Object capture module structure correct
+
+  Testing against real tenant...
+  Testing with folder: Mobile Users
+  ✓ Captured 5 address objects
+  ✓ Captured 1 address groups
+Capturing objects from folder: Mobile Users
+  Captured 211 objects
+    address_objects: 5
+    address_groups: 1
+    service_objects: 5
+    applications: 200
+  ✓ Captured 211 total objects
+
+  Object capture breakdown:
+    address_objects: 5
+    address_groups: 1
+    service_objects: 5
+    service_groups: 0
+    applications: 200
+    application_groups: 0
+    application_filters: 0
+    url_filtering_categories: 0
+    external_dynamic_lists: 0
+    fqdn_objects: 0
+
+  Example address_objects object:
+    Name: Palo Alto Networks Sinkhole
+    Type: ip_netmask
+    Description: Palo Alto Networks sinkhole
+
+============================================================
+Test 5: Profile Capture
+============================================================
+✓ Profile capture module structure correct
+
+  Testing against real tenant...
+  Testing with folder: Mobile Users
+  ✓ Captured 5 authentication profiles
+
+  Example authentication profile:
+    Name: CIE-Okta
+    Type: 
+Capturing profiles from folder: Mobile Users
+Capturing anti_spyware profiles...
+  Captured 2 anti_spyware profiles
+Capturing dns_security profiles...
+  Captured 3 dns_security profiles
+Capturing file_blocking profiles...
+  Captured 1 file_blocking profiles
+Capturing http_header profiles...
+  Captured 1 http_header profiles
+Capturing profile_groups profiles...
+  Captured 6 profile_groups profiles
+Capturing url_access profiles...
+  Captured 5 url_access profiles
+Capturing vulnerability_protection profiles...
+  Captured 4 vulnerability_protection profiles
+Capturing wildfire_anti_virus profiles...
+  Captured 2 wildfire_anti_virus profiles
+  Captured 32 profiles
+    Authentication: 5
+    Security: 24
+    Decryption: 3
+
+  Profile capture validation:
+    ✓ Authentication profiles: 5
+    ✓ Security profiles: 24
+    ✓ Decryption profiles: 3
+    ✓ Total profiles: 32
+
+  Security profile breakdown:
+    anti_spyware: 2
+    dns_security: 3
+    file_blocking: 1
+    http_header: 1
+    profile_groups: 6
+    url_access: 5
+    vulnerability_protection: 4
+    wildfire_anti_virus: 2
+
+============================================================
+Test 6: Pull Orchestrator
+============================================================
+✓ Pull orchestrator module structure correct
+
+  Testing against real tenant...
+  Testing pull with folder: Mobile Users
+    [1/3] Capturing rules from Mobile Users
+    [2/3] Capturing objects from Mobile Users
+Capturing objects from folder: Mobile Users
+  Captured 211 objects
+    address_objects: 5
+    address_groups: 1
+    service_objects: 5
+    applications: 200
+    [3/3] Capturing profiles from Mobile Users
+Capturing profiles from folder: Mobile Users
+Capturing anti_spyware profiles...
+  Captured 2 anti_spyware profiles
+Capturing dns_security profiles...
+  Captured 3 dns_security profiles
+Capturing file_blocking profiles...
+  Captured 1 file_blocking profiles
+Capturing http_header profiles...
+  Captured 1 http_header profiles
+Capturing profile_groups profiles...
+  Captured 6 profile_groups profiles
+Capturing url_access profiles...
+  Captured 5 url_access profiles
+Capturing vulnerability_protection profiles...
+  Captured 4 vulnerability_protection profiles
+Capturing wildfire_anti_virus profiles...
+  Captured 2 wildfire_anti_virus profiles
+  Captured 32 profiles
+    Authentication: 5
+    Security: 24
+    Decryption: 3
+    [4/4] Capturing snippets
+Capturing snippet: predefined-snippet
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/predefined-snippet
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/predefined-snippet
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "9824b37c-82c9-4bc0-ae8b-bd8b0dc30f0c"
+}
+================================================================================
+
+Error getting snippet details for predefined-snippet: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/predefined-snippet
+Capturing snippet: default
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/default
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/default
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "69ac5da2-5e9f-45ad-b00c-54f70cc5767e"
+}
+================================================================================
+
+Error getting snippet details for default: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/default
+Capturing snippet: optional-default
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/optional-default
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/optional-default
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "86b628a4-f971-4bd9-b948-f14dfc5e3413"
+}
+================================================================================
+
+Error getting snippet details for optional-default: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/optional-default
+Capturing snippet: office365
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/office365
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/office365
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "3595c7d2-a9f9-4eb8-a740-28296c818e79"
+}
+================================================================================
+
+Error getting snippet details for office365: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/office365
+Capturing snippet: proxy
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/proxy
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/proxy
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "1fe71b75-39a8-4643-9fb0-11020fdd8017"
+}
+================================================================================
+
+Error getting snippet details for proxy: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/proxy
+Capturing snippet: rbi
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/rbi
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/rbi
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "46c3c31a-4286-4d98-9496-1d024abcf55a"
+}
+================================================================================
+
+Error getting snippet details for rbi: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/rbi
+Capturing snippet: saas-tenant-restrictions
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/saas-tenant-restrictions
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/saas-tenant-restrictions
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "75570b09-6267-4cd2-92ea-8950fb985ec6"
+}
+================================================================================
+
+Error getting snippet details for saas-tenant-restrictions: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/saas-tenant-restrictions
+Capturing snippet: Auto-VPN-Default-Snippet
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Auto-VPN-Default-Snippet
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Auto-VPN-Default-Snippet
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "eaba0aff-8832-41a5-ba0d-01b7acdec424"
+}
+================================================================================
+
+Error getting snippet details for Auto-VPN-Default-Snippet: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Auto-VPN-Default-Snippet
+Capturing snippet: ZTP-Default-Snippet
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/ZTP-Default-Snippet
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/ZTP-Default-Snippet
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "89ffa94b-70cb-46c9-b002-af0047ec0254"
+}
+================================================================================
+
+Error getting snippet details for ZTP-Default-Snippet: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/ZTP-Default-Snippet
+Capturing snippet: Web-Security-Default
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Web-Security-Default
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Web-Security-Default
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "db2087f2-a0a2-4881-9f9c-63ca17f38a01"
+}
+================================================================================
+
+Error getting snippet details for Web-Security-Default: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Web-Security-Default
+Capturing snippet: hip-default
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/hip-default
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/hip-default
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "2cd8a1e9-596a-4119-bdbc-ff45eeda5870"
+}
+================================================================================
+
+Error getting snippet details for hip-default: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/hip-default
+Capturing snippet: Gen-AI-Best-Practice
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Gen-AI-Best-Practice
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Gen-AI-Best-Practice
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "207c206b-0248-49da-8890-865f1a955ab7"
+}
+================================================================================
+
+Error getting snippet details for Gen-AI-Best-Practice: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Gen-AI-Best-Practice
+Capturing snippet: app-tagging
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/app-tagging
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/app-tagging
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "651d23de-fdca-4871-8c21-93224a1922a7"
+}
+================================================================================
+
+Error getting snippet details for app-tagging: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/app-tagging
+Capturing snippet: Basic Internet Access
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Basic Internet Access
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Basic%20Internet%20Access
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "34f64e6c-9a07-4b5f-a243-5e8c4e92174a"
+}
+================================================================================
+
+Error getting snippet details for Basic Internet Access: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Basic%20Internet%20Access
+Capturing snippet: dlp-predefined-snippet
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/dlp-predefined-snippet
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/dlp-predefined-snippet
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "1743d973-fc70-4df5-ad63-a6f7eccae99a"
+}
+================================================================================
+
+Error getting snippet details for dlp-predefined-snippet: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/dlp-predefined-snippet
+Capturing snippet: SAAS-Inline-Pol-Recommendation
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/SAAS-Inline-Pol-Recommendation
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/SAAS-Inline-Pol-Recommendation
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "ab4f1934-0e75-4896-9311-c8ea66e2335e"
+}
+================================================================================
+
+Error getting snippet details for SAAS-Inline-Pol-Recommendation: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/SAAS-Inline-Pol-Recommendation
+Capturing snippet: Internet-Access-Best-Practice
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Internet-Access-Best-Practice
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Internet-Access-Best-Practice
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "da88db6c-175d-47fc-8afc-bcd8d66b7a80"
+}
+================================================================================
+
+Error getting snippet details for Internet-Access-Best-Practice: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Internet-Access-Best-Practice
+Capturing snippet: DNS-Best-Practice
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/DNS-Best-Practice
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/DNS-Best-Practice
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "f578afe4-dbad-4b7c-8207-9f2b91c93d21"
+}
+================================================================================
+
+Error getting snippet details for DNS-Best-Practice: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/DNS-Best-Practice
+Capturing snippet: AIRS-SLR-AWS-Default
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/AIRS-SLR-AWS-Default
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/AIRS-SLR-AWS-Default
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "f1508578-7110-4ced-99a0-89e1bc8dea96"
+}
+================================================================================
+
+Error getting snippet details for AIRS-SLR-AWS-Default: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/AIRS-SLR-AWS-Default
+Capturing snippet: AIRS-Best-Practice
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/AIRS-Best-Practice
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/AIRS-Best-Practice
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "da7529b5-aeb5-42ab-8406-e076bcbb5f89"
+}
+================================================================================
+
+Error getting snippet details for AIRS-Best-Practice: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/AIRS-Best-Practice
+Capturing snippet: GCP-VM-Default
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/GCP-VM-Default
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/GCP-VM-Default
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "c2731d52-deac-4055-8d28-567456acddce"
+}
+================================================================================
+
+Error getting snippet details for GCP-VM-Default: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/GCP-VM-Default
+Capturing snippet: Azure-VM-Default
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Azure-VM-Default
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Azure-VM-Default
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "586f11f9-43ae-4413-b5c3-5e86f70198ee"
+}
+================================================================================
+
+Error getting snippet details for Azure-VM-Default: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Azure-VM-Default
+Capturing snippet: AWS-VM-Single-Arm-Default
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/AWS-VM-Single-Arm-Default
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/AWS-VM-Single-Arm-Default
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "787a2bf3-6e00-48e7-8863-7ef9f1dfbe07"
+}
+================================================================================
+
+Error getting snippet details for AWS-VM-Single-Arm-Default: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/AWS-VM-Single-Arm-Default
+Capturing snippet: AWS-VM-Dual-Arm-Default
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/AWS-VM-Dual-Arm-Default
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/AWS-VM-Dual-Arm-Default
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "010f17c9-ec5d-434c-8d81-5f1ac9921c50"
+}
+================================================================================
+
+Error getting snippet details for AWS-VM-Dual-Arm-Default: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/AWS-VM-Dual-Arm-Default
+Capturing snippet: AWS-VM-MCN-Default
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/AWS-VM-MCN-Default
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/AWS-VM-MCN-Default
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "9e2ff59f-afd8-4575-8be9-9225f1002804"
+}
+================================================================================
+
+Error getting snippet details for AWS-VM-MCN-Default: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/AWS-VM-MCN-Default
+Capturing snippet: Azure-VM-MCN-Default
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Azure-VM-MCN-Default
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Azure-VM-MCN-Default
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "539982d5-ab74-490b-ae1a-4c061d50ed7f"
+}
+================================================================================
+
+Error getting snippet details for Azure-VM-MCN-Default: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Azure-VM-MCN-Default
+Capturing snippet: Shared Internet
+
+================================================================================
+API ERROR - Request Details:
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Shared Internet
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+--------------------------------------------------------------------------------
+Response Details:
+--------------------------------------------------------------------------------
+Status Code: 404
+Status Text: Not Found
+Final Request URL (after redirects/merging): https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Shared%20Internet
+
+Response Body (JSON):
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "5c577d8f-99d0-4ee6-9ba6-dc93816530da"
+}
+================================================================================
+
+Error getting snippet details for Shared Internet: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Shared%20Internet
+    ✓ Captured 0 snippets
+
+  Pull configuration validation:
+    ✓ Folder: Mobile Users
+    ✓ Security rules: 22
+    ✓ Objects: 211
+    ✓ Profiles: 32 (Auth: 5, Security: 24, Decryption: 3)
+    ✓ Snippets: 0
+
+  ✗ FAILED: Snippet count mismatch
+    Expected: 27 (from Test 2)
+    Actual: 0
+    This indicates snippets were not captured correctly by the orchestrator
+
+  ✗ FAILED: Configuration counts do not match expected values
+    The orchestrator may not be capturing data correctly
+
+⚠ Test test_pull_orchestrator returned False
+
+============================================================
+Test 7: Config Pull
+============================================================
+✓ Config pull module structure correct
+
+  Testing against real tenant...
+  Testing pull_folders_only...
+  Pulling 1 folder(s)...
+  Using folder: Mobile Users
+[1/1] Pulling folder Mobile Users
+[1/3] Capturing rules from Mobile Users
+
+  Config pull validation:
+    ✓ Successfully pulled 1 folder configuration(s)
+
+  Folder configuration details:
+    Folder: Mobile Users
+    Security rules: 22
+    Objects: 0
+    Profiles: 0 (Auth: 0, Security: 0, Decryption: 0)
+
+============================================================
+Test 8: Module Integration
+============================================================
+✓ All modules integrate correctly
+
+  Testing orchestrator integration...
+
+  Module integration validation:
+    ✓ FolderCapture initialized
+    ✓ RuleCapture initialized
+    ✓ ObjectCapture initialized
+    ✓ ProfileCapture initialized
+    ✓ SnippetCapture initialized
+
+  ✓ All capture modules initialized in orchestrator
+
+============================================================
+Test Summary
+============================================================
+Passed: 7/8
+
+Note: Tests were run against a real tenant
+
+✗ 1 test(s) failed
+
+Full test output saved to: Phase 2 Implementation Test-18.11.24-12.19.2025.txt
+
+📋 Detailed error log available at: /home/lindsay/Code/pa_config_lab/api_errors.log
+
+============================================================
+Error Log Summary
+============================================================
+(Showing last 50 lines of error log)
+
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "539982d5-ab74-490b-ae1a-4c061d50ed7f"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-19 18:12:25
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/Shared Internet
+Status Code: 404
+Status Text: Not Found
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...a2fHcVRw0w
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload Resource not present",
+      "details": "Resource not present"
+    }
+  ],
+  "_request_id": "5c577d8f-99d0-4ee6-9ba6-dc93816530da"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+====================================================================================================
+Test Run Ended
+Timestamp: 2025-12-19 18:12:25
+Duration: 61.12 seconds
+Summary: Tests: 7/8 passed
+====================================================================================================
+
+

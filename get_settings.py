@@ -8,11 +8,36 @@ def derive_key(password: str) -> bytes:
     return Fernet(base64.urlsafe_b64encode(hash))
 
 def prisma_access_auth(tsg,user,password):
+    """
+    Authenticate with Prisma Access SCM Authentication Service.
+    
+    Uses basic auth with Client ID as username and Client Secret as password.
+    Sends grant_type and scope as form data in request body.
+    
+    Args:
+        tsg: TSG ID
+        user: Client ID (username for basic auth)
+        password: Client Secret (password for basic auth)
+        
+    Returns:
+        Access token string or None if authentication fails
+    """
     scmUrl = "https://auth.apps.paloaltonetworks.com/oauth2/access_token"
     scope = 'tsg_id:'+tsg
-    paramValues = {'grant_type':'client_credentials','scope':scope}
     
-    response = requests.post(scmUrl, auth=(user, password), params=paramValues)
+    # Form data in request body (not query params)
+    data = {
+        'grant_type': 'client_credentials',
+        'scope': scope
+    }
+    
+    # Headers for form-urlencoded content type
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded'
+    }
+    
+    # Basic auth: Client ID as username, Client Secret as password
+    response = requests.post(scmUrl, auth=(user, password), data=data, headers=headers)
     if response.status_code == 200:
         return response.json()['access_token']
     else:

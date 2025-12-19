@@ -1,0 +1,46 @@
+List all anti-spyware profiles - include in test
+https://api.sase.paloaltonetworks.com/sse/config/v1/anti-spyware-profiles
+List all authentication profiles
+https://api.sase.paloaltonetworks.com/sse/config/v1/authentication-profiles
+List certificate profiles
+https://api.sase.paloaltonetworks.com/sse/config/v1/certificate-profiles
+List DNS security profiles - include in test
+https://api.sase.paloaltonetworks.com/sse/config/v1/dns-security-profiles
+List decryption profiles - include in test
+https://api.sase.paloaltonetworks.com/sse/config/v1/decryption-profiles
+List file blocking profiles - include in test
+https://api.sase.paloaltonetworks.com/sse/config/v1/file-blocking-profiles
+List hip profiles
+https://api.sase.paloaltonetworks.com/sse/config/v1/hip-profiles
+List HTTP header profiles - include in test
+https://api.sase.paloaltonetworks.com/sse/config/v1/http-header-profiles
+List IKE crypto profiles
+https://api.sase.paloaltonetworks.com/sse/config/v1/ike-crypto-profiles
+List IPSec crypto profiles
+https://api.sase.paloaltonetworks.com/sse/config/v1/ipsec-crypto-profiles
+List all Kerberos server profiles
+https://api.sase.paloaltonetworks.com/sse/config/v1/kerberos-server-profiles
+List all LDAP server profiles
+https://api.sase.paloaltonetworks.com/sse/config/v1/ldap-server-profiles
+List profile groups - include in test
+https://api.sase.paloaltonetworks.com/sse/config/v1/profile-groups
+List QoS profiles
+https://api.sase.paloaltonetworks.com/sse/config/v1/qos-profiles
+List all Radius server profiles
+https://api.sase.paloaltonetworks.com/sse/config/v1/radius-server-profiles
+List all SAML server profiles
+https://api.sase.paloaltonetworks.com/sse/config/v1/saml-server-profiles
+List SCEP profiles
+https://api.sase.paloaltonetworks.com/sse/config/v1/scep-profiles
+List all TACACS server profiles
+https://api.sase.paloaltonetworks.com/sse/config/v1/tacacs-server-profiles
+List TLS service profiles
+https://api.sase.paloaltonetworks.com/sse/config/v1/tls-service-profiles
+List URL access profiles - include in test
+https://api.sase.paloaltonetworks.com/sse/config/v1/url-access-profiles
+List vulnerability protection profiles - include in test
+https://api.sase.paloaltonetworks.com/sse/config/v1/vulnerability-protection-profiles
+List WildFire antivirus profiles - include in test
+https://api.sase.paloaltonetworks.com/sse/config/v1/wildfire-anti-virus-profiles
+
+

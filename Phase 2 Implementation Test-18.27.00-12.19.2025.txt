@@ -1,0 +1,248 @@
+
+============================================================
+Phase 2 Implementation Tests
+============================================================
+
+Output will be saved to: Phase 2 Implementation Test-18.27.00-12.19.2025.txt
+Error log will be saved to: /home/lindsay/Code/pa_config_lab/api_errors.log
+
+
+============================================================
+Prisma Access Credentials
+============================================================
+Enter credentials to test against a real tenant.
+Press Enter to skip and run structure tests only.
+
+Note: For testing, use tenant tsg: 1570970024
+      Use 'Mobile Users' folder for security policy testing.
+
+Test against real tenant? (y/n): Enter TSG ID: Enter API Client ID: 
+Credentials provided. Testing against real tenant...
+
+Initializing API client...
+✓ API client initialized successfully
+
+============================================================
+Test 1: Folder Capture
+============================================================
+✓ Folder capture module structure correct
+
+  Testing against real tenant...
+  ✓ Discovered 13 folders
+    - ngfw-shared (default: False)
+    - Mobile Users (default: False)
+    - Mobile Users Explicit Proxy (default: False)
+    - Mobile Users Container (default: False)
+    - Colo Connect (default: False)
+    - Remote Networks (default: False)
+    - Service Connections (default: False)
+    - Prisma Access (default: False)
+    - All (default: False)
+    - Mobile User Container (default: False)
+    - Access Agent (default: False)
+    - GlobalProtect (default: False)
+    - Explicit Proxy (default: False)
+
+  Selected test folder: Mobile Users
+    (This folder will be used for subsequent tests)
+  ✓ Built folder hierarchy (13 folders)
+  ✓ Listed 13 non-default folders for capture
+
+============================================================
+Test 2: Snippet Capture
+============================================================
+✓ Snippet capture module structure correct
+
+  Testing against real tenant...
+  ✓ Discovered 27 snippets
+
+  Snippet discovery validation:
+    ✓ Successfully discovered 27 snippet(s)
+
+  Discovered snippets:
+    - predefined-snippet (type: Unknown)
+    - default (type: predefined)
+    - optional-default (type: predefined)
+    - office365 (type: predefined)
+    - proxy (type: predefined)
+    ... and 22 more
+
+============================================================
+Test 3: Rule Capture
+============================================================
+✓ Rule capture module structure correct
+
+  Testing against real tenant...
+  Testing with folder: Mobile Users
+  ✓ Captured 22 rules from Mobile Users
+
+  Rule capture validation:
+    ✓ Successfully captured 22 rule(s)
+
+  Example rule details:
+    Name: Default Category Block
+    Action: allow
+    Position: pre
+    Source: ['any']
+    Destination: []
+
+============================================================
+Test 4: Object Capture
+============================================================
+✓ Object capture module structure correct
+
+  Testing against real tenant...
+  Testing with folder: Mobile Users
+  ✓ Captured 5 address objects
+  ✓ Captured 1 address groups
+  ✓ Captured 211 objects
+  ✓ Captured 211 total objects
+
+  Object capture breakdown:
+    address_objects: 5
+    address_groups: 1
+    service_objects: 5
+    service_groups: 0
+    applications: 200
+    application_groups: 0
+    application_filters: 0
+    url_filtering_categories: 0
+    external_dynamic_lists: 0
+    fqdn_objects: 0
+
+  Example address_objects object:
+    Name: Palo Alto Networks Sinkhole
+    Type: ip_netmask
+    Description: Palo Alto Networks sinkhole
+
+============================================================
+Test 5: Profile Capture
+============================================================
+✓ Profile capture module structure correct
+
+  Testing against real tenant...
+  Testing with folder: Mobile Users
+  ✓ Captured 5 authentication profiles
+
+  Example authentication profile:
+    Name: CIE-Okta
+    Type: 
+  ✓ Captured 32 profiles
+
+  Profile capture validation:
+    ✓ Authentication profiles: 5
+    ✓ Security profiles: 24
+    ✓ Decryption profiles: 3
+    ✓ Total profiles: 32
+
+  Security profile breakdown:
+    anti_spyware: 2
+    dns_security: 3
+    file_blocking: 1
+    http_header: 1
+    profile_groups: 6
+    url_access: 5
+    vulnerability_protection: 4
+    wildfire_anti_virus: 2
+
+============================================================
+Test 6: Pull Orchestrator
+============================================================
+✓ Pull orchestrator module structure correct
+
+  Testing against real tenant...
+  Testing pull with folder: Mobile Users
+    [1/3] Capturing rules from Mobile Users
+    [2/3] Capturing objects from Mobile Users
+  ✓ Captured 211 objects
+    [3/3] Capturing profiles from Mobile Users
+  ✓ Captured 32 profiles
+    [4/4] Capturing snippets
+    ✓ Captured 27 snippets
+
+  Pull configuration validation:
+    ✓ Folder: Mobile Users
+    ✓ Security rules: 22
+    ✓ Objects: 211
+    ✓ Profiles: 32 (Auth: 5, Security: 24, Decryption: 3)
+    ✓ Snippets: 27
+
+  Pull report:
+    Folders captured: 1
+    Rules captured: 22
+    Objects captured: 211
+    Profiles captured: 32
+    Snippets captured: 27
+
+============================================================
+Test 7: Config Pull
+============================================================
+✓ Config pull module structure correct
+
+  Testing against real tenant...
+  Testing pull_configuration (full pull)...
+  Pulling configuration for folder: Mobile Users
+[0.0%] Pulling folder configurations
+[100.0%] Pulling folder Mobile Users
+[33.3%] Capturing rules from Mobile Users
+[66.7%] Capturing objects from Mobile Users
+  ✓ Captured 211 objects
+[100.0%] Capturing profiles from Mobile Users
+  ✓ Captured 32 profiles
+[33.3%] Pulling snippet configurations
+[66.7%] Pulling infrastructure settings
+[100.0%] Pull complete
+
+============================================================
+Pull Summary
+============================================================
+Folders captured: 1
+Security rules: 22
+Objects: 211
+Profiles: 32
+Snippets: 27
+Errors: 0
+Elapsed time: 5.22 seconds
+============================================================
+
+  Config pull validation:
+    ✓ Successfully pulled configuration for folder: Mobile Users
+
+  Configuration details:
+    Folder: Mobile Users
+    Security rules: 22
+    Objects: 211
+    Profiles: 32 (Auth: 5, Security: 24, Decryption: 3)
+    Snippets: 27
+
+  ✓ All configuration counts match expected values
+
+============================================================
+Test 8: Module Integration
+============================================================
+✓ All modules integrate correctly
+
+  Testing orchestrator integration...
+
+  Module integration validation:
+    ✓ FolderCapture initialized
+    ✓ RuleCapture initialized
+    ✓ ObjectCapture initialized
+    ✓ ProfileCapture initialized
+    ✓ SnippetCapture initialized
+
+  ✓ All capture modules initialized in orchestrator
+
+============================================================
+Test Summary
+============================================================
+Passed: 8/8
+
+Note: Tests were run against a real tenant
+
+✓ All tests passed!
+
+Full test output saved to: Phase 2 Implementation Test-18.27.00-12.19.2025.txt
+
+⚠ Note: Some errors were logged to: /home/lindsay/Code/pa_config_lab/api_errors.log
+  (Errors may have been handled gracefully)

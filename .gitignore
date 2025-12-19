@@ -4,12 +4,30 @@ __pycache__/
 *$py.class
 *.so
 .Python
-
-# Virtual Environment
-venv/
 env/
+venv/
 ENV/
-.venv
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Test outputs
+*.txt
+!requirements.txt
+!readme.txt
+api_errors.log
 
 # IDE
 .vscode/
@@ -22,12 +40,12 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Project specific
-*.bin
-*.old
-*.cfg
+# Config files with sensitive data
+*-fwdata.bin
+*-config.json.encrypted
+*.key
 
-# Created by venv; see https://docs.python.org/3/library/venv.html
-Scripts/
-Lib/
-Include/
+# Temporary files
+*.tmp
+*.bak
+*.log

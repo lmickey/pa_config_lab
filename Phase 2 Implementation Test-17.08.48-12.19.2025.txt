@@ -1,0 +1,168 @@
+
+============================================================
+Phase 2 Implementation Tests
+============================================================
+
+Output will be saved to: Phase 2 Implementation Test-17.08.48-12.19.2025.txt
+
+
+============================================================
+Prisma Access Credentials
+============================================================
+Enter credentials to test against a real tenant.
+Press Enter to skip and run structure tests only.
+
+Note: For testing, use tenant tsg: 1570970024
+      Use 'Access Agent' folder for security policy testing.
+
+Test against real tenant? (y/n): Enter TSG ID: Enter API Client ID: 
+Credentials provided. Testing against real tenant...
+
+Initializing API client...
+✓ API client initialized successfully
+
+============================================================
+Test 1: Folder Capture
+============================================================
+✓ Folder capture module structure correct
+
+  Testing against real tenant...
+  Warning: Error accessing security policy folders: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/v1/folders
+  ✓ Discovered 6 folders
+    - Service Connections (default: False)
+    - Remote Networks (default: False)
+    - Mobile User Container (default: False)
+    - Access Agent (default: False)
+    - GlobalProtect (default: False)
+    - Explicit Proxy (default: False)
+
+  Selected test folder: Access Agent
+    (This folder will be used for subsequent tests)
+  Warning: Error accessing security policy folders: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/v1/folders
+  ✓ Built folder hierarchy (6 folders)
+  Warning: Error accessing security policy folders: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/v1/folders
+  ✓ Listed 6 non-default folders for capture
+
+============================================================
+Test 2: Rule Capture
+============================================================
+✓ Rule capture module structure correct
+
+  Testing against real tenant...
+  Warning: Error accessing security policy folders: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/v1/folders
+  Testing with folder: Access Agent
+Error capturing rules from folder Access Agent: 400 Client Error: Bad Request for url: https://api.sase.paloaltonetworks.com/sse/config/v1/security-rules?folder=Access+Agent
+  ✓ Captured 0 rules from Access Agent
+  ⚠ WARNING: No rules found in folder Access Agent
+
+============================================================
+Test 3: Object Capture
+============================================================
+✓ Object capture module structure correct
+
+  Testing against real tenant...
+  Warning: Error accessing security policy folders: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/v1/folders
+  Testing with folder: Access Agent
+Error capturing addresses: 400 Client Error: Bad Request for url: https://api.sase.paloaltonetworks.com/sse/config/v1/addresses?folder=Access+Agent
+  ✓ Captured 0 address objects
+Error capturing address groups: 400 Client Error: Bad Request for url: https://api.sase.paloaltonetworks.com/sse/config/v1/address-groups?folder=Access+Agent
+  ✓ Captured 0 address groups
+Capturing objects from folder: Access Agent
+Error capturing addresses: 400 Client Error: Bad Request for url: https://api.sase.paloaltonetworks.com/sse/config/v1/addresses?folder=Access+Agent
+Error capturing address groups: 400 Client Error: Bad Request for url: https://api.sase.paloaltonetworks.com/sse/config/v1/address-groups?folder=Access+Agent
+Error capturing services: 400 Client Error: Bad Request for url: https://api.sase.paloaltonetworks.com/sse/config/v1/services?folder=Access+Agent
+Error capturing applications: 400 Client Error: Bad Request for url: https://api.sase.paloaltonetworks.com/sse/config/v1/applications?folder=Access+Agent
+  Captured 0 objects
+  ✓ Captured 0 total objects
+
+============================================================
+Test 4: Profile Capture
+============================================================
+✓ Profile capture module structure correct
+
+  Testing against real tenant...
+  Warning: Error accessing security policy folders: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/v1/folders
+  Testing with folder: Access Agent
+Error capturing authentication profiles: 400 Client Error: Bad Request for url: https://api.sase.paloaltonetworks.com/sse/config/v1/authentication-profiles?folder=Access+Agent
+  ✓ Captured 0 authentication profiles
+Capturing profiles from folder: Access Agent
+Error capturing authentication profiles: 400 Client Error: Bad Request for url: https://api.sase.paloaltonetworks.com/sse/config/v1/authentication-profiles?folder=Access+Agent
+Capturing antivirus profiles...
+Capturing anti_spyware profiles...
+Capturing vulnerability profiles...
+Capturing url_filtering profiles...
+Capturing file_blocking profiles...
+Capturing wildfire profiles...
+Capturing data_filtering profiles...
+  Captured 0 profiles
+    Authentication: 0
+    Security: 0
+    Decryption: 0
+  ✓ Captured 0 auth profiles, 0 security profiles
+
+============================================================
+Test 5: Snippet Capture
+============================================================
+✓ Snippet capture module structure correct
+
+  Testing against real tenant...
+Error discovering snippets: 403 Client Error: Forbidden for url: https://api.sase.paloaltonetworks.com/sse/config/v1/security-policy/snippets
+  ✓ Discovered 0 snippets
+
+============================================================
+Test 6: Pull Orchestrator
+============================================================
+✓ Pull orchestrator module structure correct
+
+  Testing against real tenant...
+  Warning: Error accessing security policy folders: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/v1/folders
+  ✗ FAILED: Real tenant test error: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "/home/lindsay/Code/pa_config_lab/./test_phase2.py", line 499, in test_pull_orchestrator
+    test_folder = select_test_folder(folders)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lindsay/Code/pa_config_lab/./test_phase2.py", line 118, in select_test_folder
+    folder_names = [f.get('name', '') for f in folders]
+                    ^^^^^
+AttributeError: 'str' object has no attribute 'get'
+
+⚠ Test test_pull_orchestrator returned False
+
+============================================================
+Test 7: Config Pull
+============================================================
+✓ Config pull module structure correct
+
+  Testing against real tenant...
+  Testing pull_folders_only...
+  Warning: Error accessing security policy folders: 404 Client Error: Not Found for url: https://api.strata.paloaltonetworks.com/config/v1/folders
+  ✗ FAILED: Real tenant test error: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "/home/lindsay/Code/pa_config_lab/./test_phase2.py", line 572, in test_config_pull
+    test_folder = select_test_folder(folders)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lindsay/Code/pa_config_lab/./test_phase2.py", line 118, in select_test_folder
+    folder_names = [f.get('name', '') for f in folders]
+                    ^^^^^
+AttributeError: 'str' object has no attribute 'get'
+
+⚠ Test test_config_pull returned False
+
+============================================================
+Test 8: Module Integration
+============================================================
+✓ All modules integrate correctly
+
+  Testing orchestrator integration...
+  ✓ All capture modules initialized in orchestrator
+
+============================================================
+Test Summary
+============================================================
+Passed: 6/8
+
+Note: Tests were run against a real tenant
+
+✗ 2 test(s) failed
+
+Full test output saved to: Phase 2 Implementation Test-17.08.48-12.19.2025.txt
