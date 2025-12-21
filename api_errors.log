@@ -12,3 +12,2167 @@ Duration: 74.16 seconds
 Summary: Tests: 8/8 passed
 ====================================================================================================
 
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:25
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/security-rules?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "dfc34ae0-1250-4f4c-a6b8-b9d8d0122289"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:26
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/security-rules?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "0bcd425d-da87-4ca5-8d58-870571e7849d"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:26
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/addresses?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "5fe36b53-1e98-4892-bdfc-49e149516b5f"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:27
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/address-groups?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "b1328bde-9ff2-4f29-9e1a-0cfa12b026d7"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:27
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/services?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "8d097914-d8cb-4076-90ed-7acd3189233a"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:28
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/addresses?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "926d08bf-624c-4df7-9774-02d03a0686a0"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:28
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/address-groups?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "525a2765-7a5d-4466-a3db-ab1ab06c3287"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:29
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/services?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "bb62a1c3-38b9-413f-96ee-1e5027b3b49b"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:29
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/authentication-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "52793b7e-8167-49c4-abde-66a243a19f0b"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:30
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/anti-spyware-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "bc9d2ec9-4306-4c3a-aaf6-d07d8df98fac"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:30
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/dns-security-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "758e36cc-7f8a-4d33-8f92-8e2100288298"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:31
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/file-blocking-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "2e884e5b-d026-4b9c-b70a-0972adb8fb0e"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:31
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/http-header-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "a0221991-5194-487a-b44d-0dd3afead0f8"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:32
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/profile-groups?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "373bc4b7-7224-4563-8469-30372a117f01"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:32
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/url-access-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "bd91820b-9d7e-42dd-94f9-dc1b05b48e42"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:33
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/vulnerability-protection-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "82e399ce-9a03-4783-839a-01af177a92da"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:34
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/wildfire-anti-virus-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "4dc3b6bd-927a-4ff4-9f9d-e367e2769bdf"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:34
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/decryption-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "6b3273ae-1a83-487d-acbd-5f76e3ab69ef"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:35
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/authentication-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "867e07ae-3496-489b-970b-fc9ac18e4411"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:35
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/anti-spyware-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "1a520200-bf48-4b9d-982e-e4108d8d5d78"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:36
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/dns-security-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "d8ccb656-3c17-45b5-b772-0f3f27578289"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:36
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/file-blocking-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "d8385952-2a10-4ce4-bd26-780515dd3b68"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:37
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/http-header-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "dc13eefa-3d0c-4fe3-9f02-0abe95251f39"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:37
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/profile-groups?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "4d960a2d-35a8-4eec-bf16-9449c67cd6dd"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:38
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/url-access-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "57e22a4c-0f75-4684-a873-b5665b6569bc"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:38
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/vulnerability-protection-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "ab1748bb-1cff-46a6-8ae9-3e40650b3505"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:39
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/wildfire-anti-virus-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "576725de-66bc-4e38-b0f7-59b26cf8306d"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:39
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/decryption-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "b6fd0728-4f2b-4967-b4d9-2e3b83a64e50"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:47
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/security-rules?folder=Service%20Connections
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload [object Object]",
+      "details": [
+        "\"folder\" with value \"Service Connections\" fails to match the required pattern: /^((?!Service Connections).)*$/"
+      ]
+    }
+  ],
+  "_request_id": "5640c6cd-9fdd-4f7b-a770-fd39af703fa1"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:47
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/security-rules?folder=Service%20Connections
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload [object Object]",
+      "details": [
+        "\"folder\" with value \"Service Connections\" fails to match the required pattern: /^((?!Service Connections).)*$/"
+      ]
+    }
+  ],
+  "_request_id": "fc6527e6-4580-4a83-8299-26d43cdb6d52"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:52
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/http-header-profiles?folder=Service%20Connections
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload [object Object]",
+      "details": [
+        "\"folder\" with value \"Service Connections\" fails to match the required pattern: /^((?!Service Connections).)*$/"
+      ]
+    }
+  ],
+  "_request_id": "cb0b44c1-10d2-4782-ae45-3cb750968c0f"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:53
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/profile-groups?folder=Service%20Connections
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload [object Object]",
+      "details": [
+        "\"folder\" with value \"Service Connections\" fails to match the required pattern: /^((?!Service Connections).)*$/"
+      ]
+    }
+  ],
+  "_request_id": "9fa7d4f7-9cd7-4b3b-be4c-577308daaa1f"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:45:59
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/http-header-profiles?folder=Service%20Connections
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload [object Object]",
+      "details": [
+        "\"folder\" with value \"Service Connections\" fails to match the required pattern: /^((?!Service Connections).)*$/"
+      ]
+    }
+  ],
+  "_request_id": "bd86c745-c080-44f5-8c7b-dea46b200340"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:46:01
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/profile-groups?folder=Service%20Connections
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...xbaS4-gB3A
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload [object Object]",
+      "details": [
+        "\"folder\" with value \"Service Connections\" fails to match the required pattern: /^((?!Service Connections).)*$/"
+      ]
+    }
+  ],
+  "_request_id": "67102718-faf4-4281-8788-655cee0f07b0"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:36
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/security-rules?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "13e9e432-c0e2-498b-b607-9e0738cf728f"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:37
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/security-rules?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "722f9e9a-c820-4dc3-b48b-0dd1438fe5c3"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:38
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/addresses?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "98bc46b0-5d01-49c7-8384-986d75c7025a"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:38
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/address-groups?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "3dfba058-e1cd-49d5-a856-096b68bec2f5"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:39
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/services?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "0e68f9dc-51eb-43e5-886a-8d47bf02f389"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:39
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/addresses?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "be137c27-f038-4498-b9d7-87ef9f754268"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:40
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/address-groups?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "fb4acbaa-e357-45cc-a592-7fcee2e5ce47"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:40
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/services?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "056864da-fd2f-472f-95ed-c887460613c4"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:41
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/authentication-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "69fdaa34-5663-4f1e-a86f-941fe84ce1da"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:41
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/anti-spyware-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "631485a3-db06-4e01-830c-2aa3c1d82575"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:42
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/dns-security-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "9ed637d9-c885-4192-861c-3c51136ecc48"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:42
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/file-blocking-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "d636304d-625c-464f-bb12-ffa524d5fbb4"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:43
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/http-header-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "39c64ffb-80f0-4510-af41-8831c31aabdd"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:43
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/profile-groups?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "0b9c40b1-615a-4d1b-bc54-022e1d218f14"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:44
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/url-access-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "5454e12e-6202-4ad7-9a78-9beb550ca49f"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:44
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/vulnerability-protection-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "4b881b34-940d-4f6c-a550-19d45f57c063"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:45
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/wildfire-anti-virus-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "bfa8ad31-7383-4ea7-adc2-408714ae307d"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:45
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/decryption-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "607c52e7-3357-46d4-9f90-d9e6895c7b50"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:46
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/authentication-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "681ec6af-90f5-4a3f-afc0-cb21f11b6f1c"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:46
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/anti-spyware-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "208b854f-53df-4ee6-9d13-cfed90a0bc0f"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:47
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/dns-security-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "692045a9-525f-4b1f-af24-093c7e83d2ce"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:47
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/file-blocking-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "f2ae1ae3-57eb-4e24-aa02-13f71b835eed"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:48
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/http-header-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "a03ce0c9-f779-4e30-af63-5f965896ee7f"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:48
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/profile-groups?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "5dd54e82-dc46-431c-b472-a01a346d9cf7"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:49
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/url-access-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "9c3aeb82-06c7-40a5-9f34-562ddc335024"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:49
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/vulnerability-protection-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "6c87659f-73c0-4524-84a0-d08050dd5738"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:50
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/wildfire-anti-virus-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "d6ee1142-da29-49ad-9079-83dd6afc3a2e"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:50
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/decryption-profiles?folder=Colo%20Connect
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00013",
+      "message": "Your configuration is not valid. Please review the error message for more details.",
+      "details": {
+        "errorType": "Operation Impossible",
+        "message": "Folder Colo Connect doesn't exist. Please create it before running the command"
+      }
+    }
+  ],
+  "_request_id": "34dc7b48-9f70-4f03-a33c-55588037c7fd"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:59
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/security-rules?folder=Service%20Connections
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload [object Object]",
+      "details": [
+        "\"folder\" with value \"Service Connections\" fails to match the required pattern: /^((?!Service Connections).)*$/"
+      ]
+    }
+  ],
+  "_request_id": "bd080680-f492-4542-a9d7-8d78c86fd5c2"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 20:59:59
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/security-rules?folder=Service%20Connections
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload [object Object]",
+      "details": [
+        "\"folder\" with value \"Service Connections\" fails to match the required pattern: /^((?!Service Connections).)*$/"
+      ]
+    }
+  ],
+  "_request_id": "76ce7ccf-67ac-4bba-aebb-6d74243d88c7"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 21:00:04
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/http-header-profiles?folder=Service%20Connections
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload [object Object]",
+      "details": [
+        "\"folder\" with value \"Service Connections\" fails to match the required pattern: /^((?!Service Connections).)*$/"
+      ]
+    }
+  ],
+  "_request_id": "c8788b7f-61ff-473c-9a01-ba24d84790e6"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 21:00:05
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/profile-groups?folder=Service%20Connections
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload [object Object]",
+      "details": [
+        "\"folder\" with value \"Service Connections\" fails to match the required pattern: /^((?!Service Connections).)*$/"
+      ]
+    }
+  ],
+  "_request_id": "d90abfdb-9d2a-4744-aabd-6c99d6ece08a"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 21:00:09
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/http-header-profiles?folder=Service%20Connections
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload [object Object]",
+      "details": [
+        "\"folder\" with value \"Service Connections\" fails to match the required pattern: /^((?!Service Connections).)*$/"
+      ]
+    }
+  ],
+  "_request_id": "e9cdd98c-f5b1-459f-9297-5f0564b1399a"
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------
+API ERROR - 2025-12-20 21:00:10
+----------------------------------------------------------------------------------------------------
+
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/profile-groups?folder=Service%20Connections
+Status Code: 400
+Status Text: Bad Request
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...o2maxu18nQ
+
+Response Body:
+{
+  "_errors": [
+    {
+      "code": "API_I00035",
+      "message": "Invalid Request Payload [object Object]",
+      "details": [
+        "\"folder\" with value \"Service Connections\" fails to match the required pattern: /^((?!Service Connections).)*$/"
+      ]
+    }
+  ],
+  "_request_id": "3b6c5a8c-6908-4d0b-b257-1941bd14224f"
+}
+
+----------------------------------------------------------------------------------------------------
+

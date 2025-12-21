@@ -245,6 +245,8 @@ The configuration will be restructured into a hierarchical JSON format:
 
 ### Phase 3: Default Configuration Detection (Weeks 6-7)
 
+**Note**: Phase 2 already implements basic default detection for folders (`is_default` flag). This phase enhances and extends default detection to all configuration types.
+
 #### 3.1 Default Configuration Database
 **Tasks:**
 - Research and document Prisma Access default configurations
@@ -252,24 +254,33 @@ The configuration will be restructured into a hierarchical JSON format:
 - Identify default security profiles and their settings
 - Document default authentication profiles
 - Create default rule patterns
+- Document default snippet patterns (note: snippets are metadata containers, not config containers)
 
 **Files to Create:**
-- `default_configs.py` - Default configuration database
-- `default_detector.py` - Default detection logic
+- `config/defaults/default_configs.py` - Default configuration database
+- `config/defaults/default_detector.py` - Default detection logic
+
+**Key Considerations:**
+- Leverage existing `is_default` flag from folder capture
+- Snippets are high-level config (like folders), focus on metadata defaults
+- Profiles may have "default" or "best-practice" in name
+- Rules may match known default patterns
 
 #### 3.2 Detection Logic Implementation
 **Tasks:**
 - Compare captured configurations against defaults
-- Mark configurations as default vs. custom
+- Mark configurations as default vs. custom (enhance existing `is_default` flags)
 - Store detection results in configuration file
 - Allow user override for default inclusion/exclusion
 - Create reporting mechanism for detected defaults
+- Integrate with existing capture modules
 
 **Detection Strategies:**
 - Exact match comparison
 - Pattern matching for rules
-- Name-based detection (e.g., "default" in name)
+- Name-based detection (e.g., "default", "predefined", "best-practice" in name)
 - Value-based detection (known default values)
+- Leverage existing folder `is_default` detection
 
 #### 3.3 Configuration Filtering
 **Tasks:**
@@ -277,6 +288,7 @@ The configuration will be restructured into a hierarchical JSON format:
 - Provide option to include defaults for reference
 - Create separate "defaults" section in JSON for documentation
 - Generate exclusion list for user review
+- Integrate with pull orchestrator (filter during capture)
 
 ### Phase 4: Dependency Resolution & Pull Enhancement (Weeks 8-10)
 
