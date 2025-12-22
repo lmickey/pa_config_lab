@@ -85,9 +85,17 @@ def pull_configuration(
             import getpass
 
             password = getpass.getpass("Enter password for encryption: ")
-            cipher = derive_key(password)
+            cipher, salt = derive_key(password)
+        elif not encrypt:
+            cipher = None
+            salt = None
+        else:
+            # cipher provided, need to extract salt from it
+            # Actually derive_key returns (cipher, salt) so if cipher was passed it's already a tuple
+            salt = cipher[1] if isinstance(cipher, tuple) else None
+            cipher = cipher[0] if isinstance(cipher, tuple) else cipher
 
-        save_config_json(config, save_to_file, cipher=cipher, encrypt=encrypt)
+        save_config_json(config, save_to_file, cipher=cipher, salt=salt, encrypt=encrypt)
         print(f"\nConfiguration saved to: {save_to_file}")
 
     # Print summary

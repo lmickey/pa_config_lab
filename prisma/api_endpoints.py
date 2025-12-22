@@ -32,6 +32,16 @@ class APIEndpoints:
     SERVICE_CONNECTIONS = f"{SASE_BASE_URL}/service-connections"
     REMOTE_NETWORKS = f"{SASE_BASE_URL}/remote-networks"
 
+    @staticmethod
+    def service_connection(connection_id: str) -> str:
+        """Get endpoint for specific service connection."""
+        return f"{APIEndpoints.SERVICE_CONNECTIONS}/{connection_id}"
+
+    @staticmethod
+    def remote_network(network_id: str) -> str:
+        """Get endpoint for specific remote network."""
+        return f"{APIEndpoints.REMOTE_NETWORKS}/{network_id}"
+
     # Security Policy - Folders (Strata API)
     # Note: Folders endpoint uses /setup/v1/ path
     SECURITY_POLICY_FOLDERS = f"{STRATA_SETUP_BASE_URL}/folders"
@@ -237,6 +247,41 @@ class APIEndpoints:
     def ipsec_tunnel(tunnel_id: str) -> str:
         """Get endpoint for specific IPSec tunnel."""
         return f"{APIEndpoints.IPSEC_TUNNELS}/{tunnel_id}"
+
+    # Mobile User Infrastructure (SASE API)
+    # Mobile Agent Configuration - GlobalProtect settings are split across multiple endpoints
+    MOBILE_AGENT_PROFILES = f"{SASE_BASE_URL}/mobile-agent/agent-profiles"
+    MOBILE_AGENT_VERSIONS = f"{SASE_BASE_URL}/mobile-agent/agent-versions"
+    MOBILE_AGENT_AUTH_SETTINGS = f"{SASE_BASE_URL}/mobile-agent/authentication-settings"
+    MOBILE_AGENT_ENABLE = f"{SASE_BASE_URL}/mobile-agent/enable"
+    MOBILE_AGENT_GLOBAL_SETTINGS = f"{SASE_BASE_URL}/mobile-agent/global-settings"
+    MOBILE_AGENT_INFRA_SETTINGS = f"{SASE_BASE_URL}/mobile-agent/infrastructure-settings"
+    MOBILE_AGENT_LOCATIONS = f"{SASE_BASE_URL}/mobile-agent/locations"
+    MOBILE_AGENT_TUNNEL_PROFILES = f"{SASE_BASE_URL}/mobile-agent/tunnel-profiles"
+
+    # HIP (Host Information Profile) Objects and Profiles (SASE API)
+    # Note: These endpoints may vary by environment - validation needed
+    HIP_OBJECTS = f"{SASE_BASE_URL}/hip-objects"
+    HIP_PROFILES = f"{SASE_BASE_URL}/hip-profiles"
+
+    @staticmethod
+    def hip_object(object_id: str) -> str:
+        """Get endpoint for specific HIP object."""
+        return f"{APIEndpoints.HIP_OBJECTS}/{object_id}"
+
+    @staticmethod
+    def hip_profile(profile_id: str) -> str:
+        """Get endpoint for specific HIP profile."""
+        return f"{APIEndpoints.HIP_PROFILES}/{profile_id}"
+
+    # Regions and Bandwidth Allocations (SASE API)
+    BANDWIDTH_ALLOCATIONS = f"{SASE_BASE_URL}/bandwidth-allocations"
+    LOCATIONS = f"{SASE_BASE_URL}/locations"
+
+    @staticmethod
+    def bandwidth_allocation(allocation_id: str) -> str:
+        """Get endpoint for specific bandwidth allocation."""
+        return f"{APIEndpoints.BANDWIDTH_ALLOCATIONS}/{allocation_id}"
 
     # Configuration Management (SASE API)
     CONFIG_VERSIONS = f"{SASE_BASE_URL}/config-versions"

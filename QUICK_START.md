@@ -1,5 +1,19 @@
 # Quick Start Guide
 
+**Prisma Access Configuration Capture Tool v2.0**
+
+---
+
+## What's New in v2.0
+
+✅ **Infrastructure Capture** - Remote Networks, Service Connections, IPsec/IKE, Mobile Users, HIP, Regions  
+✅ **Custom Applications** - Option to capture custom/user-created applications  
+✅ **Enhanced GUI** - 6 new infrastructure options + application selector  
+✅ **Rate Limiting** - 45 req/min (90% of API limit) for safe operation  
+✅ **Comprehensive Testing** - 300+ test cases for reliability
+
+---
+
 ## Running the GUI
 
 ### Linux/Mac
@@ -98,3 +112,44 @@ python3 test_gui_import.py
 ```
 
 If all checks pass, you're ready to run the GUI!
+
+---
+
+## New Features Guide
+
+### Infrastructure Capture
+
+The GUI now includes 6 infrastructure component options:
+
+1. **Remote Networks** - Branch offices and data centers
+2. **Service Connections** - On-premises connectivity  
+3. **IPsec Tunnels & Crypto** - VPN infrastructure
+4. **Mobile User Infrastructure** - GlobalProtect gateways/portals
+5. **HIP Objects & Profiles** - Endpoint compliance checks
+6. **Regions & Bandwidth** - Deployment locations
+
+**To use:**
+1. Go to "Pull" tab
+2. Scroll to "Infrastructure Components" section
+3. All are checked by default
+4. Uncheck any you don't need
+
+### Custom Applications
+
+**NEW:** Option to capture custom/user-created applications.
+
+**To use:**
+1. Check "Custom Applications" in Pull tab
+2. Click "Select Applications..." button
+3. Enter app names (comma-separated): `App1, App2, App3`
+
+**Note:** Only needed for custom apps. Predefined applications are automatically included.
+
+---
+
+## Quick Links
+
+- **📖 Full Documentation:** See [docs/README.md](docs/README.md)
+- **🏗️ Infrastructure Guide:** See [docs/INFRASTRUCTURE_CAPTURE_GUIDE.md](docs/INFRASTRUCTURE_CAPTURE_GUIDE.md)
+- **🔧 API Reference:** See [docs/API_REFERENCE_INFRASTRUCTURE.md](docs/API_REFERENCE_INFRASTRUCTURE.md)
+- **❓ Troubleshooting:** See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)

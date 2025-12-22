@@ -571,12 +571,13 @@ Examples:
                     password = getpass.getpass("Enter password for encryption: ")
                     from config.storage.json_storage import derive_key
 
-                    cipher = derive_key(password)
+                    cipher, salt = derive_key(password)
                 else:
                     cipher = None
+                    salt = None
 
                 save_config_json(
-                    config, str(output_path), cipher=cipher, encrypt=encrypt
+                    config, str(output_path), cipher=cipher, salt=salt, encrypt=encrypt
                 )
                 print(f"\n✓ Configuration saved to: {output_path}")
 

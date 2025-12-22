@@ -74,6 +74,16 @@ class RuleCapture:
             return filtered_rules
 
         except Exception as e:
+            # Check if folder doesn't exist (400 error) or server error (500)
+            error_str = str(e).lower()
+            if "doesn't exist" in error_str or "folder" in error_str and ("400" in error_str or "not exist" in error_str or "invalid" in error_str):
+                print(f"⚠ Folder '{folder_name}' does not exist or is invalid - skipping")
+                return []
+            elif "500" in error_str or "503" in error_str or "502" in error_str:
+                # Server errors - API is having issues, skip gracefully
+                print(f"⚠ API server error for rules in folder '{folder_name}' - skipping")
+                return []
+            
             print(f"Error capturing rules from folder {folder_name}: {e}")
             return []
 

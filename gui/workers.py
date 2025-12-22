@@ -20,7 +20,7 @@ class PullWorker(QThread):
     def __init__(
         self,
         api_client,
-        options: Dict[str, bool],
+        options: Dict[str, Any],
         filter_defaults: bool = False,
     ):
         """
@@ -28,7 +28,7 @@ class PullWorker(QThread):
 
         Args:
             api_client: Authenticated PrismaAccessAPIClient
-            options: Dictionary of what to pull (folders, snippets, rules, etc.)
+            options: Dictionary of what to pull (folders, snippets, rules, objects, profiles, infrastructure, etc.)
             filter_defaults: Whether to filter default configurations
         """
         super().__init__()
@@ -36,11 +36,13 @@ class PullWorker(QThread):
         self.options = options
         self.filter_defaults = filter_defaults
         self.config = None
+        self._is_running = True
 
     def run(self):
         """Run the pull operation."""
         try:
             from prisma.pull.pull_orchestrator import PullOrchestrator
+            from prisma.pull.infrastructure_capture import InfrastructureCapture
             from config.defaults.default_detector import DefaultDetector
 
             self.progress.emit("Initializing pull operation...", 5)
@@ -49,9 +51,12 @@ class PullWorker(QThread):
             orchestrator = PullOrchestrator(self.api_client)
             
             # Set up progress callback to emit signals
-            def progress_callback(message: str, current: int, total: int):
+            def progress_callback(message: str, current: float, total: float):
+                if not self._is_running:
+                    return
                 if total > 0:
-                    percentage = int(10 + (current / total) * 70)  # 10-80% range
+                    # Use float division for accurate percentage calculation
+                    percentage = int(10 + (current / total) * 60)  # 10-70% range (leave room for infrastructure)
                 else:
                     percentage = 50
                 self.progress.emit(message, percentage)
@@ -68,8 +73,84 @@ class PullWorker(QThread):
                 include_snippets=self.options.get("snippets", True),
                 include_objects=self.options.get("objects", True),
                 include_profiles=self.options.get("profiles", True),
-                application_names=None,  # No custom applications by default
+                application_names=self.options.get("application_names", None),  # NEW: Custom applications
             )
+
+            if not self._is_running:
+                return
+
+            # Pull infrastructure if any infrastructure options are enabled
+            infra_enabled = any([
+                self.options.get("include_remote_networks", False),
+                self.options.get("include_service_connections", False),
+                self.options.get("include_ipsec_tunnels", False),
+                self.options.get("include_mobile_users", False),
+                self.options.get("include_hip", False),
+                self.options.get("include_regions", False),
+            ])
+
+            if infra_enabled and config:
+                self.progress.emit("Pulling infrastructure components...", 70)
+                
+                try:
+                    infra_capture = InfrastructureCapture(self.api_client)
+                    
+                    # Set up infrastructure progress callback
+                    def infra_progress_callback(message: str, current: int, total: int):
+                        if not self._is_running:
+                            return
+                        if total > 0:
+                            percentage = int(70 + (current / total) * 10)  # 70-80% range
+                        else:
+                            percentage = 75
+                        self.progress.emit(message, percentage)
+                    
+                    infra_data = infra_capture.capture_all_infrastructure(
+                        folder=None,
+                        include_remote_networks=self.options.get("include_remote_networks", True),
+                        include_service_connections=self.options.get("include_service_connections", True),
+                        include_ipsec_tunnels=self.options.get("include_ipsec_tunnels", True),
+                        include_mobile_users=self.options.get("include_mobile_users", True),
+                        include_hip=self.options.get("include_hip", True),
+                        include_regions=self.options.get("include_regions", True),
+                        progress_callback=infra_progress_callback,
+                    )
+                    
+                    if not self._is_running:
+                        return
+                    
+                    # Merge infrastructure data into config
+                    # Infrastructure capture returns a flat dict with all components
+                    if "remote_networks" in infra_data:
+                        config["infrastructure"]["remote_networks"] = infra_data["remote_networks"]
+                    if "service_connections" in infra_data:
+                        config["infrastructure"]["service_connections"] = infra_data["service_connections"]
+                    
+                    # Tunnel-related components are at top level in infra_data
+                    if "ipsec_tunnels" in infra_data:
+                        config["infrastructure"]["ipsec_tunnels"] = infra_data["ipsec_tunnels"]
+                    if "ike_gateways" in infra_data:
+                        config["infrastructure"]["ike_gateways"] = infra_data["ike_gateways"]
+                    if "ike_crypto_profiles" in infra_data:
+                        config["infrastructure"]["ike_crypto_profiles"] = infra_data["ike_crypto_profiles"]
+                    if "ipsec_crypto_profiles" in infra_data:
+                        config["infrastructure"]["ipsec_crypto_profiles"] = infra_data["ipsec_crypto_profiles"]
+                    
+                    # Mobile users and HIP are nested dicts
+                    if "mobile_users" in infra_data:
+                        config["mobile_users"] = infra_data["mobile_users"]
+                    if "hip" in infra_data:
+                        config["hip"] = infra_data["hip"]
+                    if "regions" in infra_data:
+                        config["regions"] = infra_data["regions"]
+                        
+                except Exception as e:
+                    # Log error but continue - infrastructure is optional
+                    print(f"Warning: Error pulling infrastructure: {e}")
+                    self.progress.emit(f"Warning: Infrastructure pull had errors", 75)
+
+            if not self._is_running:
+                return
 
             self.progress.emit("Configuration pulled successfully", 80)
 
@@ -84,47 +165,81 @@ class PullWorker(QThread):
                 # Get statistics
                 total_defaults = sum(detector.detection_stats.values())
                 
-                self.progress.emit(
-                    f"Filtered {total_defaults} default items", 95
-                )
+                if self._is_running:
+                    self.progress.emit(
+                        f"Filtered {total_defaults} default items", 95
+                    )
+
+            if not self._is_running:
+                return
 
             self.progress.emit("Pull operation complete!", 100)
 
             # Get statistics
             stats = orchestrator.stats
+            
+            # Add infrastructure stats if we pulled it
+            if infra_enabled:
+                if config.get("infrastructure", {}).get("remote_networks"):
+                    stats["remote_networks"] = len(config["infrastructure"]["remote_networks"])
+                if config.get("infrastructure", {}).get("service_connections"):
+                    stats["service_connections"] = len(config["infrastructure"]["service_connections"])
+                if config.get("mobile_users", {}).get("gp_gateways"):
+                    stats["gp_gateways"] = len(config["mobile_users"]["gp_gateways"])
+                if config.get("regions", {}).get("bandwidth_allocations"):
+                    stats["bandwidth_allocations"] = len(config["regions"]["bandwidth_allocations"])
+            
             message = self._format_stats_message(stats)
 
+            # Store config and signal completion
+            # IMPORTANT: Don't pass large config object in signal - causes Qt threading issues
             self.config = config
-            self.finished.emit(True, message, config)
+            self.finished.emit(True, message, None)  # Pass None instead of config to avoid threading issues
 
         except Exception as e:
-            self.error.emit(f"Pull operation failed: {str(e)}")
-            self.finished.emit(False, str(e), None)
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"Pull worker error: {error_details}")
+            if self._is_running:
+                self.error.emit(f"Pull operation failed: {str(e)}")
+                self.finished.emit(False, str(e), None)
 
     def _format_stats_message(self, stats: Dict[str, Any]) -> str:
         """Format statistics into a readable message."""
         lines = ["Pull completed successfully!\n"]
 
-        if "folders" in stats:
-            lines.append(f"Folders: {stats['folders']}")
-        if "snippets" in stats:
-            lines.append(f"Snippets: {stats['snippets']}")
-        if "security_rules" in stats:
-            lines.append(f"Security Rules: {stats['security_rules']}")
-        if "addresses" in stats:
-            lines.append(f"Addresses: {stats['addresses']}")
-        if "address_groups" in stats:
-            lines.append(f"Address Groups: {stats['address_groups']}")
-        if "services" in stats:
-            lines.append(f"Services: {stats['services']}")
-        if "service_groups" in stats:
-            lines.append(f"Service Groups: {stats['service_groups']}")
-        if "applications" in stats:
-            lines.append(f"Applications: {stats['applications']}")
-        if "application_groups" in stats:
-            lines.append(f"Application Groups: {stats['application_groups']}")
+        # Core components
+        if stats.get("folders_captured", 0) > 0:
+            lines.append(f"Folders: {stats['folders_captured']}")
+        if stats.get("snippets_captured", 0) > 0:
+            lines.append(f"Snippets: {stats['snippets_captured']}")
+        if stats.get("rules_captured", 0) > 0:
+            lines.append(f"Security Rules: {stats['rules_captured']}")
+        if stats.get("objects_captured", 0) > 0:
+            lines.append(f"Objects: {stats['objects_captured']}")
+        if stats.get("profiles_captured", 0) > 0:
+            lines.append(f"Profiles: {stats['profiles_captured']}")
+
+        # Infrastructure components (NEW)
+        if stats.get("remote_networks", 0) > 0:
+            lines.append(f"Remote Networks: {stats['remote_networks']}")
+        if stats.get("service_connections", 0) > 0:
+            lines.append(f"Service Connections: {stats['service_connections']}")
+        if stats.get("gp_gateways", 0) > 0:
+            lines.append(f"GP Gateways: {stats['gp_gateways']}")
+        if stats.get("bandwidth_allocations", 0) > 0:
+            lines.append(f"Bandwidth Allocations: {stats['bandwidth_allocations']}")
+
+        # Errors
+        errors = stats.get("errors", [])
+        if errors and len(errors) > 0:
+            lines.append(f"\n⚠ Warnings/Errors: {len(errors)}")
 
         return "\n".join(lines)
+    
+    def stop(self):
+        """Stop the worker thread gracefully."""
+        self._is_running = False
 
 
 class PushWorker(QThread):

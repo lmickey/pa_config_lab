@@ -59,7 +59,7 @@ class PrismaAccessAPIClient:
         tsg_id: str,
         api_user: str,
         api_secret: str,
-        rate_limit: int = 100,
+        rate_limit: int = 45,  # Changed from 100 to 45 (90% of 50 req/min for safety buffer)
         cache_ttl: int = 300,
     ):
         """
@@ -69,7 +69,7 @@ class PrismaAccessAPIClient:
             tsg_id: Tenant Service Group ID
             api_user: API client ID
             api_secret: API client secret
-            rate_limit: Maximum requests per minute
+            rate_limit: Maximum requests per minute (default: 45 - 90% of 50 req/min limit)
             cache_ttl: Cache time-to-live in seconds
         """
         self.tsg_id = tsg_id
@@ -506,12 +506,25 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_all_applications(
-        self, folder: Optional[str] = None
+        self, folder: Optional[str] = None, limit: Optional[int] = None
     ) -> List[Dict[str, Any]]:
-        """Get all application objects with automatic pagination."""
-
-        def api_func(offset=0, limit=100):
-            return self.get_applications(folder=folder, limit=limit, offset=offset)
+        """
+        Get all application objects with automatic pagination.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Optional maximum number of results to return (None = all results with pagination)
+        
+        Returns:
+            List of application objects
+        """
+        if limit is not None:
+            # If limit specified, just get that many results (no pagination)
+            return self.get_applications(folder=folder, limit=limit, offset=0)
+        
+        # Otherwise use automatic pagination to get all results
+        def api_func(offset=0, page_limit=100):
+            return self.get_applications(folder=folder, limit=page_limit, offset=offset)
 
         return paginate_api_request(api_func)
 
@@ -682,6 +695,669 @@ class PrismaAccessAPIClient:
             params["offset"] = offset
         response = self._make_request("GET", url, params=params if params else None)
         return response.get("data", [])
+
+    # ==================== Infrastructure Methods (NEW) ====================
+
+    # Remote Networks
+    def get_remote_networks(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get remote networks.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of remote network configurations
+        """
+        url = APIEndpoints.REMOTE_NETWORKS
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_remote_networks(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all remote networks with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_remote_networks(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    def get_remote_network(self, network_id: str) -> Dict[str, Any]:
+        """
+        Get specific remote network by ID.
+        
+        Args:
+            network_id: Remote network ID
+            
+        Returns:
+            Remote network configuration dict
+        """
+        url = APIEndpoints.remote_network(network_id)
+        response = self._make_request("GET", url)
+        return response
+
+    # Service Connections (enhanced from existing basic support)
+    def get_service_connections(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get service connections.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of service connection configurations
+        """
+        url = APIEndpoints.SERVICE_CONNECTIONS
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_service_connections(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all service connections with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_service_connections(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    def get_service_connection(self, connection_id: str) -> Dict[str, Any]:
+        """
+        Get specific service connection by ID.
+        
+        Args:
+            connection_id: Service connection ID
+            
+        Returns:
+            Service connection configuration dict
+        """
+        url = APIEndpoints.service_connection(connection_id)
+        response = self._make_request("GET", url)
+        return response
+
+    # IPsec Tunnels
+    def get_ipsec_tunnels(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get IPsec tunnels.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of IPsec tunnel configurations
+        """
+        url = APIEndpoints.IPSEC_TUNNELS
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_ipsec_tunnels(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all IPsec tunnels with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_ipsec_tunnels(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    def get_ipsec_tunnel(self, tunnel_id: str) -> Dict[str, Any]:
+        """
+        Get specific IPsec tunnel by ID.
+        
+        Args:
+            tunnel_id: IPsec tunnel ID
+            
+        Returns:
+            IPsec tunnel configuration dict
+        """
+        url = APIEndpoints.ipsec_tunnel(tunnel_id)
+        response = self._make_request("GET", url)
+        return response
+
+    # IKE Gateways
+    def get_ike_gateways(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get IKE gateways.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of IKE gateway configurations
+        """
+        url = APIEndpoints.IKE_GATEWAYS
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_ike_gateways(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all IKE gateways with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_ike_gateways(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    def get_ike_gateway(self, gateway_id: str) -> Dict[str, Any]:
+        """
+        Get specific IKE gateway by ID.
+        
+        Args:
+            gateway_id: IKE gateway ID
+            
+        Returns:
+            IKE gateway configuration dict
+        """
+        url = APIEndpoints.ike_gateway(gateway_id)
+        response = self._make_request("GET", url)
+        return response
+
+    # IKE Crypto Profiles
+    def get_ike_crypto_profiles(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get IKE crypto profiles.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of IKE crypto profile configurations
+        """
+        url = APIEndpoints.IKE_CRYPTO_PROFILES
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_ike_crypto_profiles(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all IKE crypto profiles with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_ike_crypto_profiles(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    def get_ike_crypto_profile(self, profile_id: str) -> Dict[str, Any]:
+        """
+        Get specific IKE crypto profile by ID.
+        
+        Args:
+            profile_id: IKE crypto profile ID
+            
+        Returns:
+            IKE crypto profile configuration dict
+        """
+        url = APIEndpoints.ike_crypto_profile(profile_id)
+        response = self._make_request("GET", url)
+        return response
+
+    # IPsec Crypto Profiles
+    def get_ipsec_crypto_profiles(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get IPsec crypto profiles.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of IPsec crypto profile configurations
+        """
+        url = APIEndpoints.IPSEC_CRYPTO_PROFILES
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_ipsec_crypto_profiles(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all IPsec crypto profiles with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_ipsec_crypto_profiles(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    def get_ipsec_crypto_profile(self, profile_id: str) -> Dict[str, Any]:
+        """
+        Get specific IPsec crypto profile by ID.
+        
+        Args:
+            profile_id: IPsec crypto profile ID
+            
+        Returns:
+            IPsec crypto profile configuration dict
+        """
+        url = APIEndpoints.ipsec_crypto_profile(profile_id)
+        response = self._make_request("GET", url)
+        return response
+
+    # Mobile User Infrastructure
+    def get_mobile_user_infrastructure(self) -> Dict[str, Any]:
+        """
+        Get mobile user infrastructure settings.
+        
+        Returns:
+            Mobile user infrastructure configuration dict
+        """
+        url = APIEndpoints.MOBILE_AGENT_INFRASTRUCTURE
+        response = self._make_request("GET", url)
+        return response
+
+    def get_globalprotect_gateways(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get GlobalProtect gateways.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of GlobalProtect gateway configurations
+        """
+        url = APIEndpoints.GLOBALPROTECT_GATEWAYS
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_globalprotect_gateways(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all GlobalProtect gateways with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_globalprotect_gateways(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    def get_globalprotect_portals(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get GlobalProtect portals.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of GlobalProtect portal configurations
+        """
+        url = APIEndpoints.GLOBALPROTECT_PORTALS
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_globalprotect_portals(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all GlobalProtect portals with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_globalprotect_portals(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    # HIP Objects and Profiles
+    def get_hip_objects(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get HIP (Host Information Profile) objects.
+        
+        Note: This endpoint may not be available in all environments.
+        Graceful error handling recommended.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of HIP object configurations
+        """
+        url = APIEndpoints.HIP_OBJECTS
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_hip_objects(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all HIP objects with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_hip_objects(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    def get_hip_profiles(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get HIP (Host Information Profile) profiles.
+        
+        Note: This endpoint may not be available in all environments.
+        Graceful error handling recommended.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of HIP profile configurations
+        """
+        url = APIEndpoints.HIP_PROFILES
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_hip_profiles(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all HIP profiles with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_hip_profiles(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+    
+    # Mobile Agent Configuration (replaces old GlobalProtect endpoints)
+    def get_mobile_agent_profiles(self, folder: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get mobile agent profiles configuration.
+        
+        Args:
+            folder: Folder name (typically "Mobile Users")
+        
+        Returns:
+            Mobile agent profiles configuration dict
+        """
+        endpoint = APIEndpoints.MOBILE_AGENT_PROFILES
+        params = {}
+        if folder:
+            params["folder"] = folder
+        response = self._make_request("GET", endpoint, params=params if params else None)
+        # _make_request already returns parsed data, not response object
+        return response if isinstance(response, dict) else {}
+    
+    def get_mobile_agent_versions(self, folder: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get mobile agent versions configuration.
+        
+        Args:
+            folder: Folder name (typically "Mobile Users")
+        
+        Returns:
+            Mobile agent versions configuration dict
+        """
+        endpoint = APIEndpoints.MOBILE_AGENT_VERSIONS
+        params = {}
+        if folder:
+            params["folder"] = folder
+        response = self._make_request("GET", endpoint, params=params if params else None)
+        # _make_request already returns parsed data, not response object
+        return response if isinstance(response, dict) else {}
+    
+    def get_mobile_agent_auth_settings(self, folder: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get mobile agent authentication settings.
+        
+        Args:
+            folder: Folder name (typically "Mobile Users")
+        
+        Returns:
+            Mobile agent authentication settings dict
+        """
+        endpoint = APIEndpoints.MOBILE_AGENT_AUTH_SETTINGS
+        params = {}
+        if folder:
+            params["folder"] = folder
+        response = self._make_request("GET", endpoint, params=params if params else None)
+        # _make_request already returns parsed data, not response object
+        return response if isinstance(response, dict) else {}
+    
+    def get_mobile_agent_enable(self, folder: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get mobile agent enable/disable configuration.
+        
+        Args:
+            folder: Folder name (typically "Mobile Users")
+        
+        Returns:
+            Mobile agent enable configuration dict
+        """
+        endpoint = APIEndpoints.MOBILE_AGENT_ENABLE
+        params = {}
+        if folder:
+            params["folder"] = folder
+        response = self._make_request("GET", endpoint, params=params if params else None)
+        # _make_request already returns parsed data, not response object
+        return response if isinstance(response, dict) else {}
+    
+    def get_mobile_agent_global_settings(self, folder: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get mobile agent global settings.
+        
+        Args:
+            folder: Folder name (typically "Mobile Users")
+        
+        Returns:
+            Mobile agent global settings dict
+        """
+        endpoint = APIEndpoints.MOBILE_AGENT_GLOBAL_SETTINGS
+        params = {}
+        if folder:
+            params["folder"] = folder
+        response = self._make_request("GET", endpoint, params=params if params else None)
+        # _make_request already returns parsed data, not response object
+        return response if isinstance(response, dict) else {}
+    
+    def get_mobile_agent_infra_settings(self, folder: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get mobile agent infrastructure settings.
+        
+        Args:
+            folder: Folder name (typically "Mobile Users")
+        
+        Returns:
+            Mobile agent infrastructure settings dict or list
+        """
+        endpoint = APIEndpoints.MOBILE_AGENT_INFRA_SETTINGS
+        params = {}
+        if folder:
+            params["folder"] = folder
+        response = self._make_request("GET", endpoint, params=params if params else None)
+        # _make_request already returns parsed data, could be dict or list
+        return response
+    
+    def get_mobile_agent_locations(self, folder: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get mobile agent locations configuration.
+        
+        Args:
+            folder: Folder name (typically "Mobile Users")
+        
+        Returns:
+            Mobile agent locations dict
+        """
+        endpoint = APIEndpoints.MOBILE_AGENT_LOCATIONS
+        params = {}
+        if folder:
+            params["folder"] = folder
+        response = self._make_request("GET", endpoint, params=params if params else None)
+        # _make_request already returns parsed data, not response object
+        return response if isinstance(response, dict) else {}
+    
+    def get_mobile_agent_tunnel_profiles(self, folder: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get mobile agent tunnel profiles.
+        
+        Args:
+            folder: Folder name (typically "Mobile Users")
+        
+        Returns:
+            Mobile agent tunnel profiles dict
+        """
+        endpoint = APIEndpoints.MOBILE_AGENT_TUNNEL_PROFILES
+        params = {}
+        if folder:
+            params["folder"] = folder
+        response = self._make_request("GET", endpoint, params=params if params else None)
+        # _make_request already returns parsed data, not response object
+        return response if isinstance(response, dict) else {}
+
+    # Bandwidth Allocations and Locations (for regions/subnets)
+    def get_bandwidth_allocations(
+        self, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get bandwidth allocations (region information).
+        
+        Args:
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of bandwidth allocation configurations
+        """
+        url = APIEndpoints.BANDWIDTH_ALLOCATIONS
+        params = {}
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_bandwidth_allocations(self) -> List[Dict[str, Any]]:
+        """Get all bandwidth allocations with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_bandwidth_allocations(limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    def get_locations(
+        self, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get locations (enabled regions).
+        
+        Args:
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of location configurations
+        """
+        url = APIEndpoints.LOCATIONS
+        params = {}
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        # Response could be a list directly or a dict with 'data' key
+        if isinstance(response, list):
+            return response
+        elif isinstance(response, dict):
+            return response.get("data", [])
+        return []
+
+    def get_all_locations(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get all locations with automatic pagination.
+        
+        Args:
+            limit: Optional maximum number of results to return (None = all results with pagination)
+        
+        Returns:
+            List of location configurations
+        """
+        if limit is not None:
+            # If limit specified, just get that many results (no pagination)
+            return self.get_locations(limit=limit, offset=0)
+        
+        # Otherwise use automatic pagination to get all results
+        def api_func(offset=0, limit=100):
+            return self.get_locations(limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    # ==================== End Infrastructure Methods ====================
 
     def clear_cache(self):
         """Clear API response cache."""

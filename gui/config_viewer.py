@@ -130,8 +130,14 @@ class ConfigViewerWidget(QWidget):
 
         splitter.addWidget(details_widget)
 
+        # Set splitter sizes - give more space to both panels
+        # Left panel (tree): 40%, Right panel (details): 60%
         splitter.setSizes([400, 600])
-        layout.addWidget(splitter)
+        splitter.setStretchFactor(0, 4)  # Tree gets 40% when resizing
+        splitter.setStretchFactor(1, 6)  # Details gets 60% when resizing
+        
+        # Add splitter with stretch to fill available space
+        layout.addWidget(splitter, stretch=1)
 
     def set_config(self, config: Optional[Dict[str, Any]]):
         """Set the configuration to display."""

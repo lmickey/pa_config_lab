@@ -195,8 +195,17 @@ class MigrationWorkflowWidget(QWidget):
 
     def _on_saved_config_loaded(self, config: Dict[str, Any]):
         """Handle when a saved configuration is loaded from sidebar."""
+        # Store as current config
+        self.current_config = config
+        
         # Load into viewer
         self.config_viewer.set_config(config)
+        
+        # Load into push widget (for migration workflow)
+        self.push_widget.set_config(config)
+        
+        # Switch to review tab to show loaded config
+        self.tabs.setCurrentIndex(1)
         
         # Show success message
         source_name = config.get("metadata", {}).get("saved_name", "saved config")
@@ -204,7 +213,7 @@ class MigrationWorkflowWidget(QWidget):
             self,
             "Configuration Loaded",
             f"Configuration '{source_name}' loaded successfully.\n\n"
-            f"You can now review it in the next tab."
+            f"Viewing in the Review tab."
         )
 
     def set_api_client(self, client):

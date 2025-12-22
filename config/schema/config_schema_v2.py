@@ -69,6 +69,26 @@ CONFIG_SCHEMA_V2 = {
                     "items": {"type": "object"},
                     "description": "Remote network configurations",
                 },
+                "ipsec_tunnels": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "IPsec tunnel configurations",
+                },
+                "ike_gateways": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "IKE gateway configurations",
+                },
+                "ike_crypto_profiles": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "IKE crypto profile configurations",
+                },
+                "ipsec_crypto_profiles": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "IPsec crypto profile configurations",
+                },
             },
         },
         "security_policies": {
@@ -301,6 +321,58 @@ CONFIG_SCHEMA_V2 = {
                 "excluded_configs": {"type": "array", "items": {"type": "string"}},
             },
         },
+        # Mobile Users section (NEW)
+        "mobile_users": {
+            "type": "object",
+            "properties": {
+                "infrastructure_settings": {
+                    "type": "object",
+                    "description": "Mobile user infrastructure settings",
+                },
+                "gp_gateways": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "GlobalProtect gateway configurations",
+                },
+                "gp_portals": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "GlobalProtect portal configurations",
+                },
+            },
+        },
+        # HIP section (NEW)
+        "hip": {
+            "type": "object",
+            "properties": {
+                "hip_objects": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "Host Information Profile objects",
+                },
+                "hip_profiles": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "Host Information Profile profiles",
+                },
+            },
+        },
+        # Regions section (NEW)
+        "regions": {
+            "type": "object",
+            "properties": {
+                "locations": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "Enabled Prisma Access locations/regions",
+                },
+                "bandwidth_allocations": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "Bandwidth allocations per region",
+                },
+            },
+        },
         # Legacy compatibility: Keep fwData and paData for backward compatibility
         "fwData": {
             "type": "object",
@@ -344,6 +416,10 @@ def create_empty_config_v2(
             "mobile_agent": {},
             "service_connections": [],
             "remote_networks": [],
+            "ipsec_tunnels": [],
+            "ike_gateways": [],
+            "ike_crypto_profiles": [],
+            "ipsec_crypto_profiles": [],
         },
         "security_policies": {"folders": [], "snippets": []},
         "authentication": {
@@ -359,6 +435,19 @@ def create_empty_config_v2(
             "ipsec_tunnels": [],
             "service_connections": [],
             "remote_networks": [],
+        },
+        "mobile_users": {
+            "infrastructure_settings": {},
+            "gp_gateways": [],
+            "gp_portals": [],
+        },
+        "hip": {
+            "hip_objects": [],
+            "hip_profiles": [],
+        },
+        "regions": {
+            "locations": [],
+            "bandwidth_allocations": [],
         },
         "defaults": {"detected_defaults": [], "excluded_configs": []},
     }

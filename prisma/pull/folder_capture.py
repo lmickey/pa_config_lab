@@ -192,12 +192,27 @@ class FolderCapture:
         Returns:
             List of folder names
         """
+        # Reserved/system folders that cannot have security policies
+        RESERVED_FOLDERS = {
+            "Service Connections",  # Infrastructure only - cannot have security policies
+            "Colo Connect",         # Infrastructure only - cannot have security policies
+            # "Remote Networks",    # CAN have security policies - commented out
+            # "Mobile Users",       # CAN have security policies - commented out
+            # "Mobile_User_Template",
+            # "Shared",             # Shared is default but can be used
+        }
+        
         folders = self.discover_folders()
 
         folder_names = []
         for folder in folders:
             folder_name = folder.get("name", "")
             is_default = folder.get("is_default", False)
+            
+            # Skip reserved infrastructure-only folders
+            if folder_name in RESERVED_FOLDERS:
+                print(f"  ℹ Skipping reserved folder: {folder_name} (infrastructure only, cannot have security policies)")
+                continue
 
             if include_defaults or not is_default:
                 folder_names.append(folder_name)

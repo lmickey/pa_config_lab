@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QScrollArea,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 
 from gui.workers import PullWorker
 
@@ -37,6 +37,13 @@ class PullConfigWidget(QWidget):
         self.api_client = None
         self.worker = None
         self.pulled_config = None
+        
+        # Batch GUI updates to prevent segfaults from rapid updates
+        self.pending_messages = []
+        self.update_timer = QTimer()
+        self.update_timer.timeout.connect(self._flush_pending_messages)
+        self.update_timer.setInterval(250)  # Update GUI every 250ms
+        # Timer will be started when pull begins, not on every progress update
 
         self._init_ui()
 
@@ -59,7 +66,7 @@ class PullConfigWidget(QWidget):
         # Scroll area for options
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setMaximumHeight(300)
+        scroll.setMaximumHeight(450)  # Increased from 300 to accommodate infrastructure options
 
         scroll_widget = QWidget()
         scroll_layout = QVBoxLayout(scroll_widget)
@@ -97,8 +104,89 @@ class PullConfigWidget(QWidget):
         )
         options_layout.addWidget(self.profiles_check)
 
+        # Custom Applications section (NEW)
+        self.applications_check = QCheckBox("Custom Applications")
+        self.applications_check.setChecked(False)
+        self.applications_check.setToolTip(
+            "Select custom applications to capture (rarely needed - most apps are predefined)"
+        )
+        self.applications_check.stateChanged.connect(self._on_applications_toggle)
+        options_layout.addWidget(self.applications_check)
+
+        # Application selector button (initially disabled)
+        app_button_layout = QHBoxLayout()
+        app_button_layout.addSpacing(20)  # Indent
+        self.applications_btn = QPushButton("Select Applications...")
+        self.applications_btn.setEnabled(False)
+        self.applications_btn.setMaximumWidth(200)
+        self.applications_btn.clicked.connect(self._select_applications)
+        app_button_layout.addWidget(self.applications_btn)
+        app_button_layout.addStretch()
+        options_layout.addLayout(app_button_layout)
+
+        # Application selection label
+        app_label_layout = QHBoxLayout()
+        app_label_layout.addSpacing(20)  # Indent
+        self.applications_label = QLabel("No applications selected")
+        self.applications_label.setStyleSheet("color: gray; font-size: 10px;")
+        app_label_layout.addWidget(self.applications_label)
+        app_label_layout.addStretch()
+        options_layout.addLayout(app_label_layout)
+
+        # Store selected applications
+        self.selected_applications = []
+
         options_group.setLayout(options_layout)
         scroll_layout.addWidget(options_group)
+
+        # Infrastructure Components group (NEW)
+        infra_group = QGroupBox("Infrastructure Components")
+        infra_layout = QVBoxLayout()
+
+        self.remote_networks_check = QCheckBox("Remote Networks")
+        self.remote_networks_check.setChecked(True)
+        self.remote_networks_check.setToolTip(
+            "Pull remote network configurations (branches, data centers)"
+        )
+        infra_layout.addWidget(self.remote_networks_check)
+
+        self.service_connections_check = QCheckBox("Service Connections")
+        self.service_connections_check.setChecked(True)
+        self.service_connections_check.setToolTip(
+            "Pull service connection configurations (on-prem connectivity)"
+        )
+        infra_layout.addWidget(self.service_connections_check)
+
+        self.ipsec_tunnels_check = QCheckBox("IPsec Tunnels & Crypto")
+        self.ipsec_tunnels_check.setChecked(True)
+        self.ipsec_tunnels_check.setToolTip(
+            "Pull IPsec tunnel configs, IKE gateways, and crypto profiles"
+        )
+        infra_layout.addWidget(self.ipsec_tunnels_check)
+
+        self.mobile_users_check = QCheckBox("Mobile User Infrastructure")
+        self.mobile_users_check.setChecked(True)
+        self.mobile_users_check.setToolTip(
+            "Pull GlobalProtect gateway/portal configs and mobile user settings"
+        )
+        infra_layout.addWidget(self.mobile_users_check)
+
+        self.hip_check = QCheckBox("HIP Objects & Profiles")
+        self.hip_check.setChecked(True)
+        self.hip_check.setToolTip(
+            "Pull Host Information Profile (HIP) objects and profiles"
+        )
+        infra_layout.addWidget(self.hip_check)
+
+        self.regions_check = QCheckBox("Regions & Bandwidth")
+        self.regions_check.setChecked(True)
+        self.regions_check.setToolTip(
+            "Pull enabled regions and bandwidth allocations"
+        )
+        infra_layout.addWidget(self.regions_check)
+
+        infra_group.setLayout(infra_layout)
+        scroll_layout.addWidget(infra_group)
 
         # Advanced options
         advanced_group = QGroupBox("Advanced Options")
@@ -187,6 +275,53 @@ class PullConfigWidget(QWidget):
             self.progress_label.setText("Not connected")
             self.progress_label.setStyleSheet("color: gray;")
 
+    def _on_applications_toggle(self, state):
+        """Enable/disable applications button when checkbox toggled."""
+        from PyQt6.QtCore import Qt
+        self.applications_btn.setEnabled(state == Qt.CheckState.Checked.value)
+        if state != Qt.CheckState.Checked.value:
+            self.selected_applications = []
+            self.applications_label.setText("No applications selected")
+            self.applications_label.setStyleSheet("color: gray; font-size: 10px;")
+
+    def _select_applications(self):
+        """Open application search dialog."""
+        if not self.api_client:
+            QMessageBox.warning(
+                self,
+                "Not Connected",
+                "Please connect to Prisma Access before selecting applications."
+            )
+            return
+        
+        # Use CLI application search for now (simple implementation)
+        from PyQt6.QtWidgets import QInputDialog
+        
+        # Simple input dialog for application names
+        text, ok = QInputDialog.getText(
+            self,
+            "Custom Applications",
+            "Enter application names (comma-separated):\n"
+            "Note: Only include custom/user-created applications.\n"
+            "Most applications are predefined and don't need to be specified.",
+            text=", ".join(self.selected_applications)
+        )
+        
+        if ok and text:
+            # Parse comma-separated list
+            apps = [app.strip() for app in text.split(",") if app.strip()]
+            self.selected_applications = apps
+            count = len(apps)
+            self.applications_label.setText(
+                f"{count} application{'s' if count != 1 else ''} selected"
+            )
+            self.applications_label.setStyleSheet("color: green; font-size: 10px;")
+        elif ok:
+            # Empty input - clear selection
+            self.selected_applications = []
+            self.applications_label.setText("No applications selected")
+            self.applications_label.setStyleSheet("color: gray; font-size: 10px;")
+
     def _select_all(self):
         """Select all checkboxes."""
         self.folders_check.setChecked(True)
@@ -194,6 +329,14 @@ class PullConfigWidget(QWidget):
         self.rules_check.setChecked(True)
         self.objects_check.setChecked(True)
         self.profiles_check.setChecked(True)
+        self.applications_check.setChecked(False)  # Don't auto-select
+        # Infrastructure
+        self.remote_networks_check.setChecked(True)
+        self.service_connections_check.setChecked(True)
+        self.ipsec_tunnels_check.setChecked(True)
+        self.mobile_users_check.setChecked(True)
+        self.hip_check.setChecked(True)
+        self.regions_check.setChecked(True)
 
     def _select_none(self):
         """Deselect all checkboxes."""
@@ -202,6 +345,14 @@ class PullConfigWidget(QWidget):
         self.rules_check.setChecked(False)
         self.objects_check.setChecked(False)
         self.profiles_check.setChecked(False)
+        self.applications_check.setChecked(False)
+        # Infrastructure
+        self.remote_networks_check.setChecked(False)
+        self.service_connections_check.setChecked(False)
+        self.ipsec_tunnels_check.setChecked(False)
+        self.mobile_users_check.setChecked(False)
+        self.hip_check.setChecked(False)
+        self.regions_check.setChecked(False)
 
     def _start_pull(self):
         """Start the pull operation."""
@@ -277,6 +428,15 @@ class PullConfigWidget(QWidget):
             "rules": self.rules_check.isChecked(),
             "objects": self.objects_check.isChecked(),
             "profiles": self.profiles_check.isChecked(),
+            # NEW: Custom applications
+            "application_names": self.selected_applications if self.applications_check.isChecked() and self.selected_applications else None,
+            # NEW: Infrastructure options
+            "include_remote_networks": self.remote_networks_check.isChecked(),
+            "include_service_connections": self.service_connections_check.isChecked(),
+            "include_ipsec_tunnels": self.ipsec_tunnels_check.isChecked(),
+            "include_mobile_users": self.mobile_users_check.isChecked(),
+            "include_hip": self.hip_check.isChecked(),
+            "include_regions": self.regions_check.isChecked(),
         }
 
         filter_defaults = self.filter_defaults_check.isChecked()
@@ -291,6 +451,10 @@ class PullConfigWidget(QWidget):
 
         # Clear previous results
         self.results_text.clear()
+        
+        # Start the batch update timer (runs continuously during pull)
+        self.pending_messages.clear()
+        self.update_timer.start()
 
         # Create and start worker
         self.worker = PullWorker(self.api_client, options, filter_defaults)
@@ -300,49 +464,97 @@ class PullConfigWidget(QWidget):
         self.worker.start()
 
     def _on_progress(self, message: str, percentage: int):
-        """Handle progress updates."""
-        self.progress_label.setText(message)
-        self.progress_bar.setValue(percentage)
+        """Handle progress updates - batched to prevent GUI overload."""
+        try:
+            # Update progress label and bar immediately (lightweight)
+            self.progress_label.setText(message)
+            self.progress_bar.setValue(percentage)
+            
+            # Queue message for batched update (prevents rapid GUI updates that cause segfaults)
+            self.pending_messages.append(f"[{percentage}%] {message}")
+            
+            # Timer is already running continuously - no need to start/stop
+            
+        except RuntimeError as e:
+            # Widget might have been deleted - ignore
+            print(f"Progress update error: {e}")
+        except Exception as e:
+            print(f"Unexpected progress update error: {e}")
+    
+    def _flush_pending_messages(self):
+        """Flush all pending messages to results text widget in one batch."""
+        if not self.pending_messages:
+            return
         
-        # Also append to results window for visibility
-        self.results_text.append(f"[{percentage}%] {message}")
+        try:
+            # Append all pending messages at once (more efficient than one-by-one)
+            self.results_text.append("\n".join(self.pending_messages))
+            self.pending_messages.clear()
+            
+            # DO NOT call QApplication.processEvents() - causes segfaults on Linux!
+            # Qt will update the GUI naturally on the next event loop iteration
+            
+        except RuntimeError as e:
+            print(f"Batch update error: {e}")
+        except Exception as e:
+            print(f"Unexpected batch update error: {e}")
 
     def _on_error(self, error_message: str):
         """Handle error from worker."""
-        self.results_text.append(f"\n❌ ERROR: {error_message}")
+        try:
+            self.results_text.append(f"\n❌ ERROR: {error_message}")
+        except RuntimeError as e:
+            print(f"Error display failed (widget deleted?): {e}")
+        except Exception as e:
+            print(f"Unexpected error display error: {e}")
 
     def _on_pull_finished(self, success: bool, message: str, config: Optional[Dict]):
         """Handle pull completion."""
-        # Re-enable UI
-        self._set_ui_enabled(True)
+        try:
+            # Stop update timer and flush any remaining messages
+            self.update_timer.stop()
+            self._flush_pending_messages()
+            
+            # Re-enable UI
+            self._set_ui_enabled(True)
 
-        if success:
-            self.progress_label.setText("Pull completed successfully!")
-            self.progress_label.setStyleSheet("color: green;")
-            
-            # Append stats to results
-            self.results_text.append(f"\n{'='*50}")
-            self.results_text.append("✓ Pull completed successfully!")
-            self.results_text.append(f"\n{message}")
-            
-            self.pulled_config = config
-
-            # Emit signal
-            self.pull_completed.emit(config)
-
-            QMessageBox.information(
-                self, "Success", "Configuration pulled successfully!"
-            )
-        else:
-            self.progress_label.setText("Pull failed")
-            self.progress_label.setStyleSheet("color: red;")
-            
-            # Show error in results
-            self.results_text.append(f"\n{'='*50}")
-            self.results_text.append(f"✗ Pull failed!")
-            self.results_text.append(f"\nError: {message}")
-            
-            QMessageBox.warning(self, "Pull Failed", f"Pull operation failed:\n\n{message}")
+            if success:
+                self.progress_label.setText("Pull completed successfully!")
+                self.progress_label.setStyleSheet("color: green;")
+                
+                # Append stats to results
+                self.results_text.append(f"\n{'='*50}")
+                self.results_text.append("✓ Pull completed successfully!")
+                self.results_text.append(f"\n{message}")
+                
+                # Get config from worker (not from signal parameter to avoid threading issues)
+                if self.worker and hasattr(self.worker, 'config'):
+                    self.pulled_config = self.worker.config
+                else:
+                    self.pulled_config = config  # Fallback to parameter if worker unavailable
+                
+                # Emit signal for other components
+                if self.pulled_config:
+                    self.pull_completed.emit(self.pulled_config)
+                
+                QMessageBox.information(
+                    self, "Success", "Configuration pulled successfully!"
+                )
+            else:
+                self.progress_label.setText("Pull failed")
+                self.progress_label.setStyleSheet("color: red;")
+                
+                # Show error in results
+                self.results_text.append(f"\n{'='*50}")
+                self.results_text.append(f"✗ Pull failed!")
+                self.results_text.append(f"\nError: {message}")
+                
+                QMessageBox.warning(self, "Pull Failed", f"Pull operation failed:\n\n{message}")
+                
+        except RuntimeError as e:
+            print(f"Pull finished handler error (widget deleted?): {e}")
+        except Exception as e:
+            print(f"Unexpected pull finished error: {e}")
 
     def _set_ui_enabled(self, enabled: bool):
         """Enable or disable UI controls."""

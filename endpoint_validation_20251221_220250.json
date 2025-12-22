@@ -1,0 +1,1504 @@
+{
+  "tsg_id": "1570970024",
+  "timestamp": "2025-12-21T22:02:50.764726",
+  "summary": {
+    "total": 29,
+    "success": 19,
+    "not_found": 2,
+    "forbidden": 0,
+    "other_error": 8
+  },
+  "results": {
+    "success": [
+      {
+        "name": "Security Rules",
+        "method": "get_security_rules",
+        "params": {
+          "folder": "Shared"
+        },
+        "status": "success",
+        "code": "200",
+        "message": "Returned 24 items",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.sase.paloaltonetworks.com/sse/config/v1/security-rules?folder=Shared",
+          "method": "GET",
+          "query_params": null,
+          "body": null,
+          "sample_response": [
+            {
+              "id": "7f31ba8c-ec33-4a2f-9921-e23196b04b9d",
+              "name": "default",
+              "folder": "All",
+              "policy_type": "Security",
+              "log_setting": "Cortex Data Lake"
+            },
+            {
+              "id": "2a514310-d44e-401f-af58-699759f44d0e",
+              "name": "Web-Security-Default",
+              "folder": "All",
+              "policy_type": "Security",
+              "log_setting": "Cortex Data Lake"
+            },
+            {
+              "id": "c6396267-347f-4e54-92b4-ac410590e046",
+              "name": "hip-default",
+              "folder": "All",
+              "policy_type": "Security"
+            }
+          ]
+        }
+      },
+      {
+        "name": "Security Policy Folders",
+        "method": "get_security_policy_folders",
+        "params": {},
+        "status": "success",
+        "code": "200",
+        "message": "Returned 9 items",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.strata.paloaltonetworks.com/config/setup/v1/folders",
+          "method": "GET",
+          "query_params": {},
+          "body": null,
+          "sample_response": [
+            {
+              "id": "7cb98082-cb70-4d3c-a4fd-07d1c03b0c58",
+              "name": "ngfw-shared",
+              "parent": "All",
+              "snippets": [
+                "Auto-VPN-Default-Snippet"
+              ],
+              "type": "container"
+            },
+            {
+              "display_name": "Mobile Users",
+              "id": "e6fac9fb-751f-4b40-9868-57d44329e75d",
+              "name": "Mobile Users",
+              "parent": "Mobile Users Container",
+              "type": "cloud"
+            },
+            {
+              "display_name": "Mobile Users Explicit Proxy",
+              "id": "76de6e4d-b7b9-4ca6-9b0c-20c558822776",
+              "name": "Mobile Users Explicit Proxy",
+              "parent": "Mobile Users Container",
+              "snippets": [
+                "proxy"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "Address Objects",
+        "method": "get_all_addresses",
+        "params": {
+          "folder": "Shared"
+        },
+        "status": "success",
+        "code": "200",
+        "message": "Returned 3 items",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.sase.paloaltonetworks.com/sse/config/v1/addresses?folder=Shared",
+          "method": "GET",
+          "query_params": null,
+          "body": null,
+          "sample_response": [
+            {
+              "id": "07c2318e-9728-4083-a3c4-60b34a4b2226",
+              "name": "Palo Alto Networks Sinkhole",
+              "folder": "All",
+              "snippet": "default",
+              "fqdn": "sinkhole.paloaltonetworks.com"
+            },
+            {
+              "id": "a9a74af7-03b9-439f-9c8b-f1c3c025ad14",
+              "name": "zoom-1",
+              "folder": "All",
+              "ip_netmask": "3.7.35.0/25"
+            },
+            {
+              "id": "d92abb4e-b6fc-47e5-91a0-cf82dc870c72",
+              "name": "VPN-Users",
+              "folder": "Shared",
+              "ip_netmask": "172.16.0.0/20"
+            }
+          ]
+        }
+      },
+      {
+        "name": "Address Groups",
+        "method": "get_all_address_groups",
+        "params": {
+          "folder": "Shared"
+        },
+        "status": "success",
+        "code": "200",
+        "message": "Returned 1 items",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.sase.paloaltonetworks.com/sse/config/v1/address-groups?folder=Shared",
+          "method": "GET",
+          "query_params": null,
+          "body": null,
+          "sample_response": [
+            {
+              "id": "ee60b649-1a77-495c-8dcb-aeed1f8a13be",
+              "name": "zoom-static",
+              "folder": "Shared",
+              "static": [
+                "VPN-Users"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "Service Objects",
+        "method": "get_services",
+        "params": {
+          "folder": "Shared"
+        },
+        "status": "success",
+        "code": "200",
+        "message": "Returned 4 items",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.sase.paloaltonetworks.com/sse/config/v1/services?folder=Shared",
+          "method": "GET",
+          "query_params": null,
+          "body": null,
+          "sample_response": [
+            {
+              "name": "service-http",
+              "folder": "All",
+              "snippet": "predefined-snippet",
+              "protocol": {
+                "tcp": {
+                  "port": "80,8080"
+                }
+              }
+            },
+            {
+              "name": "service-https",
+              "folder": "All",
+              "snippet": "predefined-snippet",
+              "protocol": {
+                "tcp": {
+                  "port": "443"
+                }
+              }
+            },
+            {
+              "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+              "name": "Quic-HTTP",
+              "folder": "Shared",
+              "protocol": {
+                "udp": {
+                  "port": "80"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Authentication Profiles",
+        "method": "get_authentication_profiles",
+        "params": {
+          "folder": "Shared"
+        },
+        "status": "success",
+        "code": "200",
+        "message": "Returned 2 items",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.sase.paloaltonetworks.com/sse/config/v1/authentication-profiles?folder=Shared",
+          "method": "GET",
+          "query_params": null,
+          "body": null,
+          "sample_response": [
+            {
+              "id": "5d28095b-5c74-4ea7-a1a8-29662108412a",
+              "name": "CIE-Okta",
+              "folder": "All",
+              "lockout": {},
+              "method": {
+                "cloud": {
+                  "profile_name": "CIE-Okta"
+                }
+              }
+            },
+            {
+              "id": "9ddbdcba-e843-46c0-bfb5-2ec4fc1de974",
+              "name": "Okta-CIE-Testing",
+              "folder": "Prisma Access",
+              "lockout": {},
+              "allow_list": [
+                "all"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "Anti-Spyware Profiles",
+        "method": "get_anti_spyware_profiles",
+        "params": {
+          "folder": "Shared"
+        },
+        "status": "success",
+        "code": "200",
+        "message": "Returned 2 items",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.sase.paloaltonetworks.com/sse/config/v1/anti-spyware-profiles?folder=Shared",
+          "method": "GET",
+          "query_params": null,
+          "body": null,
+          "sample_response": [
+            {
+              "id": "c311cbd7-4607-4584-bfb2-9c9ff1b5b30b",
+              "name": "web-security-default",
+              "folder": "All",
+              "snippet": "Web-Security-Default",
+              "rules": [
+                {
+                  "name": "adware",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                },
+                {
+                  "name": "autogen",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                },
+                {
+                  "name": "backdoor",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                },
+                {
+                  "name": "botnet",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                },
+                {
+                  "name": "browser-hijack",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                },
+                {
+                  "name": "command-and-control",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                },
+                {
+                  "name": "cryptominer",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                },
+                {
+                  "name": "data-theft",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                },
+                {
+                  "name": "downloader",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                },
+                {
+                  "name": "fraud",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                },
+                {
+                  "name": "hacktool",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                },
+                {
+                  "name": "keylogger",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                },
+                {
+                  "name": "net-worm",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                },
+                {
+                  "name": "p2p-communication",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                },
+                {
+                  "name": "phishing-kit",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                },
+                {
+                  "name": "post-exploitation",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                },
+                {
+                  "name": "spyware",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                },
+                {
+                  "name": "tls-fingerprint",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                },
+                {
+                  "name": "webshell",
+                  "severity": [
+                    "medium"
+                  ],
+                  "category": "any"
+                }
+              ]
+            },
+            {
+              "id": "b10269e8-f2d0-4771-86b4-5597e29155d0",
+              "name": "best-practice",
+              "folder": "All",
+              "snippet": "predefined-snippet",
+              "description": "Best practice anti-spyware security profile"
+            }
+          ]
+        }
+      },
+      {
+        "name": "DNS Security Profiles",
+        "method": "get_dns_security_profiles",
+        "params": {
+          "folder": "Shared"
+        },
+        "status": "success",
+        "code": "200",
+        "message": "Returned 3 items",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.sase.paloaltonetworks.com/sse/config/v1/dns-security-profiles?folder=Shared",
+          "method": "GET",
+          "query_params": null,
+          "body": null,
+          "sample_response": [
+            {
+              "id": "de78413f-df48-4ef5-9ccf-8e3eb9a67be8",
+              "name": "web-security-default",
+              "folder": "All",
+              "snippet": "Web-Security-Default",
+              "botnet_domains": {
+                "sinkhole": {
+                  "ipv4_address": "pan-sinkhole-default-ip",
+                  "ipv6_address": "::1"
+                },
+                "dns_security_categories": [
+                  {
+                    "name": "pan-dns-sec-grayware",
+                    "action": "default"
+                  },
+                  {
+                    "name": "pan-dns-sec-recent",
+                    "action": "default"
+                  },
+                  {
+                    "name": "pan-dns-sec-parked",
+                    "action": "default"
+                  },
+                  {
+                    "name": "pan-dns-sec-proxy",
+                    "action": "default"
+                  },
+                  {
+                    "name": "pan-dns-sec-cc",
+                    "action": "default"
+                  },
+                  {
+                    "name": "pan-dns-sec-ddns",
+                    "action": "default"
+                  },
+                  {
+                    "name": "pan-dns-sec-phishing",
+                    "action": "default"
+                  },
+                  {
+                    "name": "pan-dns-sec-malware",
+                    "action": "default"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "b046c962-7dcb-43eb-9fc8-61bc1083a217",
+              "name": "best-practice",
+              "folder": "Shared",
+              "override_loc": "predefined-snippet",
+              "override_type": "snippet"
+            },
+            {
+              "id": "a6e20759-2d5c-4157-baec-cf48e277a99c",
+              "name": "Use Best Practice",
+              "folder": "Shared",
+              "botnet_domains": {
+                "dns_security_categories": [
+                  {
+                    "name": "pan-dns-sec-grayware",
+                    "action": "sinkhole",
+                    "log_level": "default",
+                    "packet_capture": "disable"
+                  },
+                  {
+                    "name": "pan-dns-sec-recent",
+                    "action": "sinkhole",
+                    "log_level": "default",
+                    "packet_capture": "disable"
+                  },
+                  {
+                    "name": "pan-dns-sec-parked",
+                    "action": "sinkhole",
+                    "log_level": "default",
+                    "packet_capture": "disable"
+                  },
+                  {
+                    "name": "pan-dns-sec-proxy",
+                    "action": "sinkhole",
+                    "log_level": "default",
+                    "packet_capture": "disable"
+                  },
+                  {
+                    "name": "pan-dns-sec-adtracking",
+                    "action": "sinkhole",
+                    "log_level": "default",
+                    "packet_capture": "disable"
+                  },
+                  {
+                    "name": "pan-dns-sec-cc",
+                    "action": "sinkhole",
+                    "log_level": "default",
+                    "packet_capture": "extended-capture"
+                  },
+                  {
+                    "name": "pan-dns-sec-ddns",
+                    "action": "sinkhole",
+                    "log_level": "default",
+                    "packet_capture": "disable"
+                  },
+                  {
+                    "name": "pan-dns-sec-phishing",
+                    "action": "sinkhole",
+                    "log_level": "default",
+                    "packet_capture": "disable"
+                  },
+                  {
+                    "name": "pan-dns-sec-malware",
+                    "action": "sinkhole",
+                    "log_level": "default",
+                    "packet_capture": "disable"
+                  }
+                ],
+                "sinkhole": {
+                  "ipv4_address": "pan-sinkhole-default-ip",
+                  "ipv6_address": "::1"
+                },
+                "whitelist": [
+                  {
+                    "name": "mynetsetup.com"
+                  },
+                  {
+                    "name": "*.mynetsetup.com"
+                  }
+                ]
+              },
+              "description": "Best practice dns security profile"
+            }
+          ]
+        }
+      },
+      {
+        "name": "File Blocking Profiles",
+        "method": "get_file_blocking_profiles",
+        "params": {
+          "folder": "Shared"
+        },
+        "status": "success",
+        "code": "200",
+        "message": "Returned 1 items",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.sase.paloaltonetworks.com/sse/config/v1/file-blocking-profiles?folder=Shared",
+          "method": "GET",
+          "query_params": null,
+          "body": null,
+          "sample_response": [
+            {
+              "id": "6570f01f-cf86-47a3-9f46-686decfbcf9c",
+              "name": "best-practice",
+              "folder": "All",
+              "snippet": "predefined-snippet",
+              "rules": [
+                {
+                  "name": "Block all risky file types",
+                  "application": [
+                    "any"
+                  ],
+                  "file_type": [
+                    "7z",
+                    "bat",
+                    "chm",
+                    "class",
+                    "cpl",
+                    "dll",
+                    "hlp",
+                    "hta",
+                    "jar",
+                    "ocx",
+                    "pif",
+                    "scr",
+                    "torrent",
+                    "vbe",
+                    "wsf"
+                  ],
+                  "direction": "both",
+                  "action": "block"
+                },
+                {
+                  "name": "Continue prompt encrypted files",
+                  "application": [
+                    "any"
+                  ],
+                  "file_type": [
+                    "encrypted-rar",
+                    "encrypted-zip"
+                  ],
+                  "direction": "both",
+                  "action": "block"
+                },
+                {
+                  "name": "Log all other file types",
+                  "application": [
+                    "any"
+                  ],
+                  "file_type": [
+                    "any"
+                  ],
+                  "direction": "both",
+                  "action": "alert"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "HTTP Header Profiles",
+        "method": "get_http_header_profiles",
+        "params": {
+          "folder": "Shared"
+        },
+        "status": "success",
+        "code": "200",
+        "message": "Returned 1 items",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.sase.paloaltonetworks.com/sse/config/v1/http-header-profiles?folder=Shared",
+          "method": "GET",
+          "query_params": null,
+          "body": null,
+          "sample_response": [
+            {
+              "id": "50c4f902-201a-4e0c-914c-6ff285eb9ab1",
+              "name": "Gmail-Google",
+              "folder": "Shared",
+              "description": "Insert domain for email tracking",
+              "http_header_insertion": [
+                {
+                  "name": "Gmail-Google",
+                  "type": [
+                    {
+                      "name": "Google Apps Access Control",
+                      "headers": [
+                        {
+                          "name": "auto_bjbb8fw6",
+                          "header": "X-GooGApps-Allowed-Domains",
+                          "value": "paloaltonetworks.com"
+                        }
+                      ],
+                      "domains": [
+                        "*.google.com",
+                        "gmail.com",
+                        "*.googleusercontent.com",
+                        "*.drive.google.com",
+                        "*.gstatic.com"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "Profile Groups",
+        "method": "get_profile_groups",
+        "params": {
+          "folder": "Shared"
+        },
+        "status": "success",
+        "code": "200",
+        "message": "Returned 5 items",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.sase.paloaltonetworks.com/sse/config/v1/profile-groups?folder=Shared",
+          "method": "GET",
+          "query_params": null,
+          "body": null,
+          "sample_response": [
+            {
+              "id": "259c9007-25fa-485f-b6b2-c8cdb17a8317",
+              "name": "best-practice",
+              "folder": "Shared",
+              "override_loc": "predefined-snippet",
+              "override_type": "snippet"
+            },
+            {
+              "id": "177dfb42-5c7e-42fe-980f-5230ba0736db",
+              "name": "Explicit Proxy - Unknown Users",
+              "folder": "All",
+              "snippet": "predefined-snippet",
+              "spyware": [
+                "best-practice"
+              ]
+            },
+            {
+              "id": "015ab133-9400-48ff-8b9c-9584d07e8054",
+              "name": "Corporate Email",
+              "folder": "Shared",
+              "saas_security": [
+                "Gmail-Google"
+              ],
+              "virus_and_wildfire_analysis": [
+                "best-practice"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "URL Access Profiles",
+        "method": "get_url_access_profiles",
+        "params": {
+          "folder": "Shared"
+        },
+        "status": "success",
+        "code": "200",
+        "message": "Returned 5 items",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.sase.paloaltonetworks.com/sse/config/v1/url-access-profiles?folder=Shared",
+          "method": "GET",
+          "query_params": null,
+          "body": null,
+          "sample_response": [
+            {
+              "id": "96e86db1-0759-4fec-98a8-ff598c5f3070",
+              "name": "best-practice",
+              "folder": "Shared",
+              "override_loc": "predefined-snippet",
+              "override_type": "snippet"
+            },
+            {
+              "id": "24b32be7-2ed5-403e-b841-7443c4943e4b",
+              "name": "Explicit Proxy - Unknown Users",
+              "folder": "All",
+              "snippet": "predefined-snippet",
+              "credential_enforcement": {
+                "log_severity": "medium",
+                "mode": {
+                  "disabled": {}
+                },
+                "block": [
+                  "medium-risk",
+                  "high-risk"
+                ]
+              }
+            },
+            {
+              "id": "c287805f-5186-4c4b-b413-414885f3d92b",
+              "name": "Blocked Websites",
+              "folder": "Shared",
+              "credential_enforcement": {
+                "log_severity": "medium",
+                "mode": {
+                  "disabled": {}
+                },
+                "block": [
+                  "medium-risk",
+                  "high-risk",
+                  "ransomware"
+                ]
+              },
+              "allow": [
+                "abortion",
+                "abused-drugs",
+                "adult",
+                "alcohol-and-tobacco",
+                "artificial-intelligence",
+                "auctions",
+                "business-and-economy",
+                "command-and-control",
+                "computer-and-internet-info",
+                "content-delivery-networks",
+                "copyright-infringement",
+                "cryptocurrency",
+                "dating",
+                "dynamic-dns",
+                "educational-institutions",
+                "encrypted-dns",
+                "entertainment-and-arts",
+                "extremism",
+                "financial-services",
+                "gambling",
+                "games",
+                "government",
+                "grayware",
+                "hacking",
+                "health-and-medicine",
+                "home-and-garden",
+                "hunting-and-fishing",
+                "insufficient-content",
+                "internet-communications-and-telephony",
+                "internet-portals",
+                "job-search",
+                "legal",
+                "low-risk",
+                "malware",
+                "marijuana",
+                "military",
+                "motor-vehicles",
+                "music",
+                "newly-registered-domain",
+                "news",
+                "not-resolved",
+                "nudity",
+                "online-storage-and-backup",
+                "parked",
+                "peer-to-peer",
+                "personal-sites-and-blogs",
+                "philosophy-and-political-advocacy",
+                "phishing",
+                "private-ip-addresses",
+                "proxy-avoidance-and-anonymizers",
+                "questionable",
+                "real-estate",
+                "real-time-detection",
+                "recreation-and-hobbies",
+                "reference-and-research",
+                "religion",
+                "scanning-activity",
+                "search-engines",
+                "sex-education",
+                "shareware-and-freeware",
+                "shopping",
+                "social-networking",
+                "society",
+                "sports",
+                "stock-advice-and-tools",
+                "streaming-media",
+                "swimsuits-and-intimate-apparel",
+                "training-and-tools",
+                "translation",
+                "travel",
+                "unknown",
+                "weapons",
+                "web-advertisements",
+                "web-based-email",
+                "web-hosting"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "Vulnerability Protection Profiles",
+        "method": "get_vulnerability_protection_profiles",
+        "params": {
+          "folder": "Shared"
+        },
+        "status": "success",
+        "code": "200",
+        "message": "Returned 4 items",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.sase.paloaltonetworks.com/sse/config/v1/vulnerability-protection-profiles?folder=Shared",
+          "method": "GET",
+          "query_params": null,
+          "body": null,
+          "sample_response": [
+            {
+              "id": "7f0c02ae-4625-43ea-a823-3187f65c4203",
+              "name": "web-security-default",
+              "folder": "All",
+              "snippet": "Web-Security-Default",
+              "rules": [
+                {
+                  "name": "brute-force",
+                  "severity": [
+                    "medium"
+                  ],
+                  "cve": [
+                    "any"
+                  ],
+                  "category": "any",
+                  "host": "any",
+                  "vendor_id": [
+                    "any"
+                  ]
+                },
+                {
+                  "name": "code-execution",
+                  "severity": [
+                    "medium"
+                  ],
+                  "cve": [
+                    "any"
+                  ],
+                  "category": "any",
+                  "host": "any",
+                  "vendor_id": [
+                    "any"
+                  ]
+                },
+                {
+                  "name": "code-obfuscation",
+                  "severity": [
+                    "medium"
+                  ],
+                  "cve": [
+                    "any"
+                  ],
+                  "category": "any",
+                  "host": "any",
+                  "vendor_id": [
+                    "any"
+                  ]
+                },
+                {
+                  "name": "command-execution",
+                  "severity": [
+                    "medium"
+                  ],
+                  "cve": [
+                    "any"
+                  ],
+                  "category": "any",
+                  "host": "any",
+                  "vendor_id": [
+                    "any"
+                  ]
+                },
+                {
+                  "name": "dos",
+                  "severity": [
+                    "medium"
+                  ],
+                  "cve": [
+                    "any"
+                  ],
+                  "category": "any",
+                  "host": "any",
+                  "vendor_id": [
+                    "any"
+                  ]
+                },
+                {
+                  "name": "exploit-kit",
+                  "severity": [
+                    "medium"
+                  ],
+                  "cve": [
+                    "any"
+                  ],
+                  "category": "any",
+                  "host": "any",
+                  "vendor_id": [
+                    "any"
+                  ]
+                },
+                {
+                  "name": "info-leak",
+                  "severity": [
+                    "medium"
+                  ],
+                  "cve": [
+                    "any"
+                  ],
+                  "category": "any",
+                  "host": "any",
+                  "vendor_id": [
+                    "any"
+                  ]
+                },
+                {
+                  "name": "insecure-credentials",
+                  "severity": [
+                    "medium"
+                  ],
+                  "cve": [
+                    "any"
+                  ],
+                  "category": "any",
+                  "host": "any",
+                  "vendor_id": [
+                    "any"
+                  ]
+                },
+                {
+                  "name": "overflow",
+                  "severity": [
+                    "medium"
+                  ],
+                  "cve": [
+                    "any"
+                  ],
+                  "category": "any",
+                  "host": "any",
+                  "vendor_id": [
+                    "any"
+                  ]
+                },
+                {
+                  "name": "phishing",
+                  "severity": [
+                    "medium"
+                  ],
+                  "cve": [
+                    "any"
+                  ],
+                  "category": "any",
+                  "host": "any",
+                  "vendor_id": [
+                    "any"
+                  ]
+                },
+                {
+                  "name": "protocol-anomaly",
+                  "severity": [
+                    "medium"
+                  ],
+                  "cve": [
+                    "any"
+                  ],
+                  "category": "any",
+                  "host": "any",
+                  "vendor_id": [
+                    "any"
+                  ]
+                },
+                {
+                  "name": "scan",
+                  "severity": [
+                    "medium"
+                  ],
+                  "cve": [
+                    "any"
+                  ],
+                  "category": "any",
+                  "host": "any",
+                  "vendor_id": [
+                    "any"
+                  ]
+                },
+                {
+                  "name": "sql-injection",
+                  "severity": [
+                    "medium"
+                  ],
+                  "cve": [
+                    "any"
+                  ],
+                  "category": "any",
+                  "host": "any",
+                  "vendor_id": [
+                    "any"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "48e2a66b-5a2a-433c-803b-3452b44279ce",
+              "name": "best-practice",
+              "folder": "Shared",
+              "override_loc": "predefined-snippet",
+              "override_type": "snippet"
+            },
+            {
+              "id": "c6c3de7b-179c-4167-9394-cf5e24013ad6",
+              "name": "Auto-block portal dos",
+              "folder": "Shared",
+              "rules": [
+                {
+                  "name": "Block portal user brute-force",
+                  "packet_capture": "disable",
+                  "cve": [
+                    "any"
+                  ],
+                  "vendor_id": [
+                    "any"
+                  ],
+                  "category": "brute-force",
+                  "host": "any",
+                  "severity": [
+                    "any"
+                  ],
+                  "action": {
+                    "block_ip": {
+                      "track_by": "source",
+                      "duration": 3600
+                    }
+                  },
+                  "threat_name": "any"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "Wildfire Anti-Virus Profiles",
+        "method": "get_wildfire_anti_virus_profiles",
+        "params": {
+          "folder": "Shared"
+        },
+        "status": "success",
+        "code": "200",
+        "message": "Returned 2 items",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.sase.paloaltonetworks.com/sse/config/v1/wildfire-anti-virus-profiles?folder=Shared",
+          "method": "GET",
+          "query_params": null,
+          "body": null,
+          "sample_response": [
+            {
+              "id": "25d8d521-e609-4523-a0b7-11a5b451645c",
+              "name": "web-security-default",
+              "folder": "All",
+              "snippet": "Web-Security-Default",
+              "rules": [
+                {
+                  "name": "default-fawkes",
+                  "direction": "both",
+                  "file_type": [
+                    "any"
+                  ],
+                  "application": [
+                    "any"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "42ff4ef4-30cf-44b2-9960-daa6bc9dbba6",
+              "name": "best-practice",
+              "folder": "All",
+              "snippet": "predefined-snippet",
+              "rules": [
+                {
+                  "name": "default",
+                  "application": [
+                    "any"
+                  ],
+                  "file_type": [
+                    "any"
+                  ],
+                  "direction": "both",
+                  "analysis": "public-cloud"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "Decryption Profiles",
+        "method": "get_decryption_profiles",
+        "params": {
+          "folder": "Shared"
+        },
+        "status": "success",
+        "code": "200",
+        "message": "Returned 3 items",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.sase.paloaltonetworks.com/sse/config/v1/decryption-profiles?folder=Shared",
+          "method": "GET",
+          "query_params": null,
+          "body": null,
+          "sample_response": [
+            {
+              "id": "d4680725-aa09-46a5-8d40-f64a8cb7b539",
+              "name": "web-security-default",
+              "folder": "All",
+              "snippet": "Web-Security-Default",
+              "ssl_protocol_settings": {
+                "min_version": "tls1-2",
+                "max_version": "max",
+                "keyxchg_algo_rsa": true,
+                "keyxchg_algo_dhe": true,
+                "keyxchg_algo_ecdhe": true,
+                "auth_algo_sha256": true,
+                "auth_algo_sha384": true,
+                "enc_algo_aes_128_cbc": true,
+                "enc_algo_aes_256_cbc": true,
+                "enc_algo_aes_128_gcm": true,
+                "enc_algo_aes_256_gcm": true,
+                "enc_algo_chacha20_poly1305": true,
+                "auth_algo_sha1": false
+              }
+            },
+            {
+              "id": "13b8ea0f-20cd-44c0-a748-ab1118e39278",
+              "name": "best-practice",
+              "folder": "All",
+              "snippet": "predefined-snippet",
+              "ssl_no_proxy": {
+                "block_expired_certificate": true,
+                "block_untrusted_issuer": true
+              }
+            },
+            {
+              "id": "4c4f8b63-4c2e-493b-9402-9f98be7154b3",
+              "name": "Gmail Test",
+              "folder": "Shared",
+              "ssl_no_proxy": {
+                "block_expired_certificate": true,
+                "block_untrusted_issuer": true
+              },
+              "ssl_forward_proxy": {
+                "block_expired_certificate": true,
+                "block_untrusted_issuer": true,
+                "block_unknown_cert": true,
+                "restrict_cert_exts": true,
+                "auto_include_altname": true,
+                "block_unsupported_version": true,
+                "block_unsupported_cipher": true,
+                "block_client_cert": true,
+                "strip_alpn": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Remote Networks",
+        "method": "get_all_remote_networks",
+        "params": {},
+        "status": "success",
+        "code": "200",
+        "message": "Returned 0 items",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.sase.paloaltonetworks.com/sse/config/v1/remote-networks",
+          "method": "GET",
+          "query_params": null,
+          "body": null,
+          "sample_response": []
+        }
+      },
+      {
+        "name": "Service Connections",
+        "method": "get_all_service_connections",
+        "params": {},
+        "status": "success",
+        "code": "200",
+        "message": "Returned 1 items",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.sase.paloaltonetworks.com/sse/config/v1/service-connections",
+          "method": "GET",
+          "query_params": null,
+          "body": null,
+          "sample_response": [
+            {
+              "id": "0bf23296-1571-42cf-86cc-87d9bdd5754e",
+              "name": "Azure SCM Lab",
+              "region": "us-east-1",
+              "ipsec_tunnel": "Azure_DC_FW01",
+              "subnets": [
+                "10.12.2.0/24"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "Bandwidth Allocations",
+        "method": "get_all_bandwidth_allocations",
+        "params": {},
+        "status": "success",
+        "code": "200",
+        "message": "Returned 2 items",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.sase.paloaltonetworks.com/sse/config/v1/bandwidth-allocations",
+          "method": "GET",
+          "query_params": null,
+          "body": null,
+          "sample_response": [
+            {
+              "name": "us-east",
+              "allocated_bandwidth": 50,
+              "spn_name_list": [
+                "us-east-koyamaki"
+              ]
+            },
+            {
+              "name": "us-central",
+              "allocated_bandwidth": 50,
+              "spn_name_list": [
+                "us-central-abelia"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "Shared Infrastructure Settings",
+        "method": "get_shared_infrastructure_settings",
+        "params": {},
+        "status": "success",
+        "code": "200",
+        "message": "Returned dict",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "https://api.sase.paloaltonetworks.com/sse/config/v1/shared-infrastructure-settings",
+          "method": "GET",
+          "query_params": {},
+          "body": null,
+          "sample_response": {
+            "folder": "Shared",
+            "infra_bgp_as": "65534",
+            "infrastructure_subnet": "192.168.255.0/24",
+            "tunnel_monitor_ip_address": "192.168.255.254",
+            "captive_portal_redirect_ip_address": "192.168.255.254"
+          }
+        }
+      }
+    ],
+    "failed": [],
+    "not_found": [
+      {
+        "name": "GlobalProtect Portals",
+        "method": "get_all_globalprotect_portals",
+        "params": {},
+        "status": "not_found",
+        "code": "404",
+        "message": "404 Client Error: Not Found for url: https://api.sase.paloaltonetworks.com/sse/config/v1/mobile-agent/portals",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "Unknown",
+          "method": "GET",
+          "query_params": {},
+          "body": null,
+          "sample_response": null
+        }
+      },
+      {
+        "name": "GlobalProtect Gateways",
+        "method": "get_all_globalprotect_gateways",
+        "params": {},
+        "status": "not_found",
+        "code": "404",
+        "message": "404 Client Error: Not Found for url: https://api.sase.paloaltonetworks.com/sse/config/v1/mobile-agent/gateways",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "Unknown",
+          "method": "GET",
+          "query_params": {},
+          "body": null,
+          "sample_response": null
+        }
+      }
+    ],
+    "forbidden": [],
+    "other_error": [
+      {
+        "name": "Applications",
+        "method": "get_all_applications",
+        "params": {
+          "folder": "Shared",
+          "limit": 10
+        },
+        "status": "other_error",
+        "code": "???",
+        "message": "PrismaAccessAPIClient.get_all_applications() got an unexpected keyword argument 'limit'",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "Unknown",
+          "method": "GET",
+          "query_params": {},
+          "body": null,
+          "sample_response": null
+        }
+      },
+      {
+        "name": "IPsec Tunnels",
+        "method": "get_all_ipsec_tunnels",
+        "params": {},
+        "status": "bad_request",
+        "code": "400",
+        "message": "400 Client Error: Bad Request for url: https://api.sase.paloaltonetworks.com/sse/config/v1/ipsec-tunnels",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "Unknown",
+          "method": "GET",
+          "query_params": {},
+          "body": null,
+          "sample_response": null
+        }
+      },
+      {
+        "name": "IKE Gateways",
+        "method": "get_all_ike_gateways",
+        "params": {},
+        "status": "bad_request",
+        "code": "400",
+        "message": "400 Client Error: Bad Request for url: https://api.sase.paloaltonetworks.com/sse/config/v1/ike-gateways",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "Unknown",
+          "method": "GET",
+          "query_params": {},
+          "body": null,
+          "sample_response": null
+        }
+      },
+      {
+        "name": "IKE Crypto Profiles",
+        "method": "get_all_ike_crypto_profiles",
+        "params": {},
+        "status": "bad_request",
+        "code": "400",
+        "message": "400 Client Error: Bad Request for url: https://api.sase.paloaltonetworks.com/sse/config/v1/ike-crypto-profiles",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "Unknown",
+          "method": "GET",
+          "query_params": {},
+          "body": null,
+          "sample_response": null
+        }
+      },
+      {
+        "name": "IPsec Crypto Profiles",
+        "method": "get_all_ipsec_crypto_profiles",
+        "params": {},
+        "status": "bad_request",
+        "code": "400",
+        "message": "400 Client Error: Bad Request for url: https://api.sase.paloaltonetworks.com/sse/config/v1/ipsec-crypto-profiles",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "Unknown",
+          "method": "GET",
+          "query_params": {},
+          "body": null,
+          "sample_response": null
+        }
+      },
+      {
+        "name": "HIP Objects",
+        "method": "get_all_hip_objects",
+        "params": {},
+        "status": "bad_request",
+        "code": "400",
+        "message": "400 Client Error: Bad Request for url: https://api.sase.paloaltonetworks.com/sse/config/v1/hip-objects",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "Unknown",
+          "method": "GET",
+          "query_params": {},
+          "body": null,
+          "sample_response": null
+        }
+      },
+      {
+        "name": "HIP Profiles",
+        "method": "get_all_hip_profiles",
+        "params": {},
+        "status": "bad_request",
+        "code": "400",
+        "message": "400 Client Error: Bad Request for url: https://api.sase.paloaltonetworks.com/sse/config/v1/hip-profiles",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "Unknown",
+          "method": "GET",
+          "query_params": {},
+          "body": null,
+          "sample_response": null
+        }
+      },
+      {
+        "name": "Locations",
+        "method": "get_all_locations",
+        "params": {},
+        "status": "other_error",
+        "code": "???",
+        "message": "'list' object has no attribute 'get'",
+        "details": {
+          "base_url": "https://api.sase.paloaltonetworks.com",
+          "endpoint": "Unknown",
+          "method": "GET",
+          "query_params": {},
+          "body": null,
+          "sample_response": null
+        }
+      }
+    ]
+  }
+}

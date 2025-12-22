@@ -2176,3 +2176,134 @@ Response Body:
 
 ----------------------------------------------------------------------------------------------------
 
+
+================================================================================
+API ERROR - 2025-12-21 22:02:32
+================================================================================
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/mobile-agent/portals
+Status Code: 404
+Status Text: Not Found
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...yM1stR7r_A
+
+Response Body:
+{
+  "statusCode": 404,
+  "error": "Not Found",
+  "message": "Not Found",
+  "errorCode": "Not Found",
+  "errorMessage": "Not Found",
+  "httpStatusCode": 404,
+  "ok": false,
+  "trackingId": "c339cf9e-f55e-4ec0-be09-b9e5f5bf512b"
+}
+
+================================================================================
+
+
+================================================================================
+API ERROR - 2025-12-21 22:02:32
+================================================================================
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/mobile-agent/gateways
+Status Code: 404
+Status Text: Not Found
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...yM1stR7r_A
+
+Response Body:
+{
+  "statusCode": 404,
+  "error": "Not Found",
+  "message": "Not Found",
+  "errorCode": "Not Found",
+  "errorMessage": "Not Found",
+  "httpStatusCode": 404,
+  "ok": false,
+  "trackingId": "11d9c098-65e7-46e7-b39e-a292245e01c5"
+}
+
+================================================================================
+
+
+================================================================================
+API ERROR - 2025-12-21 22:45:33
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/folders
+Status Code: 500
+Status Text: Internal Server Error
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...UL8rdEEA8A
+
+Response Body:
+{
+  "_error": {
+    "code": "OPA_500",
+    "message": "Failed to perform OPA",
+    "_request_id": "86012066-2081-411e-b380-edc9275c88bd"
+  }
+}
+
+================================================================================
+
+
+================================================================================
+API ERROR - 2025-12-21 23:00:23
+================================================================================
+Method: GET
+URL: https://api.sase.paloaltonetworks.com/sse/config/v1/anti-spyware-profiles?folder=ngfw-shared
+Status Code: 500
+Status Text: Internal Server Error
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...ttV-Xl3M2g
+
+Response Body:
+{
+  "_error": {
+    "code": "OPA_500",
+    "message": "Failed to perform OPA",
+    "_request_id": "ef905966-4051-4c9e-bf1c-ebc05ca171f9"
+  }
+}
+
+================================================================================
+
+
+================================================================================
+API ERROR - 2025-12-21 23:30:21
+================================================================================
+Method: GET
+URL: https://api.strata.paloaltonetworks.com/config/setup/v1/folders
+Status Code: 500
+Status Text: Internal Server Error
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer eyJ0eXAiOiJKV...YDgtcPutQw
+
+Response Body:
+{
+  "_error": {
+    "code": "OPA_500",
+    "message": "Failed to perform OPA",
+    "_request_id": "bca7cbb5-1fc6-456c-95d2-d021da5bf791"
+  }
+}
+
+================================================================================
+

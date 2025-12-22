@@ -35,10 +35,20 @@ class ProfileCapture:
         Returns:
             List of normalized authentication profiles
         """
+        # Skip reserved folders
+        RESERVED_FOLDERS = {"Service Connections", "Colo Connect"}
+        if folder and folder in RESERVED_FOLDERS:
+            return []
+        
         try:
             profiles = self.api_client.get_authentication_profiles(folder=folder)
             return [self._normalize_authentication_profile(prof) for prof in profiles]
         except Exception as e:
+            # Check if this is a "folder doesn't exist" or pattern validation error
+            error_str = str(e).lower()
+            if "doesn't exist" in error_str or "400" in error_str or "pattern" in error_str:
+                print(f"  ⚠ Folder '{folder}' cannot be used for authentication profiles - skipping")
+                return []
             print(f"Error capturing authentication profiles: {e}")
             return []
 
@@ -55,6 +65,11 @@ class ProfileCapture:
         Returns:
             List of normalized security profiles
         """
+        # Skip reserved folders
+        RESERVED_FOLDERS = {"Service Connections", "Colo Connect"}
+        if folder and folder in RESERVED_FOLDERS:
+            return []
+        
         try:
             # Map profile types to API client methods
             # These match the endpoints marked "include in test" in Master-API-Entpoint-List.txt
@@ -87,6 +102,15 @@ class ProfileCapture:
             ]
 
         except Exception as e:
+            # Check if this is a "folder doesn't exist", pattern validation, or server error
+            error_str = str(e).lower()
+            if "doesn't exist" in error_str or "400" in error_str or "pattern" in error_str:
+                print(f"  ⚠ Folder '{folder}' cannot be used for {profile_type} profiles - skipping")
+                return []
+            elif "500" in error_str or "503" in error_str or "502" in error_str:
+                # Server errors - API is having issues, skip gracefully
+                print(f"  ⚠ API server error for {profile_type} profiles in folder '{folder}' - skipping")
+                return []
             print(f"Error capturing {profile_type} profiles: {e}")
             return []
 
@@ -134,6 +158,11 @@ class ProfileCapture:
         Returns:
             List of normalized decryption profiles
         """
+        # Skip reserved folders
+        RESERVED_FOLDERS = {"Service Connections", "Colo Connect"}
+        if folder and folder in RESERVED_FOLDERS:
+            return []
+        
         try:
             # Decryption profiles endpoint (marked "include in test")
             profiles = (
@@ -147,6 +176,11 @@ class ProfileCapture:
             ]
 
         except Exception as e:
+            # Check if this is a "folder doesn't exist" or pattern validation error
+            error_str = str(e).lower()
+            if "doesn't exist" in error_str or "400" in error_str or "pattern" in error_str:
+                print(f"  ⚠ Folder '{folder}' cannot be used for decryption profiles - skipping")
+                return []
             print(f"Error capturing decryption profiles: {e}")
             return []
 
@@ -164,6 +198,24 @@ class ProfileCapture:
         Returns:
             Dictionary with all profile types
         """
+        # Reserved/infrastructure folders that cannot have security profiles
+        RESERVED_FOLDERS = {
+            "Service Connections",  # Infrastructure only - cannot have security policies
+            "Colo Connect",         # Infrastructure only - cannot have security policies
+            # "Remote Networks",    # CAN have security policies - commented out
+            # "Mobile Users",       # CAN have security policies - commented out
+            # "Mobile_User_Template",
+        }
+        
+        # Return empty profiles if this is a reserved folder
+        if folder and folder in RESERVED_FOLDERS:
+            print(f"  ℹ Skipping reserved infrastructure folder: {folder} (cannot have security profiles)")
+            return {
+                "authentication_profiles": [],
+                "security_profiles": {},
+                "decryption_profiles": [],
+            }
+        
         # Capture all profiles visible from this folder
         all_visible_profiles = {
             "authentication_profiles": self.capture_authentication_profiles(folder),

@@ -36,10 +36,24 @@ class ObjectCapture:
         Returns:
             List of normalized address objects
         """
+        # Skip reserved folders
+        RESERVED_FOLDERS = {"Service Connections", "Colo Connect"}
+        if folder and folder in RESERVED_FOLDERS:
+            return []
+        
         try:
             addresses = self.api_client.get_all_addresses(folder=folder)
             return [self._normalize_address(addr) for addr in addresses]
         except Exception as e:
+            # Check if this is a "folder doesn't exist", pattern validation, or server error
+            error_str = str(e).lower()
+            if "doesn't exist" in error_str or "400" in error_str or "pattern" in error_str:
+                print(f"  ⚠ Folder '{folder}' cannot be used for addresses - skipping")
+                return []
+            elif "500" in error_str or "503" in error_str or "502" in error_str:
+                # Server errors - API is having issues, skip gracefully
+                print(f"  ⚠ API server error for addresses in folder '{folder}' - skipping")
+                return []
             print(f"Error capturing addresses: {e}")
             # Log to centralized error logger
             try:
@@ -67,6 +81,11 @@ class ObjectCapture:
         Returns:
             List of normalized address groups
         """
+        # Skip reserved folders
+        RESERVED_FOLDERS = {"Service Connections", "Colo Connect"}
+        if folder and folder in RESERVED_FOLDERS:
+            return []
+        
         try:
             groups = self.api_client.get_all_address_groups(folder=folder)
             return [self._normalize_address_group(grp) for grp in groups]
@@ -95,10 +114,24 @@ class ObjectCapture:
         Returns:
             List of normalized service objects
         """
+        # Skip reserved folders
+        RESERVED_FOLDERS = {"Service Connections", "Colo Connect"}
+        if folder and folder in RESERVED_FOLDERS:
+            return []
+        
         try:
             services = self.api_client.get_services(folder=folder)
             return [self._normalize_service(svc) for svc in services]
         except Exception as e:
+            # Check if this is a "folder doesn't exist", pattern validation, or server error
+            error_str = str(e).lower()
+            if "doesn't exist" in error_str or "400" in error_str or "pattern" in error_str:
+                print(f"  ⚠ Folder '{folder}' cannot be used for services - skipping")
+                return []
+            elif "500" in error_str or "503" in error_str or "502" in error_str:
+                # Server errors - API is having issues, skip gracefully
+                print(f"  ⚠ API server error for services in folder '{folder}' - skipping")
+                return []
             print(f"Error capturing services: {e}")
             try:
                 from ...error_logger import error_logger
@@ -125,6 +158,11 @@ class ObjectCapture:
         Returns:
             List of normalized service groups
         """
+        # Skip reserved folders
+        RESERVED_FOLDERS = {"Service Connections", "Colo Connect"}
+        if folder and folder in RESERVED_FOLDERS:
+            return []
+        
         try:
             # Note: Service groups endpoint may need to be added to API client
             # For now, using a placeholder
@@ -160,6 +198,11 @@ class ObjectCapture:
         Returns:
             List of normalized application objects
         """
+        # Skip reserved folders
+        RESERVED_FOLDERS = {"Service Connections", "Colo Connect"}
+        if folder and folder in RESERVED_FOLDERS:
+            return []
+        
         try:
             if application_names:
                 # Only capture specified applications
@@ -209,6 +252,31 @@ class ObjectCapture:
         Returns:
             Dictionary mapping object types to lists of objects
         """
+        # Reserved/infrastructure folders that cannot have security objects
+        RESERVED_FOLDERS = {
+            "Service Connections",  # Infrastructure only - cannot have security policies
+            "Colo Connect",         # Infrastructure only - cannot have security policies
+            # "Remote Networks",    # CAN have security policies - commented out
+            # "Mobile Users",       # CAN have security policies - commented out
+            # "Mobile_User_Template",
+        }
+        
+        # Return empty objects if this is a reserved folder
+        if folder and folder in RESERVED_FOLDERS:
+            print(f"  ℹ Skipping reserved infrastructure folder: {folder} (cannot have security objects)")
+            return {
+                "address_objects": [],
+                "address_groups": [],
+                "service_objects": [],
+                "service_groups": [],
+                "applications": [],
+                "application_groups": [],
+                "application_filters": [],
+                "url_filtering_categories": [],
+                "external_dynamic_lists": [],
+                "fqdn_objects": [],
+            }
+        
         # Capture all objects visible from this folder
         all_visible_objects = {
             "address_objects": self.capture_addresses(folder),

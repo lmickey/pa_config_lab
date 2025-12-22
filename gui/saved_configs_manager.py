@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-from config.storage.json_storage import save_config_json, load_config_json
+from config.storage.json_storage import save_config_json
 from config.storage.crypto_utils import derive_key_secure
 
 
@@ -109,6 +109,7 @@ class SavedConfigsManager:
                     config,
                     str(filepath),
                     cipher=cipher,
+                    salt=salt,  # Pass the salt that matches the cipher!
                     encrypt=True,
                     validate=False  # Skip validation for flexibility
                 )
@@ -149,34 +150,44 @@ class SavedConfigsManager:
             return False, None, f"Configuration '{name}' not found"
         
         try:
-            # Determine if encrypted
+            import json
+            from config.storage.json_storage import decrypt_json_data
+            
+            # Read file as binary to check encryption
             with open(filepath, 'rb') as f:
-                first_bytes = f.read(16)
-                is_encrypted = not (first_bytes.startswith(b'{') or first_bytes.startswith(b'{\n'))
+                file_data = f.read()
+            
+            # Check if encrypted (first 16 bytes are salt, not JSON)
+            is_encrypted = not (file_data.startswith(b'{') or file_data.startswith(b'{\n'))
             
             if is_encrypted:
                 if not password:
                     return False, None, "Password required for encrypted configuration"
                 
-                cipher, salt = derive_key_secure(password)
-                config = load_config_json(
-                    str(filepath),
-                    cipher=cipher,
-                    encrypted=True,
-                    validate=False
-                )
+                # Decrypt directly (extracts salt from file and uses it with password)
+                try:
+                    json_str, salt = decrypt_json_data(file_data, password=password)
+                    config = json.loads(json_str)
+                except Exception as e:
+                    # Check if it's a decryption error (wrong password)
+                    if "InvalidToken" in str(type(e).__name__) or "decrypt" in str(e).lower():
+                        return False, None, "Incorrect password or corrupted file"
+                    else:
+                        raise
             else:
-                config = load_config_json(
-                    str(filepath),
-                    encrypted=False,
-                    validate=False
-                )
+                # Unencrypted - parse JSON directly
+                json_str = file_data.decode('utf-8')
+                config = json.loads(json_str)
             
             if config:
                 return True, config, f"Configuration '{name}' loaded successfully"
             else:
                 return False, None, "Failed to load configuration"
         
+        except json.JSONDecodeError as e:
+            return False, None, f"Invalid JSON in configuration file: {str(e)}"
+        except FileNotFoundError:
+            return False, None, f"Configuration file not found"
         except Exception as e:
             return False, None, f"Error loading configuration: {str(e)}"
 
@@ -293,19 +304,28 @@ class SavedConfigsManager:
                 if not password:
                     return False, None, "Password required for encrypted configuration"
                 
-                cipher, salt = derive_key_secure(password)
-                config = load_config_json(
-                    str(import_file),
-                    cipher=cipher,
-                    encrypted=True,
-                    validate=False
-                )
+                # Read entire file
+                with open(import_file, 'rb') as f:
+                    file_data = f.read()
+                
+                # Import decrypt function
+                from config.storage.json_storage import decrypt_json_data
+                import json
+                
+                # Decrypt (extracts salt from file and uses it with password)
+                try:
+                    json_str, salt = decrypt_json_data(file_data, password=password)
+                    config = json.loads(json_str)
+                except Exception as e:
+                    # Check if it's a decryption error (wrong password)
+                    if "InvalidToken" in str(type(e).__name__) or "decrypt" in str(e).lower():
+                        return False, None, "Incorrect password or corrupted file"
+                    else:
+                        raise
             else:
-                config = load_config_json(
-                    str(import_file),
-                    encrypted=False,
-                    validate=False
-                )
+                # Unencrypted - parse JSON directly
+                with open(import_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
             
             if not config:
                 return False, None, "Failed to load configuration"

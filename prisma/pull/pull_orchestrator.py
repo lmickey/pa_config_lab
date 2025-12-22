@@ -96,6 +96,8 @@ class PullOrchestrator:
         include_objects: bool = True,
         include_profiles: bool = True,
         application_names: Optional[List[str]] = None,
+        folder_index: int = 0,
+        total_folders: int = 0,
     ) -> Dict[str, Any]:
         """
         Pull complete configuration for a single folder.
@@ -104,6 +106,9 @@ class PullOrchestrator:
             folder_name: Name of the folder
             include_objects: Whether to capture objects
             include_profiles: Whether to capture profiles
+            application_names: Optional list of custom application names to capture
+            folder_index: Current folder index (for progress reporting)
+            total_folders: Total number of folders (for progress reporting)
 
         Returns:
             Complete folder configuration dictionary
@@ -139,8 +144,26 @@ class PullOrchestrator:
         }
 
         try:
+            # Calculate sub-tasks for this folder
+            total_tasks = 1  # Rules
+            if include_objects:
+                total_tasks += 1
+            if include_profiles:
+                total_tasks += 1
+            
+            current_task = 0
+            
             # Capture security rules (reduced verbosity - progress callback handles output)
-            self._report_progress(f"Capturing rules from {folder_name}", 1, 3)
+            current_task += 1
+            if total_folders > 0:
+                self._report_progress(
+                    f"Folder {folder_index}/{total_folders}: {folder_name} - Capturing rules ({current_task}/{total_tasks})",
+                    folder_index - 1 + (current_task / total_tasks),
+                    total_folders
+                )
+            else:
+                self._report_progress(f"Capturing rules from {folder_name}", current_task, total_tasks)
+            
             # Capture rules created in this folder (filtered by folder property)
             rules = self.rule_capture.capture_rules_from_folder(folder_name)
 
@@ -175,7 +198,16 @@ class PullOrchestrator:
 
             # Capture objects (reduced verbosity)
             if include_objects:
-                self._report_progress(f"Capturing objects from {folder_name}", 2, 3)
+                current_task += 1
+                if total_folders > 0:
+                    self._report_progress(
+                        f"Folder {folder_index}/{total_folders}: {folder_name} - Capturing objects ({current_task}/{total_tasks})",
+                        folder_index - 1 + (current_task / total_tasks),
+                        total_folders
+                    )
+                else:
+                    self._report_progress(f"Capturing objects from {folder_name}", current_task, total_tasks)
+                
                 # Capture objects created in this folder (filtered by folder property)
                 objects = self.object_capture.capture_all_objects(
                     folder=folder_name, application_names=application_names
@@ -231,7 +263,15 @@ class PullOrchestrator:
 
             # Capture profiles (reduced verbosity)
             if include_profiles:
-                self._report_progress(f"Capturing profiles from {folder_name}", 3, 3)
+                current_task += 1
+                if total_folders > 0:
+                    self._report_progress(
+                        f"Folder {folder_index}/{total_folders}: {folder_name} - Capturing profiles ({current_task}/{total_tasks})",
+                        folder_index - 1 + (current_task / total_tasks),
+                        total_folders
+                    )
+                else:
+                    self._report_progress(f"Capturing profiles from {folder_name}", current_task, total_tasks)
                 # Capture profiles created in this folder (filtered by folder property)
                 profiles = self.profile_capture.capture_all_profiles(folder=folder_name)
 
@@ -404,12 +444,13 @@ class PullOrchestrator:
         folder_configs = []
 
         for idx, folder_name in enumerate(folder_names, 1):
-            self._report_progress(f"Pulling folder {folder_name}", idx, total_folders)
             folder_config = self.pull_folder_configuration(
                 folder_name,
                 include_objects=include_objects,
                 include_profiles=include_profiles,
                 application_names=application_names,
+                folder_index=idx,
+                total_folders=total_folders,
             )
             folder_configs.append(folder_config)
 

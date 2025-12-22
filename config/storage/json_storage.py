@@ -112,6 +112,7 @@ def save_config_json(
     config: Dict[str, Any],
     file_path: str,
     cipher: Optional[Fernet] = None,
+    salt: Optional[bytes] = None,
     encrypt: bool = True,
     pretty: bool = True,
     validate: bool = True,
@@ -123,6 +124,7 @@ def save_config_json(
         config: Configuration dictionary
         file_path: Path to save file
         cipher: Optional Fernet cipher for encryption
+        salt: Optional salt bytes (required if cipher provided for new format)
         encrypt: Whether to encrypt the file
         pretty: Whether to format JSON with indentation
         validate: Whether to validate configuration structure
@@ -159,13 +161,11 @@ def save_config_json(
         if encrypt:
             if cipher is None:
                 password = getpass.getpass("Enter password for encryption: ")
-                cipher, salt = derive_key(password)
+                cipher, salt = derive_key_secure(password)
             else:
-                # If cipher provided, generate a salt
-                # (caller should have provided salt too, but generate as fallback)
-                import os
-
-                salt = os.urandom(16)
+                # Cipher provided - salt must also be provided
+                if salt is None:
+                    raise ValueError("Salt must be provided when cipher is provided")
 
             encrypted_data = encrypt_json_data(json_str, cipher, salt)
 
