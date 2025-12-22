@@ -71,73 +71,36 @@ class PullConfigWidget(QWidget):
         scroll_widget = QWidget()
         scroll_layout = QVBoxLayout(scroll_widget)
 
-        # Options group
-        options_group = QGroupBox("Configuration Components")
-        options_layout = QVBoxLayout()
-
-        self.folders_check = QCheckBox("Security Policy Folders")
-        self.folders_check.setChecked(True)
-        self.folders_check.setToolTip("Pull folder structure and organization")
-        options_layout.addWidget(self.folders_check)
-
-        self.snippets_check = QCheckBox("Configuration Snippets")
-        self.snippets_check.setChecked(True)
-        self.snippets_check.setToolTip("Pull configuration snippets")
-        options_layout.addWidget(self.snippets_check)
-
-        self.rules_check = QCheckBox("Security Rules")
-        self.rules_check.setChecked(True)
-        self.rules_check.setToolTip("Pull security policy rules")
-        options_layout.addWidget(self.rules_check)
-
-        self.objects_check = QCheckBox("Security Objects")
-        self.objects_check.setChecked(True)
-        self.objects_check.setToolTip(
-            "Pull addresses, address groups, services, service groups, etc."
+        # Folder selection button (NEW)
+        folder_selection_layout = QHBoxLayout()
+        folder_selection_layout.addStretch()
+        
+        self.folder_select_btn = QPushButton("📁 Select Folders & Snippets...")
+        self.folder_select_btn.setMinimumWidth(250)
+        self.folder_select_btn.setStyleSheet(
+            "QPushButton { background-color: #FF9800; color: white; padding: 10px; font-weight: bold; }"
+            "QPushButton:hover { background-color: #F57C00; }"
         )
-        options_layout.addWidget(self.objects_check)
-
-        self.profiles_check = QCheckBox("Security Profiles")
-        self.profiles_check.setChecked(True)
-        self.profiles_check.setToolTip(
-            "Pull security profiles (AV, AS, vulnerability, etc.)"
-        )
-        options_layout.addWidget(self.profiles_check)
-
-        # Custom Applications section (NEW)
-        self.applications_check = QCheckBox("Custom Applications")
-        self.applications_check.setChecked(False)
-        self.applications_check.setToolTip(
-            "Select custom applications to capture (rarely needed - most apps are predefined)"
-        )
-        self.applications_check.stateChanged.connect(self._on_applications_toggle)
-        options_layout.addWidget(self.applications_check)
-
-        # Application selector button (initially disabled)
-        app_button_layout = QHBoxLayout()
-        app_button_layout.addSpacing(20)  # Indent
-        self.applications_btn = QPushButton("Select Applications...")
-        self.applications_btn.setEnabled(False)
-        self.applications_btn.setMaximumWidth(200)
-        self.applications_btn.clicked.connect(self._select_applications)
-        app_button_layout.addWidget(self.applications_btn)
-        app_button_layout.addStretch()
-        options_layout.addLayout(app_button_layout)
-
-        # Application selection label
-        app_label_layout = QHBoxLayout()
-        app_label_layout.addSpacing(20)  # Indent
-        self.applications_label = QLabel("No applications selected")
-        self.applications_label.setStyleSheet("color: gray; font-size: 10px;")
-        app_label_layout.addWidget(self.applications_label)
-        app_label_layout.addStretch()
-        options_layout.addLayout(app_label_layout)
-
+        self.folder_select_btn.clicked.connect(self._open_folder_selection)
+        self.folder_select_btn.setEnabled(False)  # Enable when connected
+        folder_selection_layout.addWidget(self.folder_select_btn)
+        
+        folder_selection_layout.addStretch()
+        scroll_layout.addLayout(folder_selection_layout)
+        
+        # Folder selection status label (NEW)
+        self.folder_selection_label = QLabel("No specific folders selected (will pull all)")
+        self.folder_selection_label.setStyleSheet("color: gray; font-size: 10px; padding: 5px; text-align: center;")
+        self.folder_selection_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        scroll_layout.addWidget(self.folder_selection_label)
+        
+        # Store selected folders/components/snippets (NEW)
+        self.selected_folders = []
+        self.selected_components = {}
+        self.selected_snippets = []
+        
         # Store selected applications
         self.selected_applications = []
-
-        options_group.setLayout(options_layout)
-        scroll_layout.addWidget(options_group)
 
         # Infrastructure Components group (NEW)
         infra_group = QGroupBox("Infrastructure Components")
@@ -265,6 +228,7 @@ class PullConfigWidget(QWidget):
         """Set the API client for pull operations."""
         self.api_client = api_client
         self.pull_btn.setEnabled(api_client is not None)
+        self.folder_select_btn.setEnabled(api_client is not None)  # NEW
 
         if api_client:
             self.progress_label.setText(
@@ -274,6 +238,41 @@ class PullConfigWidget(QWidget):
         else:
             self.progress_label.setText("Not connected")
             self.progress_label.setStyleSheet("color: gray;")
+
+    def _open_folder_selection(self):
+        """Open folder selection dialog."""
+        if not self.api_client:
+            QMessageBox.warning(
+                self,
+                "Not Connected",
+                "Please connect to Prisma Access before selecting folders."
+            )
+            return
+        
+        from gui.dialogs.folder_selection_dialog import FolderSelectionDialog
+        
+        dialog = FolderSelectionDialog(self.api_client, self)
+        if dialog.exec():
+            self.selected_folders = dialog.get_selected_folders()
+            self.selected_components = dialog.get_selected_components()
+            self.selected_snippets = dialog.get_selected_snippets()
+            
+            # Update label
+            folder_count = len(self.selected_folders)
+            snippet_count = len(self.selected_snippets)
+            
+            if folder_count == 0 and snippet_count == 0:
+                self.folder_selection_label.setText("No specific folders selected (will pull all)")
+                self.folder_selection_label.setStyleSheet("color: gray; font-size: 10px; padding: 5px;")
+            else:
+                parts = []
+                if folder_count > 0:
+                    parts.append(f"{folder_count} folder(s)")
+                if snippet_count > 0:
+                    parts.append(f"{snippet_count} snippet(s)")
+                
+                self.folder_selection_label.setText(f"Selected: {', '.join(parts)}")
+                self.folder_selection_label.setStyleSheet("color: green; font-size: 10px; padding: 5px;")
 
     def _on_applications_toggle(self, state):
         """Enable/disable applications button when checkbox toggled."""
@@ -323,13 +322,7 @@ class PullConfigWidget(QWidget):
             self.applications_label.setStyleSheet("color: gray; font-size: 10px;")
 
     def _select_all(self):
-        """Select all checkboxes."""
-        self.folders_check.setChecked(True)
-        self.snippets_check.setChecked(True)
-        self.rules_check.setChecked(True)
-        self.objects_check.setChecked(True)
-        self.profiles_check.setChecked(True)
-        self.applications_check.setChecked(False)  # Don't auto-select
+        """Select all infrastructure checkboxes."""
         # Infrastructure
         self.remote_networks_check.setChecked(True)
         self.service_connections_check.setChecked(True)
@@ -339,13 +332,7 @@ class PullConfigWidget(QWidget):
         self.regions_check.setChecked(True)
 
     def _select_none(self):
-        """Deselect all checkboxes."""
-        self.folders_check.setChecked(False)
-        self.snippets_check.setChecked(False)
-        self.rules_check.setChecked(False)
-        self.objects_check.setChecked(False)
-        self.profiles_check.setChecked(False)
-        self.applications_check.setChecked(False)
+        """Deselect all infrastructure checkboxes."""
         # Infrastructure
         self.remote_networks_check.setChecked(False)
         self.service_connections_check.setChecked(False)
@@ -404,39 +391,27 @@ class PullConfigWidget(QWidget):
             )
             return
 
-        # Validate at least one option is selected
-        if not any(
-            [
-                self.folders_check.isChecked(),
-                self.snippets_check.isChecked(),
-                self.rules_check.isChecked(),
-                self.objects_check.isChecked(),
-                self.profiles_check.isChecked(),
-            ]
-        ):
-            QMessageBox.warning(
-                self,
-                "No Options Selected",
-                "Please select at least one configuration component to pull.",
-            )
-            return
-
-        # Gather options
+        # Gather options (folder/snippet selection handled by dialog)
         options = {
-            "folders": self.folders_check.isChecked(),
-            "snippets": self.snippets_check.isChecked(),
-            "rules": self.rules_check.isChecked(),
-            "objects": self.objects_check.isChecked(),
-            "profiles": self.profiles_check.isChecked(),
-            # NEW: Custom applications
-            "application_names": self.selected_applications if self.applications_check.isChecked() and self.selected_applications else None,
-            # NEW: Infrastructure options
+            # Configuration components are now selected via the folder selection dialog
+            "folders": True,  # Always pull folders
+            "snippets": True,  # Always pull snippets
+            "rules": True,  # Always pull rules
+            "objects": True,  # Always pull objects
+            "profiles": True,  # Always pull profiles
+            # Custom applications (if any selected)
+            "application_names": self.selected_applications if self.selected_applications else None,
+            # Infrastructure options
             "include_remote_networks": self.remote_networks_check.isChecked(),
             "include_service_connections": self.service_connections_check.isChecked(),
             "include_ipsec_tunnels": self.ipsec_tunnels_check.isChecked(),
             "include_mobile_users": self.mobile_users_check.isChecked(),
             "include_hip": self.hip_check.isChecked(),
             "include_regions": self.regions_check.isChecked(),
+            # Folder and snippet selection (from dialog)
+            "selected_folders": self.selected_folders if self.selected_folders else None,
+            "selected_components": self.selected_components if self.selected_components else None,
+            "selected_snippets": self.selected_snippets if self.selected_snippets else None,
         }
 
         filter_defaults = self.filter_defaults_check.isChecked()
@@ -466,6 +441,11 @@ class PullConfigWidget(QWidget):
     def _on_progress(self, message: str, percentage: int):
         """Handle progress updates - batched to prevent GUI overload."""
         try:
+            # Ensure progress never goes backwards
+            current_value = self.progress_bar.value()
+            if percentage < current_value:
+                percentage = current_value  # Don't allow backwards progress
+            
             # Update progress label and bar immediately (lightweight)
             self.progress_label.setText(message)
             self.progress_bar.setValue(percentage)
@@ -558,15 +538,11 @@ class PullConfigWidget(QWidget):
 
     def _set_ui_enabled(self, enabled: bool):
         """Enable or disable UI controls."""
-        self.folders_check.setEnabled(enabled)
-        self.snippets_check.setEnabled(enabled)
-        self.rules_check.setEnabled(enabled)
-        self.objects_check.setEnabled(enabled)
-        self.profiles_check.setEnabled(enabled)
         self.filter_defaults_check.setEnabled(enabled)
         self.select_all_btn.setEnabled(enabled)
         self.select_none_btn.setEnabled(enabled)
         self.pull_btn.setEnabled(enabled)
+        self.folder_select_btn.setEnabled(enabled)
 
     def get_pulled_config(self) -> Optional[Dict[str, Any]]:
         """Get the pulled configuration."""

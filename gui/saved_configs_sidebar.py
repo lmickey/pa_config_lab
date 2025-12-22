@@ -150,7 +150,7 @@ class SavedConfigsSidebar(QWidget):
         success, config, message = self.manager.load_config(name, password)
         
         if success:
-            QMessageBox.information(self, "Success", message)
+            # No success dialog - just emit the config
             self.config_loaded.emit(config)
         else:
             QMessageBox.warning(self, "Load Failed", message)
@@ -203,7 +203,7 @@ class SavedConfigsSidebar(QWidget):
         success, config, message = self.manager.import_config(filepath, name, password)
         
         if success:
-            QMessageBox.information(self, "Success", message)
+            # No success dialog - just refresh and emit
             self._refresh_list()
             if config:
                 self.config_loaded.emit(config)
@@ -258,7 +258,7 @@ class SavedConfigsSidebar(QWidget):
         success, message = self.manager.rename_config(old_name, new_name)
         
         if success:
-            QMessageBox.information(self, "Success", message)
+            # No success dialog - just refresh the list
             self._refresh_list()
         else:
             QMessageBox.warning(self, "Rename Failed", message)
@@ -278,7 +278,8 @@ class SavedConfigsSidebar(QWidget):
         success, message = self.manager.export_config(name, filepath)
         
         if success:
-            QMessageBox.information(self, "Success", message)
+            # No success dialog - file is saved
+            pass
         else:
             QMessageBox.warning(self, "Export Failed", message)
 
@@ -297,11 +298,70 @@ class SavedConfigsSidebar(QWidget):
         success, message = self.manager.delete_config(name)
         
         if success:
-            QMessageBox.information(self, "Success", message)
+            # No success dialog - just refresh the list
             self._refresh_list()
         else:
             QMessageBox.warning(self, "Delete Failed", message)
 
+    def _get_password_with_confirmation(self, config_name: str) -> Optional[str]:
+        """
+        Show a dialog to get password and confirmation in one dialog.
+        
+        Args:
+            config_name: Name of the config being encrypted
+        
+        Returns:
+            Password if successful, None if cancelled or mismatch
+        """
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QDialogButtonBox
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Encryption Password")
+        dialog.setMinimumWidth(400)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Instructions
+        label = QLabel(f"Enter a password to encrypt '{config_name}':")
+        layout.addWidget(label)
+        
+        # Password field
+        password_label = QLabel("Password:")
+        layout.addWidget(password_label)
+        
+        password_input = QLineEdit()
+        password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        layout.addWidget(password_input)
+        
+        # Confirm password field
+        confirm_label = QLabel("Confirm Password:")
+        layout.addWidget(confirm_label)
+        
+        confirm_input = QLineEdit()
+        confirm_input.setEchoMode(QLineEdit.EchoMode.Password)
+        layout.addWidget(confirm_input)
+        
+        # Buttons
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        
+        # Show dialog
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            password = password_input.text()
+            confirm = confirm_input.text()
+            
+            if password != confirm:
+                QMessageBox.warning(self, "Password Mismatch", "Passwords do not match.")
+                return None
+            
+            return password
+        
+        return None  # User cancelled
+    
     def save_current_config(
         self,
         config: Dict[str, Any],
@@ -339,31 +399,15 @@ class SavedConfigsSidebar(QWidget):
         # Get password if encrypting
         password = None
         if encrypt:
-            password, ok = QInputDialog.getText(
-                self,
-                "Encryption Password",
-                f"Enter a password to encrypt '{name}':",
-                QLineEdit.EchoMode.Password
-            )
-            if not ok:
-                return False
-            
-            # Confirm password
-            password_confirm, ok = QInputDialog.getText(
-                self,
-                "Confirm Password",
-                "Confirm password:",
-                QLineEdit.EchoMode.Password
-            )
-            if not ok or password != password_confirm:
-                QMessageBox.warning(self, "Password Mismatch", "Passwords do not match.")
-                return False
+            password = self._get_password_with_confirmation(name)
+            if password is None:
+                return False  # User cancelled
         
         # Save
         success, message = self.manager.save_config(config, name, password, overwrite=False)
         
         if success:
-            QMessageBox.information(self, "Success", message)
+            # No success dialog - just refresh the list
             self._refresh_list()
             return True
         else:
@@ -379,7 +423,7 @@ class SavedConfigsSidebar(QWidget):
                 if reply == QMessageBox.StandardButton.Yes:
                     success, message = self.manager.save_config(config, name, password, overwrite=True)
                     if success:
-                        QMessageBox.information(self, "Success", message)
+                        # No success dialog - just refresh the list
                         self._refresh_list()
                         return True
             

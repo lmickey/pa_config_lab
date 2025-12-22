@@ -207,14 +207,7 @@ class MigrationWorkflowWidget(QWidget):
         # Switch to review tab to show loaded config
         self.tabs.setCurrentIndex(1)
         
-        # Show success message
-        source_name = config.get("metadata", {}).get("saved_name", "saved config")
-        QMessageBox.information(
-            self,
-            "Configuration Loaded",
-            f"Configuration '{source_name}' loaded successfully.\n\n"
-            f"Viewing in the Review tab."
-        )
+        # No success message - config is now visible in viewer
 
     def set_api_client(self, client):
         """Set API client for pull/push operations."""

@@ -41,7 +41,14 @@ class SnippetCapture:
             # Normalize snippet data
             normalized_snippets = []
             for snippet in snippets:
+                # Store original keys before normalization for filtering purposes
+                original_keys = set(snippet.keys())
+                
                 normalized = self._normalize_snippet(snippet)
+                
+                # Store original keys for later filtering
+                normalized["_original_keys"] = original_keys
+                
                 normalized_snippets.append(normalized)
 
             return normalized_snippets
@@ -49,6 +56,98 @@ class SnippetCapture:
         except Exception as e:
             print(f"Error discovering snippets: {e}")
             return []
+    
+    def discover_snippets_with_folders(self, debug: bool = False) -> List[Dict[str, Any]]:
+        """
+        Discover snippets with their folder associations.
+        
+        Returns snippets with enhanced metadata including:
+        - Associated folders
+        - Folder names (resolved from IDs)
+        - Snippet type/purpose
+        
+        Filtering logic:
+        - Skip snippets with ONLY "id" and "name" fields (system/internal snippets)
+        - Keep all others (use display_name if exists, otherwise use name)
+        
+        Type detection:
+        - Predefined: type='predefined' OR type='readonly'
+        - Custom: Has enable_prefix field OR no type field
+        
+        Sorts: custom snippets first, then alphabetically by name.
+        
+        Args:
+            debug: If True, print debug information (only use from main thread)
+        
+        Returns:
+            List of snippets with folder associations
+        """
+        snippets = self.discover_snippets()
+        
+        # Filter out snippets with only id and name (system/internal snippets)
+        filtered_snippets = []
+        skipped_snippets = []
+        
+        for snippet in snippets:
+            snippet_name = snippet.get("name", "")
+            
+            # Get original keys from API response (before normalization)
+            original_keys = snippet.get("_original_keys", set())
+            
+            # Skip if snippet only has id and name in the original API response
+            if original_keys == {"id", "name"} or original_keys == {"name", "id"}:
+                skipped_snippets.append(snippet_name)
+                continue
+            
+            # Use display_name if it exists and is not empty, otherwise use name
+            display_name = snippet.get("display_name", "").strip()
+            if not display_name:
+                snippet["display_name"] = snippet_name  # Fallback to name
+            
+            # Enhance with folder information
+            folder_list = snippet.get("folders", [])
+            if folder_list:
+                # Extract folder names from folder objects
+                # Folders can be: [{"id": "...", "name": "..."}] or just ["folder-name"]
+                folder_names = []
+                for folder in folder_list:
+                    if isinstance(folder, dict):
+                        folder_name = folder.get("name", "")
+                        if folder_name:
+                            folder_names.append(folder_name)
+                    elif isinstance(folder, str):
+                        folder_names.append(folder)
+                
+                snippet["folder_names"] = folder_names
+            else:
+                snippet["folder_names"] = []
+            
+            filtered_snippets.append(snippet)
+        
+        # Sort: custom first (type not in ['predefined', 'readonly']), then alphabetically by name
+        def sort_key(s):
+            snippet_type = s.get("type", "")
+            is_predefined = snippet_type in ["predefined", "readonly"]
+            name = s.get("name", "").lower()
+            # Return tuple: (is_predefined, name)
+            # False sorts before True, so custom (False) comes first
+            return (is_predefined, name)
+        
+        filtered_snippets.sort(key=sort_key)
+        
+        # Store debug info in metadata for later retrieval
+        if filtered_snippets:
+            # Add metadata to first snippet for debugging purposes
+            debug_info = {
+                "total_from_api": len(snippets),
+                "filtered_out": len(skipped_snippets),
+                "skipped_names": skipped_snippets,
+                "kept": len(filtered_snippets)
+            }
+            # Store in a way that won't interfere with normal processing
+            filtered_snippets[0]["_discovery_debug"] = debug_info
+        
+        return filtered_snippets
 
     def get_snippet_details(self, snippet_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -186,16 +285,25 @@ class SnippetCapture:
             Normalized snippet dictionary
         """
         # Expected fields from snippet-detail.txt:
-        # - id, name, last_update, created_in, folders (list), shared_in
+        # - id, name, display_name, type, last_update, created_in, folders (list), shared_in
+        # - enable_prefix (custom snippets)
+        
+        # Determine if snippet is predefined based on type field
+        # Predefined types: "predefined" or "readonly"
+        snippet_type = snippet_data.get("type", "")
+        is_predefined = snippet_type in ["predefined", "readonly"]
+        
         normalized = {
             "name": snippet_data.get("name", ""),
             "id": snippet_data.get("id", ""),
+            "display_name": snippet_data.get("display_name", ""),
+            "type": snippet_type,
             "path": snippet_data.get(
                 "path",
                 f"/config/security-policy/snippets/{snippet_data.get('name', '')}",
             ),
             "description": snippet_data.get("description", ""),
-            "is_default": self._is_default_snippet(snippet_data.get("name", "")),
+            "is_default": is_predefined,  # Use type field instead of name pattern
             "folders": snippet_data.get(
                 "folders", []
             ),  # List of folder objects with id and name

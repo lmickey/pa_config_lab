@@ -109,7 +109,16 @@ class ConfigViewerWidget(QWidget):
         self.tree.setHeaderLabels(["Item", "Type", "Count"])
         self.tree.setColumnWidth(0, 250)
         self.tree.itemClicked.connect(self._on_item_clicked)
+        # Add keyboard navigation support with delayed refresh
+        self.tree.currentItemChanged.connect(self._on_item_selection_changed)
         tree_layout.addWidget(self.tree)
+        
+        # Timer for delayed detail refresh (prevents crashes from rapid updates)
+        from PyQt6.QtCore import QTimer
+        self.detail_refresh_timer = QTimer()
+        self.detail_refresh_timer.setSingleShot(True)
+        self.detail_refresh_timer.timeout.connect(self._refresh_details)
+        self.pending_item = None
 
         splitter.addWidget(tree_widget)
 
@@ -158,9 +167,19 @@ class ConfigViewerWidget(QWidget):
         # Update info
         metadata = self.current_config.get("metadata", {})
         version = metadata.get("version", "Unknown")
-        source = metadata.get("source_tenant", "Unknown")
-
-        self.info_label.setText(f"Version: {version} | Source: {source}")
+        
+        # Determine action and source
+        saved_name = metadata.get("saved_name")
+        source_tenant = metadata.get("source_tenant", "Unknown")
+        
+        if saved_name:
+            # Config was loaded from a saved file
+            action_source = f"Load - {saved_name}"
+        else:
+            # Config was pulled from tenant
+            action_source = f"Pull - {source_tenant}"
+        
+        self.info_label.setText(f"Version: {version} | Source: {action_source}")
         self.info_label.setStyleSheet("color: green;")
 
         # Build tree
@@ -291,7 +310,27 @@ class ConfigViewerWidget(QWidget):
         return count
 
     def _on_item_clicked(self, item: QTreeWidgetItem, column: int):
-        """Handle item click."""
+        """Handle item click - immediate refresh."""
+        self._show_item_details(item)
+    
+    def _on_item_selection_changed(self, current: QTreeWidgetItem, previous: QTreeWidgetItem):
+        """Handle keyboard navigation - delayed refresh to prevent crashes."""
+        if current:
+            # Store the item and start/restart the timer
+            self.pending_item = current
+            self.detail_refresh_timer.start(250)  # 250ms delay
+    
+    def _refresh_details(self):
+        """Refresh details for pending item (called after delay)."""
+        if self.pending_item:
+            self._show_item_details(self.pending_item)
+            self.pending_item = None
+    
+    def _show_item_details(self, item: QTreeWidgetItem):
+        """Show details for an item."""
+        if not item:
+            return
+        
         # Get data from item
         data = item.data(0, Qt.ItemDataRole.UserRole)
 

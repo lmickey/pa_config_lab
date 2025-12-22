@@ -1585,8 +1585,4 @@ class POVWorkflowWidget(QWidget):
         self._update_fw_defaults_status()
         self._update_pa_defaults_status()
         
-        QMessageBox.information(
-            self,
-            "Configuration Loaded",
-            f"Configuration '{source_name}' loaded successfully."
-        )
+        # No success message - config is now visible in viewer

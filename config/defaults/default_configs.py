@@ -24,6 +24,7 @@ class DefaultConfigs:
         r"^mobile user container$",
         r"^mobile users container$",
         r"^mobile users$",  # Mobile Users folder (without Container)
+        r"^mobile users explicit proxy$",  # Mobile Users Explicit Proxy folder
         r"^prisma access$",
         r"^ngfw-shared$",
     ]

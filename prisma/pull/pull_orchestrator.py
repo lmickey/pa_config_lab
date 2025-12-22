@@ -95,6 +95,7 @@ class PullOrchestrator:
         folder_name: str,
         include_objects: bool = True,
         include_profiles: bool = True,
+        include_rules: bool = True,
         application_names: Optional[List[str]] = None,
         folder_index: int = 0,
         total_folders: int = 0,
@@ -106,6 +107,7 @@ class PullOrchestrator:
             folder_name: Name of the folder
             include_objects: Whether to capture objects
             include_profiles: Whether to capture profiles
+            include_rules: Whether to capture security rules
             application_names: Optional list of custom application names to capture
             folder_index: Current folder index (for progress reporting)
             total_folders: Total number of folders (for progress reporting)
@@ -145,7 +147,9 @@ class PullOrchestrator:
 
         try:
             # Calculate sub-tasks for this folder
-            total_tasks = 1  # Rules
+            total_tasks = 0
+            if include_rules:
+                total_tasks += 1
             if include_objects:
                 total_tasks += 1
             if include_profiles:
@@ -154,47 +158,48 @@ class PullOrchestrator:
             current_task = 0
             
             # Capture security rules (reduced verbosity - progress callback handles output)
-            current_task += 1
-            if total_folders > 0:
-                self._report_progress(
-                    f"Folder {folder_index}/{total_folders}: {folder_name} - Capturing rules ({current_task}/{total_tasks})",
-                    folder_index - 1 + (current_task / total_tasks),
-                    total_folders
+            if include_rules:
+                current_task += 1
+                if total_folders > 0:
+                    self._report_progress(
+                        f"Folder {folder_index}/{total_folders}: {folder_name} - Capturing rules ({current_task}/{total_tasks})",
+                        folder_index - 1 + (current_task / total_tasks),
+                        total_folders
+                    )
+                else:
+                    self._report_progress(f"Capturing rules from {folder_name}", current_task, total_tasks)
+                
+                # Capture rules created in this folder (filtered by folder property)
+                rules = self.rule_capture.capture_rules_from_folder(folder_name)
+
+                # Capture parent-level rules that are visible but not created in this folder
+                # These are dependencies that need to exist in parent folders
+                parent_level_rules = self.rule_capture.capture_parent_level_rules(
+                    folder_name=folder_name
                 )
-            else:
-                self._report_progress(f"Capturing rules from {folder_name}", current_task, total_tasks)
-            
-            # Capture rules created in this folder (filtered by folder property)
-            rules = self.rule_capture.capture_rules_from_folder(folder_name)
 
-            # Capture parent-level rules that are visible but not created in this folder
-            # These are dependencies that need to exist in parent folders
-            parent_level_rules = self.rule_capture.capture_parent_level_rules(
-                folder_name=folder_name
-            )
+                # Detect defaults in rules
+                if self.default_detector:
+                    rules = self.default_detector.detect_defaults_in_rules(rules)
 
-            # Detect defaults in rules
-            if self.default_detector:
-                rules = self.default_detector.detect_defaults_in_rules(rules)
+                folder_config["security_rules"] = rules
+                self.stats["rules_captured"] += len(rules)
 
-            folder_config["security_rules"] = rules
-            self.stats["rules_captured"] += len(rules)
+                # Track parent-level dependencies
+                # Initialize parent_dependencies if not already initialized
+                if "parent_dependencies" not in folder_config:
+                    folder_config["parent_dependencies"] = {}
 
-            # Track parent-level dependencies
-            # Initialize parent_dependencies if not already initialized
-            if "parent_dependencies" not in folder_config:
-                folder_config["parent_dependencies"] = {}
-
-            # Track parent-level rules as dependencies
-            if parent_level_rules:
-                folder_config["parent_dependencies"]["security_rules"] = [
-                    {
-                        "name": rule.get("name", ""),
-                        "folder": rule.get("folder", ""),
-                        "type": "security_rule",
-                    }
-                    for rule in parent_level_rules
-                ]
+                # Track parent-level rules as dependencies
+                if parent_level_rules:
+                    folder_config["parent_dependencies"]["security_rules"] = [
+                        {
+                            "name": rule.get("name", ""),
+                            "folder": rule.get("folder", ""),
+                            "type": "security_rule",
+                        }
+                        for rule in parent_level_rules
+                    ]
 
             # Capture objects (reduced verbosity)
             if include_objects:
@@ -418,6 +423,7 @@ class PullOrchestrator:
     def pull_all_folders(
         self,
         folder_names: Optional[List[str]] = None,
+        selected_components: Optional[Dict[str, List[str]]] = None,
         include_defaults: bool = False,
         include_objects: bool = True,
         include_profiles: bool = True,
@@ -428,9 +434,13 @@ class PullOrchestrator:
 
         Args:
             folder_names: List of folder names (None = all folders)
+            selected_components: Dict mapping folder names to component types to pull
+                                e.g., {"Mobile Users": ["objects", "rules"]}
+                                If None, pulls all components for selected folders
             include_defaults: Whether to include default folders
             include_objects: Whether to capture objects
             include_profiles: Whether to capture profiles
+            application_names: Optional list of custom application names to capture
 
         Returns:
             List of complete folder configurations
@@ -444,10 +454,23 @@ class PullOrchestrator:
         folder_configs = []
 
         for idx, folder_name in enumerate(folder_names, 1):
+            # Determine which components to pull for this folder
+            if selected_components and folder_name in selected_components:
+                components = selected_components[folder_name]
+                include_objs = "objects" in components
+                include_profs = "profiles" in components
+                include_ruls = "rules" in components
+            else:
+                # Pull all components by default
+                include_objs = include_objects
+                include_profs = include_profiles
+                include_ruls = True  # Always pull rules unless explicitly excluded
+            
             folder_config = self.pull_folder_configuration(
                 folder_name,
-                include_objects=include_objects,
-                include_profiles=include_profiles,
+                include_objects=include_objs,
+                include_profiles=include_profs,
+                include_rules=include_ruls,
                 application_names=application_names,
                 folder_index=idx,
                 total_folders=total_folders,
@@ -495,6 +518,7 @@ class PullOrchestrator:
         self,
         folder_names: Optional[List[str]] = None,
         snippet_names: Optional[List[str]] = None,
+        selected_components: Optional[Dict[str, List[str]]] = None,
         include_defaults: bool = False,
         include_snippets: bool = True,
         include_objects: bool = True,
@@ -507,6 +531,9 @@ class PullOrchestrator:
         Args:
             folder_names: List of folder names (None = all folders)
             snippet_names: Optional list of snippet names to pull (None = all)
+            selected_components: Dict mapping folder names to component types to pull
+                                e.g., {"Mobile Users": ["objects", "rules"], "Shared": ["profiles"]}
+                                If None, pulls all components for selected folders
             include_defaults: Whether to include default folders
             include_snippets: Whether to capture snippets
             include_objects: Whether to capture objects
@@ -543,6 +570,7 @@ class PullOrchestrator:
             self._report_progress("Pulling folder configurations", 0, 3)
             folder_configs = self.pull_all_folders(
                 folder_names=folder_names,
+                selected_components=selected_components,
                 include_defaults=include_defaults,
                 include_objects=include_objects,
                 include_profiles=include_profiles,

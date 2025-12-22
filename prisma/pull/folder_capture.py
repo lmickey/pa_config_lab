@@ -5,10 +5,26 @@ This module provides functions to discover, list, and retrieve metadata
 for security policy folders in Prisma Access SCM.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set
 from ..api_client import PrismaAccessAPIClient
 from ..api_endpoints import APIEndpoints
 from config.defaults.default_configs import DefaultConfigs
+
+
+# Reserved/system folders that cannot have security policies
+INFRASTRUCTURE_ONLY_FOLDERS: Set[str] = {
+    "Service Connections",  # Infrastructure only - cannot have security policies
+    "Colo Connect",         # Infrastructure only - cannot have security policies
+}
+
+# Folders that are not Prisma Access specific (filter from config migration)
+NON_PRISMA_ACCESS_FOLDERS: Set[str] = {
+    "all",          # Global/shared container - not Prisma Access specific
+    "ngfw-shared",  # NGFW-shared - not part of Prisma Access service
+}
+
+# Combined exclusion list for config migration
+MIGRATION_EXCLUDED_FOLDERS: Set[str] = INFRASTRUCTURE_ONLY_FOLDERS | NON_PRISMA_ACCESS_FOLDERS
 
 
 class FolderCapture:
@@ -182,6 +198,38 @@ class FolderCapture:
         ]
         return len(parts)
 
+    def discover_folders_for_migration(
+        self, include_defaults: bool = False
+    ) -> List[Dict[str, Any]]:
+        """
+        Discover folders suitable for Prisma Access configuration migration.
+        
+        Automatically filters out:
+        - Infrastructure-only folders (Service Connections, Colo Connect)
+        - Non-Prisma Access folders (all, ngfw)
+        - Default folders (if include_defaults=False)
+        
+        Args:
+            include_defaults: Whether to include default folders
+            
+        Returns:
+            List of filtered folders suitable for migration
+        """
+        # Get all folders
+        all_folders = self.discover_folders()
+        
+        # Filter for migration
+        filtered = filter_folders_for_migration(all_folders)
+        
+        # Optionally filter defaults
+        if not include_defaults:
+            filtered = [
+                f for f in filtered 
+                if not f.get("is_default", False)
+            ]
+        
+        return filtered
+
     def list_folders_for_capture(self, include_defaults: bool = False) -> List[str]:
         """
         Get list of folder names to capture.
@@ -192,32 +240,53 @@ class FolderCapture:
         Returns:
             List of folder names
         """
-        # Reserved/system folders that cannot have security policies
-        RESERVED_FOLDERS = {
-            "Service Connections",  # Infrastructure only - cannot have security policies
-            "Colo Connect",         # Infrastructure only - cannot have security policies
-            # "Remote Networks",    # CAN have security policies - commented out
-            # "Mobile Users",       # CAN have security policies - commented out
-            # "Mobile_User_Template",
-            # "Shared",             # Shared is default but can be used
-        }
+        # Use the new migration-aware discovery
+        folders = self.discover_folders_for_migration(include_defaults=include_defaults)
         
-        folders = self.discover_folders()
-
-        folder_names = []
-        for folder in folders:
-            folder_name = folder.get("name", "")
-            is_default = folder.get("is_default", False)
-            
-            # Skip reserved infrastructure-only folders
-            if folder_name in RESERVED_FOLDERS:
-                print(f"  ℹ Skipping reserved folder: {folder_name} (infrastructure only, cannot have security policies)")
-                continue
-
-            if include_defaults or not is_default:
-                folder_names.append(folder_name)
-
+        # Extract folder names
+        folder_names = [folder.get("name", "") for folder in folders]
+        
         return folder_names
+
+
+def filter_folders_for_migration(folders: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Filter folders for Prisma Access configuration migration.
+    
+    Excludes:
+    - Infrastructure-only folders (Service Connections, Colo Connect)
+    - Non-Prisma Access folders (all, ngfw)
+    
+    Args:
+        folders: List of discovered folders
+        
+    Returns:
+        Filtered list of folders suitable for Prisma Access migration
+    """
+    filtered = []
+    filtered_out = []
+    
+    for folder in folders:
+        folder_name = folder.get("name", "")
+        
+        # Skip excluded folders (case-insensitive)
+        if folder_name in MIGRATION_EXCLUDED_FOLDERS:
+            filtered_out.append(folder_name)
+            continue
+        
+        # Also check case-insensitive
+        if folder_name.lower() in {name.lower() for name in MIGRATION_EXCLUDED_FOLDERS}:
+            filtered_out.append(folder_name)
+            continue
+        
+        # Keep this folder
+        filtered.append(folder)
+    
+    # Log filtered folders if any
+    if filtered_out:
+        print(f"  ℹ Filtered out {len(filtered_out)} folder(s) (not Prisma Access specific): {', '.join(filtered_out)}")
+    
+    return filtered
 
 
 def capture_folders(api_client: PrismaAccessAPIClient) -> List[Dict[str, Any]]:

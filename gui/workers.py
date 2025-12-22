@@ -67,8 +67,9 @@ class PullWorker(QThread):
 
             # Pull configuration
             config = orchestrator.pull_complete_configuration(
-                folder_names=None,  # Pull all folders
-                snippet_names=None,  # Pull all snippets
+                folder_names=self.options.get("selected_folders", None),  # NEW: Selected folders
+                snippet_names=self.options.get("selected_snippets", None),  # NEW: Selected snippets
+                selected_components=self.options.get("selected_components", None),  # NEW: Component selection
                 include_defaults=not self.filter_defaults,
                 include_snippets=self.options.get("snippets", True),
                 include_objects=self.options.get("objects", True),
@@ -449,3 +450,55 @@ class DependencyAnalysisWorker(QThread):
             lines.append(f"\n⚠ Missing dependencies: {missing.get('total_missing', 0)}")
 
         return "\n".join(lines)
+
+
+class DiscoveryWorker(QThread):
+    """Background worker for discovering folders and snippets from tenant."""
+    
+    # Signals
+    progress = pyqtSignal(str, int)  # message, percentage
+    finished = pyqtSignal(list, list)  # folders, snippets
+    error = pyqtSignal(str)  # error message
+    
+    def __init__(self, api_client):
+        """
+        Initialize the discovery worker.
+        
+        Args:
+            api_client: Authenticated PrismaAccessAPIClient
+        """
+        super().__init__()
+        self.api_client = api_client
+    
+    def run(self):
+        """Run folder and snippet discovery."""
+        try:
+            from prisma.pull.folder_capture import FolderCapture, filter_folders_for_migration
+            from prisma.pull.snippet_capture import SnippetCapture
+            
+            self.progress.emit("Discovering folders...", 20)
+            
+            # Discover folders
+            folder_capture = FolderCapture(self.api_client)
+            all_folders = folder_capture.discover_folders()
+            
+            self.progress.emit("Filtering folders for migration...", 40)
+            
+            # Filter for migration (remove "all", "ngfw", etc.)
+            filtered_folders = filter_folders_for_migration(all_folders)
+            
+            self.progress.emit("Discovering snippets...", 60)
+            
+            # Discover snippets
+            snippet_capture = SnippetCapture(self.api_client)
+            snippets = snippet_capture.discover_snippets_with_folders()
+            
+            self.progress.emit("Discovery complete!", 100)
+            
+            # Emit success
+            self.finished.emit(filtered_folders, snippets)
+            
+        except Exception as e:
+            import traceback
+            error_msg = f"{str(e)}\n\n{traceback.format_exc()}"
+            self.error.emit(error_msg)
