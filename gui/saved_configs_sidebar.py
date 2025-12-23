@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QFileDialog,
     QMenu,
+    QToolButton,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction
@@ -46,10 +47,30 @@ class SavedConfigsSidebar(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
 
-        # Header
+        # Header with hamburger menu button
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        
         header = QLabel("<b>Saved Configurations</b>")
         header.setStyleSheet("font-size: 13px; padding: 5px;")
-        layout.addWidget(header)
+        header_layout.addWidget(header)
+        
+        header_layout.addStretch()
+        
+        # Hamburger menu button
+        self.menu_button = QToolButton()
+        self.menu_button.setText("☰")
+        self.menu_button.setStyleSheet(
+            "QToolButton { font-size: 18px; padding: 2px 8px; border: none; background: transparent; }"
+            "QToolButton:hover { background-color: #E3F2FD; border-radius: 3px; }"
+            "QToolButton:pressed { background-color: #BBDEFB; }"
+        )
+        self.menu_button.setToolTip("Right-click on a config or click here for options")
+        self.menu_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.menu_button.clicked.connect(self._show_hamburger_menu)
+        header_layout.addWidget(self.menu_button)
+        
+        layout.addLayout(header_layout)
 
         # Config list
         self.config_list = QListWidget()
@@ -57,7 +78,8 @@ class SavedConfigsSidebar(QWidget):
             "QListWidget { border: 1px solid #ccc; border-radius: 3px; }"
             "QListWidget::item { padding: 8px; }"
             "QListWidget::item:selected { background-color: #2196F3; color: white; }"
-            "QListWidget::item:hover { background-color: #E3F2FD; }"
+            "QListWidget::item:hover:!selected { background-color: #E3F2FD; }"  # Only hover when NOT selected
+            "QListWidget::item:selected:hover { background-color: #2196F3; color: white; }"  # Keep blue when selected+hover
         )
         self.config_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.config_list.customContextMenuRequested.connect(self._show_context_menu)
@@ -219,6 +241,25 @@ class SavedConfigsSidebar(QWidget):
         config_meta = item.data(Qt.ItemDataRole.UserRole)
         name = config_meta["name"]
         
+        menu = self._create_config_menu(name)
+        menu.exec(self.config_list.mapToGlobal(position))
+    
+    def _show_hamburger_menu(self):
+        """Show hamburger menu for selected config."""
+        config_meta = self._get_selected_config()
+        if not config_meta:
+            QMessageBox.information(self, "No Selection", "Please select a configuration first.")
+            return
+        
+        name = config_meta["name"]
+        menu = self._create_config_menu(name)
+        
+        # Show menu below the hamburger button
+        button_pos = self.menu_button.mapToGlobal(self.menu_button.rect().bottomLeft())
+        menu.exec(button_pos)
+    
+    def _create_config_menu(self, name: str) -> QMenu:
+        """Create the context menu for a configuration."""
         menu = QMenu(self)
         
         load_action = QAction("📂 Load", self)
@@ -241,7 +282,7 @@ class SavedConfigsSidebar(QWidget):
         delete_action.triggered.connect(lambda: self._delete_config(name))
         menu.addAction(delete_action)
         
-        menu.exec(self.config_list.mapToGlobal(position))
+        return menu
 
     def _rename_config(self, old_name: str):
         """Rename a configuration."""

@@ -288,41 +288,34 @@ class SnippetCapture:
 
     def _normalize_snippet(self, snippet_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Normalize snippet data to standard format.
+        Preserve full snippet data for push.
 
         Args:
             snippet_data: Raw snippet data from API (direct JSON object from /snippets/:id endpoint)
 
         Returns:
-            Normalized snippet dictionary
+            Normalized snippet dictionary with all original data preserved
         """
-        # Expected fields from snippet-detail.txt:
-        # - id, name, display_name, type, last_update, created_in, folders (list), shared_in
-        # - enable_prefix (custom snippets)
+        # Make a deep copy to preserve all fields
+        normalized = snippet_data.copy()
+        
+        # Remove only the 'id' field (will be regenerated on push)
+        # Note: Keep 'id' for now as snippets might need it for references
+        # normalized.pop('id', None)
+        
+        # Ensure required fields exist
+        normalized.setdefault('name', '')
         
         # Determine if snippet is predefined based on type field
-        # Predefined types: "predefined" or "readonly"
-        snippet_type = snippet_data.get("type", "")
+        snippet_type = normalized.get("type", "")
         is_predefined = snippet_type in ["predefined", "readonly"]
         
-        normalized = {
-            "name": snippet_data.get("name", ""),
-            "id": snippet_data.get("id", ""),
-            "display_name": snippet_data.get("display_name", ""),
-            "type": snippet_type,
-            "path": snippet_data.get(
-                "path",
-                f"/config/security-policy/snippets/{snippet_data.get('name', '')}",
-            ),
-            "description": snippet_data.get("description", ""),
-            "is_default": is_predefined,  # Use type field instead of name pattern
-            "folders": snippet_data.get(
-                "folders", []
-            ),  # List of folder objects with id and name
-            "shared_in": snippet_data.get("shared_in", ""),
-            "last_update": snippet_data.get("last_update", ""),
-            "created_in": snippet_data.get("created_in", ""),
-            "metadata": {
+        # Add our tracking fields (non-intrusive)
+        normalized['is_default'] = is_predefined
+        
+        # Add metadata for tracking if not present
+        if 'metadata' not in normalized:
+            normalized['metadata'] = {
                 "created": snippet_data.get(
                     "created_in", snippet_data.get("created", "")
                 ),
@@ -331,17 +324,12 @@ class SnippetCapture:
                 ),
                 "created_by": snippet_data.get("created_by", ""),
                 "updated_by": snippet_data.get("updated_by", ""),
-            },
-            # Placeholders for captured data (snippets are high-level config, not containers)
-            "security_rules": [],
-            "objects": {},
-            "profiles": {},
-        }
-
-        # Preserve any additional fields from the API response
-        for key, value in snippet_data.items():
-            if key not in normalized and key not in ["metadata"]:
-                normalized[key] = value
+            }
+        
+        # Ensure placeholders for captured data exist (snippets are high-level config)
+        normalized.setdefault('security_rules', [])
+        normalized.setdefault('objects', {})
+        normalized.setdefault('profiles', {})
 
         return normalized
 

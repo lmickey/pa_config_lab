@@ -76,9 +76,9 @@ class MigrationWorkflowWidget(QWidget):
         self.config_viewer = ConfigViewerWidget()
         viewer_layout.addWidget(self.config_viewer)
         
-        # Add save button to viewer tab
-        save_btn_layout = QHBoxLayout()
-        save_btn_layout.addStretch()
+        # Add buttons to viewer tab
+        buttons_layout = QHBoxLayout()
+        buttons_layout.addStretch()
         
         save_viewer_btn = QPushButton("💾 Save Current Config")
         save_viewer_btn.setStyleSheet(
@@ -86,16 +86,31 @@ class MigrationWorkflowWidget(QWidget):
             "QPushButton:hover { background-color: #F57C00; }"
         )
         save_viewer_btn.clicked.connect(self._save_current_config)
-        save_btn_layout.addWidget(save_viewer_btn)
+        buttons_layout.addWidget(save_viewer_btn)
         
-        viewer_layout.addLayout(save_btn_layout)
+        # Add "Next" button to go to selection tab
+        next_btn = QPushButton("➡️ Select Config to Push")
+        next_btn.setStyleSheet(
+            "QPushButton { background-color: #4CAF50; color: white; padding: 10px 20px; font-weight: bold; }"
+            "QPushButton:hover { background-color: #45a049; }"
+        )
+        next_btn.clicked.connect(lambda: self.tabs.setCurrentIndex(2))  # Go to selection tab
+        buttons_layout.addWidget(next_btn)
+        
+        viewer_layout.addLayout(buttons_layout)
         
         self.tabs.addTab(viewer_container, "2️⃣ Review Configuration")
+
+        # Selection tab (Phase 3)
+        from gui.selection_widget import SelectionWidget
+        self.selection_widget = SelectionWidget()
+        self.selection_widget.selection_ready.connect(self._on_selection_ready)
+        self.tabs.addTab(self.selection_widget, "3️⃣ Select Components")
 
         # Push tab
         self.push_widget = PushConfigWidget()
         self.push_widget.push_completed.connect(self._on_push_completed)
-        self.tabs.addTab(self.push_widget, "3️⃣ Push to Target")
+        self.tabs.addTab(self.push_widget, "4️⃣ Push to Target")
 
         content_layout.addWidget(self.tabs)
 
@@ -114,6 +129,7 @@ class MigrationWorkflowWidget(QWidget):
         self.current_config = config
         self.config_viewer.set_config(config)
         self.push_widget.set_config(config)
+        self.selection_widget.set_config(config)  # Phase 3: Update selection widget
 
         # Move to view tab
         self.tabs.setCurrentIndex(1)
@@ -206,7 +222,18 @@ class MigrationWorkflowWidget(QWidget):
         # Load into push widget (for migration workflow)
         self.push_widget.set_config(config)
         
+        # Load into selection widget (Phase 3)
+        self.selection_widget.set_config(config)
+        
         # Switch to review tab to show loaded config
         self.tabs.setCurrentIndex(1)
         
         # No success message - config is now visible in viewer
+    
+    def _on_selection_ready(self, selected_items):
+        """Handle when selection is ready from selection widget."""
+        # Set the selection in push widget (config already set)
+        self.push_widget.set_selected_items(selected_items)
+        
+        # Switch to push tab
+        self.tabs.setCurrentIndex(3)  # Push is now tab 3 (0-indexed)

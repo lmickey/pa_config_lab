@@ -24,6 +24,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 import json
 
+from gui.config_tree_builder import ConfigTreeBuilder
+
 
 class ConfigViewerWidget(QWidget):
     """Widget for viewing and browsing configuration data."""
@@ -182,189 +184,17 @@ class ConfigViewerWidget(QWidget):
         
         self.info_label.setText(f"Version: {version} | Source: {action_source}")
         self.info_label.setStyleSheet("color: green;")
-
-        # Build tree
-        root = self.tree.invisibleRootItem()
-
-        # Metadata
-        metadata_item = QTreeWidgetItem(["Metadata", "info", ""])
-        self._add_dict_items(metadata_item, metadata)
-        root.addChild(metadata_item)
-
-        # Security Policies
-        sec_policies = self.current_config.get("security_policies", {})
-        if sec_policies:
-            sec_item = QTreeWidgetItem(["Security Policies", "container", ""])
-
-            # Folders
-            folders = sec_policies.get("folders", [])
-            if folders:
-                folders_item = QTreeWidgetItem(["Folders", "list", str(len(folders))])
-                for folder in folders:
-                    name = folder.get("name", "Unknown")
-                    folder_item = QTreeWidgetItem([name, "folder", ""])
-                    folder_item.setData(0, Qt.ItemDataRole.UserRole, folder)
-                    folders_item.addChild(folder_item)
-                sec_item.addChild(folders_item)
-
-            # Snippets
-            snippets = sec_policies.get("snippets", [])
-            if snippets:
-                snippets_item = QTreeWidgetItem(
-                    ["Snippets", "list", str(len(snippets))]
-                )
-                for snippet in snippets:
-                    name = snippet.get("name", "Unknown")
-                    snip_item = QTreeWidgetItem([name, "snippet", ""])
-                    snip_item.setData(0, Qt.ItemDataRole.UserRole, snippet)
-                    snippets_item.addChild(snip_item)
-                sec_item.addChild(snippets_item)
-
-            # Security Rules
-            rules = sec_policies.get("security_rules", [])
-            if rules:
-                rules_item = QTreeWidgetItem(
-                    ["Security Rules", "list", str(len(rules))]
-                )
-                for rule in rules:
-                    name = rule.get("name", "Unknown")
-                    rule_item = QTreeWidgetItem([name, "rule", ""])
-                    rule_item.setData(0, Qt.ItemDataRole.UserRole, rule)
-                    rules_item.addChild(rule_item)
-                sec_item.addChild(rules_item)
-
-            root.addChild(sec_item)
-
-        # Objects
-        objects = self.current_config.get("objects", {})
-        if objects:
-            obj_item = QTreeWidgetItem(["Objects", "container", ""])
-
-            # Addresses
-            addresses = objects.get("addresses", [])
-            if addresses:
-                addr_item = QTreeWidgetItem(["Addresses", "list", str(len(addresses))])
-                for addr in addresses[:100]:  # Limit display
-                    name = addr.get("name", "Unknown")
-                    a_item = QTreeWidgetItem([name, "address", ""])
-                    a_item.setData(0, Qt.ItemDataRole.UserRole, addr)
-                    addr_item.addChild(a_item)
-                if len(addresses) > 100:
-                    more = QTreeWidgetItem([f"... {len(addresses)-100} more", "", ""])
-                    addr_item.addChild(more)
-                obj_item.addChild(addr_item)
-
-            # Address Groups
-            addr_groups = objects.get("address_groups", [])
-            if addr_groups:
-                ag_item = QTreeWidgetItem(
-                    ["Address Groups", "list", str(len(addr_groups))]
-                )
-                obj_item.addChild(ag_item)
-
-            # Services
-            services = objects.get("services", [])
-            if services:
-                svc_item = QTreeWidgetItem(["Services", "list", str(len(services))])
-                obj_item.addChild(svc_item)
-
-            root.addChild(obj_item)
-
-        # Infrastructure
-        infrastructure = self.current_config.get("infrastructure", {})
-        if infrastructure:
-            infra_item = QTreeWidgetItem(["Infrastructure", "container", ""])
-
-            # Remote Networks
-            remote_networks = infrastructure.get("remote_networks", [])
-            if remote_networks:
-                rn_item = QTreeWidgetItem(
-                    ["Remote Networks", "list", str(len(remote_networks))]
-                )
-                for rn in remote_networks:
-                    name = rn.get("name", "Unknown")
-                    rn_child = QTreeWidgetItem([name, "remote_network", ""])
-                    rn_child.setData(0, Qt.ItemDataRole.UserRole, rn)
-                    rn_item.addChild(rn_child)
-                infra_item.addChild(rn_item)
-
-            # Service Connections
-            service_connections = infrastructure.get("service_connections", [])
-            if service_connections:
-                sc_item = QTreeWidgetItem(
-                    ["Service Connections", "list", str(len(service_connections))]
-                )
-                for sc in service_connections:
-                    name = sc.get("name", "Unknown")
-                    sc_child = QTreeWidgetItem([name, "service_connection", ""])
-                    sc_child.setData(0, Qt.ItemDataRole.UserRole, sc)
-                    sc_item.addChild(sc_child)
-                infra_item.addChild(sc_item)
-
-            # IPSec Tunnels
-            ipsec_tunnels = infrastructure.get("ipsec_tunnels", [])
-            if ipsec_tunnels:
-                it_item = QTreeWidgetItem(
-                    ["IPSec Tunnels", "list", str(len(ipsec_tunnels))]
-                )
-                for it in ipsec_tunnels:
-                    name = it.get("name", "Unknown")
-                    it_child = QTreeWidgetItem([name, "ipsec_tunnel", ""])
-                    it_child.setData(0, Qt.ItemDataRole.UserRole, it)
-                    it_item.addChild(it_child)
-                infra_item.addChild(it_item)
-
-            # Mobile Users
-            mobile_users = infrastructure.get("mobile_users", {})
-            if mobile_users:
-                mu_item = QTreeWidgetItem(["Mobile Users", "dict", ""])
-                self._add_dict_items(mu_item, mobile_users)
-                infra_item.addChild(mu_item)
-
-            # HIP Objects
-            hip_objects = infrastructure.get("hip_objects", [])
-            if hip_objects:
-                hip_item = QTreeWidgetItem(
-                    ["HIP Objects", "list", str(len(hip_objects))]
-                )
-                for hip in hip_objects:
-                    name = hip.get("name", "Unknown")
-                    hip_child = QTreeWidgetItem([name, "hip_object", ""])
-                    hip_child.setData(0, Qt.ItemDataRole.UserRole, hip)
-                    hip_item.addChild(hip_child)
-                infra_item.addChild(hip_item)
-
-            # HIP Profiles
-            hip_profiles = infrastructure.get("hip_profiles", [])
-            if hip_profiles:
-                hp_item = QTreeWidgetItem(
-                    ["HIP Profiles", "list", str(len(hip_profiles))]
-                )
-                for hp in hip_profiles:
-                    name = hp.get("name", "Unknown")
-                    hp_child = QTreeWidgetItem([name, "hip_profile", ""])
-                    hp_child.setData(0, Qt.ItemDataRole.UserRole, hp)
-                    hp_item.addChild(hp_child)
-                infra_item.addChild(hp_item)
-
-            # Regions
-            regions = infrastructure.get("regions", {})
-            if regions:
-                reg_item = QTreeWidgetItem(["Regions", "dict", ""])
-                self._add_dict_items(reg_item, regions)
-                infra_item.addChild(reg_item)
-
-            root.addChild(infra_item)
-
+        
+        # Use shared tree builder
+        builder = ConfigTreeBuilder(enable_checkboxes=False)
+        builder.build_tree(self.tree, self.current_config)
+        
         # Update stats
         total_items = self._count_items(self.current_config)
         self.stats_label.setText(f"Total items: {total_items}")
 
-        # Expand top level
-        self.tree.expandToDepth(0)
-
     def _add_dict_items(self, parent: QTreeWidgetItem, data: Dict):
-        """Add dictionary items to tree."""
+        """Add dictionary items to tree, recursively expanding lists and dicts."""
         for key, value in data.items():
             if isinstance(value, dict):
                 item = QTreeWidgetItem([str(key), "dict", ""])
@@ -372,6 +202,19 @@ class ConfigViewerWidget(QWidget):
                 parent.addChild(item)
             elif isinstance(value, list):
                 item = QTreeWidgetItem([str(key), "list", str(len(value))])
+                # Expand list items if they're dictionaries
+                for idx, list_item in enumerate(value):
+                    if isinstance(list_item, dict):
+                        # Try to get a name for the item
+                        item_name = list_item.get("name", list_item.get("id", f"Item {idx + 1}"))
+                        child_item = QTreeWidgetItem([str(item_name), "dict", ""])
+                        child_item.setData(0, Qt.ItemDataRole.UserRole, list_item)
+                        self._add_dict_items(child_item, list_item)
+                        item.addChild(child_item)
+                    else:
+                        # Simple value in list
+                        child_item = QTreeWidgetItem([str(list_item), "value", ""])
+                        item.addChild(child_item)
                 parent.addChild(item)
             else:
                 item = QTreeWidgetItem([str(key), "value", str(value)])

@@ -259,7 +259,9 @@ class InfrastructureCapture:
             # Capture mobile agent profiles
             self._log("info", f"Capturing mobile agent profiles from {folder}...")
             try:
-                result["agent_profiles"] = self.api_client.get_mobile_agent_profiles(folder=folder)
+                response = self.api_client.get_mobile_agent_profiles(folder=folder)
+                # Extract 'data' if paginated response, otherwise use as-is
+                result["agent_profiles"] = response.get("data", response) if isinstance(response, dict) else response
                 self._log("info", "  ✓ Captured agent profiles")
             except Exception as e:
                 self._log("warning", f"  ⚠ Error capturing agent profiles: {e}")
@@ -267,7 +269,9 @@ class InfrastructureCapture:
             # Capture mobile agent versions
             self._log("info", f"Capturing mobile agent versions from {folder}...")
             try:
-                result["agent_versions"] = self.api_client.get_mobile_agent_versions(folder=folder)
+                response = self.api_client.get_mobile_agent_versions(folder=folder)
+                # Extract 'data' if paginated response, otherwise use as-is
+                result["agent_versions"] = response.get("data", response) if isinstance(response, dict) else response
                 self._log("info", "  ✓ Captured agent versions")
             except Exception as e:
                 self._log("warning", f"  ⚠ Error capturing agent versions: {e}")
@@ -275,7 +279,9 @@ class InfrastructureCapture:
             # Capture authentication settings
             self._log("info", f"Capturing mobile agent auth settings from {folder}...")
             try:
-                result["authentication_settings"] = self.api_client.get_mobile_agent_auth_settings(folder=folder)
+                response = self.api_client.get_mobile_agent_auth_settings(folder=folder)
+                # Extract 'data' if paginated response, otherwise use as-is
+                result["authentication_settings"] = response.get("data", response) if isinstance(response, dict) else response
                 self._log("info", "  ✓ Captured authentication settings")
             except Exception as e:
                 self._log("warning", f"  ⚠ Error capturing auth settings: {e}")
@@ -283,7 +289,9 @@ class InfrastructureCapture:
             # Capture global settings
             self._log("info", f"Capturing mobile agent global settings from {folder}...")
             try:
-                result["global_settings"] = self.api_client.get_mobile_agent_global_settings(folder=folder)
+                response = self.api_client.get_mobile_agent_global_settings(folder=folder)
+                # Extract 'data' if paginated response, otherwise use as-is
+                result["global_settings"] = response.get("data", response) if isinstance(response, dict) else response
                 self._log("info", "  ✓ Captured global settings")
             except Exception as e:
                 self._log("warning", f"  ⚠ Error capturing global settings: {e}")
@@ -291,7 +299,9 @@ class InfrastructureCapture:
             # Capture infrastructure settings
             self._log("info", f"Capturing mobile agent infrastructure settings from {folder}...")
             try:
-                result["infrastructure_settings"] = self.api_client.get_mobile_agent_infra_settings(folder=folder)
+                response = self.api_client.get_mobile_agent_infra_settings(folder=folder)
+                # Extract 'data' if paginated response, otherwise use as-is
+                result["infrastructure_settings"] = response.get("data", response) if isinstance(response, dict) else response
                 self._log("info", "  ✓ Captured infrastructure settings")
             except Exception as e:
                 self._log("warning", f"  ⚠ Error capturing infrastructure settings: {e}")
@@ -299,7 +309,9 @@ class InfrastructureCapture:
             # Capture locations
             self._log("info", f"Capturing mobile agent locations from {folder}...")
             try:
-                result["locations"] = self.api_client.get_mobile_agent_locations(folder=folder)
+                response = self.api_client.get_mobile_agent_locations(folder=folder)
+                # Extract 'data' if paginated response, otherwise use as-is
+                result["locations"] = response.get("data", response) if isinstance(response, dict) else response
                 self._log("info", "  ✓ Captured locations")
             except Exception as e:
                 self._log("warning", f"  ⚠ Error capturing locations: {e}")
@@ -307,7 +319,9 @@ class InfrastructureCapture:
             # Capture tunnel profiles
             self._log("info", f"Capturing mobile agent tunnel profiles from {folder}...")
             try:
-                result["tunnel_profiles"] = self.api_client.get_mobile_agent_tunnel_profiles(folder=folder)
+                response = self.api_client.get_mobile_agent_tunnel_profiles(folder=folder)
+                # Extract 'data' if paginated response, otherwise use as-is
+                result["tunnel_profiles"] = response.get("data", response) if isinstance(response, dict) else response
                 self._log("info", "  ✓ Captured tunnel profiles")
             except Exception as e:
                 self._log("warning", f"  ⚠ Error capturing tunnel profiles: {e}")
@@ -346,9 +360,13 @@ class InfrastructureCapture:
             # Capture HIP objects
             self._log("info", "Capturing HIP objects...")
             try:
-                result["hip_objects"] = self.api_client.get_all_hip_objects(
-                    folder=folder
-                )
+                hip_objects = self.api_client.get_all_hip_objects(folder=folder)
+                
+                # Filter by folder if specified (API may return all folders)
+                if folder:
+                    hip_objects = [obj for obj in hip_objects if obj.get("folder") == folder]
+                
+                result["hip_objects"] = hip_objects
                 self._log("info", f"Captured {len(result['hip_objects'])} HIP object(s)")
             except Exception as e:
                 if hasattr(e, 'response') and hasattr(e.response, 'status_code'):
@@ -360,9 +378,13 @@ class InfrastructureCapture:
             # Capture HIP profiles
             self._log("info", "Capturing HIP profiles...")
             try:
-                result["hip_profiles"] = self.api_client.get_all_hip_profiles(
-                    folder=folder
-                )
+                hip_profiles = self.api_client.get_all_hip_profiles(folder=folder)
+                
+                # Filter by folder if specified (API may return all folders)
+                if folder:
+                    hip_profiles = [prof for prof in hip_profiles if prof.get("folder") == folder]
+                
+                result["hip_profiles"] = hip_profiles
                 self._log("info", 
                     f"Captured {len(result['hip_profiles'])} HIP profile(s)"
                 )

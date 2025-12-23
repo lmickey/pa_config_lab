@@ -354,37 +354,70 @@ class ProfileCapture:
     def _normalize_authentication_profile(
         self, prof_data: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Normalize authentication profile."""
-        return {
-            "id": prof_data.get("id", prof_data.get("name", "")),
-            "name": prof_data.get("name", ""),
-            "description": prof_data.get("description", ""),
-            "type": prof_data.get("type", ""),
-            "method": prof_data.get("method", {}),
-            "folder": prof_data.get("folder", ""),
-            "tags": self._extract_list_field(prof_data, "tags"),
-            "metadata": self._extract_metadata(prof_data),
-        }
+        """Preserve full authentication profile data for push."""
+        # Make a deep copy to preserve all fields
+        normalized = prof_data.copy()
+        
+        # Remove only the 'id' field (not needed for push, will be regenerated)
+        normalized.pop('id', None)
+        
+        # Ensure required fields exist for our processing
+        normalized.setdefault('name', '')
+        normalized.setdefault('folder', '')
+        normalized.setdefault('type', 'authentication_profile')
+        
+        # Add metadata for tracking (non-intrusive)
+        if 'metadata' not in normalized:
+            normalized['metadata'] = self._extract_metadata(prof_data)
+        
+        return normalized
 
     def _normalize_security_profile(
         self, prof_data: Dict[str, Any], profile_type: str
     ) -> Dict[str, Any]:
-        """Normalize security profile."""
-        return {
-            "id": prof_data.get("id", prof_data.get("name", "")),
-            "name": prof_data.get("name", ""),
-            "description": prof_data.get("description", ""),
-            "type": profile_type,
-            "settings": prof_data.get("settings", {}),
-            "folder": prof_data.get("folder", ""),
-            "tags": self._extract_list_field(prof_data, "tags"),
-            "metadata": self._extract_metadata(prof_data),
-        }
+        """Preserve full security profile data for push."""
+        # Make a deep copy to preserve all fields
+        normalized = prof_data.copy()
+        
+        # Remove only the 'id' field
+        normalized.pop('id', None)
+        
+        # Ensure required fields exist
+        normalized.setdefault('name', '')
+        normalized.setdefault('folder', '')
+        normalized['type'] = profile_type  # Ensure type is set correctly
+        
+        # Add metadata for tracking
+        if 'metadata' not in normalized:
+            normalized['metadata'] = self._extract_metadata(prof_data)
+        
+        return normalized
 
     def _normalize_decryption_profile(
         self, prof_data: Dict[str, Any], profile_type: str
     ) -> Dict[str, Any]:
-        """Normalize decryption profile."""
+        """Preserve full decryption profile data for push."""
+        # Make a deep copy to preserve all fields
+        normalized = prof_data.copy()
+        
+        # Remove only the 'id' field
+        normalized.pop('id', None)
+        
+        # Ensure required fields exist
+        normalized.setdefault('name', '')
+        normalized.setdefault('folder', '')
+        normalized['type'] = profile_type  # Ensure type is set correctly
+        
+        # Add metadata for tracking
+        if 'metadata' not in normalized:
+            normalized['metadata'] = self._extract_metadata(prof_data)
+        
+        return normalized
+    
+    def _normalize_decryption_profile_OLD(
+        self, prof_data: Dict[str, Any], profile_type: str
+    ) -> Dict[str, Any]:
+        """OLD: Normalize decryption profile."""
         return {
             "id": prof_data.get("id", prof_data.get("name", "")),
             "name": prof_data.get("name", ""),

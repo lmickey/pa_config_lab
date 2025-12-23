@@ -126,39 +126,38 @@ class FolderCapture:
 
     def _normalize_folder(self, folder_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Normalize folder data to standard format.
+        Preserve full folder data for push.
 
         Args:
             folder_data: Raw folder data from API
 
         Returns:
-            Normalized folder dictionary
+            Normalized folder dictionary with all original data preserved
         """
-        # Extract common fields
-        folder_name = folder_data.get("name", "")
-        parent_folder = folder_data.get("parent", None)
-
-        normalized = {
-            "name": folder_name,
-            "id": folder_data.get("id", folder_data.get("name", "")),
-            "path": folder_data.get("path", ""),
-            "description": folder_data.get("description", ""),
-            "parent": parent_folder,
-            "is_default": self._is_default_folder(
-                folder_name, parent_folder=parent_folder
-            ),
-            "metadata": {
+        # Make a deep copy to preserve all fields
+        normalized = folder_data.copy()
+        
+        # Remove only the 'id' field
+        normalized.pop('id', None)
+        
+        # Ensure required fields exist
+        folder_name = normalized.get("name", "")
+        parent_folder = normalized.get("parent", None)
+        normalized.setdefault('name', '')
+        
+        # Add our tracking fields (non-intrusive)
+        normalized['is_default'] = self._is_default_folder(
+            folder_name, parent_folder=parent_folder
+        )
+        
+        # Add metadata for tracking if not present
+        if 'metadata' not in normalized:
+            normalized['metadata'] = {
                 "created": folder_data.get("created", ""),
                 "updated": folder_data.get("updated", ""),
                 "created_by": folder_data.get("created_by", ""),
                 "updated_by": folder_data.get("updated_by", ""),
-            },
-        }
-
-        # Preserve any additional fields
-        for key, value in folder_data.items():
-            if key not in normalized and key not in ["metadata"]:
-                normalized[key] = value
+            }
 
         return normalized
 

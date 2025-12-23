@@ -147,6 +147,7 @@ class PullOrchestrator:
             "security_rules": [],
             "objects": {},
             "profiles": {},
+            "hip": {},  # HIP objects and profiles (folder-level)
         }
 
         try:
@@ -356,6 +357,20 @@ class PullOrchestrator:
                     len(profs)
                     for profs in profiles.get("security_profiles", {}).values()
                 )
+            
+            # Capture HIP (Host Information Profile) objects and profiles
+            # Skip for "Remote Networks" folder - HIP doesn't apply there
+            if folder_name != "Remote Networks":
+                try:
+                    from .infrastructure_capture import InfrastructureCapture
+                    infra_capture = InfrastructureCapture(self.api_client, suppress_output=self.suppress_output)
+                    hip_data = infra_capture.capture_hip_objects_and_profiles(folder=folder_name)
+                    folder_config["hip"] = hip_data
+                except Exception as e:
+                    # HIP capture is optional - don't fail if it errors
+                    if not self.suppress_output:
+                        print(f"  ⚠ Warning: Could not capture HIP for folder {folder_name}: {e}")
+                    folder_config["hip"] = {"hip_objects": [], "hip_profiles": []}
                 # Decryption profiles is now a list, not a dict
                 dec_profiles = profiles.get("decryption_profiles", [])
                 dec_count = (

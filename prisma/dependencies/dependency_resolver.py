@@ -44,6 +44,10 @@ class DependencyResolver:
             if "snippets" in security_policies:
                 for snippet in security_policies["snippets"]:
                     self._process_snippet_dependencies(snippet)
+        
+        # Process infrastructure
+        if "infrastructure" in config:
+            self._process_infrastructure_dependencies(config["infrastructure"])
 
         return self.graph
 
@@ -251,6 +255,99 @@ class DependencyResolver:
         snippet_name = snippet.get("name", "")
         if snippet_name:
             self.graph.add_node(snippet_name, "snippet", snippet)
+    
+    def _process_infrastructure_dependencies(self, infrastructure: Dict[str, Any]):
+        """Process dependencies within infrastructure components."""
+        
+        # Process IKE Crypto Profiles (no dependencies)
+        ike_crypto_profiles = infrastructure.get("ike_crypto_profiles", [])
+        for profile in ike_crypto_profiles:
+            profile_name = profile.get("name", "")
+            if profile_name:
+                self.graph.add_node(profile_name, "ike_crypto_profile", profile)
+        
+        # Process IPSec Crypto Profiles (no dependencies)
+        ipsec_crypto_profiles = infrastructure.get("ipsec_crypto_profiles", [])
+        for profile in ipsec_crypto_profiles:
+            profile_name = profile.get("name", "")
+            if profile_name:
+                self.graph.add_node(profile_name, "ipsec_crypto_profile", profile)
+        
+        # Process IKE Gateways → IKE Crypto Profile
+        ike_gateways = infrastructure.get("ike_gateways", [])
+        for gateway in ike_gateways:
+            gateway_name = gateway.get("name", "")
+            if gateway_name:
+                self.graph.add_node(gateway_name, "ike_gateway", gateway)
+                
+                # IKE Gateway depends on IKE Crypto Profile
+                ike_crypto_profile = gateway.get("protocol", {}).get("ikev1", {}).get("ike_crypto_profile")
+                if not ike_crypto_profile:
+                    ike_crypto_profile = gateway.get("protocol", {}).get("ikev2", {}).get("ike_crypto_profile")
+                
+                if ike_crypto_profile:
+                    self.graph.add_dependency(
+                        gateway_name, ike_crypto_profile, "ike_gateway", "ike_crypto_profile"
+                    )
+        
+        # Process IPSec Tunnels → IKE Gateway + IPSec Crypto Profile
+        ipsec_tunnels = infrastructure.get("ipsec_tunnels", [])
+        for tunnel in ipsec_tunnels:
+            tunnel_name = tunnel.get("name", "")
+            if tunnel_name:
+                self.graph.add_node(tunnel_name, "ipsec_tunnel", tunnel)
+                
+                # IPSec Tunnel depends on IKE Gateway (auto_key)
+                auto_key = tunnel.get("auto_key", {})
+                ike_gateway_name = auto_key.get("ike_gateway", {})
+                if isinstance(ike_gateway_name, list) and ike_gateway_name:
+                    ike_gateway_name = ike_gateway_name[0]
+                if isinstance(ike_gateway_name, dict):
+                    ike_gateway_name = ike_gateway_name.get("name", "")
+                
+                if ike_gateway_name:
+                    self.graph.add_dependency(
+                        tunnel_name, ike_gateway_name, "ipsec_tunnel", "ike_gateway"
+                    )
+                
+                # IPSec Tunnel depends on IPSec Crypto Profile
+                ipsec_crypto_profile = auto_key.get("ipsec_crypto_profile")
+                if ipsec_crypto_profile:
+                    self.graph.add_dependency(
+                        tunnel_name, ipsec_crypto_profile, "ipsec_tunnel", "ipsec_crypto_profile"
+                    )
+        
+        # Process Service Connections → IPSec Tunnel
+        service_connections = infrastructure.get("service_connections", [])
+        for sc in service_connections:
+            sc_name = sc.get("name", "")
+            if sc_name:
+                self.graph.add_node(sc_name, "service_connection", sc)
+                
+                # Service Connection depends on IPSec Tunnel (if using IPSec)
+                ipsec_tunnel = sc.get("ipsec_tunnel")
+                if ipsec_tunnel:
+                    self.graph.add_dependency(
+                        sc_name, ipsec_tunnel, "service_connection", "ipsec_tunnel"
+                    )
+                
+                # Service Connection may also depend on BGP peer (if configured)
+                bgp_peer = sc.get("bgp_peer", {}).get("local_ip_address")
+                # BGP peer dependencies are complex and may require further analysis
+        
+        # Process Remote Networks (may have dependencies on IKE Gateways/IPSec Tunnels)
+        remote_networks = infrastructure.get("remote_networks", [])
+        for rn in remote_networks:
+            rn_name = rn.get("name", "")
+            if rn_name:
+                self.graph.add_node(rn_name, "remote_network", rn)
+                
+                # Remote Network may depend on IPSec Tunnel
+                ipsec_tunnel = rn.get("ipsec_tunnel")
+                if ipsec_tunnel:
+                    self.graph.add_dependency(
+                        rn_name, ipsec_tunnel, "remote_network", "ipsec_tunnel"
+                    )
 
     def validate_dependencies(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -311,6 +408,118 @@ class DependencyResolver:
         """
         return self.get_resolution_order(config)
 
+    def find_required_dependencies(self, selected_config: Dict[str, Any], full_config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Find dependencies required by selected items that are available in full config.
+        
+        Args:
+            selected_config: Configuration with only selected items
+            full_config: Full configuration to search for dependencies
+            
+        Returns:
+            Dictionary with required dependencies organized by type
+        """
+        # Validate selected config to find missing deps
+        validation = self.validate_dependencies(selected_config)
+        missing_deps = validation.get('missing_dependencies', [])
+        
+        if not missing_deps:
+            return {}
+        
+        # Extract missing dependency names and types
+        required = {
+            'folders': [],
+            'snippets': [],
+            'objects': {},
+            'profiles': [],
+            'infrastructure': {}
+        }
+        
+        # Search full config for missing dependencies
+        for dep in missing_deps:
+            dep_name = dep.get('name', '')
+            dep_type = dep.get('type', '')
+            
+            if not dep_name:
+                continue
+            
+            # Search in folders
+            if dep_type in ['folder']:
+                folders = full_config.get('security_policies', {}).get('folders', [])
+                for folder in folders:
+                    if folder.get('name') == dep_name:
+                        required['folders'].append(folder)
+                        break
+            
+            # Search in objects
+            elif dep_type in ['address_object', 'address_group', 'service_object', 'service_group', 
+                             'application_object', 'application_group']:
+                objects = full_config.get('objects', {})
+                
+                # Map dependency types to object keys
+                type_map = {
+                    'address_object': 'addresses',
+                    'address_group': 'address_groups',
+                    'service_object': 'services',
+                    'service_group': 'service_groups',
+                    'application_object': 'applications',
+                    'application_group': 'application_groups'
+                }
+                
+                obj_key = type_map.get(dep_type)
+                if obj_key and obj_key in objects:
+                    for obj in objects[obj_key]:
+                        if obj.get('name') == dep_name:
+                            if obj_key not in required['objects']:
+                                required['objects'][obj_key] = []
+                            required['objects'][obj_key].append(obj)
+                            break
+            
+            # Search in profiles
+            elif dep_type in ['security_profile', 'url_filtering_profile', 'file_blocking_profile',
+                             'wildfire_profile', 'decryption_profile', 'authentication_profile']:
+                # Profiles would be in folders
+                folders = full_config.get('security_policies', {}).get('folders', [])
+                for folder in folders:
+                    profiles = folder.get('profiles', {})
+                    for profile_type, profile_list in profiles.items():
+                        if isinstance(profile_list, list):
+                            for profile in profile_list:
+                                if profile.get('name') == dep_name:
+                                    required['profiles'].append(profile)
+                                    break
+            
+            # Search in infrastructure
+            elif dep_type in ['ike_crypto_profile', 'ipsec_crypto_profile', 'ike_gateway', 
+                             'ipsec_tunnel', 'service_connection', 'remote_network']:
+                infrastructure = full_config.get('infrastructure', {})
+                
+                # Map dependency types to infrastructure keys
+                type_map = {
+                    'ike_crypto_profile': 'ike_crypto_profiles',
+                    'ipsec_crypto_profile': 'ipsec_crypto_profiles',
+                    'ike_gateway': 'ike_gateways',
+                    'ipsec_tunnel': 'ipsec_tunnels',
+                    'service_connection': 'service_connections',
+                    'remote_network': 'remote_networks'
+                }
+                
+                infra_key = type_map.get(dep_type)
+                if infra_key:
+                    infra_items = infrastructure.get(infra_key, [])
+                    for item in infra_items:
+                        if item.get('name') == dep_name:
+                            # Store in infrastructure dict by type
+                            if infra_key not in required['infrastructure']:
+                                required['infrastructure'][infra_key] = []
+                            required['infrastructure'][infra_key].append(item)
+                            break
+        
+        # Remove empty categories
+        required = {k: v for k, v in required.items() if v}
+        
+        return required
+    
     def get_dependency_report(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """
         Generate dependency report for configuration.

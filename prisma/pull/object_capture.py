@@ -370,74 +370,94 @@ class ObjectCapture:
         return parent_objects
 
     def _normalize_address(self, addr_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Normalize address object."""
-        return {
-            "id": addr_data.get("id", addr_data.get("name", "")),
-            "name": addr_data.get("name", ""),
-            "description": addr_data.get("description", ""),
-            "type": addr_data.get("type", "ip_netmask"),
-            "value": addr_data.get("value", addr_data.get("ip_netmask", "")),
-            "folder": addr_data.get("folder", ""),
-            "tags": self._extract_list_field(addr_data, "tags"),
-            "metadata": self._extract_metadata(addr_data),
-        }
+        """Preserve full address object data for push."""
+        # Make a deep copy to preserve all fields
+        normalized = addr_data.copy()
+        
+        # Remove only the 'id' field
+        normalized.pop('id', None)
+        
+        # Ensure required fields exist
+        normalized.setdefault('name', '')
+        normalized.setdefault('folder', '')
+        
+        # Add metadata for tracking
+        if 'metadata' not in normalized:
+            normalized['metadata'] = self._extract_metadata(addr_data)
+        
+        return normalized
 
     def _normalize_address_group(self, group_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Normalize address group."""
-        return {
-            "id": group_data.get("id", group_data.get("name", "")),
-            "name": group_data.get("name", ""),
-            "description": group_data.get("description", ""),
-            "addresses": self._extract_list_field(group_data, "addresses"),
-            "address_groups": self._extract_list_field(group_data, "address_groups"),
-            "dynamic_match": group_data.get("dynamic_match", ""),
-            "folder": group_data.get("folder", ""),
-            "tags": self._extract_list_field(group_data, "tags"),
-            "metadata": self._extract_metadata(group_data),
-        }
+        """Preserve full address group data for push."""
+        # Make a deep copy to preserve all fields
+        normalized = group_data.copy()
+        
+        # Remove only the 'id' field
+        normalized.pop('id', None)
+        
+        # Ensure required fields exist
+        normalized.setdefault('name', '')
+        normalized.setdefault('folder', '')
+        
+        # Add metadata for tracking
+        if 'metadata' not in normalized:
+            normalized['metadata'] = self._extract_metadata(group_data)
+        
+        return normalized
 
     def _normalize_service(self, svc_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Normalize service object."""
-        return {
-            "id": svc_data.get("id", svc_data.get("name", "")),
-            "name": svc_data.get("name", ""),
-            "description": svc_data.get("description", ""),
-            "protocol": svc_data.get("protocol", ""),
-            "port": svc_data.get("port", ""),
-            "source_port": svc_data.get("source_port", ""),
-            "folder": svc_data.get("folder", ""),
-            "tags": self._extract_list_field(svc_data, "tags"),
-            "metadata": self._extract_metadata(svc_data),
-        }
+        """Preserve full service object data for push."""
+        # Make a deep copy to preserve all fields
+        normalized = svc_data.copy()
+        
+        # Remove only the 'id' field
+        normalized.pop('id', None)
+        
+        # Ensure required fields exist
+        normalized.setdefault('name', '')
+        normalized.setdefault('folder', '')
+        
+        # Add metadata for tracking
+        if 'metadata' not in normalized:
+            normalized['metadata'] = self._extract_metadata(svc_data)
+        
+        return normalized
 
     def _normalize_service_group(self, group_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Normalize service group."""
-        return {
-            "id": group_data.get("id", group_data.get("name", "")),
-            "name": group_data.get("name", ""),
-            "description": group_data.get("description", ""),
-            "services": self._extract_list_field(group_data, "services"),
-            "service_groups": self._extract_list_field(group_data, "service_groups"),
-            "folder": group_data.get("folder", ""),
-            "tags": self._extract_list_field(group_data, "tags"),
-            "metadata": self._extract_metadata(group_data),
-        }
+        """Preserve full service group data for push."""
+        # Make a deep copy to preserve all fields
+        normalized = group_data.copy()
+        
+        # Remove only the 'id' field
+        normalized.pop('id', None)
+        
+        # Ensure required fields exist
+        normalized.setdefault('name', '')
+        normalized.setdefault('folder', '')
+        
+        # Add metadata for tracking
+        if 'metadata' not in normalized:
+            normalized['metadata'] = self._extract_metadata(group_data)
+        
+        return normalized
 
     def _normalize_application(self, app_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Normalize application object."""
-        return {
-            "id": app_data.get("id", app_data.get("name", "")),
-            "name": app_data.get("name", ""),
-            "description": app_data.get("description", ""),
-            "category": app_data.get("category", ""),
-            "subcategory": app_data.get("subcategory", ""),
-            "technology": app_data.get("technology", ""),
-            "risk": app_data.get("risk", ""),
-            "folder": app_data.get("folder", ""),
-            "snippet": app_data.get("snippet", ""),  # Capture snippet association
-            "tags": self._extract_list_field(app_data, "tags"),
-            "metadata": self._extract_metadata(app_data),
-        }
+        """Preserve full application object data for push."""
+        # Make a deep copy to preserve all fields
+        normalized = app_data.copy()
+        
+        # Remove only the 'id' field
+        normalized.pop('id', None)
+        
+        # Ensure required fields exist
+        normalized.setdefault('name', '')
+        normalized.setdefault('folder', '')
+        
+        # Add metadata for tracking
+        if 'metadata' not in normalized:
+            normalized['metadata'] = self._extract_metadata(app_data)
+        
+        return normalized
 
     def _extract_list_field(self, data: Dict[str, Any], field_name: str) -> List[str]:
         """Extract a list field, handling various formats."""

@@ -241,7 +241,7 @@ class RuleCapture:
         self, rule_data: Dict[str, Any], context: str, is_snippet: bool = False
     ) -> Dict[str, Any]:
         """
-        Normalize security rule data to standard format.
+        Preserve full security rule data for push.
 
         Args:
             rule_data: Raw rule data from API
@@ -249,55 +249,31 @@ class RuleCapture:
             is_snippet: Whether rule is from a snippet
 
         Returns:
-            Normalized rule dictionary
+            Normalized rule dictionary with all original data preserved
         """
-        normalized = {
-            "id": rule_data.get("id", rule_data.get("name", "")),
-            "name": rule_data.get("name", ""),
-            "description": rule_data.get("description", ""),
-            "position": rule_data.get("position", rule_data.get("rule_index", 999999)),
-            "enabled": rule_data.get("enabled", True),
-            "context": context,
-            "is_snippet": is_snippet,
-            "folder": rule_data.get("folder", context if not is_snippet else ""),
-            # Rule conditions
-            "source": self._extract_list_field(rule_data, "source"),
-            "destination": self._extract_list_field(rule_data, "destination"),
-            "application": self._extract_list_field(rule_data, "application"),
-            "service": self._extract_list_field(rule_data, "service"),
-            "category": self._extract_list_field(rule_data, "category"),
-            "source_user": self._extract_list_field(rule_data, "source_user"),
-            "source_hip": self._extract_list_field(rule_data, "source_hip"),
-            "destination_hip": self._extract_list_field(rule_data, "destination_hip"),
-            # Rule actions
-            "action": rule_data.get("action", "allow"),
-            "log_setting": rule_data.get("log_setting", ""),
-            "log_start": rule_data.get("log_start", False),
-            "log_end": rule_data.get("log_end", False),
-            # Profiles
-            "profile_setting": rule_data.get("profile_setting", {}),
-            "security_profile": self._extract_list_field(rule_data, "security_profile"),
-            "authentication_profile": self._extract_list_field(
-                rule_data, "authentication_profile"
-            ),
-            "decryption_profile": self._extract_list_field(
-                rule_data, "decryption_profile"
-            ),
-            # Tags and metadata
-            "tags": self._extract_list_field(rule_data, "tags"),
-            "metadata": {
+        # Make a deep copy to preserve all fields
+        normalized = rule_data.copy()
+        
+        # Remove only the 'id' field
+        normalized.pop('id', None)
+        
+        # Ensure required fields exist
+        normalized.setdefault('name', '')
+        normalized.setdefault('folder', context if not is_snippet else '')
+        
+        # Add our tracking fields (non-intrusive)
+        normalized['context'] = context
+        normalized['is_snippet'] = is_snippet
+        
+        # Add metadata for tracking if not present
+        if 'metadata' not in normalized:
+            normalized['metadata'] = {
                 "created": rule_data.get("created", ""),
                 "updated": rule_data.get("updated", ""),
                 "created_by": rule_data.get("created_by", ""),
                 "updated_by": rule_data.get("updated_by", ""),
-            },
-        }
-
-        # Preserve any additional fields
-        for key, value in rule_data.items():
-            if key not in normalized and key not in ["metadata"]:
-                normalized[key] = value
-
+            }
+        
         return normalized
 
     def _extract_list_field(self, data: Dict[str, Any], field_name: str) -> List[str]:

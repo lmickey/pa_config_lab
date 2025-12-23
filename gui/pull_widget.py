@@ -414,10 +414,10 @@ class PullConfigWidget(QWidget):
             "include_hip": self.hip_check.isChecked(),
             "include_regions": self.regions_check.isChecked(),
             # Folder and snippet selection (from dialog)
-            # Keep empty lists as empty lists (don't convert to None) so orchestrator knows nothing was selected
-            "selected_folders": self.selected_folders,
-            "selected_components": self.selected_components,
-            "selected_snippets": self.selected_snippets,
+            # Convert empty lists to None so orchestrator knows to pull all
+            "selected_folders": self.selected_folders if self.selected_folders else None,
+            "selected_components": self.selected_components if self.selected_components else None,
+            "selected_snippets": self.selected_snippets if self.selected_snippets else None,
         }
 
         filter_defaults = self.filter_defaults_check.isChecked()

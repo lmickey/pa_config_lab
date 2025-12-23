@@ -85,12 +85,12 @@ class PullWorker(QThread):
                 return
 
             # Pull infrastructure if any infrastructure options are enabled
+            # Note: HIP is now captured per-folder, not at infrastructure level
             infra_enabled = any([
                 self.options.get("include_remote_networks", False),
                 self.options.get("include_service_connections", False),
                 self.options.get("include_ipsec_tunnels", False),
                 self.options.get("include_mobile_users", False),
-                self.options.get("include_hip", False),
                 self.options.get("include_regions", False),
             ])
 
@@ -116,7 +116,7 @@ class PullWorker(QThread):
                         include_service_connections=self.options.get("include_service_connections", True),
                         include_ipsec_tunnels=self.options.get("include_ipsec_tunnels", True),
                         include_mobile_users=self.options.get("include_mobile_users", True),
-                        include_hip=self.options.get("include_hip", True),
+                        include_hip=False,  # HIP is now captured per-folder, not at infrastructure level
                         include_regions=self.options.get("include_regions", True),
                         progress_callback=infra_progress_callback,
                     )
@@ -126,12 +126,13 @@ class PullWorker(QThread):
                     
                     # Merge infrastructure data into config
                     # Infrastructure capture returns a flat dict with all components
+                    # ALL infrastructure components should go under config["infrastructure"]
                     if "remote_networks" in infra_data:
                         config["infrastructure"]["remote_networks"] = infra_data["remote_networks"]
                     if "service_connections" in infra_data:
                         config["infrastructure"]["service_connections"] = infra_data["service_connections"]
                     
-                    # Tunnel-related components are at top level in infra_data
+                    # Tunnel-related components (ipsec_tunnels, ike_gateways, crypto profiles)
                     if "ipsec_tunnels" in infra_data:
                         config["infrastructure"]["ipsec_tunnels"] = infra_data["ipsec_tunnels"]
                     if "ike_gateways" in infra_data:
@@ -141,13 +142,12 @@ class PullWorker(QThread):
                     if "ipsec_crypto_profiles" in infra_data:
                         config["infrastructure"]["ipsec_crypto_profiles"] = infra_data["ipsec_crypto_profiles"]
                     
-                    # Mobile users and HIP are nested dicts
+                    # Mobile users and regions - go under infrastructure
+                    # Note: HIP is now captured per-folder, not at infrastructure level
                     if "mobile_users" in infra_data:
-                        config["mobile_users"] = infra_data["mobile_users"]
-                    if "hip" in infra_data:
-                        config["hip"] = infra_data["hip"]
+                        config["infrastructure"]["mobile_users"] = infra_data["mobile_users"]
                     if "regions" in infra_data:
-                        config["regions"] = infra_data["regions"]
+                        config["infrastructure"]["regions"] = infra_data["regions"]
                         
                 except Exception as e:
                     # Log error but continue - infrastructure is optional
@@ -184,14 +184,37 @@ class PullWorker(QThread):
             
             # Add infrastructure stats if we pulled it
             if infra_enabled:
-                if config.get("infrastructure", {}).get("remote_networks"):
-                    stats["remote_networks"] = len(config["infrastructure"]["remote_networks"])
-                if config.get("infrastructure", {}).get("service_connections"):
-                    stats["service_connections"] = len(config["infrastructure"]["service_connections"])
-                if config.get("mobile_users", {}).get("gp_gateways"):
-                    stats["gp_gateways"] = len(config["mobile_users"]["gp_gateways"])
-                if config.get("regions", {}).get("bandwidth_allocations"):
-                    stats["bandwidth_allocations"] = len(config["regions"]["bandwidth_allocations"])
+                infra = config.get("infrastructure", {})
+                if infra.get("remote_networks"):
+                    stats["remote_networks"] = len(infra["remote_networks"])
+                if infra.get("service_connections"):
+                    stats["service_connections"] = len(infra["service_connections"])
+                if infra.get("ipsec_tunnels"):
+                    stats["ipsec_tunnels"] = len(infra["ipsec_tunnels"])
+                if infra.get("ike_gateways"):
+                    stats["ike_gateways"] = len(infra["ike_gateways"])
+                if infra.get("ike_crypto_profiles"):
+                    stats["ike_crypto_profiles"] = len(infra["ike_crypto_profiles"])
+                if infra.get("ipsec_crypto_profiles"):
+                    stats["ipsec_crypto_profiles"] = len(infra["ipsec_crypto_profiles"])
+                # Mobile users is a nested dict
+                if infra.get("mobile_users", {}).get("gp_gateways"):
+                    stats["gp_gateways"] = len(infra["mobile_users"]["gp_gateways"])
+                # Regions is a nested dict
+                if infra.get("regions", {}).get("bandwidth_allocations"):
+                    stats["bandwidth_allocations"] = len(infra["regions"]["bandwidth_allocations"])
+                
+                # HIP is now per-folder - count across all folders
+                hip_objects_count = 0
+                hip_profiles_count = 0
+                for folder in config.get("security_policies", {}).get("folders", []):
+                    hip_data = folder.get("hip", {})
+                    hip_objects_count += len(hip_data.get("hip_objects", []))
+                    hip_profiles_count += len(hip_data.get("hip_profiles", []))
+                if hip_objects_count > 0:
+                    stats["hip_objects"] = hip_objects_count
+                if hip_profiles_count > 0:
+                    stats["hip_profiles"] = hip_profiles_count
             
             message = self._format_stats_message(stats)
 
