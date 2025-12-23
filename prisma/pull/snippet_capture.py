@@ -16,14 +16,16 @@ from config.defaults.default_configs import DefaultConfigs
 class SnippetCapture:
     """Capture snippets from Prisma Access."""
 
-    def __init__(self, api_client: PrismaAccessAPIClient):
+    def __init__(self, api_client: PrismaAccessAPIClient, suppress_output: bool = False):
         """
         Initialize snippet capture.
 
         Args:
             api_client: PrismaAccessAPIClient instance
+            suppress_output: Suppress print statements (for GUI usage)
         """
         self.api_client = api_client
+        self.suppress_output = suppress_output
         self.rule_capture = RuleCapture(api_client)
         self.object_capture = ObjectCapture(api_client)
         self.profile_capture = ProfileCapture(api_client)
@@ -54,7 +56,8 @@ class SnippetCapture:
             return normalized_snippets
 
         except Exception as e:
-            print(f"Error discovering snippets: {e}")
+            # Don't print from worker thread - causes segfault
+            pass
             return []
     
     def discover_snippets_with_folders(self, debug: bool = False) -> List[Dict[str, Any]]:
@@ -164,28 +167,31 @@ class SnippetCapture:
 
             # Add detailed logging for debugging
             if not snippet_data:
-                print(f"  ⚠ WARNING: Empty response for snippet ID {snippet_id}")
-                print(
-                    f"    API URL: {self.api_client._make_request.__self__.__class__.__module__}"
-                )
-                print(f"    Response was empty or None")
+                if not self.suppress_output:
+                    print(f"  ⚠ WARNING: Empty response for snippet ID {snippet_id}")
+                    print(
+                        f"    API URL: {self.api_client._make_request.__self__.__class__.__module__}"
+                    )
+                    print(f"    Response was empty or None")
                 return None
 
             # Check if response looks valid (should have 'id' or 'name' field)
             if not isinstance(snippet_data, dict):
-                print(
-                    f"  ⚠ WARNING: Unexpected response type for snippet ID {snippet_id}"
-                )
-                print(f"    Expected: dict")
-                print(f"    Got: {type(snippet_data).__name__}")
-                print(f"    Response: {snippet_data}")
+                if not self.suppress_output:
+                    print(
+                        f"  ⚠ WARNING: Unexpected response type for snippet ID {snippet_id}"
+                    )
+                    print(f"    Expected: dict")
+                    print(f"    Got: {type(snippet_data).__name__}")
+                    print(f"    Response: {snippet_data}")
                 return None
 
             if "id" not in snippet_data and "name" not in snippet_data:
-                print(f"  ⚠ WARNING: Response doesn't look like a snippet object")
-                print(f"    Snippet ID: {snippet_id}")
-                print(f"    Response keys: {list(snippet_data.keys())}")
-                print(f"    Response preview: {str(snippet_data)[:200]}")
+                if not self.suppress_output:
+                    print(f"  ⚠ WARNING: Response doesn't look like a snippet object")
+                    print(f"    Snippet ID: {snippet_id}")
+                    print(f"    Response keys: {list(snippet_data.keys())}")
+                    print(f"    Response preview: {str(snippet_data)[:200]}")
                 # Still try to normalize it - might be valid but missing expected fields
                 # return None
 
@@ -193,9 +199,11 @@ class SnippetCapture:
             return normalized
 
         except Exception as e:
-            print(f"  ✗ FAILED: Error getting snippet details for ID {snippet_id}")
-            print(f"    Error type: {type(e).__name__}")
-            print(f"    Error message: {str(e)}")
+            if not self.suppress_output:
+                print(f"  ✗ FAILED: Error getting snippet details for ID {snippet_id}")
+                print(f"    Error type: {type(e).__name__}")
+                print(f"    Error message: {str(e)}")
+            
             from prisma.error_logger import error_logger
 
             error_logger.log_capture_error(
@@ -207,10 +215,12 @@ class SnippetCapture:
                     "api_url": f"https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/{snippet_id}",
                 },
             )
-            import traceback
-
-            print("\n    Full traceback:")
-            traceback.print_exc()
+            
+            if not self.suppress_output:
+                import traceback
+                print("\n    Full traceback:")
+                traceback.print_exc()
+            
             return None
 
     def capture_snippet_configuration(
@@ -231,13 +241,14 @@ class SnippetCapture:
         snippet_info = self.get_snippet_details(snippet_id)
         if not snippet_info:
             display_name = snippet_name or snippet_id
-            print(
-                f"  ✗ FAILED: Could not retrieve snippet details for {display_name} (ID: {snippet_id})"
-            )
-            print(
-                f"    API URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/{snippet_id}"
-            )
-            print(f"    Check error log for detailed API request/response information")
+            if not self.suppress_output:
+                print(
+                    f"  ✗ FAILED: Could not retrieve snippet details for {display_name} (ID: {snippet_id})"
+                )
+                print(
+                    f"    API URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/{snippet_id}"
+                )
+                print(f"    Check error log for detailed API request/response information")
             return {}
 
         # Snippets are high-level configuration parameters (like folders), not containers
@@ -270,7 +281,8 @@ class SnippetCapture:
                 if config:
                     captured_snippets.append(config)
             else:
-                print(f"  ⚠ WARNING: Snippet '{snippet_name}' has no ID, skipping")
+                if not self.suppress_output:
+                    print(f"  ⚠ WARNING: Snippet '{snippet_name}' has no ID, skipping")
 
         return captured_snippets
 

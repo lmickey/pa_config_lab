@@ -83,6 +83,7 @@ class ConfigViewerWidget(QWidget):
                 "Applications",
                 "Snippets",
                 "Profiles",
+                "Infrastructure",
             ]
         )
         self.filter_combo.currentTextChanged.connect(self._on_filter_changed)
@@ -269,6 +270,92 @@ class ConfigViewerWidget(QWidget):
 
             root.addChild(obj_item)
 
+        # Infrastructure
+        infrastructure = self.current_config.get("infrastructure", {})
+        if infrastructure:
+            infra_item = QTreeWidgetItem(["Infrastructure", "container", ""])
+
+            # Remote Networks
+            remote_networks = infrastructure.get("remote_networks", [])
+            if remote_networks:
+                rn_item = QTreeWidgetItem(
+                    ["Remote Networks", "list", str(len(remote_networks))]
+                )
+                for rn in remote_networks:
+                    name = rn.get("name", "Unknown")
+                    rn_child = QTreeWidgetItem([name, "remote_network", ""])
+                    rn_child.setData(0, Qt.ItemDataRole.UserRole, rn)
+                    rn_item.addChild(rn_child)
+                infra_item.addChild(rn_item)
+
+            # Service Connections
+            service_connections = infrastructure.get("service_connections", [])
+            if service_connections:
+                sc_item = QTreeWidgetItem(
+                    ["Service Connections", "list", str(len(service_connections))]
+                )
+                for sc in service_connections:
+                    name = sc.get("name", "Unknown")
+                    sc_child = QTreeWidgetItem([name, "service_connection", ""])
+                    sc_child.setData(0, Qt.ItemDataRole.UserRole, sc)
+                    sc_item.addChild(sc_child)
+                infra_item.addChild(sc_item)
+
+            # IPSec Tunnels
+            ipsec_tunnels = infrastructure.get("ipsec_tunnels", [])
+            if ipsec_tunnels:
+                it_item = QTreeWidgetItem(
+                    ["IPSec Tunnels", "list", str(len(ipsec_tunnels))]
+                )
+                for it in ipsec_tunnels:
+                    name = it.get("name", "Unknown")
+                    it_child = QTreeWidgetItem([name, "ipsec_tunnel", ""])
+                    it_child.setData(0, Qt.ItemDataRole.UserRole, it)
+                    it_item.addChild(it_child)
+                infra_item.addChild(it_item)
+
+            # Mobile Users
+            mobile_users = infrastructure.get("mobile_users", {})
+            if mobile_users:
+                mu_item = QTreeWidgetItem(["Mobile Users", "dict", ""])
+                self._add_dict_items(mu_item, mobile_users)
+                infra_item.addChild(mu_item)
+
+            # HIP Objects
+            hip_objects = infrastructure.get("hip_objects", [])
+            if hip_objects:
+                hip_item = QTreeWidgetItem(
+                    ["HIP Objects", "list", str(len(hip_objects))]
+                )
+                for hip in hip_objects:
+                    name = hip.get("name", "Unknown")
+                    hip_child = QTreeWidgetItem([name, "hip_object", ""])
+                    hip_child.setData(0, Qt.ItemDataRole.UserRole, hip)
+                    hip_item.addChild(hip_child)
+                infra_item.addChild(hip_item)
+
+            # HIP Profiles
+            hip_profiles = infrastructure.get("hip_profiles", [])
+            if hip_profiles:
+                hp_item = QTreeWidgetItem(
+                    ["HIP Profiles", "list", str(len(hip_profiles))]
+                )
+                for hp in hip_profiles:
+                    name = hp.get("name", "Unknown")
+                    hp_child = QTreeWidgetItem([name, "hip_profile", ""])
+                    hp_child.setData(0, Qt.ItemDataRole.UserRole, hp)
+                    hp_item.addChild(hp_child)
+                infra_item.addChild(hp_item)
+
+            # Regions
+            regions = infrastructure.get("regions", {})
+            if regions:
+                reg_item = QTreeWidgetItem(["Regions", "dict", ""])
+                self._add_dict_items(reg_item, regions)
+                infra_item.addChild(reg_item)
+
+            root.addChild(infra_item)
+
         # Update stats
         total_items = self._count_items(self.current_config)
         self.stats_label.setText(f"Total items: {total_items}")
@@ -303,6 +390,13 @@ class ConfigViewerWidget(QWidget):
         count += len(objects.get("addresses", []))
         count += len(objects.get("address_groups", []))
         count += len(objects.get("services", []))
+
+        infrastructure = config.get("infrastructure", {})
+        count += len(infrastructure.get("remote_networks", []))
+        count += len(infrastructure.get("service_connections", []))
+        count += len(infrastructure.get("ipsec_tunnels", []))
+        count += len(infrastructure.get("hip_objects", []))
+        count += len(infrastructure.get("hip_profiles", []))
         count += len(objects.get("service_groups", []))
         count += len(objects.get("applications", []))
         count += len(objects.get("application_groups", []))

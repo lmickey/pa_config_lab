@@ -133,6 +133,14 @@ class PrismaConfigMainWindow(QMainWindow):
 
         # Tools menu
         tools_menu = menubar.addMenu("&Tools")
+        
+        tenants_action = QAction("&Manage Tenants...", self)
+        tenants_action.setShortcut("Ctrl+T")
+        tenants_action.setStatusTip("Manage saved tenant credentials")
+        tenants_action.triggered.connect(self._show_tenant_manager)
+        tools_menu.addAction(tenants_action)
+        
+        tools_menu.addSeparator()
 
         settings_action = QAction("&Settings...", self)
         settings_action.setStatusTip("Application settings")
@@ -334,26 +342,61 @@ class PrismaConfigMainWindow(QMainWindow):
 
     def _show_connection_dialog(self):
         """Show the connection dialog."""
-        dialog = ConnectionDialog(self)
-        if dialog.exec():
-            # Connection successful
-            self.api_client = dialog.get_api_client()
+        from PyQt6.QtCore import QCoreApplication
+        
+        try:
+            dialog = ConnectionDialog(self)
+            result = dialog.exec()
+            
+            # Process events to ensure dialog is fully closed
+            QCoreApplication.processEvents()
+            
+            if result:
+                # Get data before dialog is deleted
+                self.api_client = dialog.get_api_client()
+                connection_name = dialog.get_connection_name() or "Manual"
 
-            if self.api_client:
-                # Update UI
-                tsg_id = self.api_client.tsg_id
-                self.connection_status.setText(f"✓ Connected\n{tsg_id}")
-                self.connection_status.setStyleSheet("color: green; padding: 5px;")
+                # Delete dialog explicitly
+                dialog.deleteLater()
+                QCoreApplication.processEvents()
 
-                self.statusBar().showMessage(f"Connected to {tsg_id}", 5000)
+                if self.api_client:
+                    tsg_id = self.api_client.tsg_id
+                    
+                    # Update UI with tenant name instead of TSG
+                    self.connection_status.setText(f"✓ Connected\n{connection_name}")
+                    self.connection_status.setStyleSheet("color: green; padding: 5px;")
 
-                # Update workflows
-                self.migration_workflow.set_api_client(self.api_client)
-                self.pov_workflow.set_api_client(self.api_client)
+                    self.statusBar().showMessage(f"Connected to {connection_name} ({tsg_id})", 5000)
 
-                # Log connection
-                self.logs_widget.log(f"Connected to tenant {tsg_id}", "success")
+                    # Update workflows with connection name
+                    self.migration_workflow.set_api_client(self.api_client, connection_name)
+                    self.pov_workflow.set_api_client(self.api_client, connection_name)
 
+                    # Log connection
+                    self.logs_widget.log(f"Connected to {connection_name} (TSG: {tsg_id})", "success")
+            else:
+                # Dialog cancelled
+                dialog.deleteLater()
+                QCoreApplication.processEvents()
+                
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.critical(
+                self,
+                "Connection Error",
+                f"Error during connection:\n\n{str(e)}\n\nPlease check the console for details."
+            )
+
+    def _show_tenant_manager(self):
+        """Show tenant manager dialog."""
+        from gui.dialogs.tenant_manager_dialog import TenantManagerDialog
+        
+        dialog = TenantManagerDialog(self)
+        dialog.exec()
+    
     def _show_settings(self):
         """Show settings dialog."""
         dialog = SettingsDialog(self)

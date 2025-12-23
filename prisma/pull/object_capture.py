@@ -17,14 +17,16 @@ from ..api_client import PrismaAccessAPIClient
 class ObjectCapture:
     """Capture objects from Prisma Access."""
 
-    def __init__(self, api_client: PrismaAccessAPIClient):
+    def __init__(self, api_client: PrismaAccessAPIClient, suppress_output: bool = False):
         """
         Initialize object capture.
 
         Args:
             api_client: PrismaAccessAPIClient instance
+            suppress_output: Suppress print statements (for GUI usage)
         """
         self.api_client = api_client
+        self.suppress_output = suppress_output
 
     def capture_addresses(self, folder: Optional[str] = None) -> List[Dict[str, Any]]:
         """
@@ -48,13 +50,16 @@ class ObjectCapture:
             # Check if this is a "folder doesn't exist", pattern validation, or server error
             error_str = str(e).lower()
             if "doesn't exist" in error_str or "400" in error_str or "pattern" in error_str:
-                print(f"  ⚠ Folder '{folder}' cannot be used for addresses - skipping")
+                if not self.suppress_output:
+                    print(f"  ⚠ Folder '{folder}' cannot be used for addresses - skipping")
                 return []
             elif "500" in error_str or "503" in error_str or "502" in error_str:
                 # Server errors - API is having issues, skip gracefully
-                print(f"  ⚠ API server error for addresses in folder '{folder}' - skipping")
+                if not self.suppress_output:
+                    print(f"  ⚠ API server error for addresses in folder '{folder}' - skipping")
                 return []
-            print(f"Error capturing addresses: {e}")
+            if not self.suppress_output:
+                print(f"Error capturing addresses: {e}")
             # Log to centralized error logger
             try:
                 from ...error_logger import error_logger
@@ -90,7 +95,8 @@ class ObjectCapture:
             groups = self.api_client.get_all_address_groups(folder=folder)
             return [self._normalize_address_group(grp) for grp in groups]
         except Exception as e:
-            print(f"Error capturing address groups: {e}")
+            if not self.suppress_output:
+                print(f"Error capturing address groups: {e}")
             try:
                 from ...error_logger import error_logger
 
@@ -126,13 +132,16 @@ class ObjectCapture:
             # Check if this is a "folder doesn't exist", pattern validation, or server error
             error_str = str(e).lower()
             if "doesn't exist" in error_str or "400" in error_str or "pattern" in error_str:
-                print(f"  ⚠ Folder '{folder}' cannot be used for services - skipping")
+                if not self.suppress_output:
+                    print(f"  ⚠ Folder '{folder}' cannot be used for services - skipping")
                 return []
             elif "500" in error_str or "503" in error_str or "502" in error_str:
                 # Server errors - API is having issues, skip gracefully
-                print(f"  ⚠ API server error for services in folder '{folder}' - skipping")
+                if not self.suppress_output:
+                    print(f"  ⚠ API server error for services in folder '{folder}' - skipping")
                 return []
-            print(f"Error capturing services: {e}")
+            if not self.suppress_output:
+                print(f"Error capturing services: {e}")
             try:
                 from ...error_logger import error_logger
 
@@ -169,7 +178,8 @@ class ObjectCapture:
             groups = []  # self.api_client.get_service_groups(folder=folder)
             return [self._normalize_service_group(grp) for grp in groups]
         except Exception as e:
-            print(f"Error capturing service groups: {e}")
+            if not self.suppress_output:
+                print(f"Error capturing service groups: {e}")
             try:
                 from ...error_logger import error_logger
 
@@ -219,7 +229,8 @@ class ObjectCapture:
                 # No applications to capture (user said no custom apps)
                 return []
         except Exception as e:
-            print(f"Error capturing applications: {e}")
+            if not self.suppress_output:
+                print(f"Error capturing applications: {e}")
             try:
                 from ...error_logger import error_logger
 
@@ -263,7 +274,8 @@ class ObjectCapture:
         
         # Return empty objects if this is a reserved folder
         if folder and folder in RESERVED_FOLDERS:
-            print(f"  ℹ Skipping reserved infrastructure folder: {folder} (cannot have security objects)")
+            if not self.suppress_output:
+                print(f"  ℹ Skipping reserved infrastructure folder: {folder} (cannot have security objects)")
             return {
                 "address_objects": [],
                 "address_groups": [],
@@ -312,7 +324,7 @@ class ObjectCapture:
 
         # Print brief summary only
         total = sum(len(objs) for objs in all_objects.values())
-        if total > 0:
+        if total > 0 and not self.suppress_output:
             print(f"  ✓ Captured {total} objects")
 
         return all_objects

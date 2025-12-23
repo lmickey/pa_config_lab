@@ -47,16 +47,20 @@ class PullWorker(QThread):
 
             self.progress.emit("Initializing pull operation...", 5)
 
-            # Create orchestrator
-            orchestrator = PullOrchestrator(self.api_client)
+            # Create orchestrator (suppress output to avoid segfaults from print in threads)
+            orchestrator = PullOrchestrator(self.api_client, suppress_output=True)
             
             # Set up progress callback to emit signals
             def progress_callback(message: str, current: float, total: float):
                 if not self._is_running:
                     return
-                if total > 0:
-                    # Use float division for accurate percentage calculation
-                    percentage = int(10 + (current / total) * 60)  # 10-70% range (leave room for infrastructure)
+                if total == 100:
+                    # Orchestrator is passing explicit percentage (current = percentage)
+                    percentage = int(current)
+                elif total > 0:
+                    # Orchestrator is passing fraction - calculate percentage
+                    # Map to 10-55% range (leave room for snippets at 60% and infrastructure at 65%+)
+                    percentage = int(10 + (current / total) * 45)
                 else:
                     percentage = 50
                 self.progress.emit(message, percentage)
@@ -91,19 +95,19 @@ class PullWorker(QThread):
             ])
 
             if infra_enabled and config:
-                self.progress.emit("Pulling infrastructure components...", 70)
+                self.progress.emit("Pulling infrastructure components...", 68)
                 
                 try:
-                    infra_capture = InfrastructureCapture(self.api_client)
+                    infra_capture = InfrastructureCapture(self.api_client, suppress_output=True)
                     
                     # Set up infrastructure progress callback
                     def infra_progress_callback(message: str, current: int, total: int):
                         if not self._is_running:
                             return
                         if total > 0:
-                            percentage = int(70 + (current / total) * 10)  # 70-80% range
+                            percentage = int(68 + (current / total) * 10)  # 68-78% range
                         else:
-                            percentage = 75
+                            percentage = 73
                         self.progress.emit(message, percentage)
                     
                     infra_data = infra_capture.capture_all_infrastructure(
@@ -147,13 +151,12 @@ class PullWorker(QThread):
                         
                 except Exception as e:
                     # Log error but continue - infrastructure is optional
-                    print(f"Warning: Error pulling infrastructure: {e}")
-                    self.progress.emit(f"Warning: Infrastructure pull had errors", 75)
+                    self.progress.emit(f"Warning: Infrastructure pull had errors: {str(e)}", 78)
 
             if not self._is_running:
                 return
 
-            self.progress.emit("Configuration pulled successfully", 80)
+            self.progress.emit("Finalizing configuration...", 80)
 
             # Filter defaults if requested
             if self.filter_defaults and config:
@@ -200,9 +203,9 @@ class PullWorker(QThread):
         except Exception as e:
             import traceback
             error_details = traceback.format_exc()
-            print(f"Pull worker error: {error_details}")
+            # Don't print from worker thread - causes segfault
             if self._is_running:
-                self.error.emit(f"Pull operation failed: {str(e)}")
+                self.error.emit(f"Pull operation failed: {str(e)}\n\n{error_details}")
                 self.finished.emit(False, str(e), None)
 
     def _format_stats_message(self, stats: Dict[str, Any]) -> str:

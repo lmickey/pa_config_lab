@@ -491,14 +491,23 @@ class FolderSelectionDialog(QDialog):
         
         return components
     
-    def get_selected_snippets(self) -> List[str]:
-        """Get list of selected snippet names."""
+    def get_selected_snippets(self) -> List[Dict[str, str]]:
+        """
+        Get list of selected snippets with their IDs.
+        
+        Returns:
+            List of dicts with 'id' and 'name' keys
+        """
         selected = []
         
         for i in range(self.snippet_tree.topLevelItemCount()):
             item = self.snippet_tree.topLevelItem(i)
             if item.checkState(0) == Qt.CheckState.Checked:
-                snippet_name = item.text(0)
-                selected.append(snippet_name)
+                snippet_data = item.data(0, Qt.ItemDataRole.UserRole)
+                if snippet_data:
+                    selected.append({
+                        'id': snippet_data.get('id', ''),
+                        'name': snippet_data.get('name', '')
+                    })
         
         return selected

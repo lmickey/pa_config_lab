@@ -379,53 +379,138 @@ class SavedConfigsSidebar(QWidget):
         Returns:
             True if saved successfully
         """
-        # Get name
+        # Get name from config metadata if not provided
         if default_name is None:
-            # Try to get name from config metadata
             default_name = config.get("metadata", {}).get("saved_name", "")
             if not default_name:
                 default_name = f"config_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
-        name, ok = QInputDialog.getText(
-            self,
-            "Save Configuration",
-            "Enter a name for this configuration:",
-            text=default_name
-        )
+        # Show combined save dialog
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QFormLayout, QLabel, QLineEdit, QDialogButtonBox
+        from PyQt6.QtCore import QTimer
         
-        if not ok or not name:
-            return False
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Save Configuration")
+        dialog.setMinimumWidth(450)
         
-        # Get password if encrypting
-        password = None
+        layout = QVBoxLayout(dialog)
+        
+        # Status label (hidden by default, shown for success/error)
+        status_label = QLabel()
+        status_label.setWordWrap(True)
+        status_label.setStyleSheet("padding: 10px; border-radius: 4px; font-weight: bold;")
+        status_label.hide()
+        layout.addWidget(status_label)
+        
+        # Form layout
+        form_layout = QFormLayout()
+        
+        # Name field
+        name_input = QLineEdit()
+        name_input.setText(default_name)
+        name_input.selectAll()
+        form_layout.addRow("Configuration Name*:", name_input)
+        
+        # Password fields (if encrypting)
+        password_input = None
+        confirm_input = None
         if encrypt:
-            password = self._get_password_with_confirmation(name)
-            if password is None:
-                return False  # User cancelled
-        
-        # Save
-        success, message = self.manager.save_config(config, name, password, overwrite=False)
-        
-        if success:
-            # No success dialog - just refresh the list
-            self._refresh_list()
-            return True
-        else:
-            # Ask if they want to overwrite
-            if "already exists" in message:
-                reply = QMessageBox.question(
-                    self,
-                    "Overwrite?",
-                    f"Configuration '{name}' already exists. Overwrite it?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                )
-                
-                if reply == QMessageBox.StandardButton.Yes:
-                    success, message = self.manager.save_config(config, name, password, overwrite=True)
-                    if success:
-                        # No success dialog - just refresh the list
-                        self._refresh_list()
-                        return True
+            password_input = QLineEdit()
+            password_input.setEchoMode(QLineEdit.EchoMode.Password)
+            password_input.setPlaceholderText("Enter encryption password")
+            form_layout.addRow("Password*:", password_input)
             
-            QMessageBox.warning(self, "Save Failed", message)
-            return False
+            confirm_input = QLineEdit()
+            confirm_input.setEchoMode(QLineEdit.EchoMode.Password)
+            confirm_input.setPlaceholderText("Confirm password")
+            form_layout.addRow("Confirm Password*:", confirm_input)
+        
+        layout.addLayout(form_layout)
+        
+        # Buttons
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
+        layout.addWidget(buttons)
+        
+        # Handle save
+        def on_save():
+            name = name_input.text().strip()
+            if not name:
+                status_label.setText("⚠ Please enter a configuration name")
+                status_label.setStyleSheet("background-color: #ffebee; color: #c62828; padding: 10px; border-radius: 4px; font-weight: bold;")
+                status_label.show()
+                return
+            
+            # Validate password if encrypting
+            password = None
+            if encrypt:
+                password = password_input.text()
+                confirm = confirm_input.text()
+                
+                if not password:
+                    status_label.setText("⚠ Please enter a password")
+                    status_label.setStyleSheet("background-color: #ffebee; color: #c62828; padding: 10px; border-radius: 4px; font-weight: bold;")
+                    status_label.show()
+                    return
+                
+                if password != confirm:
+                    status_label.setText("⚠ Passwords do not match")
+                    status_label.setStyleSheet("background-color: #ffebee; color: #c62828; padding: 10px; border-radius: 4px; font-weight: bold;")
+                    status_label.show()
+                    return
+            
+            # Try to save
+            success, message = self.manager.save_config(config, name, password, overwrite=False)
+            
+            if success:
+                # Show success message
+                status_label.setText(f"✓ Configuration saved as '{name}'")
+                status_label.setStyleSheet("background-color: #e8f5e9; color: #2e7d32; padding: 10px; border-radius: 4px; font-weight: bold;")
+                status_label.show()
+                
+                # Refresh list
+                self._refresh_list()
+                
+                # Close dialog after 1 second
+                QTimer.singleShot(1000, dialog.accept)
+            else:
+                # Check if it's an overwrite situation
+                if "already exists" in message:
+                    reply = QMessageBox.question(
+                        dialog,
+                        "Overwrite?",
+                        f"Configuration '{name}' already exists. Overwrite it?",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                    )
+                    
+                    if reply == QMessageBox.StandardButton.Yes:
+                        success, message = self.manager.save_config(config, name, password, overwrite=True)
+                        if success:
+                            # Show success message
+                            status_label.setText(f"✓ Configuration saved as '{name}'")
+                            status_label.setStyleSheet("background-color: #e8f5e9; color: #2e7d32; padding: 10px; border-radius: 4px; font-weight: bold;")
+                            status_label.show()
+                            
+                            # Refresh list
+                            self._refresh_list()
+                            
+                            # Close dialog after 1 second
+                            QTimer.singleShot(1000, dialog.accept)
+                        else:
+                            # Show error
+                            status_label.setText(f"✗ {message}")
+                            status_label.setStyleSheet("background-color: #ffebee; color: #c62828; padding: 10px; border-radius: 4px; font-weight: bold;")
+                            status_label.show()
+                else:
+                    # Show error
+                    status_label.setText(f"✗ {message}")
+                    status_label.setStyleSheet("background-color: #ffebee; color: #c62828; padding: 10px; border-radius: 4px; font-weight: bold;")
+                    status_label.show()
+        
+        buttons.button(QDialogButtonBox.StandardButton.Save).clicked.connect(on_save)
+        buttons.rejected.connect(dialog.reject)
+        
+        # Show dialog
+        result = dialog.exec()
+        return result == QDialog.DialogCode.Accepted

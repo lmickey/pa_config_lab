@@ -14,14 +14,16 @@ from ..api_client import PrismaAccessAPIClient
 class ProfileCapture:
     """Capture profiles from Prisma Access."""
 
-    def __init__(self, api_client: PrismaAccessAPIClient):
+    def __init__(self, api_client: PrismaAccessAPIClient, suppress_output: bool = False):
         """
         Initialize profile capture.
 
         Args:
             api_client: PrismaAccessAPIClient instance
+            suppress_output: Suppress print statements (for GUI usage)
         """
         self.api_client = api_client
+        self.suppress_output = suppress_output
 
     def capture_authentication_profiles(
         self, folder: Optional[str] = None
@@ -47,9 +49,11 @@ class ProfileCapture:
             # Check if this is a "folder doesn't exist" or pattern validation error
             error_str = str(e).lower()
             if "doesn't exist" in error_str or "400" in error_str or "pattern" in error_str:
-                print(f"  ⚠ Folder '{folder}' cannot be used for authentication profiles - skipping")
+                if not self.suppress_output:
+                    print(f"  ⚠ Folder '{folder}' cannot be used for authentication profiles - skipping")
                 return []
-            print(f"Error capturing authentication profiles: {e}")
+            if not self.suppress_output:
+                print(f"Error capturing authentication profiles: {e}")
             return []
 
     def capture_security_profiles(
@@ -86,13 +90,15 @@ class ProfileCapture:
 
             method_name = profile_method_map.get(profile_type)
             if not method_name:
-                print(f"Unknown profile type: {profile_type}")
+                if not self.suppress_output:
+                    print(f"Unknown profile type: {profile_type}")
                 return []
 
             # Call the appropriate API client method
             method = getattr(self.api_client, method_name, None)
             if not method:
-                print(f"API client method {method_name} not implemented")
+                if not self.suppress_output:
+                    print(f"API client method {method_name} not implemented")
                 return []
 
             profiles = method(folder=folder) if folder else method()
@@ -105,13 +111,16 @@ class ProfileCapture:
             # Check if this is a "folder doesn't exist", pattern validation, or server error
             error_str = str(e).lower()
             if "doesn't exist" in error_str or "400" in error_str or "pattern" in error_str:
-                print(f"  ⚠ Folder '{folder}' cannot be used for {profile_type} profiles - skipping")
+                if not self.suppress_output:
+                    print(f"  ⚠ Folder '{folder}' cannot be used for {profile_type} profiles - skipping")
                 return []
             elif "500" in error_str or "503" in error_str or "502" in error_str:
                 # Server errors - API is having issues, skip gracefully
-                print(f"  ⚠ API server error for {profile_type} profiles in folder '{folder}' - skipping")
+                if not self.suppress_output:
+                    print(f"  ⚠ API server error for {profile_type} profiles in folder '{folder}' - skipping")
                 return []
-            print(f"Error capturing {profile_type} profiles: {e}")
+            if not self.suppress_output:
+                print(f"Error capturing {profile_type} profiles: {e}")
             return []
 
     def capture_all_security_profiles(
@@ -179,9 +188,11 @@ class ProfileCapture:
             # Check if this is a "folder doesn't exist" or pattern validation error
             error_str = str(e).lower()
             if "doesn't exist" in error_str or "400" in error_str or "pattern" in error_str:
-                print(f"  ⚠ Folder '{folder}' cannot be used for decryption profiles - skipping")
+                if not self.suppress_output:
+                    print(f"  ⚠ Folder '{folder}' cannot be used for decryption profiles - skipping")
                 return []
-            print(f"Error capturing decryption profiles: {e}")
+            if not self.suppress_output:
+                print(f"Error capturing decryption profiles: {e}")
             return []
 
     def capture_all_profiles(self, folder: Optional[str] = None) -> Dict[str, Any]:
@@ -209,7 +220,8 @@ class ProfileCapture:
         
         # Return empty profiles if this is a reserved folder
         if folder and folder in RESERVED_FOLDERS:
-            print(f"  ℹ Skipping reserved infrastructure folder: {folder} (cannot have security profiles)")
+            if not self.suppress_output:
+                print(f"  ℹ Skipping reserved infrastructure folder: {folder} (cannot have security profiles)")
             return {
                 "authentication_profiles": [],
                 "security_profiles": {},
@@ -271,7 +283,7 @@ class ProfileCapture:
         )
         total = auth_count + sec_count + dec_count
 
-        if total > 0:
+        if total > 0 and not self.suppress_output:
             print(f"  ✓ Captured {total} profiles")
 
         return all_profiles

@@ -21,15 +21,22 @@ from ..api_client import PrismaAccessAPIClient
 class InfrastructureCapture:
     """Capture Prisma Access infrastructure components."""
 
-    def __init__(self, api_client: PrismaAccessAPIClient):
+    def __init__(self, api_client: PrismaAccessAPIClient, suppress_output: bool = False):
         """
         Initialize infrastructure capture.
 
         Args:
             api_client: PrismaAccessAPIClient instance
+            suppress_output: Suppress logging output (for GUI usage)
         """
         self.api_client = api_client
+        self.suppress_output = suppress_output
         self.logger = logging.getLogger(__name__)
+    
+    def _log(self, level: str, message: str):
+        """Thread-safe logging wrapper that respects suppress_output flag."""
+        if not self.suppress_output:
+            getattr(self.logger, level)(message)
 
     def _validate_endpoint_availability(self, endpoint_name: str, func) -> bool:
         """
@@ -50,7 +57,7 @@ class InfrastructureCapture:
             # Check if it's a 404 (endpoint not found)
             if hasattr(e, 'response') and hasattr(e.response, 'status_code'):
                 if e.response.status_code == 404:
-                    self.logger.warning(
+                    self._log("warning", 
                         f"Endpoint '{endpoint_name}' not available (404), skipping..."
                     )
                     return False
@@ -73,20 +80,20 @@ class InfrastructureCapture:
             List of remote network configuration dictionaries
         """
         try:
-            self.logger.info("Capturing remote networks...")
+            self._log("info", "Capturing remote networks...")
             remote_networks = self.api_client.get_all_remote_networks(folder=folder)
-            self.logger.info(f"Captured {len(remote_networks)} remote network(s)")
+            self._log("info", f"Captured {len(remote_networks)} remote network(s)")
             return remote_networks
         except Exception as e:
             # Check if endpoint not available (404)
             if hasattr(e, 'response') and hasattr(e.response, 'status_code'):
                 if e.response.status_code == 404:
-                    self.logger.warning(
+                    self._log("warning", 
                         "Remote Networks endpoint not available, skipping..."
                     )
                     return []
             # Re-raise other errors
-            self.logger.error(f"Error capturing remote networks: {e}")
+            self._log("error", f"Error capturing remote networks: {e}")
             raise
 
     def capture_service_connections(
@@ -105,22 +112,22 @@ class InfrastructureCapture:
             List of service connection configuration dictionaries
         """
         try:
-            self.logger.info("Capturing service connections...")
+            self._log("info", "Capturing service connections...")
             service_connections = self.api_client.get_all_service_connections(
                 folder=folder
             )
-            self.logger.info(
+            self._log("info", 
                 f"Captured {len(service_connections)} service connection(s)"
             )
             return service_connections
         except Exception as e:
             if hasattr(e, 'response') and hasattr(e.response, 'status_code'):
                 if e.response.status_code == 404:
-                    self.logger.warning(
+                    self._log("warning", 
                         "Service Connections endpoint not available, skipping..."
                     )
                     return []
-            self.logger.error(f"Error capturing service connections: {e}")
+            self._log("error", f"Error capturing service connections: {e}")
             raise
 
     def capture_ipsec_tunnels(
@@ -166,47 +173,47 @@ class InfrastructureCapture:
         for folder in folders:
             try:
                 # Capture IPsec tunnels
-                self.logger.info(f"Capturing IPsec tunnels from folder: {folder}...")
+                self._log("info", f"Capturing IPsec tunnels from folder: {folder}...")
                 tunnels = self.api_client.get_all_ipsec_tunnels(folder=folder)
                 result["ipsec_tunnels"].extend(tunnels)
-                self.logger.info(f"  Found {len(tunnels)} IPsec tunnel(s)")
+                self._log("info", f"  Found {len(tunnels)} IPsec tunnel(s)")
 
                 # Capture IKE gateways
-                self.logger.info(f"Capturing IKE gateways from folder: {folder}...")
+                self._log("info", f"Capturing IKE gateways from folder: {folder}...")
                 gateways = self.api_client.get_all_ike_gateways(folder=folder)
                 result["ike_gateways"].extend(gateways)
-                self.logger.info(f"  Found {len(gateways)} IKE gateway(s)")
+                self._log("info", f"  Found {len(gateways)} IKE gateway(s)")
 
                 # Capture IKE crypto profiles
-                self.logger.info(f"Capturing IKE crypto profiles from folder: {folder}...")
+                self._log("info", f"Capturing IKE crypto profiles from folder: {folder}...")
                 ike_profiles = self.api_client.get_all_ike_crypto_profiles(folder=folder)
                 result["ike_crypto_profiles"].extend(ike_profiles)
-                self.logger.info(f"  Found {len(ike_profiles)} IKE crypto profile(s)")
+                self._log("info", f"  Found {len(ike_profiles)} IKE crypto profile(s)")
 
                 # Capture IPsec crypto profiles
-                self.logger.info(f"Capturing IPsec crypto profiles from folder: {folder}...")
+                self._log("info", f"Capturing IPsec crypto profiles from folder: {folder}...")
                 ipsec_profiles = self.api_client.get_all_ipsec_crypto_profiles(folder=folder)
                 result["ipsec_crypto_profiles"].extend(ipsec_profiles)
-                self.logger.info(f"  Found {len(ipsec_profiles)} IPsec crypto profile(s)")
+                self._log("info", f"  Found {len(ipsec_profiles)} IPsec crypto profile(s)")
 
             except Exception as e:
                 error_str = str(e).lower()
                 # Check for common errors that should be skipped
                 if "doesn't exist" in error_str or "404" in error_str:
-                    self.logger.info(f"  Folder '{folder}' not available for tunnels - skipping")
+                    self._log("info", f"  Folder '{folder}' not available for tunnels - skipping")
                     continue
                 elif "400" in error_str and "pattern" in error_str:
-                    self.logger.info(f"  Folder '{folder}' cannot have tunnels - skipping")
+                    self._log("info", f"  Folder '{folder}' cannot have tunnels - skipping")
                     continue
                 else:
-                    self.logger.error(f"Error capturing tunnels from folder '{folder}': {e}")
+                    self._log("error", f"Error capturing tunnels from folder '{folder}': {e}")
                     # Continue to next folder instead of raising
 
         # Log totals
-        self.logger.info(f"Total IPsec tunnels captured: {len(result['ipsec_tunnels'])}")
-        self.logger.info(f"Total IKE gateways captured: {len(result['ike_gateways'])}")
-        self.logger.info(f"Total IKE crypto profiles captured: {len(result['ike_crypto_profiles'])}")
-        self.logger.info(f"Total IPsec crypto profiles captured: {len(result['ipsec_crypto_profiles'])}")
+        self._log("info", f"Total IPsec tunnels captured: {len(result['ipsec_tunnels'])}")
+        self._log("info", f"Total IKE gateways captured: {len(result['ike_gateways'])}")
+        self._log("info", f"Total IKE crypto profiles captured: {len(result['ike_crypto_profiles'])}")
+        self._log("info", f"Total IPsec crypto profiles captured: {len(result['ipsec_crypto_profiles'])}")
 
         return result
 
@@ -245,72 +252,68 @@ class InfrastructureCapture:
         }
 
         try:
+            # Skip the enable check entirely - it causes hangs and segfaults in GUI mode
+            # Just try to capture each component and let individual calls fail gracefully
+            # Each call already has try-except handling
+            
             # Capture mobile agent profiles
-            self.logger.info(f"Capturing mobile agent profiles from {folder}...")
+            self._log("info", f"Capturing mobile agent profiles from {folder}...")
             try:
                 result["agent_profiles"] = self.api_client.get_mobile_agent_profiles(folder=folder)
-                self.logger.info("  ✓ Captured agent profiles")
+                self._log("info", "  ✓ Captured agent profiles")
             except Exception as e:
-                self.logger.warning(f"  ⚠ Error capturing agent profiles: {e}")
+                self._log("warning", f"  ⚠ Error capturing agent profiles: {e}")
 
             # Capture mobile agent versions
-            self.logger.info(f"Capturing mobile agent versions from {folder}...")
+            self._log("info", f"Capturing mobile agent versions from {folder}...")
             try:
                 result["agent_versions"] = self.api_client.get_mobile_agent_versions(folder=folder)
-                self.logger.info("  ✓ Captured agent versions")
+                self._log("info", "  ✓ Captured agent versions")
             except Exception as e:
-                self.logger.warning(f"  ⚠ Error capturing agent versions: {e}")
+                self._log("warning", f"  ⚠ Error capturing agent versions: {e}")
 
             # Capture authentication settings
-            self.logger.info(f"Capturing mobile agent auth settings from {folder}...")
+            self._log("info", f"Capturing mobile agent auth settings from {folder}...")
             try:
                 result["authentication_settings"] = self.api_client.get_mobile_agent_auth_settings(folder=folder)
-                self.logger.info("  ✓ Captured authentication settings")
+                self._log("info", "  ✓ Captured authentication settings")
             except Exception as e:
-                self.logger.warning(f"  ⚠ Error capturing auth settings: {e}")
-
-            # Capture enable/disable status
-            self.logger.info(f"Capturing mobile agent enable status from {folder}...")
-            try:
-                result["enable"] = self.api_client.get_mobile_agent_enable(folder=folder)
-                self.logger.info("  ✓ Captured enable status")
-            except Exception as e:
-                self.logger.warning(f"  ⚠ Error capturing enable status: {e}")
+                self._log("warning", f"  ⚠ Error capturing auth settings: {e}")
 
             # Capture global settings
-            self.logger.info(f"Capturing mobile agent global settings from {folder}...")
+            self._log("info", f"Capturing mobile agent global settings from {folder}...")
             try:
                 result["global_settings"] = self.api_client.get_mobile_agent_global_settings(folder=folder)
-                self.logger.info("  ✓ Captured global settings")
+                self._log("info", "  ✓ Captured global settings")
             except Exception as e:
-                self.logger.warning(f"  ⚠ Error capturing global settings: {e}")
+                self._log("warning", f"  ⚠ Error capturing global settings: {e}")
 
             # Capture infrastructure settings
-            self.logger.info(f"Capturing mobile agent infrastructure settings from {folder}...")
+            self._log("info", f"Capturing mobile agent infrastructure settings from {folder}...")
             try:
                 result["infrastructure_settings"] = self.api_client.get_mobile_agent_infra_settings(folder=folder)
-                self.logger.info("  ✓ Captured infrastructure settings")
+                self._log("info", "  ✓ Captured infrastructure settings")
             except Exception as e:
-                self.logger.warning(f"  ⚠ Error capturing infrastructure settings: {e}")
+                self._log("warning", f"  ⚠ Error capturing infrastructure settings: {e}")
 
             # Capture locations
-            self.logger.info(f"Capturing mobile agent locations from {folder}...")
+            self._log("info", f"Capturing mobile agent locations from {folder}...")
             try:
                 result["locations"] = self.api_client.get_mobile_agent_locations(folder=folder)
-                self.logger.info("  ✓ Captured locations")
+                self._log("info", "  ✓ Captured locations")
             except Exception as e:
-                self.logger.warning(f"  ⚠ Error capturing locations: {e}")
+                self._log("warning", f"  ⚠ Error capturing locations: {e}")
 
             # Capture tunnel profiles
-            self.logger.info(f"Capturing mobile agent tunnel profiles from {folder}...")
+            self._log("info", f"Capturing mobile agent tunnel profiles from {folder}...")
             try:
                 result["tunnel_profiles"] = self.api_client.get_mobile_agent_tunnel_profiles(folder=folder)
-                self.logger.info("  ✓ Captured tunnel profiles")
+                self._log("info", "  ✓ Captured tunnel profiles")
             except Exception as e:
-                self.logger.warning(f"  ⚠ Error capturing tunnel profiles: {e}")
+                self._log("warning", f"  ⚠ Error capturing tunnel profiles: {e}")
 
         except Exception as e:
-            self.logger.error(f"Error capturing mobile user infrastructure: {e}")
+            self._log("error", f"Error capturing mobile user infrastructure: {e}")
             # Don't raise - return partial results
 
         return result
@@ -341,37 +344,37 @@ class InfrastructureCapture:
 
         try:
             # Capture HIP objects
-            self.logger.info("Capturing HIP objects...")
+            self._log("info", "Capturing HIP objects...")
             try:
                 result["hip_objects"] = self.api_client.get_all_hip_objects(
                     folder=folder
                 )
-                self.logger.info(f"Captured {len(result['hip_objects'])} HIP object(s)")
+                self._log("info", f"Captured {len(result['hip_objects'])} HIP object(s)")
             except Exception as e:
                 if hasattr(e, 'response') and hasattr(e.response, 'status_code'):
                     if e.response.status_code == 404:
-                        self.logger.warning("HIP objects endpoint not available")
+                        self._log("warning", "HIP objects endpoint not available")
                 else:
-                    self.logger.warning(f"Error capturing HIP objects: {e}")
+                    self._log("warning", f"Error capturing HIP objects: {e}")
 
             # Capture HIP profiles
-            self.logger.info("Capturing HIP profiles...")
+            self._log("info", "Capturing HIP profiles...")
             try:
                 result["hip_profiles"] = self.api_client.get_all_hip_profiles(
                     folder=folder
                 )
-                self.logger.info(
+                self._log("info", 
                     f"Captured {len(result['hip_profiles'])} HIP profile(s)"
                 )
             except Exception as e:
                 if hasattr(e, 'response') and hasattr(e.response, 'status_code'):
                     if e.response.status_code == 404:
-                        self.logger.warning("HIP profiles endpoint not available")
+                        self._log("warning", "HIP profiles endpoint not available")
                 else:
-                    self.logger.warning(f"Error capturing HIP profiles: {e}")
+                    self._log("warning", f"Error capturing HIP profiles: {e}")
 
         except Exception as e:
-            self.logger.error(f"Error capturing HIP objects and profiles: {e}")
+            self._log("error", f"Error capturing HIP objects and profiles: {e}")
             # Don't raise - return partial results
 
         return result
@@ -399,25 +402,25 @@ class InfrastructureCapture:
             # They are the same across all tenants and don't need to be in configs
             
             # Capture bandwidth allocations
-            self.logger.info("Capturing bandwidth allocations...")
+            self._log("info", "Capturing bandwidth allocations...")
             try:
                 result[
                     "bandwidth_allocations"
                 ] = self.api_client.get_all_bandwidth_allocations()
-                self.logger.info(
+                self._log("info", 
                     f"Captured {len(result['bandwidth_allocations'])} bandwidth allocation(s)"
                 )
             except Exception as e:
                 if hasattr(e, 'response') and hasattr(e.response, 'status_code'):
                     if e.response.status_code == 404:
-                        self.logger.warning(
+                        self._log("warning", 
                             "Bandwidth allocations endpoint not available"
                         )
                 else:
-                    self.logger.warning(f"Error capturing bandwidth allocations: {e}")
+                    self._log("warning", f"Error capturing bandwidth allocations: {e}")
 
         except Exception as e:
-            self.logger.error(f"Error capturing regions and bandwidth: {e}")
+            self._log("error", f"Error capturing regions and bandwidth: {e}")
             # Don't raise - return partial results
 
         return result

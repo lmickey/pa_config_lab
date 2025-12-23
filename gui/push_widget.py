@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QMessageBox,
     QButtonGroup,
+    QComboBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -36,6 +37,7 @@ class PushConfigWidget(QWidget):
         super().__init__(parent)
 
         self.api_client = None
+        self.destination_client = None  # Separate destination tenant
         self.config = None
         self.worker = None
 
@@ -50,12 +52,39 @@ class PushConfigWidget(QWidget):
         layout.addWidget(title)
 
         info = QLabel(
-            "Push configuration to the connected Prisma Access tenant.\n"
-            "Configure conflict resolution and push mode."
+            "Push configuration to a Prisma Access tenant.\n"
+            "Select destination tenant and configure conflict resolution."
         )
         info.setWordWrap(True)
         info.setStyleSheet("color: gray; margin-bottom: 10px;")
         layout.addWidget(info)
+
+        # Destination tenant selection
+        dest_group = QGroupBox("Destination Tenant")
+        dest_layout = QVBoxLayout()
+        
+        tenant_select_layout = QHBoxLayout()
+        
+        tenant_select_layout.addWidget(QLabel("Push to:"))
+        
+        self.destination_combo = QComboBox()
+        self.destination_combo.addItem("-- Select Destination --", None)
+        self.destination_combo.currentIndexChanged.connect(self._on_destination_selected)
+        tenant_select_layout.addWidget(self.destination_combo, 1)
+        
+        connect_btn = QPushButton("Connect to Different Tenant...")
+        connect_btn.clicked.connect(self._connect_destination)
+        tenant_select_layout.addWidget(connect_btn)
+        
+        dest_layout.addLayout(tenant_select_layout)
+        
+        # Destination status
+        self.dest_status_label = QLabel("No destination selected")
+        self.dest_status_label.setStyleSheet("color: gray; padding: 5px;")
+        dest_layout.addWidget(self.dest_status_label)
+        
+        dest_group.setLayout(dest_layout)
+        layout.addWidget(dest_group)
 
         # Status
         self.status_label = QLabel("No configuration loaded")
@@ -168,9 +197,190 @@ class PushConfigWidget(QWidget):
         layout.addStretch()
 
     def set_api_client(self, api_client):
-        """Set the API client for push operations."""
+        """Set the API client for push operations (source tenant)."""
         self.api_client = api_client
+        self._load_destination_tenants()
         self._update_status()
+    
+    def _load_destination_tenants(self):
+        """Load available destination tenants."""
+        from config.tenant_manager import TenantManager
+        
+        # Block signals during load
+        self.destination_combo.blockSignals(True)
+        
+        # Clear existing (except first item)
+        while self.destination_combo.count() > 1:
+            self.destination_combo.removeItem(1)
+        
+        # Add "Use Source Tenant" option if connected
+        if self.api_client:
+            self.destination_combo.addItem(
+                f"Use Source Tenant ({self.api_client.tsg_id})",
+                {"type": "source", "client": self.api_client}
+            )
+        
+        # Add saved tenants
+        manager = TenantManager()
+        tenants = manager.list_tenants(sort_by="last_used")
+        
+        for tenant in tenants:
+            display_name = f"{tenant['name']} ({tenant['tsg_id']})"
+            self.destination_combo.addItem(display_name, {"type": "saved", "tenant": tenant})
+        
+        # Re-enable signals
+        self.destination_combo.blockSignals(False)
+    
+    def _on_destination_selected(self, index):
+        """Handle destination tenant selection."""
+        try:
+            data = self.destination_combo.currentData()
+            
+            if data is None:
+                # No selection
+                self.destination_client = None
+                self.dest_status_label.setText("No destination selected")
+                self.dest_status_label.setStyleSheet("color: gray; padding: 5px;")
+            elif data["type"] == "source":
+                # Use source tenant
+                self.destination_client = data["client"]
+                self.dest_status_label.setText(f"✓ Using source tenant: {self.destination_client.tsg_id}")
+                self.dest_status_label.setStyleSheet("color: green; padding: 5px;")
+            elif data["type"] == "saved":
+                # Saved tenant - need to connect
+                tenant = data["tenant"]
+                self._connect_to_tenant(tenant)
+            
+            self._update_status()
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Selection Error",
+                f"Error selecting destination tenant:\n\n{str(e)}\n\nPlease check the console for details."
+            )
+            import traceback
+            traceback.print_exc()
+            self.destination_combo.setCurrentIndex(0)
+            self.destination_client = None
+            self._update_status()
+    
+    def _connect_to_tenant(self, tenant):
+        """Connect to a saved tenant."""
+        from prisma.api_client import PrismaAccessAPIClient
+        from PyQt6.QtWidgets import QProgressDialog
+        from PyQt6.QtCore import QTimer, QCoreApplication
+        
+        # Show progress
+        progress = QProgressDialog("Connecting to destination tenant...", None, 0, 0, self)
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setMinimumDuration(0)
+        
+        try:
+            # Process events before showing to avoid issues
+            QCoreApplication.processEvents()
+            progress.show()
+            QCoreApplication.processEvents()
+            
+            # Create client
+            client = PrismaAccessAPIClient(
+                tsg_id=tenant['tsg_id'],
+                api_user=tenant['client_id'],
+                api_secret=tenant['client_secret']
+            )
+            
+            # Test authentication
+            if client.token:
+                self.destination_client = client
+                self.dest_status_label.setText(f"✓ Connected to: {tenant['name']}")
+                self.dest_status_label.setStyleSheet("color: green; padding: 5px;")
+                
+                # Mark as used
+                from config.tenant_manager import TenantManager
+                manager = TenantManager()
+                manager.mark_used(tenant['id'])
+            else:
+                self.destination_combo.setCurrentIndex(0)
+                self.destination_client = None
+                # Show error after closing progress
+                progress.close()
+                QCoreApplication.processEvents()
+                QMessageBox.critical(self, "Connection Failed", "Failed to authenticate with destination tenant.")
+                return
+                
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.destination_combo.setCurrentIndex(0)
+            self.destination_client = None
+            # Show error after closing progress
+            progress.close()
+            QCoreApplication.processEvents()
+            QMessageBox.critical(
+                self, 
+                "Connection Error", 
+                f"Error connecting to tenant:\n\n{str(e)}"
+            )
+            return
+        finally:
+            # Safely close progress dialog
+            if progress:
+                progress.close()
+                progress.deleteLater()
+            # Process events to ensure clean close
+            QCoreApplication.processEvents()
+            # Update status after a brief delay
+            QTimer.singleShot(100, self._update_status)
+    
+    def _connect_destination(self):
+        """Open connection dialog for destination tenant."""
+        from gui.connection_dialog import ConnectionDialog
+        from PyQt6.QtCore import QCoreApplication
+        
+        try:
+            dialog = ConnectionDialog(self)
+            result = dialog.exec()
+            
+            # Process events to ensure dialog is fully closed
+            QCoreApplication.processEvents()
+            
+            if result:
+                # Get data before dialog is deleted
+                client = dialog.get_api_client()
+                connection_name = dialog.get_connection_name() or "Manual"
+                
+                # Delete dialog explicitly
+                dialog.deleteLater()
+                QCoreApplication.processEvents()
+                
+                if client:
+                    self.destination_client = client
+                    
+                    # Add to combo if not already there
+                    self.destination_combo.blockSignals(True)
+                    self.destination_combo.addItem(
+                        f"{connection_name} ({client.tsg_id})",
+                        {"type": "manual", "client": client}
+                    )
+                    self.destination_combo.setCurrentIndex(self.destination_combo.count() - 1)
+                    self.destination_combo.blockSignals(False)
+                    
+                    self.dest_status_label.setText(f"✓ Connected to: {connection_name}")
+                    self.dest_status_label.setStyleSheet("color: green; padding: 5px;")
+                    self._update_status()
+            else:
+                # Dialog cancelled
+                dialog.deleteLater()
+                QCoreApplication.processEvents()
+                
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(
+                self,
+                "Connection Error",
+                f"Error connecting to destination tenant:\n\n{str(e)}"
+            )
 
     def set_config(self, config: Optional[Dict[str, Any]]):
         """Set the configuration to push."""
@@ -179,13 +389,13 @@ class PushConfigWidget(QWidget):
 
     def _update_status(self):
         """Update status label and enable/disable push button."""
-        if not self.api_client:
-            self.status_label.setText("❌ Not connected to Prisma Access")
+        if not self.destination_client:
+            self.status_label.setText("❌ No destination tenant selected")
             self.status_label.setStyleSheet(
-                "color: red; padding: 10px; background-color: #ffe6e6;"
+                "color: orange; padding: 10px; background-color: #fff4e6;"
             )
             self.push_btn.setEnabled(False)
-            self.progress_label.setText("Not connected")
+            self.progress_label.setText("Select destination tenant")
         elif not self.config:
             self.status_label.setText("❌ No configuration loaded")
             self.status_label.setStyleSheet(
@@ -197,7 +407,7 @@ class PushConfigWidget(QWidget):
             # Count items
             total_items = self._count_items()
             self.status_label.setText(
-                f"✓ Ready to push | Target: {self.api_client.tsg_id} | Items: {total_items}"
+                f"✓ Ready to push | Target: {self.destination_client.tsg_id} | Items: {total_items}"
             )
             self.status_label.setStyleSheet(
                 "color: green; padding: 10px; background-color: #e6ffe6;"
@@ -226,7 +436,7 @@ class PushConfigWidget(QWidget):
 
     def _start_push(self):
         """Start the push operation."""
-        if not self.api_client or not self.config:
+        if not self.destination_client or not self.config:
             return
 
         # Get conflict resolution
@@ -244,7 +454,7 @@ class PushConfigWidget(QWidget):
             reply = QMessageBox.question(
                 self,
                 "Confirm Push",
-                f"Push configuration to {self.api_client.tsg_id}?\n\n"
+                f"Push configuration to {self.destination_client.tsg_id}?\n\n"
                 f"Conflict Resolution: {resolution}\n"
                 f"This will modify the target tenant.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -263,8 +473,8 @@ class PushConfigWidget(QWidget):
         # Clear previous results
         self.results_text.clear()
 
-        # Create and start worker
-        self.worker = PushWorker(self.api_client, self.config, resolution, dry_run)
+        # Create and start worker (use destination_client)
+        self.worker = PushWorker(self.destination_client, self.config, resolution, dry_run)
         self.worker.progress.connect(self._on_progress)
         self.worker.finished.connect(self._on_push_finished)
         self.worker.error.connect(self._on_error)

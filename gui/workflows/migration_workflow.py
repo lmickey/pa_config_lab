@@ -102,10 +102,11 @@ class MigrationWorkflowWidget(QWidget):
         # Add main content to layout
         layout.addWidget(main_content)
 
-    def set_api_client(self, api_client):
+    def set_api_client(self, api_client, connection_name=None):
         """Set API client for all widgets."""
         self.api_client = api_client
-        self.pull_widget.set_api_client(api_client)
+        self.connection_name = connection_name  # Store for use in save dialog
+        self.pull_widget.set_api_client(api_client, connection_name)
         self.push_widget.set_api_client(api_client)
 
     def _on_pull_completed(self, config):
@@ -138,35 +139,36 @@ class MigrationWorkflowWidget(QWidget):
             )
             return
         
-        # Generate default name
-        default_name = config.get("metadata", {}).get("source_tenant", "")
-        if not default_name:
-            from datetime import datetime
-            default_name = f"migration_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        # Generate default name using connection name (tenant name) instead of TSG
+        default_name = getattr(self, 'connection_name', None)
+        if not default_name or default_name == "Manual":
+            # Fall back to TSG or timestamp
+            default_name = config.get("metadata", {}).get("source_tenant", "")
+            if not default_name:
+                from datetime import datetime
+                default_name = f"migration_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
-        success = self.saved_configs_sidebar.save_current_config(
+        # Save (no success dialog needed - handled in save_current_config)
+        self.saved_configs_sidebar.save_current_config(
             config,
             default_name=default_name,
             encrypt=True
         )
-        
-        if success:
-            QMessageBox.information(
-                self,
-                "Saved",
-                f"Configuration saved as '{default_name}'"
-            )
 
     def _auto_save_pulled_config(self, config: Dict[str, Any]):
         """Automatically prompt to save pulled configuration."""
         if not config:
             return
         
-        # Generate default filename based on TSG and date
-        tsg_id = config.get("metadata", {}).get("source_tenant", "unknown")
+        # Generate default filename based on connection name (tenant name) instead of TSG
+        connection_name = getattr(self, 'connection_name', None)
+        if not connection_name or connection_name == "Manual":
+            # Fall back to TSG
+            connection_name = config.get("metadata", {}).get("source_tenant", "unknown")
+        
         from datetime import datetime
         date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        default_name = f"pulled_{tsg_id}_{date_str}"
+        default_name = f"pulled_{connection_name}_{date_str}"
         
         # Prompt user to save
         from PyQt6.QtWidgets import QMessageBox
@@ -208,9 +210,3 @@ class MigrationWorkflowWidget(QWidget):
         self.tabs.setCurrentIndex(1)
         
         # No success message - config is now visible in viewer
-
-    def set_api_client(self, client):
-        """Set API client for pull/push operations."""
-        self.api_client = client
-        self.pull_widget.set_api_client(client)
-        self.push_widget.set_api_client(client)

@@ -912,9 +912,10 @@ class POVWorkflowWidget(QWidget):
     # EVENT HANDLERS - SOURCES TAB
     # ============================================================================
 
-    def set_api_client(self, api_client):
+    def set_api_client(self, api_client, connection_name=None):
         """Set API client."""
         self.api_client = api_client
+        self.connection_name = connection_name
 
     def _on_management_changed(self):
         """Handle management type change."""

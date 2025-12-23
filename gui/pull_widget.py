@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 
 from gui.workers import PullWorker
+from gui.toast_notification import ToastManager, DismissibleErrorNotification
 
 
 class PullConfigWidget(QWidget):
@@ -35,6 +36,9 @@ class PullConfigWidget(QWidget):
         super().__init__(parent)
 
         self.api_client = None
+        self.toast_manager = ToastManager(self)
+        self.error_notification = DismissibleErrorNotification(self)
+        self.connection_name = None
         self.worker = None
         self.pulled_config = None
         
@@ -224,15 +228,16 @@ class PullConfigWidget(QWidget):
 
         layout.addStretch()
 
-    def set_api_client(self, api_client):
+    def set_api_client(self, api_client, connection_name=None):
         """Set the API client for pull operations."""
         self.api_client = api_client
+        self.connection_name = connection_name or "Manual"
         self.pull_btn.setEnabled(api_client is not None)
         self.folder_select_btn.setEnabled(api_client is not None)  # NEW
 
         if api_client:
             self.progress_label.setText(
-                f"Connected to {api_client.tsg_id} - Ready to pull"
+                f"Connected to {self.connection_name} - Ready to pull"
             )
             self.progress_label.setStyleSheet("color: green;")
         else:
@@ -409,9 +414,10 @@ class PullConfigWidget(QWidget):
             "include_hip": self.hip_check.isChecked(),
             "include_regions": self.regions_check.isChecked(),
             # Folder and snippet selection (from dialog)
-            "selected_folders": self.selected_folders if self.selected_folders else None,
-            "selected_components": self.selected_components if self.selected_components else None,
-            "selected_snippets": self.selected_snippets if self.selected_snippets else None,
+            # Keep empty lists as empty lists (don't convert to None) so orchestrator knows nothing was selected
+            "selected_folders": self.selected_folders,
+            "selected_components": self.selected_components,
+            "selected_snippets": self.selected_snippets,
         }
 
         filter_defaults = self.filter_defaults_check.isChecked()
@@ -495,6 +501,10 @@ class PullConfigWidget(QWidget):
             self.update_timer.stop()
             self._flush_pending_messages()
             
+            # Wait for worker thread to fully finish
+            if self.worker:
+                self.worker.wait(1000)  # Wait up to 1 second for thread to finish
+            
             # Re-enable UI
             self._set_ui_enabled(True)
 
@@ -513,13 +523,17 @@ class PullConfigWidget(QWidget):
                 else:
                     self.pulled_config = config  # Fallback to parameter if worker unavailable
                 
-                # Emit signal for other components
+                # Emit signal for other components after a brief delay to ensure thread safety
                 if self.pulled_config:
-                    self.pull_completed.emit(self.pulled_config)
+                    # Use QTimer to emit from main thread to avoid memory corruption
+                    QTimer.singleShot(100, lambda: self.pull_completed.emit(self.pulled_config))
                 
-                QMessageBox.information(
-                    self, "Success", "Configuration pulled successfully!"
-                )
+                # Show toast notification instead of dialog
+                self.toast_manager.show_success("✓ Configuration pulled successfully!")
+                
+                # TODO: Re-enable error notification once we solve the memory corruption issue
+                # The config object is too large and causes heap corruption when accessed immediately
+                # For now, users can check api_errors.log manually if they suspect issues
             else:
                 self.progress_label.setText("Pull failed")
                 self.progress_label.setStyleSheet("color: red;")

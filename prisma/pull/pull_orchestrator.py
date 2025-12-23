@@ -22,20 +22,22 @@ from ..dependencies.dependency_resolver import DependencyResolver
 class PullOrchestrator:
     """Orchestrate the complete configuration pull process."""
 
-    def __init__(self, api_client: PrismaAccessAPIClient, detect_defaults: bool = True):
+    def __init__(self, api_client: PrismaAccessAPIClient, detect_defaults: bool = True, suppress_output: bool = False):
         """
         Initialize pull orchestrator.
 
         Args:
             api_client: PrismaAccessAPIClient instance
             detect_defaults: Whether to detect defaults during capture (default: True)
+            suppress_output: Suppress print statements (for GUI usage)
         """
         self.api_client = api_client
-        self.folder_capture = FolderCapture(api_client)
-        self.rule_capture = RuleCapture(api_client)
-        self.object_capture = ObjectCapture(api_client)
-        self.profile_capture = ProfileCapture(api_client)
-        self.snippet_capture = SnippetCapture(api_client)
+        self.suppress_output = suppress_output
+        self.folder_capture = FolderCapture(api_client, suppress_output=suppress_output)
+        self.rule_capture = RuleCapture(api_client, suppress_output=suppress_output)
+        self.object_capture = ObjectCapture(api_client, suppress_output=suppress_output)
+        self.profile_capture = ProfileCapture(api_client, suppress_output=suppress_output)
+        self.snippet_capture = SnippetCapture(api_client, suppress_output=suppress_output)
 
         # Initialize default detector
         self.default_detector = DefaultDetector() if detect_defaults else None
@@ -79,7 +81,8 @@ class PullOrchestrator:
         if self.progress_callback:
             self.progress_callback(message, current, total)
         else:
-            print(f"[{current}/{total}] {message}")
+            if not self.suppress_output:
+                print(f"[{current}/{total}] {message}")
 
     def _handle_error(self, message: str, error: Exception):
         """Handle error if handler is set."""
@@ -88,7 +91,8 @@ class PullOrchestrator:
         if self.error_handler:
             self.error_handler(message, error)
         else:
-            print(f"Error: {message} - {error}")
+            if not self.suppress_output:
+                print(f"Error: {message} - {error}")
 
     def pull_folder_configuration(
         self,
@@ -486,17 +490,33 @@ class PullOrchestrator:
         Pull snippet configurations.
 
         Args:
-            snippet_names: Optional list of snippet names to pull (None = all)
+            snippet_names: Optional list of snippet names/IDs to pull (None = all)
+                          Can be list of strings (names) or list of dicts with 'id' and 'name'
 
         Returns:
             List of snippet configurations with defaults detected
         """
         try:
-            snippets = self.snippet_capture.capture_all_snippets()
-
-            # Filter to specific snippets if requested
-            if snippet_names:
-                snippets = [s for s in snippets if s.get("name", "") in snippet_names]
+            # Check if snippet_names contains dicts with IDs (new format)
+            if snippet_names and isinstance(snippet_names[0], dict):
+                # Pull only selected snippets by ID (efficient)
+                snippets = []
+                for snippet_info in snippet_names:
+                    snippet_id = snippet_info.get('id')
+                    snippet_name = snippet_info.get('name')
+                    if snippet_id:
+                        snippet_config = self.snippet_capture.capture_snippet_configuration(
+                            snippet_id, snippet_name
+                        )
+                        if snippet_config:
+                            snippets.append(snippet_config)
+            else:
+                # Legacy: Pull all and filter by name (slow)
+                snippets = self.snippet_capture.capture_all_snippets()
+                
+                # Filter to specific snippets if requested
+                if snippet_names:
+                    snippets = [s for s in snippets if s.get("name", "") in snippet_names]
 
             # Detect defaults in snippets
             if self.default_detector:
@@ -566,8 +586,8 @@ class PullOrchestrator:
         start_time = time.time()
 
         try:
-            # Pull folders
-            self._report_progress("Pulling folder configurations", 0, 3)
+            # Pull folders (10-55% in worker)
+            self._report_progress("Pulling folder configurations", 10, 100)
             folder_configs = self.pull_all_folders(
                 folder_names=folder_names,
                 selected_components=selected_components,
@@ -578,9 +598,9 @@ class PullOrchestrator:
             )
             config["security_policies"]["folders"] = folder_configs
 
-            # Pull snippets
-            if include_snippets:
-                self._report_progress("Pulling snippet configurations", 1, 3)
+            # Pull snippets (skip if snippet_names is explicitly empty list)
+            if include_snippets and (snippet_names is None or len(snippet_names) > 0):
+                self._report_progress("Pulling snippet configurations", 60, 100)
                 snippet_configs = self.pull_snippets(snippet_names=snippet_names)
                 config["security_policies"]["snippets"] = snippet_configs
 
@@ -591,15 +611,15 @@ class PullOrchestrator:
                     )
                     self.stats["defaults_detected"] += defaults_in_snippets
 
-            # Pull infrastructure (if needed)
-            self._report_progress("Pulling infrastructure settings", 2, 3)
+            # Pull shared infrastructure settings (if needed)
+            self._report_progress("Pulling shared infrastructure settings", 65, 100)
             try:
                 infra_settings = self.api_client.get_shared_infrastructure_settings()
                 config["infrastructure"][
                     "shared_infrastructure_settings"
                 ] = infra_settings
             except Exception as e:
-                self._handle_error("Error pulling infrastructure settings", e)
+                self._handle_error("Error pulling shared infrastructure settings", e)
 
             elapsed_time = time.time() - start_time
 
@@ -637,7 +657,7 @@ class PullOrchestrator:
                         }
                     )
 
-            self._report_progress("Pull complete", 3, 3)
+            # Don't report "Pull complete" here - worker will report final status at 80%
 
         except Exception as e:
             self._handle_error("Error during complete pull", e)

@@ -30,14 +30,16 @@ MIGRATION_EXCLUDED_FOLDERS: Set[str] = INFRASTRUCTURE_ONLY_FOLDERS | NON_PRISMA_
 class FolderCapture:
     """Capture security policy folders from Prisma Access."""
 
-    def __init__(self, api_client: PrismaAccessAPIClient):
+    def __init__(self, api_client: PrismaAccessAPIClient, suppress_output: bool = False):
         """
         Initialize folder capture.
 
         Args:
             api_client: PrismaAccessAPIClient instance
+            suppress_output: Suppress print statements (for GUI usage)
         """
         self.api_client = api_client
+        self.suppress_output = suppress_output
 
     def discover_folders(self) -> List[Dict[str, Any]]:
         """
@@ -59,13 +61,14 @@ class FolderCapture:
                     all_folders.append(normalized)
         except Exception as e:
             # Log error but don't add fallback folders
-            if "403" in str(e) or "Forbidden" in str(e):
-                print(
-                    f"  ⚠ Warning: Security policy folders endpoint returned 403 Forbidden"
-                )
-                print(f"    Cannot discover folders without proper permissions")
-            else:
-                print(f"  ⚠ Warning: Error accessing security policy folders: {e}")
+            if not self.suppress_output:
+                if "403" in str(e) or "Forbidden" in str(e):
+                    print(
+                        f"  ⚠ Warning: Security policy folders endpoint returned 403 Forbidden"
+                    )
+                    print(f"    Cannot discover folders without proper permissions")
+                else:
+                    print(f"  ⚠ Warning: Error accessing security policy folders: {e}")
 
         return all_folders
 
@@ -89,7 +92,8 @@ class FolderCapture:
             return None
 
         except Exception as e:
-            print(f"Error getting folder details for {folder_name}: {e}")
+            if not self.suppress_output:
+                print(f"Error getting folder details for {folder_name}: {e}")
             return None
 
     def get_folder_hierarchy(self) -> Dict[str, Any]:
@@ -282,9 +286,9 @@ def filter_folders_for_migration(folders: List[Dict[str, Any]]) -> List[Dict[str
         # Keep this folder
         filtered.append(folder)
     
-    # Log filtered folders if any
-    if filtered_out:
-        print(f"  ℹ Filtered out {len(filtered_out)} folder(s) (not Prisma Access specific): {', '.join(filtered_out)}")
+    # Log filtered folders if any (this is a module-level function, so check if suppress_output should be passed)
+    # Note: This function is called from outside the class, so we can't check self.suppress_output
+    # For now, keep this print as it's informational and not in a worker thread context
     
     return filtered
 

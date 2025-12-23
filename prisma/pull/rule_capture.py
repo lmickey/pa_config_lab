@@ -12,14 +12,16 @@ from ..api_client import PrismaAccessAPIClient
 class RuleCapture:
     """Capture security rules from Prisma Access."""
 
-    def __init__(self, api_client: PrismaAccessAPIClient):
+    def __init__(self, api_client: PrismaAccessAPIClient, suppress_output: bool = False):
         """
         Initialize rule capture.
 
         Args:
             api_client: PrismaAccessAPIClient instance
+            suppress_output: Suppress print statements (for GUI usage)
         """
         self.api_client = api_client
+        self.suppress_output = suppress_output
 
     def capture_rules_from_folder(self, folder_name: str) -> List[Dict[str, Any]]:
         """
@@ -77,14 +79,17 @@ class RuleCapture:
             # Check if folder doesn't exist (400 error) or server error (500)
             error_str = str(e).lower()
             if "doesn't exist" in error_str or "folder" in error_str and ("400" in error_str or "not exist" in error_str or "invalid" in error_str):
-                print(f"⚠ Folder '{folder_name}' does not exist or is invalid - skipping")
+                if not self.suppress_output:
+                    print(f"⚠ Folder '{folder_name}' does not exist or is invalid - skipping")
                 return []
             elif "500" in error_str or "503" in error_str or "502" in error_str:
                 # Server errors - API is having issues, skip gracefully
-                print(f"⚠ API server error for rules in folder '{folder_name}' - skipping")
+                if not self.suppress_output:
+                    print(f"⚠ API server error for rules in folder '{folder_name}' - skipping")
                 return []
             
-            print(f"Error capturing rules from folder {folder_name}: {e}")
+            if not self.suppress_output:
+                print(f"Error capturing rules from folder {folder_name}: {e}")
             return []
 
     def capture_parent_level_rules(self, folder_name: str) -> List[Dict[str, Any]]:
@@ -140,7 +145,8 @@ class RuleCapture:
             return parent_rules
 
         except Exception as e:
-            print(f"Error capturing parent-level rules from folder {folder_name}: {e}")
+            if not self.suppress_output:
+                print(f"Error capturing parent-level rules from folder {folder_name}: {e}")
             return []
 
     def capture_rules_from_snippet(self, snippet_name: str) -> List[Dict[str, Any]]:
@@ -192,7 +198,8 @@ class RuleCapture:
             return normalized_rules
 
         except Exception as e:
-            print(f"Error capturing rules from snippet {snippet_name}: {e}")
+            if not self.suppress_output:
+                print(f"Error capturing rules from snippet {snippet_name}: {e}")
             return []
 
     def capture_all_rules(
@@ -225,7 +232,7 @@ class RuleCapture:
 
         # Print brief summary only
         total_rules = sum(len(rules) for rules in all_rules.values())
-        if total_rules > 0:
+        if total_rules > 0 and not self.suppress_output:
             print(f"  ✓ Captured {total_rules} rules")
 
         return all_rules
