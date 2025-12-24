@@ -666,14 +666,28 @@ class ComponentSelectionDialog(QDialog):
                 'infrastructure': selected.get('infrastructure', {})
             }
             
+            # Debug: Show what we're analyzing
+            print(f"\nDEBUG: Selected config structure:")
+            print(f"  Infrastructure types: {list(selected_config.get('infrastructure', {}).keys())}")
+            for infra_type, items in selected_config.get('infrastructure', {}).items():
+                if isinstance(items, list):
+                    print(f"    {infra_type}: {len(items)} items")
+                    for item in items:
+                        print(f"      - {item.get('name', 'Unknown')}")
+                else:
+                    print(f"    {infra_type}: 1 item (dict)")
+            
             # Find required dependencies
             required_deps = resolver.find_required_dependencies(selected_config, self.full_config)
             
             # Debug output
-            print(f"DEBUG: Required dependencies found: {list(required_deps.keys())}")
+            print(f"\nDEBUG: Required dependencies found: {list(required_deps.keys())}")
             for key, value in required_deps.items():
                 if isinstance(value, dict):
                     print(f"  {key}: {sum(len(v) for v in value.values() if isinstance(v, list))} items")
+                    for subkey, subvalue in value.items():
+                        if isinstance(subvalue, list):
+                            print(f"    {subkey}: {len(subvalue)} items")
                 elif isinstance(value, list):
                     print(f"  {key}: {len(value)} items")
             
@@ -692,6 +706,9 @@ class ComponentSelectionDialog(QDialog):
                 
                 # Add dependencies to selection
                 selected = self._merge_dependencies(selected, required_deps)
+                
+                # Check the newly added dependencies in the tree
+                self._check_merged_dependencies(required_deps)
             
             # Store final selection
             self.selected_items = selected
@@ -756,6 +773,102 @@ class ComponentSelectionDialog(QDialog):
                         selected['infrastructure'][infra_type].append(item)
         
         return selected
+    
+    def _check_merged_dependencies(self, required_deps: Dict[str, Any]):
+        """Check items in the tree that were added as dependencies."""
+        self.tree.blockSignals(True)
+        
+        try:
+            # Helper to recursively find and check items by name and type
+            def find_and_check_item(parent: QTreeWidgetItem, name: str, check_type: str) -> bool:
+                """Recursively find and check an item."""
+                for i in range(parent.childCount()):
+                    item = parent.child(i)
+                    item_data = item.data(0, Qt.ItemDataRole.UserRole)
+                    
+                    if item_data:
+                        data = item_data.get('data', {})
+                        item_type = item_data.get('type')
+                        infra_type = item_data.get('infra_type')
+                        
+                        # Check if this is the item we're looking for
+                        if check_type == 'infrastructure' and item_type == 'infrastructure':
+                            if infra_type == name or data.get('name') == name:
+                                item.setCheckState(0, Qt.CheckState.Checked)
+                                self._update_parent_check_state(item)
+                                return True
+                        elif item_type == check_type and data.get('name') == name:
+                            item.setCheckState(0, Qt.CheckState.Checked)
+                            self._update_parent_check_state(item)
+                            return True
+                    
+                    # Recurse into children
+                    if find_and_check_item(item, name, check_type):
+                        return True
+                
+                return False
+            
+            # Check infrastructure dependencies
+            if 'infrastructure' in required_deps:
+                for infra_type, items in required_deps['infrastructure'].items():
+                    for item in items:
+                        item_name = item.get('name', item.get('id'))
+                        if item_name:
+                            # Find Infrastructure section
+                            root = self.tree.invisibleRootItem()
+                            for i in range(root.childCount()):
+                                section = root.child(i)
+                                if section.text(0) == "Infrastructure":
+                                    find_and_check_item(section, item_name, 'infrastructure')
+                                    break
+            
+            # Check snippet dependencies
+            if 'snippets' in required_deps:
+                for snippet in required_deps['snippets']:
+                    snippet_name = snippet.get('name')
+                    if snippet_name:
+                        root = self.tree.invisibleRootItem()
+                        for i in range(root.childCount()):
+                            section = root.child(i)
+                            if section.text(0) == "Security Policies":
+                                find_and_check_item(section, snippet_name, 'snippet')
+                                break
+            
+            # Check folder dependencies
+            if 'folders' in required_deps:
+                for folder in required_deps['folders']:
+                    folder_name = folder.get('name')
+                    if folder_name:
+                        root = self.tree.invisibleRootItem()
+                        for i in range(root.childCount()):
+                            section = root.child(i)
+                            if section.text(0) == "Security Policies":
+                                find_and_check_item(section, folder_name, 'folder')
+                                break
+            
+            # Check object dependencies
+            if 'objects' in required_deps:
+                for obj_type, obj_list in required_deps['objects'].items():
+                    for obj in obj_list:
+                        obj_name = obj.get('name')
+                        if obj_name:
+                            # Objects are under folders, need to find the right folder
+                            folder_name = obj.get('folder')
+                            if folder_name:
+                                root = self.tree.invisibleRootItem()
+                                for i in range(root.childCount()):
+                                    section = root.child(i)
+                                    if section.text(0) == "Security Policies":
+                                        # Find the folder
+                                        for j in range(section.childCount()):
+                                            folders_section = section.child(j)
+                                            if folders_section.text(0) == "Folders":
+                                                find_and_check_item(folders_section, obj_name, 'folder_object')
+                                                break
+                                        break
+        
+        finally:
+            self.tree.blockSignals(False)
     
     def _restore_selections(self):
         """Restore previously selected items in the tree."""

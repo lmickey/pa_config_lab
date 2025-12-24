@@ -64,7 +64,10 @@ class DependencyGraph:
             The created or existing node
         """
         if node_id not in self.nodes:
-            self.nodes[node_id] = DependencyNode(node_id, node_type, data)
+            node = DependencyNode(node_id, node_type, data)
+            # Mark as reference if data is None/empty
+            node.is_reference = (data is None or len(data) == 0)
+            self.nodes[node_id] = node
         return self.nodes[node_id]
 
     def add_dependency(

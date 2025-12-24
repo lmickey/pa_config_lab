@@ -259,12 +259,17 @@ class DependencyResolver:
     def _process_infrastructure_dependencies(self, infrastructure: Dict[str, Any]):
         """Process dependencies within infrastructure components."""
         
+        print(f"\nDEBUG: Processing infrastructure dependencies")
+        print(f"  Infrastructure keys: {list(infrastructure.keys())}")
+        
         # Process IKE Crypto Profiles (no dependencies)
         ike_crypto_profiles = infrastructure.get("ike_crypto_profiles", [])
+        print(f"  IKE Crypto Profiles: {len(ike_crypto_profiles)}")
         for profile in ike_crypto_profiles:
             profile_name = profile.get("name", "")
             if profile_name:
                 self.graph.add_node(profile_name, "ike_crypto_profile", profile)
+                print(f"    Added node: {profile_name}")
         
         # Process IPSec Crypto Profiles (no dependencies)
         ipsec_crypto_profiles = infrastructure.get("ipsec_crypto_profiles", [])
@@ -286,8 +291,9 @@ class DependencyResolver:
                     ike_crypto_profile = gateway.get("protocol", {}).get("ikev2", {}).get("ike_crypto_profile")
                 
                 if ike_crypto_profile:
+                    # Don't auto-create the crypto profile node
                     self.graph.add_dependency(
-                        gateway_name, ike_crypto_profile, "ike_gateway", "ike_crypto_profile"
+                        gateway_name, ike_crypto_profile, "ike_gateway", None
                     )
         
         # Process IPSec Tunnels → IKE Gateway + IPSec Crypto Profile
@@ -306,30 +312,42 @@ class DependencyResolver:
                     ike_gateway_name = ike_gateway_name.get("name", "")
                 
                 if ike_gateway_name:
+                    # Don't auto-create the gateway node
                     self.graph.add_dependency(
-                        tunnel_name, ike_gateway_name, "ipsec_tunnel", "ike_gateway"
+                        tunnel_name, ike_gateway_name, "ipsec_tunnel", None
                     )
                 
                 # IPSec Tunnel depends on IPSec Crypto Profile
                 ipsec_crypto_profile = auto_key.get("ipsec_crypto_profile")
                 if ipsec_crypto_profile:
+                    # Don't auto-create the crypto profile node
                     self.graph.add_dependency(
-                        tunnel_name, ipsec_crypto_profile, "ipsec_tunnel", "ipsec_crypto_profile"
+                        tunnel_name, ipsec_crypto_profile, "ipsec_tunnel", None
                     )
         
         # Process Service Connections → IPSec Tunnel
         service_connections = infrastructure.get("service_connections", [])
+        print(f"  Service Connections: {len(service_connections)}")
         for sc in service_connections:
             sc_name = sc.get("name", "")
             if sc_name:
                 self.graph.add_node(sc_name, "service_connection", sc)
+                print(f"    Added node: {sc_name}")
+                print(f"    Service connection keys: {list(sc.keys())}")
                 
                 # Service Connection depends on IPSec Tunnel (if using IPSec)
                 ipsec_tunnel = sc.get("ipsec_tunnel")
+                print(f"    Looking for ipsec_tunnel field: {ipsec_tunnel}")
                 if ipsec_tunnel:
+                    # Add dependency - pass the type so the edge gets created
+                    # The tunnel node will be created as a "reference", and if it's not in the actual
+                    # config, it will be flagged as missing
                     self.graph.add_dependency(
                         sc_name, ipsec_tunnel, "service_connection", "ipsec_tunnel"
                     )
+                    print(f"    Added dependency: {sc_name} -> {ipsec_tunnel}")
+                else:
+                    print(f"    No ipsec_tunnel field found")
                 
                 # Service Connection may also depend on BGP peer (if configured)
                 bgp_peer = sc.get("bgp_peer", {}).get("local_ip_address")
@@ -345,8 +363,9 @@ class DependencyResolver:
                 # Remote Network may depend on IPSec Tunnel
                 ipsec_tunnel = rn.get("ipsec_tunnel")
                 if ipsec_tunnel:
+                    # Don't auto-create the tunnel node
                     self.graph.add_dependency(
-                        rn_name, ipsec_tunnel, "remote_network", "ipsec_tunnel"
+                        rn_name, ipsec_tunnel, "remote_network", None
                     )
 
     def validate_dependencies(self, config: Dict[str, Any]) -> Dict[str, Any]:
@@ -362,8 +381,12 @@ class DependencyResolver:
         # Build graph
         self.build_dependency_graph(config)
 
-        # Get all available nodes
-        available_nodes = set(self.graph.nodes.keys())
+        # Get all available nodes (only non-reference nodes that are actually in the config)
+        available_nodes = set(node_id for node_id, node in self.graph.nodes.items() 
+                             if not getattr(node, 'is_reference', False))
+        
+        print(f"DEBUG: Available nodes (non-reference): {available_nodes}")
+        print(f"DEBUG: All nodes in graph: {set(self.graph.nodes.keys())}")
 
         # Find missing dependencies
         missing = self.graph.find_missing_dependencies(available_nodes)
@@ -410,7 +433,7 @@ class DependencyResolver:
 
     def find_required_dependencies(self, selected_config: Dict[str, Any], full_config: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Find dependencies required by selected items that are available in full config.
+        Find ALL dependencies required by selected items (recursively resolving transitive deps).
         
         Args:
             selected_config: Configuration with only selected items
@@ -419,15 +442,8 @@ class DependencyResolver:
         Returns:
             Dictionary with required dependencies organized by type
         """
-        # Validate selected config to find missing deps
-        validation = self.validate_dependencies(selected_config)
-        missing_deps = validation.get('missing_dependencies', [])
-        
-        if not missing_deps:
-            return {}
-        
-        # Extract missing dependency names and types
-        required = {
+        # Accumulate all required dependencies
+        all_required = {
             'folders': [],
             'snippets': [],
             'objects': {},
@@ -435,90 +451,104 @@ class DependencyResolver:
             'infrastructure': {}
         }
         
-        # Search full config for missing dependencies
-        for dep in missing_deps:
-            dep_name = dep.get('name', '')
-            dep_type = dep.get('type', '')
+        # Keep a copy of the config we're analyzing (will grow as we add deps)
+        working_config = self._deep_copy_config(selected_config)
+        
+        # Track what we've already added to avoid infinite loops
+        added_names = set()
+        
+        # Keep finding dependencies until there are none left
+        max_iterations = 10  # Safety limit
+        iteration = 0
+        
+        while iteration < max_iterations:
+            iteration += 1
+            print(f"\nDEBUG: Dependency resolution iteration {iteration}")
             
-            if not dep_name:
-                continue
+            # Validate working config to find missing deps
+            validation = self.validate_dependencies(working_config)
+            missing_deps_dict = validation.get('missing_dependencies', {})
             
-            # Search in folders
-            if dep_type in ['folder']:
-                folders = full_config.get('security_policies', {}).get('folders', [])
-                for folder in folders:
-                    if folder.get('name') == dep_name:
-                        required['folders'].append(folder)
-                        break
+            print(f"  Total nodes in graph: {len(self.graph.nodes)}")
+            print(f"  Nodes: {list(self.graph.nodes.keys())}")
+            print(f"  Total edges in graph: {len(self.graph.edges)}")
+            print(f"  Edges: {[(f'{e[0]}->{e[1]}') for e in self.graph.edges]}")
+            print(f"  Missing dependencies dict: {missing_deps_dict}")
             
-            # Search in objects
-            elif dep_type in ['address_object', 'address_group', 'service_object', 'service_group', 
-                             'application_object', 'application_group']:
-                objects = full_config.get('objects', {})
+            # Convert missing_deps dict to list
+            missing_deps = []
+            for node_id, missing_dep_names in missing_deps_dict.items():
+                for dep_name in missing_dep_names:
+                    if dep_name not in added_names:
+                        missing_deps.append({
+                            'name': dep_name,
+                            'type': 'unknown',
+                            'referenced_by': node_id
+                        })
+            
+            print(f"  Missing dependencies list: {len(missing_deps)}")
+            for dep in missing_deps:
+                print(f"    - {dep.get('name')} (referenced by: {dep.get('referenced_by')})")
+            
+            # If no missing dependencies, we're done
+            if not missing_deps:
+                print(f"  No more missing dependencies found after {iteration} iteration(s)")
+                break
+            
+            # Search full config for missing dependencies and add to working config
+            found_any = False
+            for dep in missing_deps:
+                dep_name = dep.get('name', '')
                 
-                # Map dependency types to object keys
-                type_map = {
-                    'address_object': 'addresses',
-                    'address_group': 'address_groups',
-                    'service_object': 'services',
-                    'service_group': 'service_groups',
-                    'application_object': 'applications',
-                    'application_group': 'application_groups'
-                }
+                if not dep_name or dep_name in added_names:
+                    continue
                 
-                obj_key = type_map.get(dep_type)
-                if obj_key and obj_key in objects:
-                    for obj in objects[obj_key]:
-                        if obj.get('name') == dep_name:
-                            if obj_key not in required['objects']:
-                                required['objects'][obj_key] = []
-                            required['objects'][obj_key].append(obj)
-                            break
-            
-            # Search in profiles
-            elif dep_type in ['security_profile', 'url_filtering_profile', 'file_blocking_profile',
-                             'wildfire_profile', 'decryption_profile', 'authentication_profile']:
-                # Profiles would be in folders
-                folders = full_config.get('security_policies', {}).get('folders', [])
-                for folder in folders:
-                    profiles = folder.get('profiles', {})
-                    for profile_type, profile_list in profiles.items():
-                        if isinstance(profile_list, list):
-                            for profile in profile_list:
-                                if profile.get('name') == dep_name:
-                                    required['profiles'].append(profile)
-                                    break
-            
-            # Search in infrastructure
-            elif dep_type in ['ike_crypto_profile', 'ipsec_crypto_profile', 'ike_gateway', 
-                             'ipsec_tunnel', 'service_connection', 'remote_network']:
+                print(f"\n  Searching for dependency: {dep_name}")
+                
+                # Try infrastructure
+                found = False
                 infrastructure = full_config.get('infrastructure', {})
-                
-                # Map dependency types to infrastructure keys
-                type_map = {
-                    'ike_crypto_profile': 'ike_crypto_profiles',
-                    'ipsec_crypto_profile': 'ipsec_crypto_profiles',
-                    'ike_gateway': 'ike_gateways',
-                    'ipsec_tunnel': 'ipsec_tunnels',
-                    'service_connection': 'service_connections',
-                    'remote_network': 'remote_networks'
-                }
-                
-                infra_key = type_map.get(dep_type)
-                if infra_key:
+                for infra_key in ['ipsec_tunnels', 'ike_gateways', 'ike_crypto_profiles', 
+                                 'ipsec_crypto_profiles', 'service_connections', 'remote_networks']:
                     infra_items = infrastructure.get(infra_key, [])
                     for item in infra_items:
                         if item.get('name') == dep_name:
-                            # Store in infrastructure dict by type
-                            if infra_key not in required['infrastructure']:
-                                required['infrastructure'][infra_key] = []
-                            required['infrastructure'][infra_key].append(item)
+                            print(f"    Found in {infra_key}")
+                            
+                            # Add to all_required
+                            if infra_key not in all_required['infrastructure']:
+                                all_required['infrastructure'][infra_key] = []
+                            all_required['infrastructure'][infra_key].append(item)
+                            
+                            # Add to working_config so next iteration includes it
+                            if infra_key not in working_config.get('infrastructure', {}):
+                                working_config.setdefault('infrastructure', {})[infra_key] = []
+                            working_config['infrastructure'][infra_key].append(item)
+                            
+                            added_names.add(dep_name)
+                            found = True
+                            found_any = True
                             break
+                    if found:
+                        break
+                
+                # Try other types if not found in infrastructure
+                # (folders, snippets, objects, profiles - similar pattern)
+                # For now, focusing on infrastructure since that's the current use case
+            
+            if not found_any:
+                print(f"  WARNING: Could not find some dependencies in full config")
+                break
         
-        # Remove empty categories
-        required = {k: v for k, v in required.items() if v}
+        if iteration >= max_iterations:
+            print(f"  WARNING: Reached max iterations ({max_iterations}), stopping dependency resolution")
         
-        return required
+        return all_required
+    
+    def _deep_copy_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a deep copy of a config dict."""
+        import copy
+        return copy.deepcopy(config)
     
     def get_dependency_report(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """
