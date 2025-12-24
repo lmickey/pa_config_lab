@@ -182,6 +182,76 @@ class DependencyResolver:
                     "decryption_profile",
                     {"folder": folder_name, **dec_profile},
                 )
+        
+        # Security profile groups → individual profiles
+        profile_groups_list = security_profiles.get("profile_groups", [])
+        for prof_group in profile_groups_list:
+            group_name = prof_group.get("name", "")
+            if group_name:
+                self.graph.add_node(
+                    group_name,
+                    "profile_group",
+                    {"folder": folder_name, **prof_group},
+                )
+                
+                # Add dependencies on individual profiles
+                # Profile groups can reference: url_filtering, file_blocking, antivirus, 
+                # anti_spyware, vulnerability, spyware, wildfire_analysis, etc.
+                for profile_field in ['url_filtering', 'file_blocking', 'antivirus', 
+                                     'anti_spyware', 'vulnerability', 'spyware', 
+                                     'wildfire_analysis', 'dns_security']:
+                    profile_names = prof_group.get(profile_field, [])
+                    if isinstance(profile_names, list):
+                        for prof_name in profile_names:
+                            if isinstance(prof_name, str):
+                                self.graph.add_dependency(
+                                    group_name, prof_name, "profile_group", "security_profile"
+                                )
+        
+        # HIP profiles → HIP objects
+        hip_data = folder.get("hip", {})
+        hip_profiles = hip_data.get("hip_profiles", [])
+        hip_objects = hip_data.get("hip_objects", [])
+        
+        # Add HIP objects as nodes
+        for hip_obj in hip_objects:
+            obj_name = hip_obj.get("name", "")
+            if obj_name:
+                self.graph.add_node(
+                    obj_name,
+                    "hip_object",
+                    {"folder": folder_name, **hip_obj},
+                )
+        
+        # Add HIP profiles and their dependencies
+        for hip_prof in hip_profiles:
+            prof_name = hip_prof.get("name", "")
+            if prof_name:
+                self.graph.add_node(
+                    prof_name,
+                    "hip_profile",
+                    {"folder": folder_name, **hip_prof},
+                )
+                
+                # Parse the 'match' expression to find referenced HIP objects
+                # Format: "Object1 and Object2" or "Object1 or Object2"
+                match_expr = hip_prof.get("match", "")
+                if match_expr:
+                    # Simple parser: split by 'and', 'or', parentheses, spaces
+                    # Extract object names (alphanumeric, hyphens, underscores)
+                    import re
+                    # Remove operators and extract object names
+                    object_names = re.findall(r'[\w-]+', match_expr)
+                    # Filter out operators
+                    operators = {'and', 'or', 'not', 'AND', 'OR', 'NOT'}
+                    object_names = [name for name in object_names if name not in operators]
+                    
+                    for obj_name in object_names:
+                        # Check if this matches a HIP object name
+                        if any(obj.get('name') == obj_name for obj in hip_objects):
+                            self.graph.add_dependency(
+                                prof_name, obj_name, "hip_profile", "hip_object"
+                            )
 
         # Process rules → profiles and objects
         rules = folder.get("security_rules", [])
@@ -544,9 +614,214 @@ class DependencyResolver:
                     if not found:
                         print(f"    NOT FOUND in infrastructure")
                     
-                    # Try other types if not found in infrastructure
-                    # (folders, snippets, objects, profiles - similar pattern)
-                    # For now, focusing on infrastructure since that's the current use case
+                    # Try folders (objects and profiles)
+                    if not found:
+                        folders = full_config.get('security_policies', {}).get('folders', [])
+                        for folder in folders:
+                            folder_name = folder.get('name', '')
+                            objects = folder.get('objects', {})
+                            profiles = folder.get('profiles', {})
+                            
+                            # Search address objects
+                            for addr_obj in objects.get('address_objects', []):
+                                if addr_obj.get('name') == dep_name:
+                                    print(f"    Found address object in folder '{folder_name}'")
+                                    # Add to all_required
+                                    # Find or create folder in all_required
+                                    req_folder = next((f for f in all_required['folders'] if f.get('name') == folder_name), None)
+                                    if not req_folder:
+                                        req_folder = {'name': folder_name, 'objects': {}}
+                                        all_required['folders'].append(req_folder)
+                                    if 'address_objects' not in req_folder.get('objects', {}):
+                                        req_folder.setdefault('objects', {})['address_objects'] = []
+                                    req_folder['objects']['address_objects'].append(addr_obj)
+                                    
+                                    # Add to working_config
+                                    work_folder = next((f for f in working_config.setdefault('security_policies', {}).setdefault('folders', []) 
+                                                       if f.get('name') == folder_name), None)
+                                    if not work_folder:
+                                        work_folder = {'name': folder_name, 'objects': {}}
+                                        working_config['security_policies']['folders'].append(work_folder)
+                                    work_folder.setdefault('objects', {}).setdefault('address_objects', []).append(addr_obj)
+                                    
+                                    added_names.add(dep_name)
+                                    found = True
+                                    found_any = True
+                                    break
+                            
+                            # Search address groups
+                            if not found:
+                                for addr_group in objects.get('address_groups', []):
+                                    if addr_group.get('name') == dep_name:
+                                        print(f"    Found address group in folder '{folder_name}'")
+                                        req_folder = next((f for f in all_required['folders'] if f.get('name') == folder_name), None)
+                                        if not req_folder:
+                                            req_folder = {'name': folder_name, 'objects': {}}
+                                            all_required['folders'].append(req_folder)
+                                        req_folder.setdefault('objects', {}).setdefault('address_groups', []).append(addr_group)
+                                        
+                                        work_folder = next((f for f in working_config.setdefault('security_policies', {}).setdefault('folders', []) 
+                                                           if f.get('name') == folder_name), None)
+                                        if not work_folder:
+                                            work_folder = {'name': folder_name, 'objects': {}}
+                                            working_config['security_policies']['folders'].append(work_folder)
+                                        work_folder.setdefault('objects', {}).setdefault('address_groups', []).append(addr_group)
+                                        
+                                        added_names.add(dep_name)
+                                        found = True
+                                        found_any = True
+                                        break
+                            
+                            # Search service objects
+                            if not found:
+                                for svc_obj in objects.get('service_objects', []):
+                                    if svc_obj.get('name') == dep_name:
+                                        print(f"    Found service object in folder '{folder_name}'")
+                                        req_folder = next((f for f in all_required['folders'] if f.get('name') == folder_name), None)
+                                        if not req_folder:
+                                            req_folder = {'name': folder_name, 'objects': {}}
+                                            all_required['folders'].append(req_folder)
+                                        req_folder.setdefault('objects', {}).setdefault('service_objects', []).append(svc_obj)
+                                        
+                                        work_folder = next((f for f in working_config.setdefault('security_policies', {}).setdefault('folders', []) 
+                                                           if f.get('name') == folder_name), None)
+                                        if not work_folder:
+                                            work_folder = {'name': folder_name, 'objects': {}}
+                                            working_config['security_policies']['folders'].append(work_folder)
+                                        work_folder.setdefault('objects', {}).setdefault('service_objects', []).append(svc_obj)
+                                        
+                                        added_names.add(dep_name)
+                                        found = True
+                                        found_any = True
+                                        break
+                            
+                            # Search service groups
+                            if not found:
+                                for svc_group in objects.get('service_groups', []):
+                                    if svc_group.get('name') == dep_name:
+                                        print(f"    Found service group in folder '{folder_name}'")
+                                        req_folder = next((f for f in all_required['folders'] if f.get('name') == folder_name), None)
+                                        if not req_folder:
+                                            req_folder = {'name': folder_name, 'objects': {}}
+                                            all_required['folders'].append(req_folder)
+                                        req_folder.setdefault('objects', {}).setdefault('service_groups', []).append(svc_group)
+                                        
+                                        work_folder = next((f for f in working_config.setdefault('security_policies', {}).setdefault('folders', []) 
+                                                           if f.get('name') == folder_name), None)
+                                        if not work_folder:
+                                            work_folder = {'name': folder_name, 'objects': {}}
+                                            working_config['security_policies']['folders'].append(work_folder)
+                                        work_folder.setdefault('objects', {}).setdefault('service_groups', []).append(svc_group)
+                                        
+                                        added_names.add(dep_name)
+                                        found = True
+                                        found_any = True
+                                        break
+                            
+                            # Search profiles (authentication, security profiles, decryption, etc.)
+                            if not found:
+                                # Authentication profiles
+                                for auth_prof in profiles.get('authentication_profiles', []):
+                                    if auth_prof.get('name') == dep_name:
+                                        print(f"    Found authentication profile in folder '{folder_name}'")
+                                        req_folder = next((f for f in all_required['folders'] if f.get('name') == folder_name), None)
+                                        if not req_folder:
+                                            req_folder = {'name': folder_name, 'profiles': {}}
+                                            all_required['folders'].append(req_folder)
+                                        req_folder.setdefault('profiles', {}).setdefault('authentication_profiles', []).append(auth_prof)
+                                        
+                                        work_folder = next((f for f in working_config.setdefault('security_policies', {}).setdefault('folders', []) 
+                                                           if f.get('name') == folder_name), None)
+                                        if not work_folder:
+                                            work_folder = {'name': folder_name, 'profiles': {}}
+                                            working_config['security_policies']['folders'].append(work_folder)
+                                        work_folder.setdefault('profiles', {}).setdefault('authentication_profiles', []).append(auth_prof)
+                                        
+                                        added_names.add(dep_name)
+                                        found = True
+                                        found_any = True
+                                        break
+                                
+                                # Security profiles (nested dict)
+                                if not found:
+                                    sec_profiles = profiles.get('security_profiles', {})
+                                    for prof_type, prof_list in sec_profiles.items():
+                                        for prof in prof_list:
+                                            if prof.get('name') == dep_name:
+                                                print(f"    Found {prof_type} profile in folder '{folder_name}'")
+                                                req_folder = next((f for f in all_required['folders'] if f.get('name') == folder_name), None)
+                                                if not req_folder:
+                                                    req_folder = {'name': folder_name, 'profiles': {'security_profiles': {}}}
+                                                    all_required['folders'].append(req_folder)
+                                                req_folder.setdefault('profiles', {}).setdefault('security_profiles', {}).setdefault(prof_type, []).append(prof)
+                                                
+                                                work_folder = next((f for f in working_config.setdefault('security_policies', {}).setdefault('folders', []) 
+                                                                   if f.get('name') == folder_name), None)
+                                                if not work_folder:
+                                                    work_folder = {'name': folder_name, 'profiles': {'security_profiles': {}}}
+                                                    working_config['security_policies']['folders'].append(work_folder)
+                                                work_folder.setdefault('profiles', {}).setdefault('security_profiles', {}).setdefault(prof_type, []).append(prof)
+                                                
+                                                added_names.add(dep_name)
+                                                found = True
+                                                found_any = True
+                                                break
+                                        if found:
+                                            break
+                            
+                            # Search HIP objects and profiles
+                            if not found:
+                                hip_data = folder.get('hip', {})
+                                # HIP objects
+                                for hip_obj in hip_data.get('hip_objects', []):
+                                    if hip_obj.get('name') == dep_name:
+                                        print(f"    Found HIP object in folder '{folder_name}'")
+                                        req_folder = next((f for f in all_required['folders'] if f.get('name') == folder_name), None)
+                                        if not req_folder:
+                                            req_folder = {'name': folder_name, 'hip': {}}
+                                            all_required['folders'].append(req_folder)
+                                        req_folder.setdefault('hip', {}).setdefault('hip_objects', []).append(hip_obj)
+                                        
+                                        work_folder = next((f for f in working_config.setdefault('security_policies', {}).setdefault('folders', []) 
+                                                           if f.get('name') == folder_name), None)
+                                        if not work_folder:
+                                            work_folder = {'name': folder_name, 'hip': {}}
+                                            working_config['security_policies']['folders'].append(work_folder)
+                                        work_folder.setdefault('hip', {}).setdefault('hip_objects', []).append(hip_obj)
+                                        
+                                        added_names.add(dep_name)
+                                        found = True
+                                        found_any = True
+                                        break
+                                
+                                # HIP profiles
+                                if not found:
+                                    for hip_prof in hip_data.get('hip_profiles', []):
+                                        if hip_prof.get('name') == dep_name:
+                                            print(f"    Found HIP profile in folder '{folder_name}'")
+                                            req_folder = next((f for f in all_required['folders'] if f.get('name') == folder_name), None)
+                                            if not req_folder:
+                                                req_folder = {'name': folder_name, 'hip': {}}
+                                                all_required['folders'].append(req_folder)
+                                            req_folder.setdefault('hip', {}).setdefault('hip_profiles', []).append(hip_prof)
+                                            
+                                            work_folder = next((f for f in working_config.setdefault('security_policies', {}).setdefault('folders', []) 
+                                                               if f.get('name') == folder_name), None)
+                                            if not work_folder:
+                                                work_folder = {'name': folder_name, 'hip': {}}
+                                                working_config['security_policies']['folders'].append(work_folder)
+                                            work_folder.setdefault('hip', {}).setdefault('hip_profiles', []).append(hip_prof)
+                                            
+                                            added_names.add(dep_name)
+                                            found = True
+                                            found_any = True
+                                            break
+                            
+                            if found:
+                                break
+                    
+                    if not found:
+                        print(f"    NOT FOUND in any configuration section")
                 
                 except Exception as e:
                     import traceback

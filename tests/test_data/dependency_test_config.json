@@ -71,7 +71,7 @@
           }
         ],
         "objects": {
-          "addresses": [
+          "address_objects": [
             {
               "name": "Internal-Network",
               "folder": "Dependency Test Folder",
@@ -129,7 +129,7 @@
               "static": ["Address-Group-1", "DMZ-Host-1", "DMZ-Host-2"]
             }
           ],
-          "services": [
+          "service_objects": [
             {
               "name": "Custom-TCP-8080",
               "folder": "Dependency Test Folder",
