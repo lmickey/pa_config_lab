@@ -918,7 +918,13 @@ class ComponentSelectionDialog(QDialog):
     
     def _restore_selections(self):
         """Restore previously selected items in the tree."""
+        print(f"DEBUG _restore_selections: Called!")
+        print(f"  previous_selection is None? {self.previous_selection is None}")
+        if self.previous_selection:
+            print(f"  previous_selection keys: {list(self.previous_selection.keys())}")
+        
         if not self.previous_selection:
+            print(f"  Returning early - no previous selection")
             return
         
         self.tree.blockSignals(True)
@@ -928,21 +934,33 @@ class ComponentSelectionDialog(QDialog):
         selected_snippet_names = {s.get('name') for s in self.previous_selection.get('snippets', [])}
         
         # For infrastructure, build a dict of {infra_type: set of item names}
+        print(f"DEBUG _restore_selections: Starting infrastructure restoration")
+        print(f"DEBUG: previous_selection.infrastructure keys: {list(self.previous_selection.get('infrastructure', {}).keys())}")
         selected_infra_items = {}
         try:
             for infra_type, items in self.previous_selection.get('infrastructure', {}).items():
+                print(f"DEBUG: Processing infra_type={infra_type}, items type={type(items)}, count={len(items) if isinstance(items, (list, dict)) else '?'}")
                 selected_infra_items[infra_type] = set()
                 if isinstance(items, list):
-                    for item in items:
+                    for idx, item in enumerate(items):
+                        print(f"  DEBUG: Item {idx}: type={type(item)}")
                         if isinstance(item, dict):
                             item_name = item.get('name') or item.get('id')
                             if item_name:
+                                print(f"    Adding to selected_infra_items[{infra_type}]: {item_name}")
                                 selected_infra_items[infra_type].add(item_name)
+                        else:
+                            print(f"    WARNING: Item is not a dict, it's {type(item)}")
                 elif isinstance(items, dict):
                     # Single item (not a list)
+                    print(f"  DEBUG: Single dict item")
                     item_name = items.get('name') or items.get('id')
                     if item_name:
+                        print(f"    Adding to selected_infra_items[{infra_type}]: {item_name}")
                         selected_infra_items[infra_type].add(item_name)
+                else:
+                    print(f"  WARNING: items is neither list nor dict, it's {type(items)}")
+            print(f"DEBUG: Built selected_infra_items: {selected_infra_items}")
         except Exception as e:
             print(f"ERROR building selected_infra_items: {e}")
             import traceback
@@ -951,111 +969,139 @@ class ComponentSelectionDialog(QDialog):
         
         # Recursively check items
         def restore_item(item: QTreeWidgetItem):
-            item_data = item.data(0, Qt.ItemDataRole.UserRole)
-            
-            if item_data:
-                item_type = item_data.get('type')
-                data = item_data.get('data', {})
+            try:
+                print(f"DEBUG restore_item: Processing item '{item.text(0)}'")
+                item_data = item.data(0, Qt.ItemDataRole.UserRole)
+                print(f"  item_data: {type(item_data)}")
                 
-                # Check folders
-                if item_type == 'folder':
-                    if data.get('name') in selected_folder_names:
-                        # Check if this folder was fully selected or partially
-                        prev_folder = next((f for f in self.previous_selection.get('folders', []) 
-                                          if f.get('name') == data.get('name')), None)
-                        if prev_folder:
-                            # Check if it has selective contents or was fully selected
-                            has_rules = 'security_rules' in prev_folder
-                            has_objects = 'objects' in prev_folder
-                            has_profiles = 'profiles' in prev_folder
-                            has_hip = 'hip' in prev_folder
-                            
-                            if not (has_rules or has_objects or has_profiles or has_hip):
-                                # Fully selected - check the folder
-                                item.setCheckState(0, Qt.CheckState.Checked)
-                            # If partial, we'll handle children below
-                
-                # Check security rules
-                elif item_type == 'security_rule':
-                    folder_name = item_data.get('folder')
-                    rule_name = data.get('name')
-                    # Check if this rule was in the previous selection
-                    for folder in self.previous_selection.get('folders', []):
-                        if folder.get('name') == folder_name:
-                            rules = folder.get('security_rules', [])
-                            if any(r.get('name') == rule_name for r in rules):
-                                item.setCheckState(0, Qt.CheckState.Checked)
-                
-                # Check folder objects
-                elif item_type == 'folder_object':
-                    folder_name = item_data.get('folder')
-                    obj_type = item_data.get('object_type')
-                    obj_name = data.get('name')
-                    # Check if this object was in the previous selection
-                    for folder in self.previous_selection.get('folders', []):
-                        if folder.get('name') == folder_name:
-                            objects = folder.get('objects', {}).get(obj_type, [])
-                            if any(o.get('name') == obj_name for o in objects):
-                                item.setCheckState(0, Qt.CheckState.Checked)
-                
-                # Check folder profiles
-                elif item_type == 'folder_profile':
-                    folder_name = item_data.get('folder')
-                    prof_type = item_data.get('profile_type')
-                    prof_name = data.get('name')
-                    # Check if this profile was in the previous selection
-                    for folder in self.previous_selection.get('folders', []):
-                        if folder.get('name') == folder_name:
-                            profiles = folder.get('profiles', {}).get(prof_type, [])
-                            if any(p.get('name') == prof_name for p in profiles):
-                                item.setCheckState(0, Qt.CheckState.Checked)
-                
-                # Check HIP items (stored directly in item_data)
-                # HIP items don't have a 'type' field, so check by parent structure
-                parent_item = item.parent()
-                if parent_item:
-                    parent_text = parent_item.text(0)
-                    grandparent = parent_item.parent()
-                    if grandparent and grandparent.text(0) == "HIP":
-                        # This is a HIP object or profile
-                        # Find the folder this belongs to
-                        folder_item = grandparent.parent()
-                        if folder_item:
-                            folder_name = folder_item.text(0)
-                            item_name = item.text(0)
-                            
-                            # Check if this HIP item was in the previous selection
-                            for folder in self.previous_selection.get('folders', []):
-                                if folder.get('name') == folder_name:
-                                    hip_data = folder.get('hip', {})
-                                    if "HIP Objects" in parent_text:
-                                        hip_objects = hip_data.get('hip_objects', [])
-                                        if any(obj.get('name') == item_name for obj in hip_objects):
-                                            item.setCheckState(0, Qt.CheckState.Checked)
-                                    elif "HIP Profiles" in parent_text:
-                                        hip_profiles = hip_data.get('hip_profiles', [])
-                                        if any(prof.get('name') == item_name for prof in hip_profiles):
-                                            item.setCheckState(0, Qt.CheckState.Checked)
-                
-                # Check snippets (item_data is the snippet itself, not wrapped)
-                if not item_type and isinstance(item_data, dict) and item_data.get('name') in selected_snippet_names:
-                    item.setCheckState(0, Qt.CheckState.Checked)
-                
-                # Check infrastructure
-                elif item_type == 'infrastructure':
-                    infra_type = item_data.get('infra_type')
-                    item_name = data.get('name', data.get('id'))
-                    # Check if this specific infrastructure item is in the selection
-                    if infra_type in selected_infra_items and item_name in selected_infra_items[infra_type]:
+                if item_data:
+                    item_type = item_data.get('type')
+                    data = item_data.get('data', {})
+                    print(f"  item_type: {item_type}, has data: {bool(data)}")
+                    
+                    # Check folders
+                    if item_type == 'folder':
+                        if data.get('name') in selected_folder_names:
+                            # Check if this folder was fully selected or partially
+                            prev_folder = next((f for f in self.previous_selection.get('folders', []) 
+                                              if f.get('name') == data.get('name')), None)
+                            if prev_folder:
+                                # Check if it has selective contents or was fully selected
+                                has_rules = 'security_rules' in prev_folder
+                                has_objects = 'objects' in prev_folder
+                                has_profiles = 'profiles' in prev_folder
+                                has_hip = 'hip' in prev_folder
+                                
+                                if not (has_rules or has_objects or has_profiles or has_hip):
+                                    # Fully selected - check the folder
+                                    item.setCheckState(0, Qt.CheckState.Checked)
+                                # If partial, we'll handle children below
+                    
+                    # Check security rules
+                    elif item_type == 'security_rule':
+                        folder_name = item_data.get('folder')
+                        rule_name = data.get('name')
+                        # Check if this rule was in the previous selection
+                        for folder in self.previous_selection.get('folders', []):
+                            if folder.get('name') == folder_name:
+                                rules = folder.get('security_rules', [])
+                                if any(r.get('name') == rule_name for r in rules):
+                                    item.setCheckState(0, Qt.CheckState.Checked)
+                    
+                    # Check folder objects
+                    elif item_type == 'folder_object':
+                        folder_name = item_data.get('folder')
+                        obj_type = item_data.get('object_type')
+                        obj_name = data.get('name')
+                        # Check if this object was in the previous selection
+                        for folder in self.previous_selection.get('folders', []):
+                            if folder.get('name') == folder_name:
+                                objects = folder.get('objects', {}).get(obj_type, [])
+                                if any(o.get('name') == obj_name for o in objects):
+                                    item.setCheckState(0, Qt.CheckState.Checked)
+                    
+                    # Check folder profiles
+                    elif item_type == 'folder_profile':
+                        folder_name = item_data.get('folder')
+                        prof_type = item_data.get('profile_type')
+                        prof_name = data.get('name')
+                        # Check if this profile was in the previous selection
+                        for folder in self.previous_selection.get('folders', []):
+                            if folder.get('name') == folder_name:
+                                profiles = folder.get('profiles', {}).get(prof_type, [])
+                                if any(p.get('name') == prof_name for p in profiles):
+                                    item.setCheckState(0, Qt.CheckState.Checked)
+                    
+                    # Check snippets (item_data is the snippet itself, not wrapped)
+                    elif not item_type and isinstance(item_data, dict) and item_data.get('name') in selected_snippet_names:
+                        print(f"  SNIPPET CHECK MATCHED")
                         item.setCheckState(0, Qt.CheckState.Checked)
-            
-            # Recurse to children
-            for i in range(item.childCount()):
-                restore_item(item.child(i))
+                    
+                    # Check infrastructure
+                    elif item_type == 'infrastructure':
+                        print(f"DEBUG: ENTERED infrastructure elif block!")
+                        infra_type = item_data.get('infra_type')
+                        item_name = data.get('name', data.get('id'))
+                        print(f"DEBUG restore_item: Checking infrastructure item '{item_name}' (infra_type={infra_type})")
+                        
+                        # Skip if item_name is None (container items like Mobile Users, Regions, etc.)
+                        if item_name is None:
+                            print(f"  Skipping - item_name is None (likely a container)")
+                        elif infra_type in selected_infra_items:
+                            print(f"  infra_type in selected_infra_items? True")
+                            print(f"  item_name in selected_infra_items[{infra_type}]? {item_name in selected_infra_items[infra_type]}")
+                            # Check if this specific infrastructure item is in the selection
+                            if item_name in selected_infra_items[infra_type]:
+                                print(f"  RESTORING: Checking item '{item_name}'")
+                                item.setCheckState(0, Qt.CheckState.Checked)
+                        else:
+                            print(f"  infra_type NOT in selected_infra_items")
+                    else:
+                        print(f"  No matching elif for item_type='{item_type}'")
+                    
+                    # Check HIP items (stored directly in item_data)
+                    # HIP items don't have a 'type' field, so check by parent structure
+                    # This check runs independently after the main type-based checks
+                    parent_item = item.parent()
+                    if parent_item:
+                        parent_text = parent_item.text(0)
+                        grandparent = parent_item.parent()
+                        if grandparent and grandparent.text(0) == "HIP":
+                            # This is a HIP object or profile
+                            # Find the folder this belongs to
+                            folder_item = grandparent.parent()
+                            if folder_item:
+                                folder_name = folder_item.text(0)
+                                item_name = item.text(0)
+                                
+                                # Check if this HIP item was in the previous selection
+                                for folder in self.previous_selection.get('folders', []):
+                                    if folder.get('name') == folder_name:
+                                        hip_data = folder.get('hip', {})
+                                        if "HIP Objects" in parent_text:
+                                            hip_objects = hip_data.get('hip_objects', [])
+                                            if any(obj.get('name') == item_name for obj in hip_objects):
+                                                item.setCheckState(0, Qt.CheckState.Checked)
+                                        elif "HIP Profiles" in parent_text:
+                                            hip_profiles = hip_data.get('hip_profiles', [])
+                                            if any(prof.get('name') == item_name for prof in hip_profiles):
+                                                item.setCheckState(0, Qt.CheckState.Checked)
+                
+                # Recurse to children
+                for i in range(item.childCount()):
+                    restore_item(item.child(i))
+            except Exception as e:
+                print(f"ERROR in restore_item for '{item.text(0)}': {e}")
+                import traceback
+                traceback.print_exc()
         
         # Start restoration from top level
+        print(f"DEBUG: Starting tree restoration loop")
+        print(f"  Tree has {self.tree.topLevelItemCount()} top-level items")
         for i in range(self.tree.topLevelItemCount()):
-            restore_item(self.tree.topLevelItem(i))
+            top_item = self.tree.topLevelItem(i)
+            print(f"  Restoring top-level item {i}: {top_item.text(0)}")
+            restore_item(top_item)
         
         # Update parent check states
         for i in range(self.tree.topLevelItemCount()):
