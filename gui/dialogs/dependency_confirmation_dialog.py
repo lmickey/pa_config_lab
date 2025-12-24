@@ -94,14 +94,98 @@ class DependencyConfirmationDialog(QDialog):
         # Add folders
         folders = self.required_deps.get('folders', [])
         if folders:
-            folders_item = QTreeWidgetItem(self.tree, ["Folders", "Security Policy", f"{len(folders)} required"])
+            # Count total items in all folders
+            folder_item_count = 0
+            for folder in folders:
+                objects = folder.get('objects', {})
+                profiles = folder.get('profiles', {})
+                rules = folder.get('security_rules', [])
+                hip = folder.get('hip', {})
+                
+                folder_item_count += len(rules)
+                folder_item_count += sum(len(v) for v in objects.values() if isinstance(v, list))
+                folder_item_count += len(profiles.get('authentication_profiles', []))
+                folder_item_count += sum(len(v) for v in profiles.get('security_profiles', {}).values() if isinstance(v, list))
+                folder_item_count += len(profiles.get('decryption_profiles', []))
+                folder_item_count += len(hip.get('hip_objects', []))
+                folder_item_count += len(hip.get('hip_profiles', []))
+            
+            folders_item = QTreeWidgetItem(self.tree, ["Folders", "Security Policy", f"{folder_item_count} items in {len(folders)} folder(s)"])
             folders_item.setExpanded(True)
             
             for folder in folders:
-                name = folder.get('name', 'Unknown')
-                QTreeWidgetItem(folders_item, [name, "Folder", "Required by rules"])
+                folder_name = folder.get('name', 'Unknown')
+                folder_item = QTreeWidgetItem(folders_item, [folder_name, "Folder", ""])
+                folder_item.setExpanded(True)
+                
+                # Add objects from this folder
+                objects = folder.get('objects', {})
+                if objects:
+                    for obj_type, obj_list in objects.items():
+                        if isinstance(obj_list, list) and obj_list:
+                            type_name = obj_type.replace('_', ' ').title()
+                            type_item = QTreeWidgetItem(folder_item, [type_name, f"{len(obj_list)} items", "Required by rules/groups"])
+                            
+                            for obj in obj_list:
+                                obj_name = obj.get('name', 'Unknown')
+                                QTreeWidgetItem(type_item, [f"  {obj_name}", obj_type.replace('_', ' '), ""])
+                
+                # Add profiles from this folder
+                profiles = folder.get('profiles', {})
+                if profiles:
+                    # Authentication profiles
+                    auth_profiles = profiles.get('authentication_profiles', [])
+                    if auth_profiles:
+                        auth_item = QTreeWidgetItem(folder_item, ["Authentication Profiles", f"{len(auth_profiles)} items", "Required by rules"])
+                        for prof in auth_profiles:
+                            prof_name = prof.get('name', 'Unknown')
+                            QTreeWidgetItem(auth_item, [f"  {prof_name}", "authentication", ""])
+                    
+                    # Security profiles
+                    sec_profiles = profiles.get('security_profiles', {})
+                    if sec_profiles:
+                        for prof_type, prof_list in sec_profiles.items():
+                            if isinstance(prof_list, list) and prof_list:
+                                type_name = prof_type.replace('_', ' ').title()
+                                sec_item = QTreeWidgetItem(folder_item, [type_name, f"{len(prof_list)} items", "Required by rules/groups"])
+                                for prof in prof_list:
+                                    prof_name = prof.get('name', 'Unknown')
+                                    QTreeWidgetItem(sec_item, [f"  {prof_name}", prof_type, ""])
+                    
+                    # Decryption profiles
+                    dec_profiles = profiles.get('decryption_profiles', [])
+                    if dec_profiles:
+                        dec_item = QTreeWidgetItem(folder_item, ["Decryption Profiles", f"{len(dec_profiles)} items", "Required by rules"])
+                        for prof in dec_profiles:
+                            prof_name = prof.get('name', 'Unknown')
+                            QTreeWidgetItem(dec_item, [f"  {prof_name}", "decryption", ""])
+                
+                # Add HIP from this folder
+                hip = folder.get('hip', {})
+                if hip:
+                    hip_objects = hip.get('hip_objects', [])
+                    if hip_objects:
+                        hip_obj_item = QTreeWidgetItem(folder_item, ["HIP Objects", f"{len(hip_objects)} items", "Required by HIP profiles"])
+                        for obj in hip_objects:
+                            obj_name = obj.get('name', 'Unknown')
+                            QTreeWidgetItem(hip_obj_item, [f"  {obj_name}", "hip_object", ""])
+                    
+                    hip_profiles = hip.get('hip_profiles', [])
+                    if hip_profiles:
+                        hip_prof_item = QTreeWidgetItem(folder_item, ["HIP Profiles", f"{len(hip_profiles)} items", "Required by rules"])
+                        for prof in hip_profiles:
+                            prof_name = prof.get('name', 'Unknown')
+                            QTreeWidgetItem(hip_prof_item, [f"  {prof_name}", "hip_profile", ""])
+                
+                # Add rules from this folder
+                rules = folder.get('security_rules', [])
+                if rules:
+                    rules_item = QTreeWidgetItem(folder_item, ["Security Rules", f"{len(rules)} items", ""])
+                    for rule in rules:
+                        rule_name = rule.get('name', 'Unknown')
+                        QTreeWidgetItem(rules_item, [f"  {rule_name}", "security_rule", ""])
             
-            total_count += len(folders)
+            total_count += folder_item_count
         
         # Add snippets
         snippets = self.required_deps.get('snippets', [])
