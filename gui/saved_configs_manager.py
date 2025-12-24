@@ -295,6 +295,8 @@ class SavedConfigsManager:
         
         # Load the config
         try:
+            import json  # Import at top of try block for both encrypted and unencrypted paths
+            
             # Check if encrypted
             with open(import_file, 'rb') as f:
                 first_bytes = f.read(16)
@@ -310,7 +312,6 @@ class SavedConfigsManager:
                 
                 # Import decrypt function
                 from config.storage.json_storage import decrypt_json_data
-                import json
                 
                 # Decrypt (extracts salt from file and uses it with password)
                 try:
