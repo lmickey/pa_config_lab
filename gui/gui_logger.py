@@ -13,29 +13,35 @@ from io import StringIO
 
 
 class GUILogHandler(logging.Handler):
-    """Custom logging handler that sends logs to GUI widget."""
+    """Custom logging handler that sends logs to GUI widget and file."""
     
-    def __init__(self, logs_widget=None):
+    def __init__(self, logs_widget=None, log_file="activity.log"):
         """
         Initialize GUI log handler.
         
         Args:
             logs_widget: LogsWidget instance to send logs to
+            log_file: Path to log file for persistent logging
         """
         super().__init__()
         self.logs_widget = logs_widget
+        self.log_file = log_file
         self.setFormatter(logging.Formatter('%(message)s'))
+        
+        # Clear the log file on initialization (overwrite mode)
+        try:
+            with open(self.log_file, 'w') as f:
+                f.write(f"=== Activity Log Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n")
+        except Exception as e:
+            print(f"Warning: Could not initialize log file {self.log_file}: {e}")
     
     def emit(self, record):
         """
-        Emit a log record to the GUI.
+        Emit a log record to the GUI and file.
         
         Args:
             record: LogRecord to emit
         """
-        if not self.logs_widget:
-            return
-        
         try:
             msg = self.format(record)
             
@@ -51,31 +57,42 @@ class GUILogHandler(logging.Handler):
             gui_level = level_map.get(record.levelno, 'info')
             
             # Send to GUI logs widget
-            self.logs_widget.log(msg, gui_level)
+            if self.logs_widget:
+                self.logs_widget.log(msg, gui_level)
+            
+            # Write to log file with timestamp
+            try:
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                with open(self.log_file, 'a') as f:
+                    f.write(f"[{timestamp}] {msg}\n")
+            except Exception:
+                pass  # Silently fail if file logging fails
             
         except Exception:
-            # Silently fail if GUI logging fails
+            # Silently fail if logging fails
             pass
 
 
 class PrintRedirector:
-    """Redirect print statements to GUI log."""
+    """Redirect print statements to GUI log and file."""
     
-    def __init__(self, logs_widget=None, level='info'):
+    def __init__(self, logs_widget=None, level='info', log_file="activity.log"):
         """
         Initialize print redirector.
         
         Args:
             logs_widget: LogsWidget instance
             level: Log level for print statements
+            log_file: Path to log file
         """
         self.logs_widget = logs_widget
         self.level = level
+        self.log_file = log_file
         self.buffer = StringIO()
         
     def write(self, text):
         """
-        Write text to GUI log.
+        Write text to GUI log and file.
         
         Args:
             text: Text to write
@@ -85,17 +102,26 @@ class PrintRedirector:
         if not text:
             return
         
+        # Check if this is an error message
+        level = self.level
+        if any(keyword in text.lower() for keyword in ['error', 'failed', 'exception', 'traceback']):
+            level = 'error'
+        elif any(keyword in text.lower() for keyword in ['warning', 'warn']):
+            level = 'warning'
+        elif any(keyword in text.lower() for keyword in ['success', 'completed', 'done']):
+            level = 'success'
+        
+        # Send to GUI
         if self.logs_widget:
-            # Check if this is an error message
-            level = self.level
-            if any(keyword in text.lower() for keyword in ['error', 'failed', 'exception', 'traceback']):
-                level = 'error'
-            elif any(keyword in text.lower() for keyword in ['warning', 'warn']):
-                level = 'warning'
-            elif any(keyword in text.lower() for keyword in ['success', 'completed', 'done']):
-                level = 'success'
-            
             self.logs_widget.log(text, level)
+        
+        # Write to file
+        try:
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            with open(self.log_file, 'a') as f:
+                f.write(f"[{timestamp}] {text}\n")
+        except Exception:
+            pass  # Silently fail if file logging fails
     
     def flush(self):
         """Flush the buffer (required for file-like objects)."""

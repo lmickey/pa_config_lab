@@ -929,12 +929,25 @@ class ComponentSelectionDialog(QDialog):
         
         # For infrastructure, build a dict of {infra_type: set of item names}
         selected_infra_items = {}
-        for infra_type, items in self.previous_selection.get('infrastructure', {}).items():
-            if isinstance(items, list):
-                selected_infra_items[infra_type] = {item.get('name', item.get('id')) for item in items if isinstance(item, dict)}
-            else:
-                # Single item (not a list)
-                selected_infra_items[infra_type] = {items.get('name', items.get('id'))} if isinstance(items, dict) else set()
+        try:
+            for infra_type, items in self.previous_selection.get('infrastructure', {}).items():
+                selected_infra_items[infra_type] = set()
+                if isinstance(items, list):
+                    for item in items:
+                        if isinstance(item, dict):
+                            item_name = item.get('name') or item.get('id')
+                            if item_name:
+                                selected_infra_items[infra_type].add(item_name)
+                elif isinstance(items, dict):
+                    # Single item (not a list)
+                    item_name = items.get('name') or items.get('id')
+                    if item_name:
+                        selected_infra_items[infra_type].add(item_name)
+        except Exception as e:
+            print(f"ERROR building selected_infra_items: {e}")
+            import traceback
+            traceback.print_exc()
+            selected_infra_items = {}
         
         # Recursively check items
         def restore_item(item: QTreeWidgetItem):
