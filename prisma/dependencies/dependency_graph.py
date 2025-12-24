@@ -92,11 +92,15 @@ class DependencyGraph:
         if to_node_id not in self.nodes and to_type:
             self.add_node(to_node_id, to_type)
 
-        # Add dependency if both nodes exist
-        if from_node_id in self.nodes and to_node_id in self.nodes:
+        # Always record the dependency in the from_node, even if to_node doesn't exist
+        # This allows us to detect missing dependencies
+        if from_node_id in self.nodes:
             self.nodes[from_node_id].add_dependency(to_node_id)
-            self.nodes[to_node_id].add_dependent(from_node_id)
-            self.edges.append((from_node_id, to_node_id))
+            
+            # Only add the reverse relationship and edge if both nodes exist
+            if to_node_id in self.nodes:
+                self.nodes[to_node_id].add_dependent(from_node_id)
+                self.edges.append((from_node_id, to_node_id))
 
     def get_node(self, node_id: str) -> Optional[DependencyNode]:
         """Get a node by ID."""
@@ -122,9 +126,10 @@ class DependencyGraph:
         # Kahn's algorithm for topological sorting
         in_degree = defaultdict(int)
 
-        # Calculate in-degrees
+        # Calculate in-degrees (only count dependencies that exist as nodes)
         for node_id in self.nodes:
-            in_degree[node_id] = len(self.nodes[node_id].dependencies)
+            node = self.nodes[node_id]
+            in_degree[node_id] = sum(1 for dep in node.dependencies if dep in self.nodes)
 
         # Find nodes with no dependencies
         queue = deque([node_id for node_id, degree in in_degree.items() if degree == 0])
@@ -201,8 +206,16 @@ class DependencyGraph:
             visited.add(node_id)
             rec_stack.add(node_id)
 
-            node = self.nodes[node_id]
+            node = self.nodes.get(node_id)
+            if not node:
+                # Node doesn't exist (referenced but not in graph)
+                return False
+                
             for dep_id in node.dependencies:
+                # Skip dependencies that don't have nodes (missing dependencies)
+                if dep_id not in self.nodes:
+                    continue
+                    
                 if dep_id not in visited:
                     if has_cycle_util(dep_id):
                         return True

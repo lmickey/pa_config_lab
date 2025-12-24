@@ -505,36 +505,53 @@ class DependencyResolver:
                 
                 print(f"\n  Searching for dependency: {dep_name}")
                 
-                # Try infrastructure
-                found = False
-                infrastructure = full_config.get('infrastructure', {})
-                for infra_key in ['ipsec_tunnels', 'ike_gateways', 'ike_crypto_profiles', 
-                                 'ipsec_crypto_profiles', 'service_connections', 'remote_networks']:
-                    infra_items = infrastructure.get(infra_key, [])
-                    for item in infra_items:
-                        if item.get('name') == dep_name:
-                            print(f"    Found in {infra_key}")
+                try:
+                    # Try infrastructure
+                    found = False
+                    infrastructure = full_config.get('infrastructure', {})
+                    for infra_key in ['ipsec_tunnels', 'ike_gateways', 'ike_crypto_profiles', 
+                                     'ipsec_crypto_profiles', 'service_connections', 'remote_networks']:
+                        infra_items = infrastructure.get(infra_key, [])
+                        if not isinstance(infra_items, list):
+                            print(f"    WARNING: {infra_key} is not a list: {type(infra_items)}")
+                            continue
                             
-                            # Add to all_required
-                            if infra_key not in all_required['infrastructure']:
-                                all_required['infrastructure'][infra_key] = []
-                            all_required['infrastructure'][infra_key].append(item)
-                            
-                            # Add to working_config so next iteration includes it
-                            if infra_key not in working_config.get('infrastructure', {}):
-                                working_config.setdefault('infrastructure', {})[infra_key] = []
-                            working_config['infrastructure'][infra_key].append(item)
-                            
-                            added_names.add(dep_name)
-                            found = True
-                            found_any = True
+                        for item in infra_items:
+                            if not isinstance(item, dict):
+                                print(f"    WARNING: Item in {infra_key} is not a dict: {type(item)}")
+                                continue
+                                
+                            if item.get('name') == dep_name:
+                                print(f"    Found in {infra_key}")
+                                
+                                # Add to all_required
+                                if infra_key not in all_required['infrastructure']:
+                                    all_required['infrastructure'][infra_key] = []
+                                all_required['infrastructure'][infra_key].append(item)
+                                
+                                # Add to working_config so next iteration includes it
+                                if infra_key not in working_config.get('infrastructure', {}):
+                                    working_config.setdefault('infrastructure', {})[infra_key] = []
+                                working_config['infrastructure'][infra_key].append(item)
+                                
+                                added_names.add(dep_name)
+                                found = True
+                                found_any = True
+                                break
+                        if found:
                             break
-                    if found:
-                        break
+                    
+                    if not found:
+                        print(f"    NOT FOUND in infrastructure")
+                    
+                    # Try other types if not found in infrastructure
+                    # (folders, snippets, objects, profiles - similar pattern)
+                    # For now, focusing on infrastructure since that's the current use case
                 
-                # Try other types if not found in infrastructure
-                # (folders, snippets, objects, profiles - similar pattern)
-                # For now, focusing on infrastructure since that's the current use case
+                except Exception as e:
+                    import traceback
+                    print(f"    ERROR searching for {dep_name}: {e}")
+                    traceback.print_exc()
             
             if not found_any:
                 print(f"  WARNING: Could not find some dependencies in full config")

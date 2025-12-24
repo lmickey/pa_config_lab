@@ -590,15 +590,25 @@ class ComponentSelectionDialog(QDialog):
         """Collect checked infrastructure items organized by type."""
         infrastructure = {}
         
-        def collect_recursive(item):
+        def collect_recursive(item, depth=0):
             """Recursively collect checked infrastructure items."""
             item_data = item.data(0, Qt.ItemDataRole.UserRole)
+            indent = "  " * depth
+            
+            # Debug: Print item info
+            item_text = item.text(0)
+            check_state = item.checkState(0)
+            print(f"{indent}Checking item: '{item_text}', CheckState: {check_state}")
             
             if item_data and item_data.get('type') == 'infrastructure':
                 # This is an infrastructure item
+                print(f"{indent}  -> Is infrastructure item")
                 if item.checkState(0) == Qt.CheckState.Checked:
+                    print(f"{indent}  -> Is CHECKED")
                     infra_type = item_data.get('infra_type')
                     data = item_data.get('data')
+                    
+                    print(f"{indent}  -> infra_type={infra_type}, has_data={data is not None}")
                     
                     if infra_type and data:
                         # Initialize list if needed
@@ -608,21 +618,28 @@ class ComponentSelectionDialog(QDialog):
                         # For lists, extend the list
                         if isinstance(data, list):
                             infrastructure[infra_type].extend(data)
+                            print(f"{indent}  -> Extended list with {len(data)} items")
                         # For single items (dict), append to list
                         elif isinstance(data, dict):
                             infrastructure[infra_type].append(data)
+                            print(f"{indent}  -> Appended dict item")
                         # For other types, store directly (e.g., Mobile Users settings)
                         else:
                             infrastructure[infra_type] = data
+                            print(f"{indent}  -> Stored directly")
+                else:
+                    print(f"{indent}  -> NOT checked")
             
             # Check children
             for i in range(item.childCount()):
-                collect_recursive(item.child(i))
+                collect_recursive(item.child(i), depth + 1)
         
+        print(f"\nDEBUG: Starting _collect_infrastructure")
         # Start recursive collection from parent's children
         for i in range(parent.childCount()):
             collect_recursive(parent.child(i))
         
+        print(f"DEBUG: _collect_infrastructure found {len(infrastructure)} types: {list(infrastructure.keys())}")
         return infrastructure
     
     def accept(self):
@@ -709,6 +726,16 @@ class ComponentSelectionDialog(QDialog):
                 
                 # Check the newly added dependencies in the tree
                 self._check_merged_dependencies(required_deps)
+                
+                # Re-collect from tree to ensure checked items are included
+                # (This ensures the GUI state matches the internal state)
+                print("\nDEBUG: Re-collecting items from tree after checking dependencies")
+                tree_selected = self.get_selected_items()
+                print(f"  Tree has {len(tree_selected.get('infrastructure', {}))} infrastructure types after checking")
+                
+                # Merge tree selection with our already-merged selection
+                # (This ensures we don't lose anything)
+                selected = self._merge_dependencies(selected, tree_selected)
             
             # Store final selection
             self.selected_items = selected
@@ -790,16 +817,23 @@ class ComponentSelectionDialog(QDialog):
                         data = item_data.get('data', {})
                         item_type = item_data.get('type')
                         infra_type = item_data.get('infra_type')
+                        item_name = data.get('name') if isinstance(data, dict) else None
+                        
+                        # Debug: Print what we're comparing
+                        if check_type == 'infrastructure':
+                            print(f"    Comparing: '{name}' with item_name='{item_name}', infra_type='{infra_type}', item_type='{item_type}'")
                         
                         # Check if this is the item we're looking for
                         if check_type == 'infrastructure' and item_type == 'infrastructure':
-                            if infra_type == name or data.get('name') == name:
+                            if data.get('name') == name:
+                                print(f"    MATCH! Checking item: {name}")
                                 item.setCheckState(0, Qt.CheckState.Checked)
-                                self._update_parent_check_state(item)
+                                # DON'T call _update_parent_check_state - it will uncheck the item!
+                                # Parent state updates will happen naturally when user interacts
                                 return True
                         elif item_type == check_type and data.get('name') == name:
                             item.setCheckState(0, Qt.CheckState.Checked)
-                            self._update_parent_check_state(item)
+                            # DON'T call _update_parent_check_state
                             return True
                     
                     # Recurse into children
@@ -810,9 +844,21 @@ class ComponentSelectionDialog(QDialog):
             
             # Check infrastructure dependencies
             if 'infrastructure' in required_deps:
+                print(f"\nDEBUG: Checking infrastructure dependencies")
                 for infra_type, items in required_deps['infrastructure'].items():
-                    for item in items:
+                    print(f"  Type: {infra_type}, Items type: {type(items)}, Count: {len(items) if isinstance(items, list) else 'N/A'}")
+                    
+                    if not isinstance(items, list):
+                        print(f"  WARNING: {infra_type} is not a list, skipping")
+                        continue
+                    
+                    for idx, item in enumerate(items):
+                        if not isinstance(item, dict):
+                            print(f"  WARNING: Item {idx} is not a dict: {type(item)} = {item}")
+                            continue
+                            
                         item_name = item.get('name', item.get('id'))
+                        print(f"  Checking item: {item_name}")
                         if item_name:
                             # Find Infrastructure section
                             root = self.tree.invisibleRootItem()
@@ -881,8 +927,14 @@ class ComponentSelectionDialog(QDialog):
         selected_folder_names = {f.get('name') for f in self.previous_selection.get('folders', [])}
         selected_snippet_names = {s.get('name') for s in self.previous_selection.get('snippets', [])}
         
-        # For infrastructure, build a set of selected types
-        selected_infra_types = set(self.previous_selection.get('infrastructure', {}).keys())
+        # For infrastructure, build a dict of {infra_type: set of item names}
+        selected_infra_items = {}
+        for infra_type, items in self.previous_selection.get('infrastructure', {}).items():
+            if isinstance(items, list):
+                selected_infra_items[infra_type] = {item.get('name', item.get('id')) for item in items if isinstance(item, dict)}
+            else:
+                # Single item (not a list)
+                selected_infra_items[infra_type] = {items.get('name', items.get('id'))} if isinstance(items, dict) else set()
         
         # Recursively check items
         def restore_item(item: QTreeWidgetItem):
@@ -979,7 +1031,9 @@ class ComponentSelectionDialog(QDialog):
                 # Check infrastructure
                 elif item_type == 'infrastructure':
                     infra_type = item_data.get('infra_type')
-                    if infra_type in selected_infra_types:
+                    item_name = data.get('name', data.get('id'))
+                    # Check if this specific infrastructure item is in the selection
+                    if infra_type in selected_infra_items and item_name in selected_infra_items[infra_type]:
                         item.setCheckState(0, Qt.CheckState.Checked)
             
             # Recurse to children
