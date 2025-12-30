@@ -380,6 +380,18 @@ class ConfigFetchWorker(QThread):
                 folder_name = folder.get('name')
                 folder_profiles = folder.get('profiles', {})
                 for profile_type, profile_list in folder_profiles.items():
+                    # Skip security_profiles container - it's not a real profile type
+                    if profile_type == 'security_profiles':
+                        # security_profiles is a container with sub-types
+                        # Expand it into individual profile types
+                        if isinstance(profile_list, dict):
+                            for sub_type, sub_list in profile_list.items():
+                                if sub_type not in profile_folders:
+                                    profile_folders[sub_type] = set()
+                                if folder_name:
+                                    profile_folders[sub_type].add(folder_name)
+                        continue
+                    
                     if profile_type not in profile_folders:
                         profile_folders[profile_type] = set()
                     if folder_name:
@@ -643,20 +655,18 @@ class PushPreviewDialog(QDialog):
             'Mobile Users Explicit Proxy'
         }
         
-        # Analyze folders - skip built-in folders
+        # Analyze folders
         for folder in self.selected_items.get('folders', []):
             name = folder.get('name', 'Unknown')
             
-            # Skip built-in folders entirely
-            if name in BUILTIN_FOLDERS:
-                continue
-                
-            if name in self.destination_config.get('folders', {}):
-                conflicts.append(('folder', name, folder))
-            else:
-                new_items.append(('folder', name, folder))
+            # Check if folder itself needs to be created (skip built-in folders)
+            if name not in BUILTIN_FOLDERS:
+                if name in self.destination_config.get('folders', {}):
+                    conflicts.append(('folder', name, folder))
+                else:
+                    new_items.append(('folder', name, folder))
             
-            # Also analyze folder contents (objects, rules, profiles)
+            # ALWAYS analyze folder contents (even for built-in folders)
             # Objects from folder
             folder_objects = folder.get('objects', {})
             for obj_type, obj_list in folder_objects.items():
@@ -681,10 +691,14 @@ class PushPreviewDialog(QDialog):
             for prof_type, prof_list in folder_profiles.items():
                 if not isinstance(prof_list, list):
                     continue
+                # Check if profiles exist in destination
+                dest_profiles = self.destination_config.get('profiles', {}).get(prof_type, {})
                 for prof in prof_list:
                     prof_name = prof.get('name', 'Unknown')
-                    # Profiles are folder-specific, so they're typically new
-                    new_items.append((f"{prof_type} (from {name})", prof_name, prof))
+                    if prof_name in dest_profiles:
+                        conflicts.append((f"{prof_type} (from {name})", prof_name, prof))
+                    else:
+                        new_items.append((f"{prof_type} (from {name})", prof_name, prof))
             
             # HIP from folder
             folder_hip = folder.get('hip', {})
