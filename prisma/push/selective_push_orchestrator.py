@@ -161,6 +161,42 @@ class SelectivePushOrchestrator:
         error_str = str(error).lower()
         return 'already exists' in error_str or 'object_already_exists' in error_str
     
+    def _clean_item_for_api(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Remove read-only fields from an item before sending to API.
+        
+        These fields are returned by GET operations but should not be
+        included in POST/PUT operations.
+        
+        Args:
+            item: Configuration item dictionary
+            
+        Returns:
+            Cleaned item without read-only fields
+        """
+        import copy
+        cleaned = copy.deepcopy(item)
+        
+        # List of read-only fields that should be removed
+        readonly_fields = [
+            'id',              # API-generated ID
+            'metadata',        # Created/updated timestamps and users
+            'override_id',     # Override-specific fields
+            'override_loc',
+            'override_type',
+            'is_default',      # System-defined flag
+            'created',         # Timestamps
+            'updated',
+            'created_by',      # User tracking
+            'updated_by',
+        ]
+        
+        for field in readonly_fields:
+            if field in cleaned:
+                del cleaned[field]
+        
+        return cleaned
+    
     def _update_references_in_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
         """
         Update references in a configuration item to use renamed names.
@@ -1227,7 +1263,7 @@ class SelectivePushOrchestrator:
                             
                             # Create renamed object
                             try:
-                                renamed_obj = obj.copy()
+                                renamed_obj = self._clean_item_for_api(obj)
                                 renamed_obj['name'] = new_name
                                 
                                 result = self._create_object(obj_type, renamed_obj, folder_name)
@@ -1253,7 +1289,8 @@ class SelectivePushOrchestrator:
                     else:
                         # Create new (or recreate after delete in OVERWRITE mode)
                         try:
-                            result = self._create_object(obj_type, obj, folder_name)
+                            cleaned_obj = self._clean_item_for_api(obj)
+                            result = self._create_object(obj_type, cleaned_obj, folder_name)
                             
                             self._add_result(
                                 obj_type,
@@ -1341,7 +1378,7 @@ class SelectivePushOrchestrator:
                             logger.info(f"Name mapping: {prof_name} → {new_name}")
                             
                             try:
-                                renamed_prof = prof.copy()
+                                renamed_prof = self._clean_item_for_api(prof)
                                 renamed_prof['name'] = new_name
                                 
                                 result = self._create_profile(prof_type, renamed_prof, folder_name)
@@ -1367,7 +1404,8 @@ class SelectivePushOrchestrator:
                     else:
                         # Create new (or recreate after delete in OVERWRITE mode)
                         try:
-                            result = self._create_profile(prof_type, prof, folder_name)
+                            cleaned_prof = self._clean_item_for_api(prof)
+                            result = self._create_profile(prof_type, cleaned_prof, folder_name)
                             
                             self._add_result(
                                 prof_type,
@@ -1455,7 +1493,7 @@ class SelectivePushOrchestrator:
                             logger.info(f"Name mapping: {hip_name} → {new_name}")
                             
                             try:
-                                renamed_hip = hip_item.copy()
+                                renamed_hip = self._clean_item_for_api(hip_item)
                                 renamed_hip['name'] = new_name
                                 
                                 result = self._create_hip(hip_type, renamed_hip, folder_name)
@@ -1481,7 +1519,8 @@ class SelectivePushOrchestrator:
                     else:
                         # Create new (or recreate after delete in OVERWRITE mode)
                         try:
-                            result = self._create_hip(hip_type, hip_item, folder_name)
+                            cleaned_hip = self._clean_item_for_api(hip_item)
+                            result = self._create_hip(hip_type, cleaned_hip, folder_name)
                             
                             self._add_result(
                                 hip_type,
@@ -1616,7 +1655,7 @@ class SelectivePushOrchestrator:
                         logger.info(f"Name mapping: {item_name} → {new_name}")
                         
                         try:
-                            renamed_item = item.copy()
+                            renamed_item = self._clean_item_for_api(item)
                             renamed_item['name'] = new_name
                             
                             result = self._create_infrastructure(infra_type, renamed_item, folder_name)
@@ -1642,7 +1681,8 @@ class SelectivePushOrchestrator:
                 else:
                     # Create new (or recreate after delete in OVERWRITE mode)
                     try:
-                        result = self._create_infrastructure(infra_type, item, folder_name)
+                        cleaned_item = self._clean_item_for_api(item)
+                        result = self._create_infrastructure(infra_type, cleaned_item, folder_name)
                         
                         self._add_result(
                             infra_type,
@@ -1739,7 +1779,7 @@ class SelectivePushOrchestrator:
                         
                         # Create renamed rule with updated references
                         try:
-                            renamed_rule = updated_rule.copy()
+                            renamed_rule = self._clean_item_for_api(updated_rule)
                             renamed_rule['name'] = new_name
                             
                             result = self._create_security_rule(renamed_rule, folder_name)
@@ -1765,7 +1805,8 @@ class SelectivePushOrchestrator:
                 else:
                     # Create new (or recreate after delete in OVERWRITE mode)
                     try:
-                        result = self._create_security_rule(updated_rule, folder_name)
+                        cleaned_rule = self._clean_item_for_api(updated_rule)
+                        result = self._create_security_rule(cleaned_rule, folder_name)
                         
                         self._add_result(
                             'security_rule',
