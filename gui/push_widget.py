@@ -541,7 +541,11 @@ class PushConfigWidget(QWidget):
             self
         )
         
-        if not preview_dialog.exec():
+        # Store destination config before dialog closes
+        result = preview_dialog.exec()
+        destination_config = preview_dialog.destination_config if hasattr(preview_dialog, 'destination_config') else None
+        
+        if not result:
             # User cancelled from preview
             return
 
@@ -574,9 +578,6 @@ class PushConfigWidget(QWidget):
             reply = msg_box.exec()
             if reply != QMessageBox.StandardButton.Yes:
                 return
-
-        # Get destination config from preview dialog (for conflict detection)
-        destination_config = preview_dialog.destination_config if hasattr(preview_dialog, 'destination_config') else None
 
         # Disable UI during push
         self._set_ui_enabled(False)
