@@ -46,6 +46,18 @@ class ConfigFetchWorker(QThread):
                     print(f"  {key}: {list(value.keys())} ({sum(len(v) for v in value.values() if isinstance(v, list))} items)")
                 elif isinstance(value, list):
                     print(f"  {key}: {len(value)} items")
+                    # Show folder details
+                    if key == 'folders' and len(value) > 0:
+                        for folder in value[:2]:  # Show first 2 folders
+                            print(f"    Folder: {folder.get('name')}")
+                            if 'objects' in folder:
+                                print(f"      objects: {list(folder.get('objects', {}).keys())}")
+                            if 'security_rules' in folder:
+                                print(f"      security_rules: {len(folder.get('security_rules', []))} items")
+                            if 'profiles' in folder:
+                                print(f"      profiles: {list(folder.get('profiles', {}).keys())}")
+                            if 'hip' in folder:
+                                print(f"      hip: {list(folder.get('hip', {}).keys())}")
                 else:
                     print(f"  {key}: {value}")
             
@@ -221,6 +233,7 @@ class ConfigFetchWorker(QThread):
                     'ike_gateways': 'get_all_ike_gateways',
                     'ike_crypto_profiles': 'get_all_ike_crypto_profiles',
                     'ipsec_crypto_profiles': 'get_all_ipsec_crypto_profiles',
+                    'agent_profiles': None,  # Mobile agent profiles - different API structure
                 }
                 
                 for infra_type, infra_list in infrastructure.items():
@@ -232,9 +245,36 @@ class ConfigFetchWorker(QThread):
                     method_name = infra_method_map.get(infra_type)
                     if method_name and hasattr(self.api_client, method_name):
                         try:
-                            print(f"    Calling API method: {method_name}()")
+                            # Determine which folder(s) to query
+                            # Infrastructure items typically belong to specific folders
+                            folders_to_check = set()
+                            for item in infra_list:
+                                item_folder = item.get('folder')
+                                if item_folder:
+                                    folders_to_check.add(item_folder)
+                            
+                            print(f"    Folders to check: {list(folders_to_check) if folders_to_check else 'all'}")
+                            
+                            # Fetch from each folder (or all if no folder specified)
+                            all_existing_items = []
                             method = getattr(self.api_client, method_name)
-                            existing_items = method()
+                            
+                            if folders_to_check:
+                                # Query each folder separately
+                                for folder in folders_to_check:
+                                    print(f"    Calling API method: {method_name}(folder='{folder}')")
+                                    try:
+                                        folder_items = method(folder=folder)
+                                        if isinstance(folder_items, list):
+                                            all_existing_items.extend(folder_items)
+                                    except Exception as folder_err:
+                                        print(f"      ERROR for folder '{folder}': {folder_err}")
+                            else:
+                                # No folder specified, try without folder parameter
+                                print(f"    Calling API method: {method_name}()")
+                                all_existing_items = method()
+                            
+                            existing_items = all_existing_items
                             
                             if not isinstance(existing_items, list):
                                 print(f"    WARNING: Expected list, got {type(existing_items)}")
