@@ -409,9 +409,13 @@ class SelectivePushWorker(QThread):
                 self.conflict_resolution
             )
 
-            # Set progress callback
+            # Set progress callback with error handling
             def progress_callback(message: str, current: int, total: int):
-                self.progress.emit(message, current, total)
+                try:
+                    self.progress.emit(message, current, total)
+                except Exception:
+                    # Silently ignore signal errors
+                    pass
 
             orchestrator.set_progress_callback(progress_callback)
 
@@ -434,17 +438,33 @@ class SelectivePushWorker(QThread):
                     f"Skipped: {summary['skipped']}\n"
                     f"Failed: {summary['failed']}"
                 )
-                self.finished.emit(True, message, result)
+                try:
+                    self.finished.emit(True, message, result)
+                except Exception as e:
+                    # If emit fails, try error signal
+                    try:
+                        self.error.emit(f"Signal error: {str(e)}")
+                    except:
+                        pass
             else:
                 error_msg = result.get('message', 'Push failed')
-                self.error.emit(error_msg)
-                self.finished.emit(False, error_msg, result)
+                try:
+                    self.error.emit(error_msg)
+                    self.finished.emit(False, error_msg, result)
+                except Exception:
+                    pass
 
         except Exception as e:
             import traceback
-            traceback.print_exc()
-            self.error.emit(f"Push operation failed: {str(e)}")
-            self.finished.emit(False, str(e), None)
+            import sys
+            # Write to stderr instead of print (safer in threads)
+            traceback.print_exc(file=sys.stderr)
+            try:
+                self.error.emit(f"Push operation failed: {str(e)}")
+                self.finished.emit(False, str(e), None)
+            except Exception:
+                # Last resort - just exit
+                pass
 
 
 class DefaultDetectionWorker(QThread):

@@ -59,8 +59,13 @@ class SelectivePushOrchestrator:
     def _report_progress(self, message: str, current: int = 0, total: int = 0):
         """Report progress if callback is set."""
         if self.progress_callback:
-            self.progress_callback(message, current, total)
-        print(f"[{current}/{total}] {message}")
+            try:
+                self.progress_callback(message, current, total)
+            except Exception as e:
+                # Silently ignore callback errors to prevent crashes
+                pass
+        # Don't print in threads - can cause Qt crashes
+        # print(f"[{current}/{total}] {message}")
 
     def _add_result(
         self,
