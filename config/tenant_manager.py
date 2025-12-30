@@ -92,11 +92,10 @@ class TenantManager:
             # Check if file is empty or corrupted
             if len(file_data) < 16:
                 print(f"Warning: Tenant file is corrupted (too small: {len(file_data)} bytes)")
-                print("Creating new empty tenant file...")
-                # Recreate empty file
-                empty_data = {"version": "1.0", "tenants": []}
-                self._save_tenants(empty_data)
-                return empty_data
+                print("Deleting corrupted file...")
+                # Delete corrupted file
+                self.tenants_file.unlink()
+                return {"version": "1.0", "tenants": []}
             
             # Extract salt (first 16 bytes) and encrypted data
             salt = file_data[:16]
@@ -104,10 +103,10 @@ class TenantManager:
             
             if len(encrypted_data) == 0:
                 print("Warning: Tenant file has no encrypted data")
-                print("Creating new empty tenant file...")
-                empty_data = {"version": "1.0", "tenants": []}
-                self._save_tenants(empty_data)
-                return empty_data
+                print("Deleting corrupted file...")
+                # Delete corrupted file
+                self.tenants_file.unlink()
+                return {"version": "1.0", "tenants": []}
             
             # Decrypt
             cipher, _ = self._get_encryption_key()
@@ -131,11 +130,10 @@ class TenantManager:
             print(f"Error loading tenants: {e}")
             import traceback
             traceback.print_exc()
-            print("\nCreating new empty tenant file...")
-            # Return empty structure on error and save it
-            empty_data = {"version": "1.0", "tenants": []}
-            self._save_tenants(empty_data)
-            return empty_data
+            print("\nReturning empty tenant structure (file may be corrupted)...")
+            # Return empty structure on error but DON'T try to save
+            # (saving might fail and cause more corruption)
+            return {"version": "1.0", "tenants": []}
     
     def _save_tenants(self, data: Dict[str, Any]) -> bool:
         """

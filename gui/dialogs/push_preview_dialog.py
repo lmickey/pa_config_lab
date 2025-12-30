@@ -479,6 +479,14 @@ class ConfigFetchWorker(QThread):
             
             if hip_folders:
                 try:
+                    # TEMPORARY: Skip HIP fetching - causing segfaults
+                    # TODO: Investigate root cause of HIP API segfault
+                    print(f"⚠️  Skipping HIP validation (known stability issue - will be fixed)")
+                    if 'hip' not in dest_config:
+                        dest_config['hip'] = {}
+                    # Skip the rest of HIP processing
+                    if False:  # Disabled
+                        pass
                     self.progress.emit(f"Checking HIP items...", int((current / max(total_items, 1)) * 100))
                     print(f"  HIP types to check: {list(hip_folders.keys())}")
                     
