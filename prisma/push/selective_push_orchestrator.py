@@ -142,7 +142,9 @@ class SelectivePushOrchestrator:
         elif status == 'failed':
             logger.error(log_msg)
             if error:
-                logger.error(f"  Error details: {str(error)}")
+                # Limit error details to prevent log overflow
+                error_str = str(error)[:500]
+                logger.error(f"  Error details: {error_str}")
         else:
             logger.warning(log_msg)
 
@@ -976,66 +978,79 @@ class SelectivePushOrchestrator:
             if not isinstance(infra_list, list):
                 continue
             
-            for infra_item in infra_list:
-                infra_name = infra_item.get('name', 'Unknown')
-                
-                # Check if exists in destination
-                exists = False
-                if destination_config and 'infrastructure' in destination_config:
-                    dest_infra = destination_config['infrastructure'].get(infra_type, [])
-                    if isinstance(dest_infra, list):
-                        exists = any(i.get('name') == infra_name for i in dest_infra)
-                    elif isinstance(dest_infra, dict):
-                        exists = infra_name in dest_infra
-                
-                if exists:
-                    self._report_progress(
-                        f"Deleting {infra_type}: {infra_name}",
-                        current_item,
-                        total_items
-                    )
-                    
-                    # Get infrastructure ID from destination config
+            # Wrap entire type processing in try-except to prevent crashes
+            try:
+                for infra_item in infra_list:
                     try:
-                        if isinstance(dest_infra, list):
-                            # Find the item in the list
-                            infra_obj = next((i for i in dest_infra if i.get('name') == infra_name), None)
-                            infra_id = infra_obj.get('id') if infra_obj else None
-                        elif isinstance(dest_infra, dict):
-                            infra_id = dest_infra[infra_name].get('id')
-                        else:
-                            infra_id = None
+                        infra_name = infra_item.get('name', 'Unknown')
                         
-                        if infra_id:
-                            self._delete_infrastructure_item(infra_type, infra_id)
-                            self._add_result(
-                                infra_type,
-                                infra_name,
-                                'Infrastructure',
-                                'deleted',
-                                'success',
-                                'Deleted successfully'
-                            )
-                        else:
-                            self._add_result(
-                                infra_type,
-                                infra_name,
-                                'Infrastructure',
-                                'deleted',
-                                'failed',
-                                'Infrastructure ID not found in destination config'
-                            )
-                    except Exception as e:
-                        self._add_result(
-                            infra_type,
-                            infra_name,
-                            'Infrastructure',
-                            'deleted',
-                            'failed',
-                            f'Failed to delete: {str(e)}',
-                            error=e
-                        )
-                    current_item += 1
+                        # Check if exists in destination
+                        exists = False
+                        if destination_config and 'infrastructure' in destination_config:
+                            dest_infra = destination_config['infrastructure'].get(infra_type, [])
+                            if isinstance(dest_infra, list):
+                                exists = any(i.get('name') == infra_name for i in dest_infra)
+                            elif isinstance(dest_infra, dict):
+                                exists = infra_name in dest_infra
+                        
+                        if exists:
+                            try:
+                                self._report_progress(
+                                    f"Deleting {infra_type}: {infra_name}",
+                                    current_item,
+                                    total_items
+                                )
+                            except:
+                                pass  # Ignore progress callback errors
+                            
+                            # Get infrastructure ID from destination config
+                            try:
+                                if isinstance(dest_infra, list):
+                                    # Find the item in the list
+                                    infra_obj = next((i for i in dest_infra if i.get('name') == infra_name), None)
+                                    infra_id = infra_obj.get('id') if infra_obj else None
+                                elif isinstance(dest_infra, dict):
+                                    infra_id = dest_infra[infra_name].get('id')
+                                else:
+                                    infra_id = None
+                                
+                                if infra_id:
+                                    self._delete_infrastructure_item(infra_type, infra_id)
+                                    self._add_result(
+                                        infra_type,
+                                        infra_name,
+                                        'Infrastructure',
+                                        'deleted',
+                                        'success',
+                                        'Deleted successfully'
+                                    )
+                                else:
+                                    self._add_result(
+                                        infra_type,
+                                        infra_name,
+                                        'Infrastructure',
+                                        'deleted',
+                                        'failed',
+                                        'Infrastructure ID not found in destination config'
+                                    )
+                            except Exception as e:
+                                self._add_result(
+                                    infra_type,
+                                    infra_name,
+                                    'Infrastructure',
+                                    'deleted',
+                                    'failed',
+                                    f'Failed to delete: {str(e)[:200]}',  # Limit error message length
+                                    error=e
+                                )
+                        current_item += 1
+                    except Exception as item_error:
+                        logger.error(f"Error processing infrastructure item: {str(item_error)[:200]}")
+                        current_item += 1
+                        continue
+            except Exception as type_error:
+                logger.error(f"Error processing infrastructure type {infra_type}: {str(type_error)[:200]}")
+                continue
         
         return current_item
     
