@@ -446,8 +446,16 @@ class PushConfigWidget(QWidget):
             dest_display = self.destination_name if self.destination_name else self.destination_client.tsg_id
             
             # Check if source and destination are the same tenant
-            is_same_tenant = (self.api_client and self.destination_client and 
-                            self.api_client.tsg_id == self.destination_client.tsg_id)
+            # Get source TSG ID from either live connection or config metadata
+            source_tsg_id = None
+            if self.api_client:
+                source_tsg_id = self.api_client.tsg_id
+            elif self.config and 'metadata' in self.config:
+                source_tsg_id = self.config['metadata'].get('source_tenant')
+            
+            dest_tsg_id = self.destination_client.tsg_id if self.destination_client else None
+            
+            is_same_tenant = (source_tsg_id and dest_tsg_id and source_tsg_id == dest_tsg_id)
             
             if is_same_tenant:
                 # Warning: pushing to same tenant
