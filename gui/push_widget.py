@@ -46,6 +46,7 @@ class PushConfigWidget(QWidget):
         self.loaded_config = None  # Currently loaded config
         self.selected_items = None  # Selected components to push
         self.saved_configs_manager = None  # Will be set by parent
+        self.push_completed_successfully = False  # Track if push just completed
 
         self._init_ui()
 
@@ -400,6 +401,10 @@ class PushConfigWidget(QWidget):
 
     def _update_status(self):
         """Update status label and enable/disable push button."""
+        # Don't overwrite success message after push completes
+        if self.push_completed_successfully:
+            return
+        
         if not self.destination_client:
             self.status_label.setText("❌ Select destination tenant first")
             self.status_label.setStyleSheet(
@@ -579,6 +584,9 @@ class PushConfigWidget(QWidget):
             if reply != QMessageBox.StandardButton.Yes:
                 return
 
+        # Reset push completion flag
+        self.push_completed_successfully = False
+        
         # Disable UI during push
         self._set_ui_enabled(False)
 
@@ -623,6 +631,9 @@ class PushConfigWidget(QWidget):
             self._set_ui_enabled(True)
 
             if success:
+                # Mark push as completed successfully
+                self.push_completed_successfully = True
+                
                 # Update status banner with success message
                 # Defensive: handle various result structures
                 summary = {}
