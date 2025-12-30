@@ -381,6 +381,7 @@ class SelectivePushOrchestrator:
             logger.info(f"Created: {self.results['summary']['created']}")
             logger.info(f"Updated: {self.results['summary']['updated']}")
             logger.info(f"Deleted: {self.results['summary']['deleted']}")
+            logger.info(f"Renamed: {self.results['summary']['renamed']}")
             logger.info(f"Skipped: {self.results['summary']['skipped']}")
             logger.info(f"Failed: {self.results['summary']['failed']}")
             logger.info(f"Elapsed Time: {elapsed_time:.2f} seconds")

@@ -629,12 +629,15 @@ class PushConfigWidget(QWidget):
                 created = summary.get('created', 0)
                 updated = summary.get('updated', 0)
                 deleted = summary.get('deleted', 0)
+                renamed = summary.get('renamed', 0)
                 skipped = summary.get('skipped', 0)
                 failed = summary.get('failed', 0)
                 
                 status_msg = f"✅ Push completed successfully! Created: {created}, Updated: {updated}"
                 if deleted > 0:
                     status_msg += f", Deleted: {deleted}"
+                if renamed > 0:
+                    status_msg += f", Renamed: {renamed}"
                 status_msg += f", Skipped: {skipped}"
                 if failed > 0:
                     status_msg += f", Failed: {failed}"
