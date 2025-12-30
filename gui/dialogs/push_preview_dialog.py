@@ -478,54 +478,65 @@ class ConfigFetchWorker(QThread):
                         hip_folders[hip_type].add(folder_name)
             
             if hip_folders:
-                self.progress.emit(f"Checking HIP items...", int((current / max(total_items, 1)) * 100))
-                print(f"  HIP types to check: {list(hip_folders.keys())}")
-                
-                # Map HIP types to API methods
-                hip_method_map = {
-                    'hip_objects': 'get_all_hip_objects',
-                    'hip_profiles': 'get_all_hip_profiles',
-                }
-                
-                if 'hip' not in dest_config:
-                    dest_config['hip'] = {}
-                
-                for hip_type, folders_set in hip_folders.items():
-                    print(f"  Checking {hip_type} in folders: {list(folders_set)}")
-                    method_name = hip_method_map.get(hip_type)
+                try:
+                    self.progress.emit(f"Checking HIP items...", int((current / max(total_items, 1)) * 100))
+                    print(f"  HIP types to check: {list(hip_folders.keys())}")
                     
-                    if method_name and hasattr(self.api_client, method_name):
+                    # Map HIP types to API methods
+                    hip_method_map = {
+                        'hip_objects': 'get_all_hip_objects',
+                        'hip_profiles': 'get_all_hip_profiles',
+                    }
+                    
+                    if 'hip' not in dest_config:
+                        dest_config['hip'] = {}
+                    
+                    for hip_type, folders_set in hip_folders.items():
                         try:
-                            all_hip_items = []
-                            method = getattr(self.api_client, method_name)
+                            print(f"  Checking {hip_type} in folders: {list(folders_set)}")
+                            method_name = hip_method_map.get(hip_type)
                             
-                            for folder in folders_set:
-                                print(f"    Calling API method: {method_name}(folder='{folder}')")
+                            if method_name and hasattr(self.api_client, method_name):
                                 try:
-                                    folder_hip_items = method(folder=folder)
-                                    if isinstance(folder_hip_items, list):
-                                        all_hip_items.extend(folder_hip_items)
-                                        print(f"      Found {len(folder_hip_items)} items in folder '{folder}'")
-                                except Exception as folder_err:
-                                    print(f"      ERROR for folder '{folder}': {folder_err}")
-                            
-                            if hip_type not in dest_config['hip']:
-                                dest_config['hip'][hip_type] = {}
-                            
-                            for hip_item in all_hip_items:
-                                if isinstance(hip_item, dict):
-                                    hip_name = hip_item.get('name')
-                                    if hip_name:
-                                        dest_config['hip'][hip_type][hip_name] = hip_item
-                            
-                            print(f"    Total {hip_type}: {len(dest_config['hip'][hip_type])} items")
-                            
-                        except Exception as e:
-                            print(f"    ERROR fetching {hip_type}: {type(e).__name__}: {e}")
+                                    all_hip_items = []
+                                    method = getattr(self.api_client, method_name)
+                                    
+                                    for folder in folders_set:
+                                        print(f"    Calling API method: {method_name}(folder='{folder}')")
+                                        try:
+                                            folder_hip_items = method(folder=folder)
+                                            if isinstance(folder_hip_items, list):
+                                                all_hip_items.extend(folder_hip_items)
+                                                print(f"      Found {len(folder_hip_items)} items in folder '{folder}'")
+                                        except Exception as folder_err:
+                                            print(f"      ERROR for folder '{folder}': {folder_err}")
+                                    
+                                    if hip_type not in dest_config['hip']:
+                                        dest_config['hip'][hip_type] = {}
+                                    
+                                    for hip_item in all_hip_items:
+                                        if isinstance(hip_item, dict):
+                                            hip_name = hip_item.get('name')
+                                            if hip_name:
+                                                dest_config['hip'][hip_type][hip_name] = hip_item
+                                    
+                                    print(f"    Total {hip_type}: {len(dest_config['hip'][hip_type])} items")
+                                    
+                                except Exception as e:
+                                    print(f"    ERROR fetching {hip_type}: {type(e).__name__}: {e}")
+                                    import traceback
+                                    traceback.print_exc()
+                            else:
+                                print(f"    ⚠️  WARNING: No API method for {hip_type} (mapped to: {method_name})")
+                        except Exception as hip_type_err:
+                            print(f"  ERROR processing {hip_type}: {hip_type_err}")
                             import traceback
                             traceback.print_exc()
-                    else:
-                        print(f"    ⚠️  WARNING: No API method for {hip_type} (mapped to: {method_name})")
+                except Exception as hip_err:
+                    print(f"ERROR in HIP section: {hip_err}")
+                    import traceback
+                    traceback.print_exc()
+                    # Continue even if HIP fails
             
             # Fetch security rules from folders
             rule_folders = set()  # Track which folders have rules
