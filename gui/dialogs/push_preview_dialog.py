@@ -72,13 +72,18 @@ class ConfigFetchWorker(QThread):
             if folders:
                 self.progress.emit(f"Checking folders...", int((current / max(total_items, 1)) * 100))
                 try:
-                    response = self.api_client.get('/config/security/v1/security-policy-folders')
-                    if response and isinstance(response, dict):
-                        existing_folders = response.get('data', [])
-                        for folder in existing_folders:
-                            dest_config['folders'][folder.get('name')] = folder
+                    print(f"  Fetching folders using get_security_policy_folders()")
+                    existing_folders = self.api_client.get_security_policy_folders()
+                    print(f"    Found {len(existing_folders)} existing folders")
+                    for folder in existing_folders:
+                        folder_name = folder.get('name')
+                        if folder_name:
+                            dest_config['folders'][folder_name] = folder
+                            print(f"      - {folder_name}")
                 except Exception as e:
-                    pass  # Continue even if fetch fails
+                    print(f"    ERROR fetching folders: {e}")
+                    import traceback
+                    traceback.print_exc()
                 current += len(folders)
             
             # Fetch snippets
@@ -86,44 +91,63 @@ class ConfigFetchWorker(QThread):
             if snippets:
                 self.progress.emit(f"Checking snippets...", int((current / max(total_items, 1)) * 100))
                 try:
-                    response = self.api_client.get('/config/setup/v1/snippets')
-                    if response and isinstance(response, dict):
-                        existing_snippets = response.get('data', [])
-                        for snippet in existing_snippets:
-                            dest_config['snippets'][snippet.get('name')] = snippet
+                    print(f"  Fetching snippets using get_security_policy_snippets()")
+                    existing_snippets = self.api_client.get_security_policy_snippets()
+                    print(f"    Found {len(existing_snippets)} existing snippets")
+                    for snippet in existing_snippets:
+                        snippet_name = snippet.get('name')
+                        if snippet_name:
+                            dest_config['snippets'][snippet_name] = snippet
+                            print(f"      - {snippet_name}")
                 except Exception as e:
-                    pass
+                    print(f"    ERROR fetching snippets: {e}")
+                    import traceback
+                    traceback.print_exc()
                 current += len(snippets)
             
-            # Fetch objects (simplified - just check addresses as example)
+            # Fetch objects
             objects = self.selected_items.get('objects', {})
             if objects:
                 self.progress.emit(f"Checking objects...", int((current / max(total_items, 1)) * 100))
+                
+                # Map object types to API client methods
+                object_method_map = {
+                    'address_objects': 'get_all_addresses',
+                    'address_groups': 'get_all_address_groups',
+                    'service_objects': 'get_all_services',
+                    'service_groups': 'get_all_service_groups',
+                    'applications': 'get_all_applications',
+                    'application_groups': None,  # Not implemented yet
+                }
+                
                 for obj_type, obj_list in objects.items():
                     if not isinstance(obj_list, list):
                         continue
-                    try:
-                        # Map object types to API endpoints
-                        endpoint_map = {
-                            'addresses': '/config/objects/v1/addresses',
-                            'address_groups': '/config/objects/v1/address-groups',
-                            'services': '/config/objects/v1/services',
-                            'service_groups': '/config/objects/v1/service-groups',
-                            'applications': '/config/objects/v1/applications',
-                            'application_groups': '/config/objects/v1/application-groups',
-                        }
-                        
-                        endpoint = endpoint_map.get(obj_type)
-                        if endpoint:
-                            response = self.api_client.get(endpoint)
-                            if response and isinstance(response, dict):
-                                if obj_type not in dest_config['objects']:
-                                    dest_config['objects'][obj_type] = {}
-                                existing_objects = response.get('data', [])
-                                for obj in existing_objects:
-                                    dest_config['objects'][obj_type][obj.get('name')] = obj
-                    except Exception as e:
-                        pass
+                    
+                    print(f"  Checking {obj_type}: {len(obj_list)} items")
+                    method_name = object_method_map.get(obj_type)
+                    if method_name and hasattr(self.api_client, method_name):
+                        try:
+                            print(f"    Calling API method: {method_name}")
+                            method = getattr(self.api_client, method_name)
+                            existing_objects = method()
+                            print(f"    Found {len(existing_objects)} existing items")
+                            
+                            if obj_type not in dest_config['objects']:
+                                dest_config['objects'][obj_type] = {}
+                            
+                            for obj in existing_objects:
+                                obj_name = obj.get('name')
+                                if obj_name:
+                                    dest_config['objects'][obj_type][obj_name] = obj
+                                    print(f"      - {obj_name}")
+                        except Exception as e:
+                            print(f"    ERROR fetching {obj_type}: {e}")
+                            import traceback
+                            traceback.print_exc()
+                    else:
+                        print(f"    No API method for {obj_type}")
+                    
                     current += len(obj_list)
             
             # Fetch infrastructure components
@@ -132,14 +156,14 @@ class ConfigFetchWorker(QThread):
             if infrastructure:
                 self.progress.emit(f"Checking infrastructure...", int((current / max(total_items, 1)) * 100))
                 
-                # Map infrastructure types to API endpoints
-                infra_endpoint_map = {
-                    'remote_networks': '/sse/config/v1/remote-networks',
-                    'service_connections': '/sse/config/v1/service-connections',
-                    'ipsec_tunnels': '/sse/config/v1/ipsec-tunnels',
-                    'ike_gateways': '/sse/config/v1/ike-gateways',
-                    'ike_crypto_profiles': '/sse/config/v1/ike-crypto-profiles',
-                    'ipsec_crypto_profiles': '/sse/config/v1/ipsec-crypto-profiles',
+                # Map infrastructure types to API client methods
+                infra_method_map = {
+                    'remote_networks': 'get_all_remote_networks',
+                    'service_connections': 'get_all_service_connections',
+                    'ipsec_tunnels': 'get_all_ipsec_tunnels',
+                    'ike_gateways': 'get_all_ike_gateways',
+                    'ike_crypto_profiles': 'get_all_ike_crypto_profiles',
+                    'ipsec_crypto_profiles': 'get_all_ipsec_crypto_profiles',
                 }
                 
                 for infra_type, infra_list in infrastructure.items():
@@ -148,29 +172,29 @@ class ConfigFetchWorker(QThread):
                         continue
                     
                     print(f"  Checking {infra_type}: {len(infra_list)} items")
-                    endpoint = infra_endpoint_map.get(infra_type)
-                    if endpoint:
+                    method_name = infra_method_map.get(infra_type)
+                    if method_name and hasattr(self.api_client, method_name):
                         try:
-                            print(f"    Calling API: {endpoint}")
-                            response = self.api_client.get(endpoint)
-                            print(f"    Response type: {type(response)}, is dict: {isinstance(response, dict)}")
-                            if response and isinstance(response, dict):
-                                if infra_type not in dest_config['infrastructure']:
-                                    dest_config['infrastructure'][infra_type] = {}
-                                existing_items = response.get('data', [])
-                                print(f"    Found {len(existing_items)} existing items")
-                                for item in existing_items:
-                                    item_name = item.get('name', item.get('id'))
-                                    if item_name:
-                                        dest_config['infrastructure'][infra_type][item_name] = item
-                                        print(f"      - {item_name}")
+                            print(f"    Calling API method: {method_name}")
+                            method = getattr(self.api_client, method_name)
+                            existing_items = method()
+                            print(f"    Found {len(existing_items)} existing items")
+                            
+                            if infra_type not in dest_config['infrastructure']:
+                                dest_config['infrastructure'][infra_type] = {}
+                            
+                            for item in existing_items:
+                                item_name = item.get('name', item.get('id'))
+                                if item_name:
+                                    dest_config['infrastructure'][infra_type][item_name] = item
+                                    print(f"      - {item_name}")
                         except Exception as e:
                             # Continue even if fetch fails (endpoint might not be available)
                             print(f"    ERROR fetching {infra_type}: {e}")
                             import traceback
                             traceback.print_exc()
                     else:
-                        print(f"    No endpoint mapping for {infra_type}")
+                        print(f"    No API method for {infra_type} (method: {method_name})")
                     
                     current += len(infra_list)
             
