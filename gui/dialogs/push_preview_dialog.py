@@ -944,6 +944,26 @@ class PushPreviewDialog(QDialog):
         conflict_text = f"{len(conflicts)} conflict{'s' if len(conflicts) != 1 else ''}" if conflicts else "no conflicts"
         new_text = f"{len(new_items)} new item{'s' if len(new_items) != 1 else ''}" if new_items else "no new items"
         
-        self.action_label.setText(
-            f"📊 Ready to push: {conflict_text}, {new_text} ({total} total items)"
-        )
+        # Check if all items will be skipped (conflicts exist but no new items, and resolution is SKIP)
+        if conflicts and not new_items and self.conflict_resolution == 'SKIP':
+            # All items are conflicts and will be skipped - nothing to push
+            self.action_label.setText(
+                f"⚠️ All selected items already exist and will be skipped. "
+                f"Update your selection or change conflict resolution to continue."
+            )
+            self.action_label.setStyleSheet(
+                "padding: 10px; background-color: #FFEBEE; border: 2px solid #F44336; "
+                "border-radius: 5px; font-weight: bold; color: #C62828;"
+            )
+            # Disable the push button
+            self.ok_button.setEnabled(False)
+        else:
+            # Normal case - show summary and enable push
+            self.action_label.setText(
+                f"📊 Ready to push: {conflict_text}, {new_text} ({total} total items)"
+            )
+            self.action_label.setStyleSheet(
+                "padding: 10px; background-color: #FFF3E0; border-radius: 5px; font-weight: bold;"
+            )
+            # Button was already enabled in _on_fetch_complete, keep it enabled
+            self.ok_button.setEnabled(True)
