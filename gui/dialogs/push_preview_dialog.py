@@ -305,8 +305,14 @@ class ConfigFetchWorker(QThread):
                                     print(f"    Calling API method: {method_name}(folder='{folder}')")
                                     try:
                                         folder_items = method(folder=folder)
+                                        print(f"      Response type: {type(folder_items)}")
                                         if isinstance(folder_items, list):
                                             all_existing_items.extend(folder_items)
+                                        elif isinstance(folder_items, dict):
+                                            # For dict responses (like agent_profiles), store as-is
+                                            # We'll process it below
+                                            all_existing_items = folder_items
+                                            break  # Dict response, no need to continue
                                     except Exception as folder_err:
                                         print(f"      ERROR for folder '{folder}': {folder_err}")
                             else:
@@ -767,16 +773,22 @@ class PushPreviewDialog(QDialog):
             # ALWAYS analyze folder contents (even for built-in folders)
             # Objects from folder
             folder_objects = folder.get('objects', {})
+            print(f"\nDEBUG: Analyzing folder '{name}' objects:")
             for obj_type, obj_list in folder_objects.items():
                 if not isinstance(obj_list, list):
                     continue
+                print(f"  {obj_type}: {len(obj_list)} selected items")
+                if len(obj_list) > 0 and len(obj_list) <= 10:
+                    print(f"    Names: {[obj.get('name') for obj in obj_list]}")
                 dest_objects = self.destination_config.get('objects', {}).get(obj_type, {})
                 for obj in obj_list:
                     obj_name = obj.get('name', 'Unknown')
                     if obj_name in dest_objects:
                         conflicts.append((f"{obj_type} (from {name})", obj_name, obj))
+                        print(f"    ✓ Conflict: {obj_name}")
                     else:
                         new_items.append((f"{obj_type} (from {name})", obj_name, obj))
+                        print(f"    ✗ New: {obj_name}")
             
             # Rules from folder
             folder_rules = folder.get('security_rules', [])
