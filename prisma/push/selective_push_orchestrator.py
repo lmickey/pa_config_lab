@@ -512,6 +512,100 @@ class SelectivePushOrchestrator:
         """Delete a security rule."""
         return self.api_client.delete_security_rule(rule_id)
     
+    def _create_profile(self, prof_type: str, prof_data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """
+        Create a profile using the appropriate API method.
+        
+        Args:
+            prof_type: Profile type (e.g., 'anti_spyware_profiles', 'decryption_profiles')
+            prof_data: Profile data
+            folder: Folder name
+            
+        Returns:
+            API response
+        """
+        type_to_method = {
+            'anti_spyware_profiles': self.api_client.create_anti_spyware_profile,
+            'dns_security_profiles': self.api_client.create_dns_security_profile,
+            'file_blocking_profiles': self.api_client.create_file_blocking_profile,
+            'url_access_profiles': self.api_client.create_url_access_profile,
+            'vulnerability_protection_profiles': self.api_client.create_vulnerability_protection_profile,
+            'wildfire_anti_virus_profiles': self.api_client.create_wildfire_anti_virus_profile,
+            'decryption_profiles': self.api_client.create_decryption_profile,
+            'authentication_profiles': self.api_client.create_authentication_profile,
+        }
+        
+        method = type_to_method.get(prof_type)
+        if not method:
+            raise ValueError(f"Unknown profile type: {prof_type}")
+        
+        return method(prof_data, folder)
+    
+    def _delete_profile(self, prof_type: str, prof_id: str) -> Dict[str, Any]:
+        """
+        Delete a profile using the appropriate API method.
+        
+        Args:
+            prof_type: Profile type
+            prof_id: Profile ID
+            
+        Returns:
+            API response
+        """
+        type_to_method = {
+            'anti_spyware_profiles': self.api_client.delete_anti_spyware_profile,
+            'dns_security_profiles': self.api_client.delete_dns_security_profile,
+            'file_blocking_profiles': self.api_client.delete_file_blocking_profile,
+            'url_access_profiles': self.api_client.delete_url_access_profile,
+            'vulnerability_protection_profiles': self.api_client.delete_vulnerability_protection_profile,
+            'wildfire_anti_virus_profiles': self.api_client.delete_wildfire_anti_virus_profile,
+            'decryption_profiles': self.api_client.delete_decryption_profile,
+            'authentication_profiles': self.api_client.delete_authentication_profile,
+        }
+        
+        method = type_to_method.get(prof_type)
+        if not method:
+            raise ValueError(f"Unknown profile type: {prof_type}")
+        
+        return method(prof_id)
+    
+    def _create_hip(self, hip_type: str, hip_data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """
+        Create a HIP object or profile.
+        
+        Args:
+            hip_type: HIP type ('hip_objects' or 'hip_profiles')
+            hip_data: HIP data
+            folder: Folder name
+            
+        Returns:
+            API response
+        """
+        if hip_type == 'hip_objects':
+            return self.api_client.create_hip_object(hip_data, folder)
+        elif hip_type == 'hip_profiles':
+            return self.api_client.create_hip_profile(hip_data, folder)
+        else:
+            raise ValueError(f"Unknown HIP type: {hip_type}")
+    
+    def _delete_hip(self, hip_type: str, hip_id: str) -> Dict[str, Any]:
+        """
+        Delete a HIP object or profile.
+        
+        Args:
+            hip_type: HIP type
+            hip_id: HIP ID
+            
+        Returns:
+            API response
+        """
+        if hip_type == 'hip_objects':
+            return self.api_client.delete_hip_object(hip_id)
+        elif hip_type == 'hip_profiles':
+            return self.api_client.delete_hip_profile(hip_id)
+        else:
+            raise ValueError(f"Unknown HIP type: {hip_type}")
+    
     # ========================================================================
     # DELETE METHODS (for OVERWRITE mode - reverse dependency order)
     # ========================================================================
@@ -650,15 +744,38 @@ class SelectivePushOrchestrator:
                             total_items
                         )
                         
-                        # TODO: Implement delete API call
-                        self._add_result(
-                            hip_type,
-                            hip_name,
-                            folder_name,
-                            'deleted',
-                            'success',
-                            'Deleted (placeholder - API not implemented)'
-                        )
+                        # Get HIP ID from destination config
+                        try:
+                            hip_id = dest_hip[hip_name].get('id')
+                            if hip_id:
+                                self._delete_hip(hip_type, hip_id)
+                                self._add_result(
+                                    hip_type,
+                                    hip_name,
+                                    folder_name,
+                                    'deleted',
+                                    'success',
+                                    'Deleted successfully'
+                                )
+                            else:
+                                self._add_result(
+                                    hip_type,
+                                    hip_name,
+                                    folder_name,
+                                    'deleted',
+                                    'failed',
+                                    'HIP ID not found in destination config'
+                                )
+                        except Exception as e:
+                            self._add_result(
+                                hip_type,
+                                hip_name,
+                                folder_name,
+                                'deleted',
+                                'failed',
+                                f'Failed to delete: {str(e)}',
+                                error=e
+                            )
                         current_item += 1
         
         return current_item
@@ -694,15 +811,38 @@ class SelectivePushOrchestrator:
                             total_items
                         )
                         
-                        # TODO: Implement delete API call
-                        self._add_result(
-                            prof_type,
-                            prof_name,
-                            folder_name,
-                            'deleted',
-                            'success',
-                            'Deleted (placeholder - API not implemented)'
-                        )
+                        # Get profile ID from destination config
+                        try:
+                            prof_id = dest_profiles[prof_name].get('id')
+                            if prof_id:
+                                self._delete_profile(prof_type, prof_id)
+                                self._add_result(
+                                    prof_type,
+                                    prof_name,
+                                    folder_name,
+                                    'deleted',
+                                    'success',
+                                    'Deleted successfully'
+                                )
+                            else:
+                                self._add_result(
+                                    prof_type,
+                                    prof_name,
+                                    folder_name,
+                                    'deleted',
+                                    'failed',
+                                    'Profile ID not found in destination config'
+                                )
+                        except Exception as e:
+                            self._add_result(
+                                prof_type,
+                                prof_name,
+                                folder_name,
+                                'deleted',
+                                'failed',
+                                f'Failed to delete: {str(e)}',
+                                error=e
+                            )
                         current_item += 1
         
         return current_item
@@ -1025,24 +1165,53 @@ class SelectivePushOrchestrator:
                             
                             logger.info(f"Name mapping: {prof_name} → {new_name}")
                             
-                            self._add_result(
-                                prof_type,
-                                new_name,
-                                folder_name,
-                                'renamed',
-                                'success',
-                                f'Created as {new_name} (placeholder - API not implemented)'
-                            )
+                            try:
+                                renamed_prof = prof.copy()
+                                renamed_prof['name'] = new_name
+                                
+                                result = self._create_profile(prof_type, renamed_prof, folder_name)
+                                
+                                self._add_result(
+                                    prof_type,
+                                    new_name,
+                                    folder_name,
+                                    'renamed',
+                                    'success',
+                                    f'Created as {new_name}'
+                                )
+                            except Exception as e:
+                                self._add_result(
+                                    prof_type,
+                                    new_name,
+                                    folder_name,
+                                    'renamed',
+                                    'failed',
+                                    f'Failed to create: {str(e)}',
+                                    error=e
+                                )
                     else:
                         # Create new (or recreate after delete in OVERWRITE mode)
-                        self._add_result(
-                            prof_type,
-                            prof_name,
-                            folder_name,
-                            'created',
-                            'success',
-                            'Created (placeholder - API not implemented)'
-                        )
+                        try:
+                            result = self._create_profile(prof_type, prof, folder_name)
+                            
+                            self._add_result(
+                                prof_type,
+                                prof_name,
+                                folder_name,
+                                'created',
+                                'success',
+                                'Created successfully'
+                            )
+                        except Exception as e:
+                            self._add_result(
+                                prof_type,
+                                prof_name,
+                                folder_name,
+                                'created',
+                                'failed',
+                                f'Failed to create: {str(e)}',
+                                error=e
+                            )
                     
                     current_item += 1
         
@@ -1098,24 +1267,53 @@ class SelectivePushOrchestrator:
                             
                             logger.info(f"Name mapping: {hip_name} → {new_name}")
                             
-                            self._add_result(
-                                hip_type,
-                                new_name,
-                                folder_name,
-                                'renamed',
-                                'success',
-                                f'Created as {new_name} (placeholder - API not implemented)'
-                            )
+                            try:
+                                renamed_hip = hip_item.copy()
+                                renamed_hip['name'] = new_name
+                                
+                                result = self._create_hip(hip_type, renamed_hip, folder_name)
+                                
+                                self._add_result(
+                                    hip_type,
+                                    new_name,
+                                    folder_name,
+                                    'renamed',
+                                    'success',
+                                    f'Created as {new_name}'
+                                )
+                            except Exception as e:
+                                self._add_result(
+                                    hip_type,
+                                    new_name,
+                                    folder_name,
+                                    'renamed',
+                                    'failed',
+                                    f'Failed to create: {str(e)}',
+                                    error=e
+                                )
                     else:
                         # Create new (or recreate after delete in OVERWRITE mode)
-                        self._add_result(
-                            hip_type,
-                            hip_name,
-                            folder_name,
-                            'created',
-                            'success',
-                            'Created (placeholder - API not implemented)'
-                        )
+                        try:
+                            result = self._create_hip(hip_type, hip_item, folder_name)
+                            
+                            self._add_result(
+                                hip_type,
+                                hip_name,
+                                folder_name,
+                                'created',
+                                'success',
+                                'Created successfully'
+                            )
+                        except Exception as e:
+                            self._add_result(
+                                hip_type,
+                                hip_name,
+                                folder_name,
+                                'created',
+                                'failed',
+                                f'Failed to create: {str(e)}',
+                                error=e
+                            )
                     
                     current_item += 1
         
