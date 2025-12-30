@@ -122,31 +122,52 @@ class ConfigFetchWorker(QThread):
                 
                 for obj_type, obj_list in objects.items():
                     if not isinstance(obj_list, list):
+                        print(f"  Skipping {obj_type} - not a list (type: {type(obj_list)})")
                         continue
                     
                     print(f"  Checking {obj_type}: {len(obj_list)} items")
                     method_name = object_method_map.get(obj_type)
                     if method_name and hasattr(self.api_client, method_name):
                         try:
-                            print(f"    Calling API method: {method_name}")
+                            print(f"    Calling API method: {method_name}()")
                             method = getattr(self.api_client, method_name)
+                            # Call without folder parameter to get all objects across all folders
                             existing_objects = method()
+                            
+                            if not isinstance(existing_objects, list):
+                                print(f"    WARNING: Expected list, got {type(existing_objects)}")
+                                existing_objects = []
+                            
                             print(f"    Found {len(existing_objects)} existing items")
                             
                             if obj_type not in dest_config['objects']:
                                 dest_config['objects'][obj_type] = {}
                             
                             for obj in existing_objects:
+                                if not isinstance(obj, dict):
+                                    print(f"      WARNING: Object is not a dict: {type(obj)}")
+                                    continue
                                 obj_name = obj.get('name')
                                 if obj_name:
                                     dest_config['objects'][obj_type][obj_name] = obj
-                                    print(f"      - {obj_name}")
+                                    if len(dest_config['objects'][obj_type]) <= 5:  # Only print first 5
+                                        print(f"      - {obj_name}")
+                            
+                            if len(dest_config['objects'][obj_type]) > 5:
+                                print(f"      ... and {len(dest_config['objects'][obj_type]) - 5} more")
+                                
+                        except AttributeError as e:
+                            print(f"    ERROR: Method {method_name} not found: {e}")
+                        except TypeError as e:
+                            print(f"    ERROR: Type error calling {method_name}: {e}")
+                            import traceback
+                            traceback.print_exc()
                         except Exception as e:
-                            print(f"    ERROR fetching {obj_type}: {e}")
+                            print(f"    ERROR fetching {obj_type}: {type(e).__name__}: {e}")
                             import traceback
                             traceback.print_exc()
                     else:
-                        print(f"    No API method for {obj_type}")
+                        print(f"    No API method for {obj_type} (mapped to: {method_name})")
                     
                     current += len(obj_list)
             
@@ -168,33 +189,52 @@ class ConfigFetchWorker(QThread):
                 
                 for infra_type, infra_list in infrastructure.items():
                     if not isinstance(infra_list, list):
-                        print(f"  Skipping {infra_type} - not a list")
+                        print(f"  Skipping {infra_type} - not a list (type: {type(infra_list)})")
                         continue
                     
                     print(f"  Checking {infra_type}: {len(infra_list)} items")
                     method_name = infra_method_map.get(infra_type)
                     if method_name and hasattr(self.api_client, method_name):
                         try:
-                            print(f"    Calling API method: {method_name}")
+                            print(f"    Calling API method: {method_name}()")
                             method = getattr(self.api_client, method_name)
                             existing_items = method()
+                            
+                            if not isinstance(existing_items, list):
+                                print(f"    WARNING: Expected list, got {type(existing_items)}")
+                                existing_items = []
+                            
                             print(f"    Found {len(existing_items)} existing items")
                             
                             if infra_type not in dest_config['infrastructure']:
                                 dest_config['infrastructure'][infra_type] = {}
                             
                             for item in existing_items:
+                                if not isinstance(item, dict):
+                                    print(f"      WARNING: Item is not a dict: {type(item)}")
+                                    continue
                                 item_name = item.get('name', item.get('id'))
                                 if item_name:
                                     dest_config['infrastructure'][infra_type][item_name] = item
-                                    print(f"      - {item_name}")
+                                    if len(dest_config['infrastructure'][infra_type]) <= 5:  # Only print first 5
+                                        print(f"      - {item_name}")
+                            
+                            if len(dest_config['infrastructure'][infra_type]) > 5:
+                                print(f"      ... and {len(dest_config['infrastructure'][infra_type]) - 5} more")
+                                
+                        except AttributeError as e:
+                            print(f"    ERROR: Method {method_name} not found: {e}")
+                        except TypeError as e:
+                            print(f"    ERROR: Type error calling {method_name}: {e}")
+                            import traceback
+                            traceback.print_exc()
                         except Exception as e:
                             # Continue even if fetch fails (endpoint might not be available)
-                            print(f"    ERROR fetching {infra_type}: {e}")
+                            print(f"    ERROR fetching {infra_type}: {type(e).__name__}: {e}")
                             import traceback
                             traceback.print_exc()
                     else:
-                        print(f"    No API method for {infra_type} (method: {method_name})")
+                        print(f"    No API method for {infra_type} (mapped to: {method_name})")
                     
                     current += len(infra_list)
             
