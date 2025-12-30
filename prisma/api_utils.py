@@ -253,14 +253,27 @@ def handle_api_response(
                         if "password" in key.lower() or "secret" in key.lower():
                             print(f"  {key}: ***REDACTED***")
                         else:
-                            print(f"  {key}: {value}")
+                            # Limit value length to prevent crashes
+                            value_str = str(value)
+                            if len(value_str) > 500:
+                                print(f"  {key}: {value_str[:500]}... (truncated)")
+                            else:
+                                print(f"  {key}: {value}")
                 else:
-                    print(f"  {data}")
+                    data_str = str(data)
+                    if len(data_str) > 1000:
+                        print(f"  {data_str[:1000]}... (truncated)")
+                    else:
+                        print(f"  {data}")
             elif json_data:
                 print(f"\nRequest Body (JSON):")
                 import json
 
-                print(f"  {json.dumps(json_data, indent=2)}")
+                json_str = json.dumps(json_data, indent=2)
+                if len(json_str) > 1000:
+                    print(f"  {json_str[:1000]}... (truncated)")
+                else:
+                    print(f"  {json_str}")
 
         print("\n" + "-" * 80)
         print("Response Details:")
@@ -275,7 +288,13 @@ def handle_api_response(
             print(f"\nResponse Body (JSON):")
             import json
 
-            print(json.dumps(response_json, indent=2))
+            # Limit JSON output to prevent crashes from large responses
+            json_str = json.dumps(response_json, indent=2)
+            if len(json_str) > 2000:
+                print(json_str[:2000])
+                print(f"... (truncated, total length: {len(json_str)} chars)")
+            else:
+                print(json_str)
         except ValueError:
             print(f"\nResponse Body (Text):")
             print(response.text[:1000])  # Limit to first 1000 chars
