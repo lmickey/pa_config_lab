@@ -114,11 +114,42 @@ class ConfigFetchWorker(QThread):
                         pass
                     current += len(obj_list)
             
-            # Infrastructure (simplified)
+            # Fetch infrastructure components
             infrastructure = self.selected_items.get('infrastructure', {})
             if infrastructure:
                 self.progress.emit(f"Checking infrastructure...", int((current / max(total_items, 1)) * 100))
-                current += sum(len(v) for v in infrastructure.values() if isinstance(v, list))
+                
+                # Map infrastructure types to API endpoints
+                infra_endpoint_map = {
+                    'remote_networks': '/sse/config/v1/remote-networks',
+                    'service_connections': '/sse/config/v1/service-connections',
+                    'ipsec_tunnels': '/sse/config/v1/ipsec-tunnels',
+                    'ike_gateways': '/sse/config/v1/ike-gateways',
+                    'ike_crypto_profiles': '/sse/config/v1/ike-crypto-profiles',
+                    'ipsec_crypto_profiles': '/sse/config/v1/ipsec-crypto-profiles',
+                }
+                
+                for infra_type, infra_list in infrastructure.items():
+                    if not isinstance(infra_list, list):
+                        continue
+                    
+                    endpoint = infra_endpoint_map.get(infra_type)
+                    if endpoint:
+                        try:
+                            response = self.api_client.get(endpoint)
+                            if response and isinstance(response, dict):
+                                if infra_type not in dest_config['infrastructure']:
+                                    dest_config['infrastructure'][infra_type] = {}
+                                existing_items = response.get('data', [])
+                                for item in existing_items:
+                                    item_name = item.get('name', item.get('id'))
+                                    if item_name:
+                                        dest_config['infrastructure'][infra_type][item_name] = item
+                        except Exception as e:
+                            # Continue even if fetch fails (endpoint might not be available)
+                            pass
+                    
+                    current += len(infra_list)
             
             self.progress.emit("Analysis complete", 100)
             self.finished.emit(dest_config)
@@ -344,10 +375,13 @@ class PushPreviewDialog(QDialog):
         for infra_type, infra_list in self.selected_items.get('infrastructure', {}).items():
             if not isinstance(infra_list, list):
                 continue
+            dest_infra = self.destination_config.get('infrastructure', {}).get(infra_type, {})
             for item in infra_list:
                 name = item.get('name', item.get('id', 'Unknown'))
-                # For simplicity, assume infrastructure items are new (would need more complex checking)
-                new_items.append((infra_type, name, item))
+                if name in dest_infra:
+                    conflicts.append((infra_type, name, item))
+                else:
+                    new_items.append((infra_type, name, item))
         
         # Populate conflicts tree
         self.conflicts_tree.clear()
