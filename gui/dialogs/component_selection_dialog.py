@@ -758,6 +758,16 @@ class ComponentSelectionDialog(QDialog):
                 # Add dependencies to selection
                 selected = self._merge_dependencies(selected, required_deps)
                 
+                # Debug: Show what we're about to check
+                print(f"\nDEBUG: About to check merged dependencies in tree")
+                print(f"  required_deps keys: {list(required_deps.keys())}")
+                if 'objects' in required_deps:
+                    print(f"  Objects to check:")
+                    for obj_type, obj_list in required_deps['objects'].items():
+                        print(f"    {obj_type}: {len(obj_list)} items")
+                        for obj in obj_list[:3]:
+                            print(f"      - {obj.get('name')} (folder: {obj.get('folder')})")
+                
                 # Check the newly added dependencies in the tree
                 self._check_merged_dependencies(required_deps)
                 
@@ -766,6 +776,16 @@ class ComponentSelectionDialog(QDialog):
                 print("\nDEBUG: Re-collecting items from tree after checking dependencies")
                 tree_selected = self.get_selected_items()
                 print(f"  Tree has {len(tree_selected.get('infrastructure', {}))} infrastructure types after checking")
+                if 'folders' in tree_selected:
+                    print(f"  Tree has {len(tree_selected['folders'])} folders")
+                    for folder in tree_selected['folders']:
+                        folder_name = folder.get('name')
+                        if 'objects' in folder:
+                            print(f"    Folder '{folder_name}' has objects:")
+                            for obj_type, obj_list in folder.get('objects', {}).items():
+                                print(f"      {obj_type}: {len(obj_list)} items")
+                                for obj in obj_list[:3]:
+                                    print(f"        - {obj.get('name')}")
                 
                 # Merge tree selection with our already-merged selection
                 # (This ensures we don't lose anything)
