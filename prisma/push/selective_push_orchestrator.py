@@ -238,13 +238,15 @@ class SelectivePushOrchestrator:
             self._report_progress("Starting push operation", 0, total_items)
             
             # PHASE 1: If OVERWRITE mode, delete existing items in REVERSE dependency order
-            # (top-down: rules → profiles → hip → objects → infrastructure → folders)
+            # (top-down: rules → snippets → infrastructure → hip → profiles → objects → folders)
+            # Note: Infrastructure must be deleted BEFORE profiles because infra uses profiles
             if self.conflict_resolution == 'OVERWRITE' and destination_config:
                 logger.info("-" * 80)
                 logger.info("PHASE 1: Deleting existing conflicting items (reverse dependency order)")
                 logger.info("-" * 80)
                 
                 # Delete in reverse order: rules first, objects last
+                # 1. Security rules (depend on everything)
                 if 'folders' in selected_items:
                     current_item = self._delete_security_rules(
                         selected_items['folders'],
@@ -253,6 +255,7 @@ class SelectivePushOrchestrator:
                         total_items
                     )
                 
+                # 2. Snippets
                 if 'snippets' in selected_items:
                     current_item = self._delete_snippets(
                         selected_items['snippets'],
@@ -261,22 +264,7 @@ class SelectivePushOrchestrator:
                         total_items
                     )
                 
-                if 'folders' in selected_items:
-                    current_item = self._delete_folder_hip(
-                        selected_items['folders'],
-                        destination_config,
-                        current_item,
-                        total_items
-                    )
-                
-                if 'folders' in selected_items:
-                    current_item = self._delete_folder_profiles(
-                        selected_items['folders'],
-                        destination_config,
-                        current_item,
-                        total_items
-                    )
-                
+                # 3. Infrastructure (uses profiles, so delete BEFORE profiles)
                 if 'infrastructure' in selected_items:
                     current_item = self._delete_infrastructure(
                         selected_items['infrastructure'],
@@ -285,6 +273,25 @@ class SelectivePushOrchestrator:
                         total_items
                     )
                 
+                # 4. HIP (may use profiles)
+                if 'folders' in selected_items:
+                    current_item = self._delete_folder_hip(
+                        selected_items['folders'],
+                        destination_config,
+                        current_item,
+                        total_items
+                    )
+                
+                # 5. Profiles (used by infrastructure and HIP)
+                if 'folders' in selected_items:
+                    current_item = self._delete_folder_profiles(
+                        selected_items['folders'],
+                        destination_config,
+                        current_item,
+                        total_items
+                    )
+                
+                # 6. Objects (used by rules and profiles)
                 if 'folders' in selected_items:
                     current_item = self._delete_folder_objects(
                         selected_items['folders'],
