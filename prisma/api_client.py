@@ -528,6 +528,176 @@ class PrismaAccessAPIClient:
 
         return paginate_api_request(api_func)
 
+    # Application Groups
+    def get_application_groups(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get application groups.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of application groups
+        """
+        url = APIEndpoints.APPLICATION_GROUPS
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_application_groups(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all application groups with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_application_groups(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    # Application Filters
+    def get_application_filters(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get application filters.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of application filters
+        """
+        url = APIEndpoints.APPLICATION_FILTERS
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_application_filters(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all application filters with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_application_filters(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    # External Dynamic Lists
+    def get_external_dynamic_lists(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get external dynamic lists.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of external dynamic lists
+        """
+        url = APIEndpoints.EXTERNAL_DYNAMIC_LISTS
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_external_dynamic_lists(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all external dynamic lists with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_external_dynamic_lists(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    # FQDN Objects
+    def get_fqdn_objects(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get FQDN objects.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of FQDN objects
+        """
+        url = APIEndpoints.FQDN
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_fqdn_objects(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all FQDN objects with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_fqdn_objects(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    # URL Categories
+    def get_url_categories(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get URL filtering categories.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of URL filtering categories
+        """
+        url = APIEndpoints.URL_CATEGORIES
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_url_categories(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all URL filtering categories with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_url_categories(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
     # Authentication Profiles
     def get_authentication_profiles(
         self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
@@ -695,6 +865,246 @@ class PrismaAccessAPIClient:
             params["offset"] = offset
         response = self._make_request("GET", url, params=params if params else None)
         return response.get("data", [])
+
+    def get_all_decryption_profiles(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all decryption profiles with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_decryption_profiles(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    # Security Profiles
+    def get_anti_spyware_profiles(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get anti-spyware profiles.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of anti-spyware profiles
+        """
+        url = APIEndpoints.ANTI_SPYWARE_PROFILES
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_anti_spyware_profiles(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all anti-spyware profiles with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_anti_spyware_profiles(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    def get_dns_security_profiles(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get DNS security profiles.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of DNS security profiles
+        """
+        url = APIEndpoints.DNS_SECURITY_PROFILES
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_dns_security_profiles(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all DNS security profiles with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_dns_security_profiles(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    def get_file_blocking_profiles(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get file blocking profiles.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of file blocking profiles
+        """
+        url = APIEndpoints.FILE_BLOCKING_PROFILES
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_file_blocking_profiles(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all file blocking profiles with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_file_blocking_profiles(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    def get_url_access_profiles(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get URL access profiles.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of URL access profiles
+        """
+        url = APIEndpoints.URL_ACCESS_PROFILES
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_url_access_profiles(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all URL access profiles with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_url_access_profiles(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    def get_vulnerability_profiles(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get vulnerability protection profiles.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of vulnerability protection profiles
+        """
+        url = APIEndpoints.VULNERABILITY_PROTECTION_PROFILES
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_vulnerability_profiles(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all vulnerability protection profiles with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_vulnerability_profiles(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    def get_wildfire_profiles(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get WildFire antivirus profiles.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of WildFire antivirus profiles
+        """
+        url = APIEndpoints.WILDFIRE_ANTI_VIRUS_PROFILES
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_wildfire_profiles(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all WildFire antivirus profiles with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_wildfire_profiles(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    def get_profile_groups(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get profile groups.
+        
+        Args:
+            folder: Optional folder name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of profile groups
+        """
+        url = APIEndpoints.PROFILE_GROUPS
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_profile_groups(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all profile groups with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_profile_groups(folder=folder, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
 
     # ==================== Infrastructure Methods (NEW) ====================
 

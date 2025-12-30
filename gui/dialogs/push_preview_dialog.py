@@ -181,7 +181,11 @@ class ConfigFetchWorker(QThread):
                     'service_objects': 'get_all_services',
                     'service_groups': 'get_all_service_groups',
                     'applications': 'get_all_applications',
-                    'application_groups': None,  # Not implemented yet
+                    'application_groups': 'get_all_application_groups',
+                    'application_filters': 'get_all_application_filters',
+                    'external_dynamic_lists': 'get_all_external_dynamic_lists',
+                    'fqdn_objects': 'get_all_fqdn_objects',
+                    'url_filtering_categories': 'get_all_url_categories',
                 }
                 
                 for obj_type, obj_list in objects.items():
@@ -251,7 +255,7 @@ class ConfigFetchWorker(QThread):
                             import traceback
                             traceback.print_exc()
                     else:
-                        print(f"    No API method for {obj_type} (mapped to: {method_name})")
+                        print(f"    ⚠️  WARNING: No API method for {obj_type} (mapped to: {method_name})")
                     
                     current += len(obj_list)
             
@@ -365,7 +369,7 @@ class ConfigFetchWorker(QThread):
                             import traceback
                             traceback.print_exc()
                     else:
-                        print(f"    No API method for {infra_type} (mapped to: {method_name})")
+                        print(f"    ⚠️  WARNING: No API method for {infra_type} (mapped to: {method_name})")
                     
                     current += len(infra_list)
             
@@ -389,7 +393,14 @@ class ConfigFetchWorker(QThread):
                 profile_method_map = {
                     'authentication_profiles': 'get_all_authentication_profiles',
                     'decryption_profiles': 'get_all_decryption_profiles',
-                    'security_profiles': None,  # Security profiles is a group, not a single type
+                    'anti_spyware_profiles': 'get_all_anti_spyware_profiles',
+                    'dns_security_profiles': 'get_all_dns_security_profiles',
+                    'file_blocking_profiles': 'get_all_file_blocking_profiles',
+                    'url_access_profiles': 'get_all_url_access_profiles',
+                    'vulnerability_profiles': 'get_all_vulnerability_profiles',
+                    'wildfire_profiles': 'get_all_wildfire_profiles',
+                    'profile_groups': 'get_all_profile_groups',
+                    'security_profiles': None,  # Security profiles is a container, not a single type
                 }
                 
                 if 'profiles' not in dest_config:
@@ -430,7 +441,7 @@ class ConfigFetchWorker(QThread):
                             import traceback
                             traceback.print_exc()
                     else:
-                        print(f"    No API method for {profile_type} (mapped to: {method_name})")
+                        print(f"    ⚠️  WARNING: No API method for {profile_type} (mapped to: {method_name})")
             
             self.progress.emit("Analysis complete", 100)
             print(f"\n=== ConfigFetchWorker.run() complete ===")
