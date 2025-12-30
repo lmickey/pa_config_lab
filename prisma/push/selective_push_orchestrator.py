@@ -450,6 +450,60 @@ class SelectivePushOrchestrator:
         return count
 
     # ========================================================================
+    # HELPER METHODS - API Call Wrappers
+    # ========================================================================
+    
+    def _create_object(self, obj_type: str, obj_data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """
+        Create an object using the appropriate API method.
+        
+        Args:
+            obj_type: Object type (e.g., 'address_objects', 'service_objects')
+            obj_data: Object data
+            folder: Folder name
+            
+        Returns:
+            API response
+        """
+        # Map object type to API method
+        type_to_method = {
+            'address_objects': self.api_client.create_address,
+            'address_groups': self.api_client.create_address_group,
+            'service_objects': self.api_client.create_service,
+            'service_groups': self.api_client.create_service_group,
+        }
+        
+        method = type_to_method.get(obj_type)
+        if not method:
+            raise ValueError(f"Unknown object type: {obj_type}")
+        
+        return method(obj_data, folder)
+    
+    def _delete_object(self, obj_type: str, obj_id: str) -> Dict[str, Any]:
+        """
+        Delete an object using the appropriate API method.
+        
+        Args:
+            obj_type: Object type
+            obj_id: Object ID
+            
+        Returns:
+            API response
+        """
+        type_to_method = {
+            'address_objects': self.api_client.delete_address,
+            'address_groups': self.api_client.delete_address_group,
+            'service_objects': self.api_client.delete_service,
+            'service_groups': self.api_client.delete_service_group,
+        }
+        
+        method = type_to_method.get(obj_type)
+        if not method:
+            raise ValueError(f"Unknown object type: {obj_type}")
+        
+        return method(obj_id)
+    
+    # ========================================================================
     # DELETE METHODS (for OVERWRITE mode - reverse dependency order)
     # ========================================================================
     
@@ -689,23 +743,46 @@ class SelectivePushOrchestrator:
                         dest_objects = destination_config['objects'].get(obj_type, {})
                         exists = obj_name in dest_objects
                     
-                    if exists:
-                        self._report_progress(
-                            f"Deleting {obj_type}: {obj_name}",
-                            current_item,
-                            total_items
-                        )
-                        
-                        # TODO: Implement delete API call
+                if exists:
+                    self._report_progress(
+                        f"Deleting {obj_type}: {obj_name}",
+                        current_item,
+                        total_items
+                    )
+                    
+                    # Get object ID from destination config
+                    try:
+                        obj_id = dest_objects[obj_name].get('id')
+                        if obj_id:
+                            self._delete_object(obj_type, obj_id)
+                            self._add_result(
+                                obj_type,
+                                obj_name,
+                                folder_name,
+                                'deleted',
+                                'success',
+                                'Deleted successfully'
+                            )
+                        else:
+                            self._add_result(
+                                obj_type,
+                                obj_name,
+                                folder_name,
+                                'deleted',
+                                'failed',
+                                'Object ID not found in destination config'
+                            )
+                    except Exception as e:
                         self._add_result(
                             obj_type,
                             obj_name,
                             folder_name,
                             'deleted',
-                            'success',
-                            'Deleted (placeholder - API not implemented)'
+                            'failed',
+                            f'Failed to delete: {str(e)}',
+                            error=e
                         )
-                        current_item += 1
+                    current_item += 1
         
         return current_item
     
@@ -813,26 +890,54 @@ class SelectivePushOrchestrator:
                             
                             logger.info(f"Name mapping: {obj_name} → {new_name}")
                             
-                            # TODO: Implement create with renamed API call
-                            self._add_result(
-                                obj_type,
-                                new_name,
-                                folder_name,
-                                'renamed',
-                                'success',
-                                f'Created as {new_name} (placeholder - API not implemented)'
-                            )
+                            # Create renamed object
+                            try:
+                                renamed_obj = obj.copy()
+                                renamed_obj['name'] = new_name
+                                
+                                result = self._create_object(obj_type, renamed_obj, folder_name)
+                                
+                                self._add_result(
+                                    obj_type,
+                                    new_name,
+                                    folder_name,
+                                    'renamed',
+                                    'success',
+                                    f'Created as {new_name}'
+                                )
+                            except Exception as e:
+                                self._add_result(
+                                    obj_type,
+                                    new_name,
+                                    folder_name,
+                                    'renamed',
+                                    'failed',
+                                    f'Failed to create: {str(e)}',
+                                    error=e
+                                )
                     else:
                         # Create new (or recreate after delete in OVERWRITE mode)
-                        # TODO: Implement create API call
-                        self._add_result(
-                            obj_type,
-                            obj_name,
-                            folder_name,
-                            'created',
-                            'success',
-                            'Created (placeholder - API not implemented)'
-                        )
+                        try:
+                            result = self._create_object(obj_type, obj, folder_name)
+                            
+                            self._add_result(
+                                obj_type,
+                                obj_name,
+                                folder_name,
+                                'created',
+                                'success',
+                                'Created successfully'
+                            )
+                        except Exception as e:
+                            self._add_result(
+                                obj_type,
+                                obj_name,
+                                folder_name,
+                                'created',
+                                'failed',
+                                f'Failed to create: {str(e)}',
+                                error=e
+                            )
                     
                     current_item += 1
         
