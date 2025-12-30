@@ -738,11 +738,8 @@ class PushPreviewDialog(QDialog):
         # Update window title
         self.setWindowTitle("Push Preview - Analysis Complete")
         
-        # Analyze conflicts
+        # Analyze conflicts (this will enable/disable button based on results)
         self._analyze_and_populate()
-        
-        # Enable proceed button
-        self.ok_button.setEnabled(True)
     
     def _analyze_and_populate(self):
         """Analyze conflicts and populate trees."""
@@ -952,8 +949,8 @@ class PushPreviewDialog(QDialog):
                 f"Update your selection or change conflict resolution to continue."
             )
             self.action_label.setStyleSheet(
-                "padding: 10px; background-color: #FFEBEE; border: 2px solid #F44336; "
-                "border-radius: 5px; font-weight: bold; color: #C62828;"
+                "padding: 10px; background-color: #FFF9C4; border: 2px solid #FBC02D; "
+                "border-radius: 5px; font-weight: bold; color: #F57F17;"
             )
             # Disable the push button
             self.ok_button.setEnabled(False)
