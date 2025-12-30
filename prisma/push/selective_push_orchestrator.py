@@ -503,6 +503,14 @@ class SelectivePushOrchestrator:
         
         return method(obj_id)
     
+    def _create_security_rule(self, rule_data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create a security rule."""
+        return self.api_client.create_security_rule(rule_data, folder)
+    
+    def _delete_security_rule(self, rule_id: str) -> Dict[str, Any]:
+        """Delete a security rule."""
+        return self.api_client.delete_security_rule(rule_id)
+    
     # ========================================================================
     # DELETE METHODS (for OVERWRITE mode - reverse dependency order)
     # ========================================================================
@@ -538,15 +546,38 @@ class SelectivePushOrchestrator:
                         total_items
                     )
                     
-                    # TODO: Implement delete API call
-                    self._add_result(
-                        'security_rule',
-                        rule_name,
-                        folder_name,
-                        'deleted',
-                        'success',
-                        'Deleted (placeholder - API not implemented)'
-                    )
+                    # Get rule ID from destination config
+                    try:
+                        rule_id = dest_rules[rule_name].get('id')
+                        if rule_id:
+                            self._delete_security_rule(rule_id)
+                            self._add_result(
+                                'security_rule',
+                                rule_name,
+                                folder_name,
+                                'deleted',
+                                'success',
+                                'Deleted successfully'
+                            )
+                        else:
+                            self._add_result(
+                                'security_rule',
+                                rule_name,
+                                folder_name,
+                                'deleted',
+                                'failed',
+                                'Rule ID not found in destination config'
+                            )
+                    except Exception as e:
+                        self._add_result(
+                            'security_rule',
+                            rule_name,
+                            folder_name,
+                            'deleted',
+                            'failed',
+                            f'Failed to delete: {str(e)}',
+                            error=e
+                        )
                     current_item += 1
         
         return current_item
@@ -1220,26 +1251,54 @@ class SelectivePushOrchestrator:
                         if self.name_mappings:
                             logger.info(f"  Updated references in rule: {list(self.name_mappings.keys())}")
                         
-                        # TODO: Use updated_rule with renamed references
-                        self._add_result(
-                            'security_rule',
-                            new_name,
-                            folder_name,
-                            'renamed',
-                            'success',
-                            f'Created as {new_name} (placeholder - API not implemented)'
-                        )
+                        # Create renamed rule with updated references
+                        try:
+                            renamed_rule = updated_rule.copy()
+                            renamed_rule['name'] = new_name
+                            
+                            result = self._create_security_rule(renamed_rule, folder_name)
+                            
+                            self._add_result(
+                                'security_rule',
+                                new_name,
+                                folder_name,
+                                'renamed',
+                                'success',
+                                f'Created as {new_name}'
+                            )
+                        except Exception as e:
+                            self._add_result(
+                                'security_rule',
+                                new_name,
+                                folder_name,
+                                'renamed',
+                                'failed',
+                                f'Failed to create: {str(e)}',
+                                error=e
+                            )
                 else:
                     # Create new (or recreate after delete in OVERWRITE mode)
-                    # TODO: Use updated_rule if in RENAME mode and there are mappings
-                    self._add_result(
-                        'security_rule',
-                        rule_name,
-                        folder_name,
-                        'created',
-                        'success',
-                        'Created (placeholder - API not implemented)'
-                    )
+                    try:
+                        result = self._create_security_rule(updated_rule, folder_name)
+                        
+                        self._add_result(
+                            'security_rule',
+                            rule_name,
+                            folder_name,
+                            'created',
+                            'success',
+                            'Created successfully'
+                        )
+                    except Exception as e:
+                        self._add_result(
+                            'security_rule',
+                            rule_name,
+                            folder_name,
+                            'created',
+                            'failed',
+                            f'Failed to create: {str(e)}',
+                            error=e
+                        )
                 
                 current_item += 1
         
