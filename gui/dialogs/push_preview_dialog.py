@@ -155,14 +155,21 @@ class ConfigFetchWorker(QThread):
             # Fetch objects (both top-level and from folders)
             objects = self.selected_items.get('objects', {})
             
-            # Also collect object types from folders
+            # Also collect object types and folders from folder selections
             folders = self.selected_items.get('folders', [])
+            object_folders = {}  # Track which folders contain which object types
+            
             for folder in folders:
+                folder_name = folder.get('name')
                 folder_objects = folder.get('objects', {})
                 for obj_type, obj_list in folder_objects.items():
                     if obj_type not in objects:
                         objects[obj_type] = []
-                    # Don't duplicate, just ensure the type is in our fetch list
+                    # Track which folders have this object type
+                    if obj_type not in object_folders:
+                        object_folders[obj_type] = set()
+                    if folder_name:
+                        object_folders[obj_type].add(folder_name)
             
             if objects:
                 self.progress.emit(f"Checking objects...", int((current / max(total_items, 1)) * 100))
@@ -186,10 +193,30 @@ class ConfigFetchWorker(QThread):
                     method_name = object_method_map.get(obj_type)
                     if method_name and hasattr(self.api_client, method_name):
                         try:
-                            print(f"    Calling API method: {method_name}()")
+                            # Determine which folders to query for this object type
+                            folders_to_check = object_folders.get(obj_type, set())
+                            print(f"    Folders to check: {list(folders_to_check) if folders_to_check else 'all'}")
+                            
+                            # Fetch from each folder
+                            all_existing_objects = []
                             method = getattr(self.api_client, method_name)
-                            # Call without folder parameter to get all objects across all folders
-                            existing_objects = method()
+                            
+                            if folders_to_check:
+                                # Query each folder separately
+                                for folder in folders_to_check:
+                                    print(f"    Calling API method: {method_name}(folder='{folder}')")
+                                    try:
+                                        folder_objects = method(folder=folder)
+                                        if isinstance(folder_objects, list):
+                                            all_existing_objects.extend(folder_objects)
+                                    except Exception as folder_err:
+                                        print(f"      ERROR for folder '{folder}': {folder_err}")
+                            else:
+                                # No folder specified, try without folder parameter
+                                print(f"    Calling API method: {method_name}()")
+                                all_existing_objects = method()
+                            
+                            existing_objects = all_existing_objects
                             
                             if not isinstance(existing_objects, list):
                                 print(f"    WARNING: Expected list, got {type(existing_objects)}")
@@ -322,6 +349,69 @@ class ConfigFetchWorker(QThread):
                         print(f"    No API method for {infra_type} (mapped to: {method_name})")
                     
                     current += len(infra_list)
+            
+            # Fetch profiles from folders
+            # Profiles are folder-specific and need to be fetched per folder
+            profile_folders = {}  # Track which folders contain which profile types
+            for folder in self.selected_items.get('folders', []):
+                folder_name = folder.get('name')
+                folder_profiles = folder.get('profiles', {})
+                for profile_type, profile_list in folder_profiles.items():
+                    if profile_type not in profile_folders:
+                        profile_folders[profile_type] = set()
+                    if folder_name:
+                        profile_folders[profile_type].add(folder_name)
+            
+            if profile_folders:
+                self.progress.emit(f"Checking profiles...", int((current / max(total_items, 1)) * 100))
+                print(f"  Profile types to check: {list(profile_folders.keys())}")
+                
+                # Map profile types to API methods
+                profile_method_map = {
+                    'authentication_profiles': 'get_all_authentication_profiles',
+                    'decryption_profiles': 'get_all_decryption_profiles',
+                    'security_profiles': None,  # Security profiles is a group, not a single type
+                }
+                
+                if 'profiles' not in dest_config:
+                    dest_config['profiles'] = {}
+                
+                for profile_type, folders_set in profile_folders.items():
+                    print(f"  Checking {profile_type} in folders: {list(folders_set)}")
+                    method_name = profile_method_map.get(profile_type)
+                    
+                    if method_name and hasattr(self.api_client, method_name):
+                        try:
+                            all_profiles = []
+                            method = getattr(self.api_client, method_name)
+                            
+                            for folder in folders_set:
+                                print(f"    Calling API method: {method_name}(folder='{folder}')")
+                                try:
+                                    folder_profiles = method(folder=folder)
+                                    if isinstance(folder_profiles, list):
+                                        all_profiles.extend(folder_profiles)
+                                        print(f"      Found {len(folder_profiles)} items in folder '{folder}'")
+                                except Exception as folder_err:
+                                    print(f"      ERROR for folder '{folder}': {folder_err}")
+                            
+                            if profile_type not in dest_config['profiles']:
+                                dest_config['profiles'][profile_type] = {}
+                            
+                            for profile in all_profiles:
+                                if isinstance(profile, dict):
+                                    profile_name = profile.get('name')
+                                    if profile_name:
+                                        dest_config['profiles'][profile_type][profile_name] = profile
+                            
+                            print(f"    Total {profile_type}: {len(dest_config['profiles'][profile_type])} items")
+                            
+                        except Exception as e:
+                            print(f"    ERROR fetching {profile_type}: {type(e).__name__}: {e}")
+                            import traceback
+                            traceback.print_exc()
+                    else:
+                        print(f"    No API method for {profile_type} (mapped to: {method_name})")
             
             self.progress.emit("Analysis complete", 100)
             print(f"\n=== ConfigFetchWorker.run() complete ===")
