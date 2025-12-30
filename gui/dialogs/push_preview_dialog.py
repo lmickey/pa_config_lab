@@ -269,7 +269,7 @@ class ConfigFetchWorker(QThread):
                     'ike_gateways': 'get_all_ike_gateways',
                     'ike_crypto_profiles': 'get_all_ike_crypto_profiles',
                     'ipsec_crypto_profiles': 'get_all_ipsec_crypto_profiles',
-                    'agent_profiles': None,  # Mobile agent profiles - different API structure
+                    'agent_profiles': 'get_mobile_agent_profiles',  # Returns dict, not list
                 }
                 
                 for infra_type, infra_list in infrastructure.items():
@@ -311,6 +311,25 @@ class ConfigFetchWorker(QThread):
                                 all_existing_items = method()
                             
                             existing_items = all_existing_items
+                            
+                            # Handle both list and dict responses
+                            if isinstance(existing_items, dict):
+                                # Some APIs return dict (e.g., agent_profiles)
+                                # Extract the profiles list from the dict
+                                print(f"    Response is dict with keys: {list(existing_items.keys())}")
+                                
+                                # Try to find a profiles list in the dict
+                                if 'profiles' in existing_items:
+                                    existing_items = existing_items['profiles']
+                                    print(f"    Extracted 'profiles' list: {len(existing_items) if isinstance(existing_items, list) else 'not a list'}")
+                                elif 'data' in existing_items:
+                                    existing_items = existing_items['data']
+                                    print(f"    Extracted 'data': {len(existing_items) if isinstance(existing_items, list) else 'not a list'}")
+                                else:
+                                    # Store the whole dict
+                                    print(f"    Storing entire dict response")
+                                    dest_config['infrastructure'][infra_type] = existing_items
+                                    existing_items = []  # Skip item iteration below
                             
                             if not isinstance(existing_items, list):
                                 print(f"    WARNING: Expected list, got {type(existing_items)}")
