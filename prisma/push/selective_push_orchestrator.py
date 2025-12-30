@@ -8,8 +8,12 @@ Prisma Access tenant, with conflict resolution and detailed result tracking.
 from typing import Dict, Any, List, Optional, Callable
 from datetime import datetime
 import time
+import logging
 
 from ..api_client import PrismaAccessAPIClient
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 
 class SelectivePushOrchestrator:
@@ -110,6 +114,20 @@ class SelectivePushOrchestrator:
                 self.results['summary']['renamed'] += 1
         elif status == 'failed':
             self.results['summary']['failed'] += 1
+        
+        # Log the action
+        log_msg = f"[{action.upper()}] {item_type}: {name} (folder: {folder}) - {message}"
+        if status == 'success':
+            if action == 'skipped':
+                logger.info(log_msg)
+            else:
+                logger.info(log_msg)
+        elif status == 'failed':
+            logger.error(log_msg)
+            if error:
+                logger.error(f"  Error details: {str(error)}")
+        else:
+            logger.warning(log_msg)
 
     def push_selected_items(
         self,
@@ -146,6 +164,13 @@ class SelectivePushOrchestrator:
             # Count total items for progress
             total_items = self._count_items(selected_items)
             current_item = 0
+            
+            logger.info("=" * 80)
+            logger.info("STARTING SELECTIVE PUSH OPERATION")
+            logger.info(f"Destination Tenant: {self.api_client.tsg_id}")
+            logger.info(f"Conflict Resolution: {self.conflict_resolution}")
+            logger.info(f"Total Items to Push: {total_items}")
+            logger.info("=" * 80)
             
             self._report_progress("Starting push operation", 0, total_items)
             
@@ -225,6 +250,17 @@ class SelectivePushOrchestrator:
             
             self._report_progress("Push operation complete", total_items, total_items)
             
+            # Log completion summary
+            logger.info("=" * 80)
+            logger.info("PUSH OPERATION COMPLETED")
+            logger.info(f"Total Items: {self.results['summary']['total']}")
+            logger.info(f"Created: {self.results['summary']['created']}")
+            logger.info(f"Updated: {self.results['summary']['updated']}")
+            logger.info(f"Skipped: {self.results['summary']['skipped']}")
+            logger.info(f"Failed: {self.results['summary']['failed']}")
+            logger.info(f"Elapsed Time: {elapsed_time:.2f} seconds")
+            logger.info("=" * 80)
+            
             return {
                 'success': True,
                 'message': 'Push completed',
@@ -233,7 +269,10 @@ class SelectivePushOrchestrator:
             }
             
         except Exception as e:
-            print(f"ERROR: Push operation failed: {e}")
+            logger.error("=" * 80)
+            logger.error("PUSH OPERATION FAILED")
+            logger.error(f"Error: {str(e)}")
+            logger.error("=" * 80)
             import traceback
             traceback.print_exc()
             

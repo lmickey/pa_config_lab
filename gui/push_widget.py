@@ -623,8 +623,30 @@ class PushConfigWidget(QWidget):
             self._set_ui_enabled(True)
 
             if success:
+                # Update status banner with success message
+                summary = result.get('summary', {}) if result else {}
+                total = summary.get('total', 0)
+                created = summary.get('created', 0)
+                updated = summary.get('updated', 0)
+                skipped = summary.get('skipped', 0)
+                failed = summary.get('failed', 0)
+                
+                status_msg = f"✅ Push completed successfully! Created: {created}, Updated: {updated}, Skipped: {skipped}"
+                if failed > 0:
+                    status_msg += f", Failed: {failed}"
+                
+                self.status_label.setText(status_msg)
+                self.status_label.setStyleSheet(
+                    "color: #2e7d32; background-color: #e8f5e9; border: 1px solid #4CAF50; "
+                    "border-radius: 5px; padding: 10px; font-weight: bold;"
+                )
+                self.status_label.setVisible(True)
+                
+                # Update progress label
                 self.progress_label.setText("Push completed successfully!")
                 self.progress_label.setStyleSheet("color: green;")
+                
+                # Show detailed results
                 self.results_text.setPlainText(message)
 
                 # Emit signal (wrapped in try/except)
@@ -632,11 +654,15 @@ class PushConfigWidget(QWidget):
                     self.push_completed.emit(result)
                 except Exception as e:
                     print(f"Error emitting push_completed signal: {e}")
-
-                QMessageBox.information(
-                    self, "Success", "Configuration pushed successfully!"
-                )
             else:
+                # Update status banner with error message
+                self.status_label.setText(f"❌ Push failed: {message}")
+                self.status_label.setStyleSheet(
+                    "color: #c62828; background-color: #ffebee; border: 1px solid #f44336; "
+                    "border-radius: 5px; padding: 10px; font-weight: bold;"
+                )
+                self.status_label.setVisible(True)
+                
                 self.progress_label.setText("Push failed")
                 self.progress_label.setStyleSheet("color: red;")
                 self.results_text.setPlainText(f"Error: {message}")
