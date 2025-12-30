@@ -318,6 +318,7 @@ class SelectivePushOrchestrator:
         
         # Reset results and name mappings
         self.name_mappings = {}
+        self.failed_deletes = {}  # Reset failed deletes tracking
         self.results = {
             'summary': {
                 'total': 0,
@@ -326,10 +327,12 @@ class SelectivePushOrchestrator:
                 'skipped': 0,
                 'failed': 0,
                 'renamed': 0,
-                'deleted': 0
+                'deleted': 0,
+                'could_not_overwrite': 0
             },
             'details': [],
-            'errors': []
+            'errors': [],
+            'could_not_overwrite': []
         }
         
         try:
