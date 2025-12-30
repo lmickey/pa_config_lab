@@ -367,6 +367,86 @@ class PushWorker(QThread):
         return "\n".join(lines)
 
 
+class SelectivePushWorker(QThread):
+    """Background worker for selective push operations."""
+
+    # Signals
+    progress = pyqtSignal(str, int, int)  # message, current, total
+    finished = pyqtSignal(bool, str, object)  # success, message, results
+    error = pyqtSignal(str)  # error message
+
+    def __init__(
+        self,
+        api_client,
+        selected_items: Dict[str, Any],
+        destination_config: Optional[Dict[str, Any]],
+        conflict_resolution: str = "SKIP",
+    ):
+        """
+        Initialize the selective push worker.
+
+        Args:
+            api_client: Authenticated PrismaAccessAPIClient for destination
+            selected_items: Dictionary of selected items to push
+            destination_config: Optional destination config for conflict detection
+            conflict_resolution: How to handle conflicts (SKIP, OVERWRITE, RENAME)
+        """
+        super().__init__()
+        self.api_client = api_client
+        self.selected_items = selected_items
+        self.destination_config = destination_config
+        self.conflict_resolution = conflict_resolution
+        self.results = None
+
+    def run(self):
+        """Run the selective push operation."""
+        try:
+            from prisma.push.selective_push_orchestrator import SelectivePushOrchestrator
+
+            # Create orchestrator
+            orchestrator = SelectivePushOrchestrator(
+                self.api_client,
+                self.conflict_resolution
+            )
+
+            # Set progress callback
+            def progress_callback(message: str, current: int, total: int):
+                self.progress.emit(message, current, total)
+
+            orchestrator.set_progress_callback(progress_callback)
+
+            # Push selected items
+            result = orchestrator.push_selected_items(
+                self.selected_items,
+                self.destination_config
+            )
+
+            self.results = result
+
+            if result.get('success'):
+                # Format success message
+                summary = result['results']['summary']
+                message = (
+                    f"Push completed!\n\n"
+                    f"Total: {summary['total']}\n"
+                    f"Created: {summary['created']}\n"
+                    f"Updated: {summary['updated']}\n"
+                    f"Skipped: {summary['skipped']}\n"
+                    f"Failed: {summary['failed']}"
+                )
+                self.finished.emit(True, message, result)
+            else:
+                error_msg = result.get('message', 'Push failed')
+                self.error.emit(error_msg)
+                self.finished.emit(False, error_msg, result)
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.error.emit(f"Push operation failed: {str(e)}")
+            self.finished.emit(False, str(e), None)
+
+
 class DefaultDetectionWorker(QThread):
     """Background worker for detecting default configurations."""
 

@@ -575,16 +575,8 @@ class PushConfigWidget(QWidget):
             if reply != QMessageBox.StandardButton.Yes:
                 return
 
-        # TODO: Phase 3 Step 4 - Implement SelectivePushOrchestrator
-        # For now, show a message that push is not yet implemented
-        QMessageBox.information(
-            self,
-            "Push Not Yet Implemented",
-            "The selective push orchestrator is not yet implemented.\n\n"
-            "This will be completed in Phase 3, Step 4.\n\n"
-            "For now, the push functionality is a placeholder."
-        )
-        return
+        # Get destination config from preview dialog (for conflict detection)
+        destination_config = preview_dialog.destination_config if hasattr(preview_dialog, 'destination_config') else None
 
         # Disable UI during push
         self._set_ui_enabled(False)
@@ -597,13 +589,26 @@ class PushConfigWidget(QWidget):
         # Clear previous results
         self.results_text.clear()
 
-        # Create and start worker (use destination_client)
-        # self.worker = PushWorker(self.destination_client, self.config, resolution, dry_run)
-        # self.worker.progress.connect(self._on_progress)
-        # self.worker.finished.connect(self._on_push_finished)
-        # self.worker.error.connect(self._on_error)
-        # self.worker.conflicts_detected.connect(self._on_conflicts)
-        # self.worker.start()
+        # Create and start worker
+        from gui.workers import SelectivePushWorker
+        
+        self.worker = SelectivePushWorker(
+            self.destination_client,
+            self.selected_items,
+            destination_config,
+            resolution
+        )
+        self.worker.progress.connect(self._on_push_progress)
+        self.worker.finished.connect(self._on_push_finished)
+        self.worker.error.connect(self._on_error)
+        self.worker.start()
+
+    def _on_push_progress(self, message: str, current: int, total: int):
+        """Handle selective push progress updates."""
+        self.progress_label.setText(message)
+        if total > 0:
+            percentage = int((current / total) * 100)
+            self.progress_bar.setValue(percentage)
 
     def _on_progress(self, message: str, percentage: int):
         """Handle progress updates."""
