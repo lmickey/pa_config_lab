@@ -326,12 +326,15 @@ class ConfigFetchWorker(QThread):
                                 if 'profiles' in existing_items:
                                     existing_items = existing_items['profiles']
                                     print(f"    Extracted 'profiles' list: {len(existing_items) if isinstance(existing_items, list) else 'not a list'}")
+                                    if isinstance(existing_items, list) and len(existing_items) > 0:
+                                        print(f"    First profile: {existing_items[0].get('name') if isinstance(existing_items[0], dict) else existing_items[0]}")
                                 elif 'data' in existing_items:
                                     existing_items = existing_items['data']
                                     print(f"    Extracted 'data': {len(existing_items) if isinstance(existing_items, list) else 'not a list'}")
                                 else:
                                     # Store the whole dict
                                     print(f"    Storing entire dict response")
+                                    print(f"    Dict content sample: {str(existing_items)[:200]}")
                                     dest_config['infrastructure'][infra_type] = existing_items
                                     existing_items = []  # Skip item iteration below
                             
@@ -454,6 +457,101 @@ class ConfigFetchWorker(QThread):
                             traceback.print_exc()
                     else:
                         print(f"    ⚠️  WARNING: No API method for {profile_type} (mapped to: {method_name})")
+            
+            # Fetch HIP items from folders
+            hip_folders = {}  # Track which folders contain which HIP types
+            for folder in self.selected_items.get('folders', []):
+                folder_name = folder.get('name')
+                folder_hip = folder.get('hip', {})
+                for hip_type, hip_list in folder_hip.items():
+                    if not isinstance(hip_list, list):
+                        continue
+                    if hip_type not in hip_folders:
+                        hip_folders[hip_type] = set()
+                    if folder_name:
+                        hip_folders[hip_type].add(folder_name)
+            
+            if hip_folders:
+                self.progress.emit(f"Checking HIP items...", int((current / max(total_items, 1)) * 100))
+                print(f"  HIP types to check: {list(hip_folders.keys())}")
+                
+                # Map HIP types to API methods
+                hip_method_map = {
+                    'hip_objects': 'get_all_hip_objects',
+                    'hip_profiles': 'get_all_hip_profiles',
+                }
+                
+                if 'hip' not in dest_config:
+                    dest_config['hip'] = {}
+                
+                for hip_type, folders_set in hip_folders.items():
+                    print(f"  Checking {hip_type} in folders: {list(folders_set)}")
+                    method_name = hip_method_map.get(hip_type)
+                    
+                    if method_name and hasattr(self.api_client, method_name):
+                        try:
+                            all_hip_items = []
+                            method = getattr(self.api_client, method_name)
+                            
+                            for folder in folders_set:
+                                print(f"    Calling API method: {method_name}(folder='{folder}')")
+                                try:
+                                    folder_hip_items = method(folder=folder)
+                                    if isinstance(folder_hip_items, list):
+                                        all_hip_items.extend(folder_hip_items)
+                                        print(f"      Found {len(folder_hip_items)} items in folder '{folder}'")
+                                except Exception as folder_err:
+                                    print(f"      ERROR for folder '{folder}': {folder_err}")
+                            
+                            if hip_type not in dest_config['hip']:
+                                dest_config['hip'][hip_type] = {}
+                            
+                            for hip_item in all_hip_items:
+                                if isinstance(hip_item, dict):
+                                    hip_name = hip_item.get('name')
+                                    if hip_name:
+                                        dest_config['hip'][hip_type][hip_name] = hip_item
+                            
+                            print(f"    Total {hip_type}: {len(dest_config['hip'][hip_type])} items")
+                            
+                        except Exception as e:
+                            print(f"    ERROR fetching {hip_type}: {type(e).__name__}: {e}")
+                            import traceback
+                            traceback.print_exc()
+                    else:
+                        print(f"    ⚠️  WARNING: No API method for {hip_type} (mapped to: {method_name})")
+            
+            # Fetch security rules from folders
+            rule_folders = set()  # Track which folders have rules
+            for folder in self.selected_items.get('folders', []):
+                folder_name = folder.get('name')
+                folder_rules = folder.get('security_rules', [])
+                if folder_rules and folder_name:
+                    rule_folders.add(folder_name)
+            
+            if rule_folders:
+                self.progress.emit(f"Checking security rules...", int((current / max(total_items, 1)) * 100))
+                print(f"  Checking security rules in folders: {list(rule_folders)}")
+                
+                if 'security_rules' not in dest_config:
+                    dest_config['security_rules'] = {}
+                
+                for folder_name in rule_folders:
+                    print(f"    Calling API method: get_all_security_rules(folder='{folder_name}')")
+                    try:
+                        rules = self.api_client.get_all_security_rules(folder=folder_name)
+                        if isinstance(rules, list):
+                            # Store rules by folder
+                            if folder_name not in dest_config['security_rules']:
+                                dest_config['security_rules'][folder_name] = {}
+                            for rule in rules:
+                                if isinstance(rule, dict):
+                                    rule_name = rule.get('name')
+                                    if rule_name:
+                                        dest_config['security_rules'][folder_name][rule_name] = rule
+                            print(f"      Found {len(dest_config['security_rules'][folder_name])} rules in '{folder_name}'")
+                    except Exception as e:
+                        print(f"      ERROR fetching rules from '{folder_name}': {e}")
             
             self.progress.emit("Analysis complete", 100)
             print(f"\n=== ConfigFetchWorker.run() complete ===")
@@ -680,34 +778,57 @@ class PushPreviewDialog(QDialog):
                     else:
                         new_items.append((f"{obj_type} (from {name})", obj_name, obj))
             
-            # Rules from folder (always new since they're folder-specific)
+            # Rules from folder
             folder_rules = folder.get('security_rules', [])
-            for rule in folder_rules:
-                rule_name = rule.get('name', 'Unknown')
-                new_items.append((f"security_rule (from {name})", rule_name, rule))
+            if folder_rules:
+                # Check if rules exist in destination for this folder
+                dest_rules = self.destination_config.get('security_rules', {}).get(name, {})
+                for rule in folder_rules:
+                    rule_name = rule.get('name', 'Unknown')
+                    if rule_name in dest_rules:
+                        conflicts.append((f"security_rule (from {name})", rule_name, rule))
+                    else:
+                        new_items.append((f"security_rule (from {name})", rule_name, rule))
             
             # Profiles from folder
             folder_profiles = folder.get('profiles', {})
             for prof_type, prof_list in folder_profiles.items():
-                if not isinstance(prof_list, list):
-                    continue
-                # Check if profiles exist in destination
-                dest_profiles = self.destination_config.get('profiles', {}).get(prof_type, {})
-                for prof in prof_list:
-                    prof_name = prof.get('name', 'Unknown')
-                    if prof_name in dest_profiles:
-                        conflicts.append((f"{prof_type} (from {name})", prof_name, prof))
-                    else:
-                        new_items.append((f"{prof_type} (from {name})", prof_name, prof))
+                # Handle security_profiles container
+                if prof_type == 'security_profiles' and isinstance(prof_list, dict):
+                    # Expand into sub-types
+                    for sub_type, sub_list in prof_list.items():
+                        if not isinstance(sub_list, list):
+                            continue
+                        dest_profiles = self.destination_config.get('profiles', {}).get(sub_type, {})
+                        for prof in sub_list:
+                            prof_name = prof.get('name', 'Unknown')
+                            if prof_name in dest_profiles:
+                                conflicts.append((f"{sub_type} (from {name})", prof_name, prof))
+                            else:
+                                new_items.append((f"{sub_type} (from {name})", prof_name, prof))
+                elif isinstance(prof_list, list):
+                    # Check if profiles exist in destination
+                    dest_profiles = self.destination_config.get('profiles', {}).get(prof_type, {})
+                    for prof in prof_list:
+                        prof_name = prof.get('name', 'Unknown')
+                        if prof_name in dest_profiles:
+                            conflicts.append((f"{prof_type} (from {name})", prof_name, prof))
+                        else:
+                            new_items.append((f"{prof_type} (from {name})", prof_name, prof))
             
             # HIP from folder
             folder_hip = folder.get('hip', {})
             for hip_type, hip_list in folder_hip.items():
                 if not isinstance(hip_list, list):
                     continue
+                # Check if HIP items exist in destination
+                dest_hip = self.destination_config.get('hip', {}).get(hip_type, {})
                 for hip_item in hip_list:
                     hip_name = hip_item.get('name', 'Unknown')
-                    new_items.append((f"{hip_type} (from {name})", hip_name, hip_item))
+                    if hip_name in dest_hip:
+                        conflicts.append((f"{hip_type} (from {name})", hip_name, hip_item))
+                    else:
+                        new_items.append((f"{hip_type} (from {name})", hip_name, hip_item))
         
         # Analyze snippets
         for snippet in self.selected_items.get('snippets', []):
