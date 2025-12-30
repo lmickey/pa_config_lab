@@ -117,8 +117,15 @@ class SelectivePushOrchestrator:
         
         # Log the action
         log_msg = f"[{action.upper()}] {item_type}: {name} (folder: {folder}) - {message}"
+        
+        # Check if this is a placeholder/not implemented action
+        is_placeholder = 'API not implemented' in message or 'placeholder' in message.lower()
+        
         if status == 'success':
-            if action == 'skipped':
+            if is_placeholder:
+                # Highlight placeholder actions as warnings
+                logger.warning(f"⚠️  {log_msg}")
+            elif action == 'skipped':
                 logger.info(log_msg)
             else:
                 logger.info(log_msg)
