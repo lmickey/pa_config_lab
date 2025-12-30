@@ -473,8 +473,9 @@ class SelectivePushOrchestrator:
                 # Check if exists in destination
                 exists = False
                 if destination_config and 'security_rules' in destination_config:
-                    dest_rules = destination_config['security_rules'].get(folder_name, [])
-                    exists = any(r.get('name') == rule_name for r in dest_rules)
+                    dest_rules = destination_config['security_rules'].get(folder_name, {})
+                    # dest_rules is a dict: {rule_name: rule_obj}
+                    exists = rule_name in dest_rules
                 
                 if exists:
                     self._report_progress(
@@ -1088,8 +1089,9 @@ class SelectivePushOrchestrator:
                 exists = False
                 if self.conflict_resolution != 'OVERWRITE':
                     if destination_config and 'security_rules' in destination_config:
-                        dest_rules = destination_config['security_rules'].get(folder_name, [])
-                        exists = any(r.get('name') == rule_name for r in dest_rules)
+                        dest_rules = destination_config['security_rules'].get(folder_name, {})
+                        # dest_rules is a dict: {rule_name: rule_obj}
+                        exists = rule_name in dest_rules
                 
                 # Apply conflict resolution
                 if exists:
