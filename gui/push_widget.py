@@ -624,37 +624,57 @@ class PushConfigWidget(QWidget):
 
             if success:
                 # Update status banner with success message
-                summary = result.get('summary', {}) if result else {}
-                total = summary.get('total', 0)
-                created = summary.get('created', 0)
-                updated = summary.get('updated', 0)
-                deleted = summary.get('deleted', 0)
-                renamed = summary.get('renamed', 0)
-                skipped = summary.get('skipped', 0)
-                failed = summary.get('failed', 0)
+                # Defensive: handle various result structures
+                summary = {}
+                try:
+                    if result and isinstance(result, dict):
+                        if 'results' in result and isinstance(result['results'], dict):
+                            summary = result['results'].get('summary', {})
+                        elif 'summary' in result:
+                            summary = result.get('summary', {})
+                except:
+                    pass
                 
-                status_msg = f"✅ Push completed successfully! Created: {created}, Updated: {updated}"
-                if deleted > 0:
-                    status_msg += f", Deleted: {deleted}"
-                if renamed > 0:
-                    status_msg += f", Renamed: {renamed}"
-                status_msg += f", Skipped: {skipped}"
-                if failed > 0:
-                    status_msg += f", Failed: {failed}"
+                total = summary.get('total', 0) if isinstance(summary, dict) else 0
+                created = summary.get('created', 0) if isinstance(summary, dict) else 0
+                updated = summary.get('updated', 0) if isinstance(summary, dict) else 0
+                deleted = summary.get('deleted', 0) if isinstance(summary, dict) else 0
+                renamed = summary.get('renamed', 0) if isinstance(summary, dict) else 0
+                skipped = summary.get('skipped', 0) if isinstance(summary, dict) else 0
+                failed = summary.get('failed', 0) if isinstance(summary, dict) else 0
                 
-                self.status_label.setText(status_msg)
-                self.status_label.setStyleSheet(
-                    "color: #2e7d32; background-color: #e8f5e9; border: 1px solid #4CAF50; "
-                    "border-radius: 5px; padding: 10px; font-weight: bold;"
-                )
-                self.status_label.setVisible(True)
+                try:
+                    status_msg = f"✅ Push completed successfully! Created: {created}, Updated: {updated}"
+                    if deleted > 0:
+                        status_msg += f", Deleted: {deleted}"
+                    if renamed > 0:
+                        status_msg += f", Renamed: {renamed}"
+                    status_msg += f", Skipped: {skipped}"
+                    if failed > 0:
+                        status_msg += f", Failed: {failed}"
+                    
+                    self.status_label.setText(status_msg)
+                    self.status_label.setStyleSheet(
+                        "color: #2e7d32; background-color: #e8f5e9; border: 1px solid #4CAF50; "
+                        "border-radius: 5px; padding: 10px; font-weight: bold;"
+                    )
+                    self.status_label.setVisible(True)
+                except Exception as label_err:
+                    print(f"Error updating status label: {label_err}")
                 
                 # Update progress label
-                self.progress_label.setText("Push completed successfully!")
-                self.progress_label.setStyleSheet("color: green;")
+                try:
+                    self.progress_label.setText("Push completed successfully!")
+                    self.progress_label.setStyleSheet("color: green;")
+                except Exception as prog_err:
+                    print(f"Error updating progress label: {prog_err}")
                 
                 # Show detailed results
-                self.results_text.setPlainText(message)
+                try:
+                    if message and isinstance(message, str):
+                        self.results_text.setPlainText(message)
+                except Exception as results_err:
+                    print(f"Error updating results text: {results_err}")
 
                 # Emit signal (wrapped in try/except)
                 try:
@@ -677,6 +697,14 @@ class PushConfigWidget(QWidget):
             print(f"Error in _on_push_finished: {e}")
             import traceback
             traceback.print_exc()
+        finally:
+            # Clean up worker after a delay to prevent premature garbage collection
+            try:
+                from PyQt6.QtCore import QTimer
+                if hasattr(self, 'worker') and self.worker:
+                    QTimer.singleShot(1000, lambda: self.worker.deleteLater() if hasattr(self, 'worker') else None)
+            except:
+                pass
 
     def _on_error(self, error_message: str):
         """Handle errors."""
