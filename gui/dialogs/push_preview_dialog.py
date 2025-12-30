@@ -97,36 +97,35 @@ class ConfigFetchWorker(QThread):
                     if len(dest_config['folders']) > 5:
                         print(f"      ... and {len(dest_config['folders']) - 5} more")
                     
-                    # Also extract objects/rules/profiles from folders for conflict checking
-                    # This allows checking folder contents separately
-                    print(f"  Extracting folder contents for conflict checking...")
+                    # Also fetch objects/rules/profiles from folders for conflict checking
+                    print(f"  Fetching folder contents for conflict checking...")
                     for folder in folders:
                         folder_name = folder.get('name', 'Unknown')
                         print(f"    Folder: {folder_name}")
                         
-                        # Extract objects from folder
+                        # Fetch objects from this folder
                         folder_objects = folder.get('objects', {})
                         if folder_objects:
-                            print(f"      Objects: {list(folder_objects.keys())}")
-                            for obj_type, obj_list in folder_objects.items():
+                            print(f"      Fetching objects from folder: {list(folder_objects.keys())}")
+                            for obj_type in folder_objects.keys():
                                 if obj_type not in dest_config['objects']:
                                     dest_config['objects'][obj_type] = {}
-                                # Note: We'll fetch these from destination later
+                                # We'll fetch these in the objects section below
                         
-                        # Extract rules from folder
+                        # Note: Rules are folder-specific, so we don't fetch them globally
                         folder_rules = folder.get('security_rules', [])
                         if folder_rules:
-                            print(f"      Rules: {len(folder_rules)} items")
+                            print(f"      Rules: {len(folder_rules)} items (folder-specific)")
                         
-                        # Extract profiles from folder
+                        # Note: Profiles are folder-specific
                         folder_profiles = folder.get('profiles', {})
                         if folder_profiles:
-                            print(f"      Profiles: {list(folder_profiles.keys())}")
+                            print(f"      Profiles: {list(folder_profiles.keys())} (folder-specific)")
                         
-                        # Extract HIP from folder
+                        # Note: HIP is folder-specific
                         folder_hip = folder.get('hip', {})
                         if folder_hip:
-                            print(f"      HIP: {list(folder_hip.keys())}")
+                            print(f"      HIP: {list(folder_hip.keys())} (folder-specific)")
                     
                 except Exception as e:
                     print(f"    ERROR fetching folders: {e}")
@@ -153,8 +152,18 @@ class ConfigFetchWorker(QThread):
                     traceback.print_exc()
                 current += len(snippets)
             
-            # Fetch objects
+            # Fetch objects (both top-level and from folders)
             objects = self.selected_items.get('objects', {})
+            
+            # Also collect object types from folders
+            folders = self.selected_items.get('folders', [])
+            for folder in folders:
+                folder_objects = folder.get('objects', {})
+                for obj_type, obj_list in folder_objects.items():
+                    if obj_type not in objects:
+                        objects[obj_type] = []
+                    # Don't duplicate, just ensure the type is in our fetch list
+            
             if objects:
                 self.progress.emit(f"Checking objects...", int((current / max(total_items, 1)) * 100))
                 
