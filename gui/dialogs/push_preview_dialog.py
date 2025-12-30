@@ -38,6 +38,17 @@ class ConfigFetchWorker(QThread):
     def run(self):
         """Fetch configurations from destination tenant."""
         try:
+            print(f"\n=== ConfigFetchWorker.run() starting ===")
+            print(f"API Client: {self.api_client}")
+            print(f"Selected items keys: {list(self.selected_items.keys())}")
+            for key, value in self.selected_items.items():
+                if isinstance(value, dict):
+                    print(f"  {key}: {list(value.keys())} ({sum(len(v) for v in value.values() if isinstance(v, list))} items)")
+                elif isinstance(value, list):
+                    print(f"  {key}: {len(value)} items")
+                else:
+                    print(f"  {key}: {value}")
+            
             dest_config = {
                 'folders': {},
                 'snippets': {},
@@ -53,6 +64,7 @@ class ConfigFetchWorker(QThread):
                 else:
                     total_items += len(items)
             
+            print(f"Total items to check: {total_items}")
             current = 0
             
             # Fetch folders
@@ -116,6 +128,7 @@ class ConfigFetchWorker(QThread):
             
             # Fetch infrastructure components
             infrastructure = self.selected_items.get('infrastructure', {})
+            print(f"\nInfrastructure to check: {list(infrastructure.keys()) if infrastructure else 'None'}")
             if infrastructure:
                 self.progress.emit(f"Checking infrastructure...", int((current / max(total_items, 1)) * 100))
                 
@@ -131,30 +144,53 @@ class ConfigFetchWorker(QThread):
                 
                 for infra_type, infra_list in infrastructure.items():
                     if not isinstance(infra_list, list):
+                        print(f"  Skipping {infra_type} - not a list")
                         continue
                     
+                    print(f"  Checking {infra_type}: {len(infra_list)} items")
                     endpoint = infra_endpoint_map.get(infra_type)
                     if endpoint:
                         try:
+                            print(f"    Calling API: {endpoint}")
                             response = self.api_client.get(endpoint)
+                            print(f"    Response type: {type(response)}, is dict: {isinstance(response, dict)}")
                             if response and isinstance(response, dict):
                                 if infra_type not in dest_config['infrastructure']:
                                     dest_config['infrastructure'][infra_type] = {}
                                 existing_items = response.get('data', [])
+                                print(f"    Found {len(existing_items)} existing items")
                                 for item in existing_items:
                                     item_name = item.get('name', item.get('id'))
                                     if item_name:
                                         dest_config['infrastructure'][infra_type][item_name] = item
+                                        print(f"      - {item_name}")
                         except Exception as e:
                             # Continue even if fetch fails (endpoint might not be available)
-                            pass
+                            print(f"    ERROR fetching {infra_type}: {e}")
+                            import traceback
+                            traceback.print_exc()
+                    else:
+                        print(f"    No endpoint mapping for {infra_type}")
                     
                     current += len(infra_list)
             
             self.progress.emit("Analysis complete", 100)
+            print(f"\n=== ConfigFetchWorker.run() complete ===")
+            print(f"Destination config keys: {list(dest_config.keys())}")
+            for key, value in dest_config.items():
+                if isinstance(value, dict):
+                    print(f"  {key}: {len(value)} items")
+                    for subkey in list(value.keys())[:5]:  # Show first 5
+                        print(f"    - {subkey}")
+            print("=" * 50)
             self.finished.emit(dest_config)
             
         except Exception as e:
+            print(f"\n=== ConfigFetchWorker ERROR ===")
+            print(f"Error: {e}")
+            import traceback
+            traceback.print_exc()
+            print("=" * 50)
             self.error.emit(f"Error fetching destination config: {str(e)}")
 
 
