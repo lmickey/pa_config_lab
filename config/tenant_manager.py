@@ -89,9 +89,25 @@ class TenantManager:
             with open(self.tenants_file, 'rb') as f:
                 file_data = f.read()
             
+            # Check if file is empty or corrupted
+            if len(file_data) < 16:
+                print(f"Warning: Tenant file is corrupted (too small: {len(file_data)} bytes)")
+                print("Creating new empty tenant file...")
+                # Recreate empty file
+                empty_data = {"version": "1.0", "tenants": []}
+                self._save_tenants(empty_data)
+                return empty_data
+            
             # Extract salt (first 16 bytes) and encrypted data
             salt = file_data[:16]
             encrypted_data = file_data[16:]
+            
+            if len(encrypted_data) == 0:
+                print("Warning: Tenant file has no encrypted data")
+                print("Creating new empty tenant file...")
+                empty_data = {"version": "1.0", "tenants": []}
+                self._save_tenants(empty_data)
+                return empty_data
             
             # Decrypt
             cipher, _ = self._get_encryption_key()
@@ -113,15 +129,20 @@ class TenantManager:
             
         except Exception as e:
             print(f"Error loading tenants: {e}")
-            # Return empty structure on error
-            return {
-                "version": "1.0",
-                "tenants": []
-            }
+            import traceback
+            traceback.print_exc()
+            print("\nCreating new empty tenant file...")
+            # Return empty structure on error and save it
+            empty_data = {"version": "1.0", "tenants": []}
+            self._save_tenants(empty_data)
+            return empty_data
     
     def _save_tenants(self, data: Dict[str, Any]) -> bool:
         """
-        Save tenants to encrypted file.
+        Save tenants to encrypted file using atomic write.
+        
+        Uses atomic write (write to temp file, then rename) to prevent
+        corruption if process crashes during write.
         
         Args:
             data: Tenant data structure
@@ -138,10 +159,23 @@ class TenantManager:
             json_bytes = json_str.encode('utf-8')
             encrypted_data = encrypt_data(json_bytes, cipher, include_version=True)
             
-            # Write to file (prepend salt)
-            with open(self.tenants_file, 'wb') as f:
-                f.write(salt)  # Write salt first
-                f.write(encrypted_data)
+            # Atomic write: write to temp file first
+            temp_file = self.tenants_file.with_suffix('.tmp')
+            try:
+                # Write to temp file
+                with open(temp_file, 'wb') as f:
+                    f.write(salt)  # Write salt first
+                    f.write(encrypted_data)
+                    f.flush()  # Ensure data is written
+                    os.fsync(f.fileno())  # Force write to disk
+                
+                # Atomic rename (replaces old file)
+                temp_file.replace(self.tenants_file)
+                
+            finally:
+                # Clean up temp file if it still exists
+                if temp_file.exists():
+                    temp_file.unlink()
             
             # Update cache
             self._tenants_cache = data
@@ -150,6 +184,8 @@ class TenantManager:
             
         except Exception as e:
             print(f"Error saving tenants: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def validate_credentials(
