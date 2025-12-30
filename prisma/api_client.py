@@ -1769,6 +1769,419 @@ class PrismaAccessAPIClient:
 
     # ==================== End Infrastructure Methods ====================
 
+    # ==================== CREATE/UPDATE/DELETE Methods ====================
+    
+    # Folders
+    
+    def create_folder(self, name: str, parent: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Create a new folder.
+        
+        Args:
+            name: Folder name
+            parent: Parent folder name (optional)
+            
+        Returns:
+            Created folder object
+        """
+        data = {"name": name}
+        if parent:
+            data["parent"] = parent
+        
+        return self._make_request("POST", APIEndpoints.SECURITY_POLICY_FOLDERS, data=data, use_cache=False)
+    
+    # Address Objects
+    
+    def create_address(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """
+        Create an address object.
+        
+        Args:
+            data: Address object data (must include 'name' and address definition)
+            folder: Folder name
+            
+        Returns:
+            Created address object
+        """
+        url = APIEndpoints.ADDRESSES + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_address(self, address_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update an address object.
+        
+        Args:
+            address_id: Address object ID
+            data: Updated address object data
+            
+        Returns:
+            Updated address object
+        """
+        url = APIEndpoints.address(address_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_address(self, address_id: str) -> Dict[str, Any]:
+        """
+        Delete an address object.
+        
+        Args:
+            address_id: Address object ID
+            
+        Returns:
+            Deletion response
+        """
+        url = APIEndpoints.address(address_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    # Address Groups
+    
+    def create_address_group(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create an address group."""
+        url = APIEndpoints.ADDRESS_GROUPS + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_address_group(self, group_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update an address group."""
+        url = APIEndpoints.address_group(group_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_address_group(self, group_id: str) -> Dict[str, Any]:
+        """Delete an address group."""
+        url = APIEndpoints.address_group(group_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    # Service Objects
+    
+    def create_service(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create a service object."""
+        url = APIEndpoints.SERVICES + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_service(self, service_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update a service object."""
+        url = APIEndpoints.service(service_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_service(self, service_id: str) -> Dict[str, Any]:
+        """Delete a service object."""
+        url = APIEndpoints.service(service_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    # Service Groups
+    
+    def create_service_group(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create a service group."""
+        url = APIEndpoints.SERVICE_GROUPS + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_service_group(self, group_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update a service group."""
+        url = APIEndpoints.service_group(group_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_service_group(self, group_id: str) -> Dict[str, Any]:
+        """Delete a service group."""
+        url = APIEndpoints.service_group(group_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    # Security Rules
+    
+    def create_security_rule(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """
+        Create a security rule.
+        
+        Args:
+            data: Security rule data
+            folder: Folder name
+            
+        Returns:
+            Created security rule
+        """
+        url = APIEndpoints.SECURITY_RULES + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_security_rule(self, rule_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update a security rule."""
+        url = APIEndpoints.security_rule(rule_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_security_rule(self, rule_id: str) -> Dict[str, Any]:
+        """Delete a security rule."""
+        url = APIEndpoints.security_rule(rule_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    # Snippets
+    
+    def create_snippet(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a snippet."""
+        return self._make_request("POST", APIEndpoints.SECURITY_POLICY_SNIPPETS, data=data, use_cache=False)
+    
+    def update_snippet(self, snippet_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update a snippet."""
+        url = APIEndpoints.security_policy_snippet(snippet_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_snippet(self, snippet_id: str) -> Dict[str, Any]:
+        """Delete a snippet."""
+        url = APIEndpoints.security_policy_snippet(snippet_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    # Security Profiles
+    
+    def create_anti_spyware_profile(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create an anti-spyware profile."""
+        url = APIEndpoints.ANTI_SPYWARE_PROFILES + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_anti_spyware_profile(self, profile_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update an anti-spyware profile."""
+        url = APIEndpoints.anti_spyware_profile(profile_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_anti_spyware_profile(self, profile_id: str) -> Dict[str, Any]:
+        """Delete an anti-spyware profile."""
+        url = APIEndpoints.anti_spyware_profile(profile_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    def create_dns_security_profile(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create a DNS security profile."""
+        url = APIEndpoints.DNS_SECURITY_PROFILES + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_dns_security_profile(self, profile_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update a DNS security profile."""
+        url = APIEndpoints.dns_security_profile(profile_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_dns_security_profile(self, profile_id: str) -> Dict[str, Any]:
+        """Delete a DNS security profile."""
+        url = APIEndpoints.dns_security_profile(profile_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    def create_file_blocking_profile(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create a file blocking profile."""
+        url = APIEndpoints.FILE_BLOCKING_PROFILES + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_file_blocking_profile(self, profile_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update a file blocking profile."""
+        url = APIEndpoints.file_blocking_profile(profile_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_file_blocking_profile(self, profile_id: str) -> Dict[str, Any]:
+        """Delete a file blocking profile."""
+        url = APIEndpoints.file_blocking_profile(profile_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    def create_url_access_profile(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create a URL access profile."""
+        url = APIEndpoints.URL_ACCESS_PROFILES + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_url_access_profile(self, profile_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update a URL access profile."""
+        url = APIEndpoints.url_access_profile(profile_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_url_access_profile(self, profile_id: str) -> Dict[str, Any]:
+        """Delete a URL access profile."""
+        url = APIEndpoints.url_access_profile(profile_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    def create_vulnerability_protection_profile(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create a vulnerability protection profile."""
+        url = APIEndpoints.VULNERABILITY_PROTECTION_PROFILES + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_vulnerability_protection_profile(self, profile_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update a vulnerability protection profile."""
+        url = APIEndpoints.vulnerability_protection_profile(profile_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_vulnerability_protection_profile(self, profile_id: str) -> Dict[str, Any]:
+        """Delete a vulnerability protection profile."""
+        url = APIEndpoints.vulnerability_protection_profile(profile_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    def create_wildfire_anti_virus_profile(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create a WildFire anti-virus profile."""
+        url = APIEndpoints.WILDFIRE_ANTI_VIRUS_PROFILES + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_wildfire_anti_virus_profile(self, profile_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update a WildFire anti-virus profile."""
+        url = APIEndpoints.wildfire_anti_virus_profile(profile_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_wildfire_anti_virus_profile(self, profile_id: str) -> Dict[str, Any]:
+        """Delete a WildFire anti-virus profile."""
+        url = APIEndpoints.wildfire_anti_virus_profile(profile_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    def create_decryption_profile(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create a decryption profile."""
+        url = APIEndpoints.DECRYPTION_PROFILES + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_decryption_profile(self, profile_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update a decryption profile."""
+        url = APIEndpoints.decryption_profile(profile_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_decryption_profile(self, profile_id: str) -> Dict[str, Any]:
+        """Delete a decryption profile."""
+        url = APIEndpoints.decryption_profile(profile_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    def create_authentication_profile(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create an authentication profile."""
+        url = APIEndpoints.AUTHENTICATION_PROFILES + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_authentication_profile(self, profile_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update an authentication profile."""
+        url = APIEndpoints.authentication_profile(profile_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_authentication_profile(self, profile_id: str) -> Dict[str, Any]:
+        """Delete an authentication profile."""
+        url = APIEndpoints.authentication_profile(profile_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    # HIP Objects and Profiles
+    
+    def create_hip_object(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create a HIP object."""
+        url = APIEndpoints.HIP_OBJECTS + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_hip_object(self, object_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update a HIP object."""
+        url = APIEndpoints.hip_object(object_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_hip_object(self, object_id: str) -> Dict[str, Any]:
+        """Delete a HIP object."""
+        url = APIEndpoints.hip_object(object_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    def create_hip_profile(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create a HIP profile."""
+        url = APIEndpoints.HIP_PROFILES + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_hip_profile(self, profile_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update a HIP profile."""
+        url = APIEndpoints.hip_profile(profile_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_hip_profile(self, profile_id: str) -> Dict[str, Any]:
+        """Delete a HIP profile."""
+        url = APIEndpoints.hip_profile(profile_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    # Infrastructure - Remote Networks
+    
+    def create_remote_network(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create a remote network."""
+        url = APIEndpoints.REMOTE_NETWORKS + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_remote_network(self, network_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update a remote network."""
+        url = APIEndpoints.remote_network(network_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_remote_network(self, network_id: str) -> Dict[str, Any]:
+        """Delete a remote network."""
+        url = APIEndpoints.remote_network(network_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    # Infrastructure - Service Connections
+    
+    def create_service_connection(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create a service connection."""
+        url = APIEndpoints.SERVICE_CONNECTIONS + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_service_connection(self, connection_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update a service connection."""
+        url = APIEndpoints.service_connection(connection_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_service_connection(self, connection_id: str) -> Dict[str, Any]:
+        """Delete a service connection."""
+        url = APIEndpoints.service_connection(connection_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    # Infrastructure - IPsec Tunnels
+    
+    def create_ipsec_tunnel(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create an IPsec tunnel."""
+        url = APIEndpoints.IPSEC_TUNNELS + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_ipsec_tunnel(self, tunnel_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update an IPsec tunnel."""
+        url = APIEndpoints.ipsec_tunnel(tunnel_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_ipsec_tunnel(self, tunnel_id: str) -> Dict[str, Any]:
+        """Delete an IPsec tunnel."""
+        url = APIEndpoints.ipsec_tunnel(tunnel_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    # Infrastructure - IKE Gateways
+    
+    def create_ike_gateway(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create an IKE gateway."""
+        url = APIEndpoints.IKE_GATEWAYS + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_ike_gateway(self, gateway_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update an IKE gateway."""
+        url = APIEndpoints.ike_gateway(gateway_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_ike_gateway(self, gateway_id: str) -> Dict[str, Any]:
+        """Delete an IKE gateway."""
+        url = APIEndpoints.ike_gateway(gateway_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    # Infrastructure - Crypto Profiles
+    
+    def create_ike_crypto_profile(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create an IKE crypto profile."""
+        url = APIEndpoints.IKE_CRYPTO_PROFILES + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_ike_crypto_profile(self, profile_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update an IKE crypto profile."""
+        url = APIEndpoints.ike_crypto_profile(profile_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_ike_crypto_profile(self, profile_id: str) -> Dict[str, Any]:
+        """Delete an IKE crypto profile."""
+        url = APIEndpoints.ike_crypto_profile(profile_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    def create_ipsec_crypto_profile(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """Create an IPsec crypto profile."""
+        url = APIEndpoints.IPSEC_CRYPTO_PROFILES + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_ipsec_crypto_profile(self, profile_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update an IPsec crypto profile."""
+        url = APIEndpoints.ipsec_crypto_profile(profile_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_ipsec_crypto_profile(self, profile_id: str) -> Dict[str, Any]:
+        """Delete an IPsec crypto profile."""
+        url = APIEndpoints.ipsec_crypto_profile(profile_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    # ==================== End CREATE/UPDATE/DELETE Methods ====================
+
     def clear_cache(self):
         """Clear API response cache."""
         self.cache.clear()
