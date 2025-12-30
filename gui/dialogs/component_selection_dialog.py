@@ -762,11 +762,26 @@ class ComponentSelectionDialog(QDialog):
                 print(f"\nDEBUG: About to check merged dependencies in tree")
                 print(f"  required_deps keys: {list(required_deps.keys())}")
                 if 'objects' in required_deps:
-                    print(f"  Objects to check:")
+                    print(f"  Top-level objects to check:")
                     for obj_type, obj_list in required_deps['objects'].items():
                         print(f"    {obj_type}: {len(obj_list)} items")
                         for obj in obj_list[:3]:
                             print(f"      - {obj.get('name')} (folder: {obj.get('folder')})")
+                if 'folders' in required_deps:
+                    print(f"  Folders with contents:")
+                    for folder in required_deps['folders']:
+                        folder_name = folder.get('name')
+                        print(f"    Folder: {folder_name}")
+                        if 'objects' in folder:
+                            for obj_type, obj_list in folder.get('objects', {}).items():
+                                print(f"      {obj_type}: {len(obj_list)} items")
+                                for obj in obj_list[:3]:
+                                    print(f"        - {obj.get('name')}")
+                        if 'security_rules' in folder:
+                            rules = folder.get('security_rules', [])
+                            print(f"      security_rules: {len(rules)} items")
+                            for rule in rules[:3]:
+                                print(f"        - {rule.get('name')}")
                 
                 # Check the newly added dependencies in the tree
                 self._check_merged_dependencies(required_deps)
@@ -938,8 +953,10 @@ class ComponentSelectionDialog(QDialog):
             
             # Check folder dependencies
             if 'folders' in required_deps:
+                print(f"\nDEBUG: Checking folder dependencies")
                 for folder in required_deps['folders']:
                     folder_name = folder.get('name')
+                    print(f"  Folder: {folder_name}")
                     if folder_name:
                         root = self.tree.invisibleRootItem()
                         for i in range(root.childCount()):
@@ -947,6 +964,36 @@ class ComponentSelectionDialog(QDialog):
                             if section.text(0) == "Security Policies":
                                 find_and_check_item(section, folder_name, 'folder')
                                 break
+                        
+                        # Check objects within this folder
+                        if 'objects' in folder:
+                            print(f"    Folder has objects to check")
+                            for obj_type, obj_list in folder.get('objects', {}).items():
+                                print(f"      {obj_type}: {len(obj_list)} items")
+                                for obj in obj_list:
+                                    obj_name = obj.get('name')
+                                    print(f"        Checking object: {obj_name}")
+                                    if obj_name:
+                                        # Find the folder in the tree
+                                        for i in range(root.childCount()):
+                                            section = root.child(i)
+                                            if section.text(0) == "Security Policies":
+                                                for j in range(section.childCount()):
+                                                    folders_section = section.child(j)
+                                                    if folders_section.text(0) == "Folders":
+                                                        self._check_object_in_folder(folders_section, folder_name, obj_name, obj_type)
+                                                        break
+                                                break
+                        
+                        # Check security rules within this folder
+                        if 'security_rules' in folder:
+                            print(f"    Folder has security rules to check")
+                            rules = folder.get('security_rules', [])
+                            print(f"      security_rules: {len(rules)} items")
+                            for rule in rules:
+                                rule_name = rule.get('name')
+                                print(f"        Checking rule: {rule_name}")
+                                # Rules would need similar logic, but let's focus on objects first
             
             # Check object dependencies
             if 'objects' in required_deps:
