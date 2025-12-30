@@ -930,27 +930,64 @@ class ComponentSelectionDialog(QDialog):
             
             # Check object dependencies
             if 'objects' in required_deps:
+                print(f"\nDEBUG: Checking object dependencies")
                 for obj_type, obj_list in required_deps['objects'].items():
+                    print(f"  Object type: {obj_type}, Count: {len(obj_list)}")
                     for obj in obj_list:
                         obj_name = obj.get('name')
-                        if obj_name:
+                        folder_name = obj.get('folder')
+                        print(f"    Object: {obj_name}, Folder: {folder_name}")
+                        if obj_name and folder_name:
                             # Objects are under folders, need to find the right folder
-                            folder_name = obj.get('folder')
-                            if folder_name:
-                                root = self.tree.invisibleRootItem()
-                                for i in range(root.childCount()):
-                                    section = root.child(i)
-                                    if section.text(0) == "Security Policies":
-                                        # Find the folder
-                                        for j in range(section.childCount()):
-                                            folders_section = section.child(j)
-                                            if folders_section.text(0) == "Folders":
-                                                find_and_check_item(folders_section, obj_name, 'folder_object')
-                                                break
-                                        break
+                            root = self.tree.invisibleRootItem()
+                            for i in range(root.childCount()):
+                                section = root.child(i)
+                                if section.text(0) == "Security Policies":
+                                    # Find the folder
+                                    for j in range(section.childCount()):
+                                        folders_section = section.child(j)
+                                        if folders_section.text(0) == "Folders":
+                                            # Need to recursively find the folder, then the object
+                                            print(f"    Searching for object '{obj_name}' in folder '{folder_name}'")
+                                            self._check_object_in_folder(folders_section, folder_name, obj_name, obj_type)
+                                            break
+                                    break
         
         finally:
             self.tree.blockSignals(False)
+    
+    def _check_object_in_folder(self, folders_section: QTreeWidgetItem, folder_name: str, obj_name: str, obj_type: str):
+        """Find and check an object within a specific folder."""
+        # Find the folder
+        for i in range(folders_section.childCount()):
+            folder_item = folders_section.child(i)
+            folder_data = folder_item.data(0, Qt.ItemDataRole.UserRole)
+            if folder_data and folder_data.get('type') == 'folder':
+                if folder_data.get('data', {}).get('name') == folder_name:
+                    print(f"      Found folder: {folder_name}")
+                    # Found the folder, now find the Objects container
+                    for j in range(folder_item.childCount()):
+                        content_item = folder_item.child(j)
+                        if content_item.text(0) == "Objects":
+                            print(f"      Found Objects container")
+                            # Found Objects container, now find the object type
+                            for k in range(content_item.childCount()):
+                                obj_type_item = content_item.child(k)
+                                obj_type_data = obj_type_item.data(0, Qt.ItemDataRole.UserRole)
+                                if obj_type_data and obj_type_data.get('object_type') == obj_type:
+                                    print(f"      Found object type: {obj_type}")
+                                    # Found the object type, now find the specific object
+                                    for m in range(obj_type_item.childCount()):
+                                        obj_item = obj_type_item.child(m)
+                                        obj_item_data = obj_item.data(0, Qt.ItemDataRole.UserRole)
+                                        if obj_item_data:
+                                            item_name = obj_item_data.get('data', {}).get('name')
+                                            if item_name == obj_name:
+                                                print(f"      MATCH! Checking object: {obj_name}")
+                                                obj_item.setCheckState(0, Qt.CheckState.Checked)
+                                                return True
+                    return False
+        return False
     
     def _restore_selections(self):
         """Restore previously selected items in the tree."""
