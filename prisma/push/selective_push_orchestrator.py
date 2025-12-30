@@ -606,6 +606,59 @@ class SelectivePushOrchestrator:
         else:
             raise ValueError(f"Unknown HIP type: {hip_type}")
     
+    def _create_infrastructure(self, infra_type: str, infra_data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """
+        Create an infrastructure item.
+        
+        Args:
+            infra_type: Infrastructure type (e.g., 'remote_networks', 'ipsec_tunnels')
+            infra_data: Infrastructure data
+            folder: Folder name
+            
+        Returns:
+            API response
+        """
+        type_to_method = {
+            'remote_networks': self.api_client.create_remote_network,
+            'service_connections': self.api_client.create_service_connection,
+            'ipsec_tunnels': self.api_client.create_ipsec_tunnel,
+            'ike_gateways': self.api_client.create_ike_gateway,
+            'ike_crypto_profiles': self.api_client.create_ike_crypto_profile,
+            'ipsec_crypto_profiles': self.api_client.create_ipsec_crypto_profile,
+        }
+        
+        method = type_to_method.get(infra_type)
+        if not method:
+            raise ValueError(f"Unknown infrastructure type: {infra_type}")
+        
+        return method(infra_data, folder)
+    
+    def _delete_infrastructure_item(self, infra_type: str, infra_id: str) -> Dict[str, Any]:
+        """
+        Delete an infrastructure item.
+        
+        Args:
+            infra_type: Infrastructure type
+            infra_id: Infrastructure ID
+            
+        Returns:
+            API response
+        """
+        type_to_method = {
+            'remote_networks': self.api_client.delete_remote_network,
+            'service_connections': self.api_client.delete_service_connection,
+            'ipsec_tunnels': self.api_client.delete_ipsec_tunnel,
+            'ike_gateways': self.api_client.delete_ike_gateway,
+            'ike_crypto_profiles': self.api_client.delete_ike_crypto_profile,
+            'ipsec_crypto_profiles': self.api_client.delete_ipsec_crypto_profile,
+        }
+        
+        method = type_to_method.get(infra_type)
+        if not method:
+            raise ValueError(f"Unknown infrastructure type: {infra_type}")
+        
+        return method(infra_id)
+    
     # ========================================================================
     # DELETE METHODS (for OVERWRITE mode - reverse dependency order)
     # ========================================================================
@@ -878,15 +931,46 @@ class SelectivePushOrchestrator:
                         total_items
                     )
                     
-                    # TODO: Implement delete API call
-                    self._add_result(
-                        infra_type,
-                        infra_name,
-                        'Infrastructure',
-                        'deleted',
-                        'success',
-                        'Deleted (placeholder - API not implemented)'
-                    )
+                    # Get infrastructure ID from destination config
+                    try:
+                        if isinstance(dest_infra, list):
+                            # Find the item in the list
+                            infra_obj = next((i for i in dest_infra if i.get('name') == infra_name), None)
+                            infra_id = infra_obj.get('id') if infra_obj else None
+                        elif isinstance(dest_infra, dict):
+                            infra_id = dest_infra[infra_name].get('id')
+                        else:
+                            infra_id = None
+                        
+                        if infra_id:
+                            self._delete_infrastructure_item(infra_type, infra_id)
+                            self._add_result(
+                                infra_type,
+                                infra_name,
+                                'Infrastructure',
+                                'deleted',
+                                'success',
+                                'Deleted successfully'
+                            )
+                        else:
+                            self._add_result(
+                                infra_type,
+                                infra_name,
+                                'Infrastructure',
+                                'deleted',
+                                'failed',
+                                'Infrastructure ID not found in destination config'
+                            )
+                    except Exception as e:
+                        self._add_result(
+                            infra_type,
+                            infra_name,
+                            'Infrastructure',
+                            'deleted',
+                            'failed',
+                            f'Failed to delete: {str(e)}',
+                            error=e
+                        )
                     current_item += 1
         
         return current_item
@@ -1370,24 +1454,53 @@ class SelectivePushOrchestrator:
                         
                         logger.info(f"Name mapping: {item_name} → {new_name}")
                         
-                        self._add_result(
-                            infra_type,
-                            new_name,
-                            folder_name,
-                            'renamed',
-                            'success',
-                            f'Created as {new_name} (placeholder - API not implemented)'
-                        )
+                        try:
+                            renamed_item = item.copy()
+                            renamed_item['name'] = new_name
+                            
+                            result = self._create_infrastructure(infra_type, renamed_item, folder_name)
+                            
+                            self._add_result(
+                                infra_type,
+                                new_name,
+                                folder_name,
+                                'renamed',
+                                'success',
+                                f'Created as {new_name}'
+                            )
+                        except Exception as e:
+                            self._add_result(
+                                infra_type,
+                                new_name,
+                                folder_name,
+                                'renamed',
+                                'failed',
+                                f'Failed to create: {str(e)}',
+                                error=e
+                            )
                 else:
                     # Create new (or recreate after delete in OVERWRITE mode)
-                    self._add_result(
-                        infra_type,
-                        item_name,
-                        folder_name,
-                        'created',
-                        'success',
-                        'Created (placeholder - API not implemented)'
-                    )
+                    try:
+                        result = self._create_infrastructure(infra_type, item, folder_name)
+                        
+                        self._add_result(
+                            infra_type,
+                            item_name,
+                            folder_name,
+                            'created',
+                            'success',
+                            'Created successfully'
+                        )
+                    except Exception as e:
+                        self._add_result(
+                            infra_type,
+                            item_name,
+                            folder_name,
+                            'created',
+                            'failed',
+                            f'Failed to create: {str(e)}',
+                            error=e
+                        )
                 
                 current_item += 1
         
