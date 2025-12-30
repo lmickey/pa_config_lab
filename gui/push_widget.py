@@ -618,24 +618,32 @@ class PushConfigWidget(QWidget):
 
     def _on_push_finished(self, success: bool, message: str, result: Optional[Dict]):
         """Handle push completion."""
-        # Re-enable UI
-        self._set_ui_enabled(True)
+        try:
+            # Re-enable UI
+            self._set_ui_enabled(True)
 
-        if success:
-            self.progress_label.setText("Push completed successfully!")
-            self.progress_label.setStyleSheet("color: green;")
-            self.results_text.setPlainText(message)
+            if success:
+                self.progress_label.setText("Push completed successfully!")
+                self.progress_label.setStyleSheet("color: green;")
+                self.results_text.setPlainText(message)
 
-            # Emit signal
-            self.push_completed.emit(result)
+                # Emit signal (wrapped in try/except)
+                try:
+                    self.push_completed.emit(result)
+                except Exception as e:
+                    print(f"Error emitting push_completed signal: {e}")
 
-            QMessageBox.information(
-                self, "Success", "Configuration pushed successfully!"
-            )
-        else:
-            self.progress_label.setText("Push failed")
-            self.progress_label.setStyleSheet("color: red;")
-            self.results_text.setPlainText(f"Error: {message}")
+                QMessageBox.information(
+                    self, "Success", "Configuration pushed successfully!"
+                )
+            else:
+                self.progress_label.setText("Push failed")
+                self.progress_label.setStyleSheet("color: red;")
+                self.results_text.setPlainText(f"Error: {message}")
+        except Exception as e:
+            print(f"Error in _on_push_finished: {e}")
+            import traceback
+            traceback.print_exc()
 
     def _on_error(self, error_message: str):
         """Handle errors."""
