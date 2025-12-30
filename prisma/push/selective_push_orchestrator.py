@@ -938,8 +938,41 @@ class SelectivePushOrchestrator:
         current_item: int,
         total_items: int
     ) -> int:
-        """Delete existing infrastructure items (Phase 1 - OVERWRITE mode)."""
-        for infra_type, infra_list in infrastructure.items():
+        """
+        Delete existing infrastructure items (Phase 1 - OVERWRITE mode).
+        
+        CRITICAL: Infrastructure has internal dependencies and must be deleted
+        in the correct order to avoid 409 Conflict errors:
+        
+        1. ipsec_tunnels (use: ike_gateways, ipsec_crypto_profiles)
+        2. ike_gateways (use: ike_crypto_profiles)
+        3. ike_crypto_profiles
+        4. ipsec_crypto_profiles
+        5. remote_networks
+        6. service_connections
+        7. mobile_users (gp_gateways, portals, agent_profiles - use auth profiles)
+        8. bandwidth_allocations
+        """
+        # Define the correct delete order for infrastructure
+        infra_delete_order = [
+            'ipsec_tunnels',
+            'ike_gateways',
+            'ike_crypto_profiles',
+            'ipsec_crypto_profiles',
+            'remote_networks',
+            'service_connections',
+            'gp_gateways',
+            'gp_portals',
+            'agent_profiles',
+            'bandwidth_allocations',
+        ]
+        
+        # Delete in the specified order
+        for infra_type in infra_delete_order:
+            if infra_type not in infrastructure:
+                continue
+            
+            infra_list = infrastructure[infra_type]
             if not isinstance(infra_list, list):
                 continue
             
@@ -1477,8 +1510,41 @@ class SelectivePushOrchestrator:
         current_item: int,
         total_items: int
     ) -> int:
-        """Push infrastructure items."""
-        for infra_type, infra_list in infrastructure.items():
+        """
+        Push infrastructure items.
+        
+        CRITICAL: Infrastructure has internal dependencies and must be created
+        in the correct order (reverse of delete order):
+        
+        1. bandwidth_allocations
+        2. mobile_users (agent_profiles, gp_portals, gp_gateways)
+        3. service_connections
+        4. remote_networks
+        5. ipsec_crypto_profiles
+        6. ike_crypto_profiles
+        7. ike_gateways (use: ike_crypto_profiles)
+        8. ipsec_tunnels (use: ike_gateways, ipsec_crypto_profiles)
+        """
+        # Define the correct create order for infrastructure (reverse of delete)
+        infra_create_order = [
+            'bandwidth_allocations',
+            'agent_profiles',
+            'gp_portals',
+            'gp_gateways',
+            'service_connections',
+            'remote_networks',
+            'ipsec_crypto_profiles',
+            'ike_crypto_profiles',
+            'ike_gateways',
+            'ipsec_tunnels',
+        ]
+        
+        # Create in the specified order
+        for infra_type in infra_create_order:
+            if infra_type not in infrastructure:
+                continue
+            
+            infra_list = infrastructure[infra_type]
             if not isinstance(infra_list, list):
                 continue
             
