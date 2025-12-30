@@ -67,7 +67,7 @@ class ConfigFetchWorker(QThread):
             print(f"Total items to check: {total_items}")
             current = 0
             
-            # Fetch folders
+            # Fetch folders and their contents
             folders = self.selected_items.get('folders', [])
             if folders:
                 self.progress.emit(f"Checking folders...", int((current / max(total_items, 1)) * 100))
@@ -79,7 +79,43 @@ class ConfigFetchWorker(QThread):
                         folder_name = folder.get('name')
                         if folder_name:
                             dest_config['folders'][folder_name] = folder
-                            print(f"      - {folder_name}")
+                            if len(dest_config['folders']) <= 5:
+                                print(f"      - {folder_name}")
+                    
+                    if len(dest_config['folders']) > 5:
+                        print(f"      ... and {len(dest_config['folders']) - 5} more")
+                    
+                    # Also extract objects/rules/profiles from folders for conflict checking
+                    # This allows checking folder contents separately
+                    print(f"  Extracting folder contents for conflict checking...")
+                    for folder in folders:
+                        folder_name = folder.get('name', 'Unknown')
+                        print(f"    Folder: {folder_name}")
+                        
+                        # Extract objects from folder
+                        folder_objects = folder.get('objects', {})
+                        if folder_objects:
+                            print(f"      Objects: {list(folder_objects.keys())}")
+                            for obj_type, obj_list in folder_objects.items():
+                                if obj_type not in dest_config['objects']:
+                                    dest_config['objects'][obj_type] = {}
+                                # Note: We'll fetch these from destination later
+                        
+                        # Extract rules from folder
+                        folder_rules = folder.get('security_rules', [])
+                        if folder_rules:
+                            print(f"      Rules: {len(folder_rules)} items")
+                        
+                        # Extract profiles from folder
+                        folder_profiles = folder.get('profiles', {})
+                        if folder_profiles:
+                            print(f"      Profiles: {list(folder_profiles.keys())}")
+                        
+                        # Extract HIP from folder
+                        folder_hip = folder.get('hip', {})
+                        if folder_hip:
+                            print(f"      HIP: {list(folder_hip.keys())}")
+                    
                 except Exception as e:
                     print(f"    ERROR fetching folders: {e}")
                     import traceback
@@ -450,6 +486,45 @@ class PushPreviewDialog(QDialog):
                 conflicts.append(('folder', name, folder))
             else:
                 new_items.append(('folder', name, folder))
+            
+            # Also analyze folder contents (objects, rules, profiles)
+            # Objects from folder
+            folder_objects = folder.get('objects', {})
+            for obj_type, obj_list in folder_objects.items():
+                if not isinstance(obj_list, list):
+                    continue
+                dest_objects = self.destination_config.get('objects', {}).get(obj_type, {})
+                for obj in obj_list:
+                    obj_name = obj.get('name', 'Unknown')
+                    if obj_name in dest_objects:
+                        conflicts.append((f"{obj_type} (from {name})", obj_name, obj))
+                    else:
+                        new_items.append((f"{obj_type} (from {name})", obj_name, obj))
+            
+            # Rules from folder (always new since they're folder-specific)
+            folder_rules = folder.get('security_rules', [])
+            for rule in folder_rules:
+                rule_name = rule.get('name', 'Unknown')
+                new_items.append((f"security_rule (from {name})", rule_name, rule))
+            
+            # Profiles from folder
+            folder_profiles = folder.get('profiles', {})
+            for prof_type, prof_list in folder_profiles.items():
+                if not isinstance(prof_list, list):
+                    continue
+                for prof in prof_list:
+                    prof_name = prof.get('name', 'Unknown')
+                    # Profiles are folder-specific, so they're typically new
+                    new_items.append((f"{prof_type} (from {name})", prof_name, prof))
+            
+            # HIP from folder
+            folder_hip = folder.get('hip', {})
+            for hip_type, hip_list in folder_hip.items():
+                if not isinstance(hip_list, list):
+                    continue
+                for hip_item in hip_list:
+                    hip_name = hip_item.get('name', 'Unknown')
+                    new_items.append((f"{hip_type} (from {name})", hip_name, hip_item))
         
         # Analyze snippets
         for snippet in self.selected_items.get('snippets', []):
