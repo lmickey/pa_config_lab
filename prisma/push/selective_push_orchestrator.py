@@ -200,7 +200,21 @@ class SelectivePushOrchestrator:
             True if this is an 'already exists' error
         """
         error_str = str(error).lower()
-        return 'already exists' in error_str or 'object_already_exists' in error_str
+        
+        # Check the error message
+        if 'already exists' in error_str or 'object_already_exists' in error_str:
+            return True
+        
+        # For requests.HTTPError, check the response body
+        if hasattr(error, 'response') and error.response is not None:
+            try:
+                response_text = error.response.text.lower()
+                if 'already exists' in response_text or 'object_already_exists' in response_text:
+                    return True
+            except:
+                pass
+        
+        return False
     
     def _clean_item_for_api(self, item: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -521,11 +535,22 @@ class SelectivePushOrchestrator:
             import traceback
             traceback.print_exc()
             
+            # Create a safe copy of results to avoid serialization issues
+            try:
+                safe_results = {
+                    'summary': dict(self.results.get('summary', {})),
+                    'details': [],  # Don't include details on error to avoid size issues
+                    'errors': self.results.get('errors', [])[:10],  # Limit to first 10 errors
+                    'could_not_overwrite': self.results.get('could_not_overwrite', [])[:10]
+                }
+            except:
+                safe_results = {'summary': {}, 'details': [], 'errors': [], 'could_not_overwrite': []}
+            
             return {
                 'success': False,
-                'message': f'Push failed: {str(e)}',
-                'results': self.results,
-                'error': str(e)
+                'message': f'Push failed: {str(e)[:200]}',  # Limit error message length
+                'results': safe_results,
+                'error': str(e)[:200]
             }
 
     def _count_items(self, selected_items: Dict[str, Any]) -> int:
