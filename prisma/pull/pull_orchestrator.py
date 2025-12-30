@@ -15,6 +15,7 @@ from .rule_capture import RuleCapture
 from .object_capture import ObjectCapture
 from .profile_capture import ProfileCapture
 from .snippet_capture import SnippetCapture
+from .infrastructure_capture import InfrastructureCapture
 from config.defaults.default_detector import DefaultDetector
 from ..dependencies.dependency_resolver import DependencyResolver
 
@@ -38,6 +39,7 @@ class PullOrchestrator:
         self.object_capture = ObjectCapture(api_client, suppress_output=suppress_output)
         self.profile_capture = ProfileCapture(api_client, suppress_output=suppress_output)
         self.snippet_capture = SnippetCapture(api_client, suppress_output=suppress_output)
+        self.infrastructure_capture = InfrastructureCapture(api_client, suppress_output=suppress_output)
 
         # Initialize default detector
         self.default_detector = DefaultDetector() if detect_defaults else None
@@ -54,6 +56,7 @@ class PullOrchestrator:
             "objects_captured": 0,
             "profiles_captured": 0,
             "snippets_captured": 0,
+            "infrastructure_captured": 0,
             "defaults_detected": 0,
             "errors": [],
         }
@@ -559,6 +562,12 @@ class PullOrchestrator:
         include_objects: bool = True,
         include_profiles: bool = True,
         application_names: Optional[List[str]] = None,
+        include_remote_networks: bool = True,
+        include_service_connections: bool = True,
+        include_ipsec_tunnels: bool = True,
+        include_mobile_users: bool = True,
+        include_hip: bool = True,
+        include_regions: bool = True,
     ) -> Dict[str, Any]:
         """
         Pull complete Prisma Access configuration.
@@ -574,6 +583,12 @@ class PullOrchestrator:
             include_objects: Whether to capture objects
             include_profiles: Whether to capture profiles
             application_names: Optional list of custom application names to capture (None = no applications)
+            include_remote_networks: Whether to capture remote networks (default: True)
+            include_service_connections: Whether to capture service connections (default: True)
+            include_ipsec_tunnels: Whether to capture IPsec tunnels and crypto profiles (default: True)
+            include_mobile_users: Whether to capture mobile user infrastructure (default: True)
+            include_hip: Whether to capture HIP objects and profiles (default: True)
+            include_regions: Whether to capture regions and bandwidth allocations (default: True)
 
         Returns:
             Complete configuration dictionary in v2 format
@@ -636,6 +651,94 @@ class PullOrchestrator:
             except Exception as e:
                 self._handle_error("Error pulling shared infrastructure settings", e)
 
+            # Pull infrastructure components (65-80% in worker)
+            # Check if any infrastructure components are requested
+            any_infra = (
+                include_remote_networks or
+                include_service_connections or
+                include_ipsec_tunnels or
+                include_mobile_users or
+                include_hip or
+                include_regions
+            )
+            
+            if any_infra:
+                self._report_progress("Pulling infrastructure components", 68, 100)
+                try:
+                    # Capture infrastructure with progress callback
+                    def infra_progress(message: str, current: int, total: int):
+                        # Map infrastructure progress to 68-78% range
+                        progress = 68 + int((current / total) * 10) if total > 0 else 68
+                        self._report_progress(message, progress, 100)
+                    
+                    infrastructure = self.infrastructure_capture.capture_all_infrastructure(
+                        folder=None,  # Capture from all folders
+                        include_remote_networks=include_remote_networks,
+                        include_service_connections=include_service_connections,
+                        include_ipsec_tunnels=include_ipsec_tunnels,
+                        include_mobile_users=include_mobile_users,
+                        include_hip=include_hip,
+                        include_regions=include_regions,
+                        progress_callback=infra_progress,
+                    )
+                    
+                    # Merge infrastructure into config
+                    # Remote networks and service connections go into infrastructure section
+                    if "remote_networks" in infrastructure:
+                        config["infrastructure"]["remote_networks"] = infrastructure["remote_networks"]
+                    if "service_connections" in infrastructure:
+                        config["infrastructure"]["service_connections"] = infrastructure["service_connections"]
+                    
+                    # IPsec components go into infrastructure section
+                    if "ipsec_tunnels" in infrastructure:
+                        config["infrastructure"]["ipsec_tunnels"] = infrastructure["ipsec_tunnels"]
+                    if "ike_gateways" in infrastructure:
+                        config["infrastructure"]["ike_gateways"] = infrastructure["ike_gateways"]
+                    if "ike_crypto_profiles" in infrastructure:
+                        config["infrastructure"]["ike_crypto_profiles"] = infrastructure["ike_crypto_profiles"]
+                    if "ipsec_crypto_profiles" in infrastructure:
+                        config["infrastructure"]["ipsec_crypto_profiles"] = infrastructure["ipsec_crypto_profiles"]
+                    
+                    # Mobile users go into their own top-level section
+                    if "mobile_users" in infrastructure:
+                        config["mobile_users"] = infrastructure["mobile_users"]
+                    
+                    # HIP goes into its own top-level section
+                    if "hip" in infrastructure:
+                        config["hip"] = infrastructure["hip"]
+                    
+                    # Regions go into their own top-level section
+                    if "regions" in infrastructure:
+                        config["regions"] = infrastructure["regions"]
+                    
+                    # Count infrastructure items for stats
+                    infra_count = 0
+                    infra_count += len(infrastructure.get("remote_networks", []))
+                    infra_count += len(infrastructure.get("service_connections", []))
+                    infra_count += len(infrastructure.get("ipsec_tunnels", []))
+                    infra_count += len(infrastructure.get("ike_gateways", []))
+                    infra_count += len(infrastructure.get("ike_crypto_profiles", []))
+                    infra_count += len(infrastructure.get("ipsec_crypto_profiles", []))
+                    
+                    # Count mobile users components
+                    mobile_users = infrastructure.get("mobile_users", {})
+                    infra_count += len(mobile_users.get("gp_gateways", []))
+                    infra_count += len(mobile_users.get("gp_portals", []))
+                    
+                    # Count HIP components
+                    hip = infrastructure.get("hip", {})
+                    infra_count += len(hip.get("hip_objects", []))
+                    infra_count += len(hip.get("hip_profiles", []))
+                    
+                    # Count regions components
+                    regions = infrastructure.get("regions", {})
+                    infra_count += len(regions.get("bandwidth_allocations", []))
+                    
+                    self.stats["infrastructure_captured"] = infra_count
+                    
+                except Exception as e:
+                    self._handle_error("Error pulling infrastructure components", e)
+
             elapsed_time = time.time() - start_time
 
             # Add pull metadata
@@ -645,6 +748,7 @@ class PullOrchestrator:
                 "objects": self.stats["objects_captured"],
                 "profiles": self.stats["profiles_captured"],
                 "snippets": self.stats["snippets_captured"],
+                "infrastructure": self.stats["infrastructure_captured"],
                 "defaults_detected": self.stats.get("defaults_detected", 0),
                 "errors": len(self.stats["errors"]),
                 "elapsed_seconds": elapsed_time,

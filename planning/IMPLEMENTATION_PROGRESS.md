@@ -136,7 +136,8 @@
 |-------|--------|-----------------|----------|
 | **Week 1: Foundation** | ✅ Complete | 3/3 | 100% |
 | **Week 2: Infrastructure Capture** | ✅ Complete | 3/3 | 100% |
-| **Week 3: GUI Enhancements** | ⚪ Not Started | 0/3 | 0% |
+| **Week 3: Orchestrator Integration** | ✅ Complete | 1/1 | 100% |
+| **Week 3: GUI Enhancements** | ⚪ Not Started | 0/4 | 0% |
 
 ### Detailed Task Completion
 
@@ -145,7 +146,7 @@
 ✅ Week 1: Configure rate limiting to 45 req/min - **COMPLETE**  
 ✅ Week 2: Create infrastructure_capture.py module - **COMPLETE**  
 ✅ Week 2: Update config schema with infrastructure sections - **COMPLETE**  
-✅ Week 2: Integrate infrastructure capture with pull orchestrator - **COMPLETE** (auto-integrated via imports)  
+✅ Week 3: Integrate infrastructure capture with pull orchestrator - **COMPLETE**  
 
 ---
 
@@ -177,27 +178,40 @@
 
 ---
 
+## ✅ Week 3: Orchestrator Integration - COMPLETE
+
+### Completed:
+
+#### 1. Integrate with Pull Orchestrator ✅
+**File:** `prisma/pull/pull_orchestrator.py`
+
+**Changes Made:**
+- ✅ Imported `InfrastructureCapture` class
+- ✅ Initialized `infrastructure_capture` in `__init__`
+- ✅ Added infrastructure options to `pull_complete_configuration()` method:
+  - `include_remote_networks` (default: True)
+  - `include_service_connections` (default: True)
+  - `include_ipsec_tunnels` (default: True)
+  - `include_mobile_users` (default: True)
+  - `include_hip` (default: True)
+  - `include_regions` (default: True)
+- ✅ Call infrastructure capture after security policy capture (68-78% progress)
+- ✅ Update progress reporting with infrastructure progress callback
+- ✅ Update statistics tracking (`infrastructure_captured` stat)
+- ✅ Merge infrastructure into config structure correctly
+- ✅ Update metadata with infrastructure stats
+
+**Lines Added:** ~100 lines of code
+
+**Testing:** All integration tests pass
+
+**Documentation:** Created `docs/INFRASTRUCTURE_INTEGRATION.md`
+
+---
+
 ## ⚠️ Next Steps (Week 3: GUI Enhancements)
 
 ### Still To Do:
-
-#### 1. Integrate with Pull Orchestrator
-**File:** `prisma/pull/pull_orchestrator.py`
-
-**Required Changes:**
-- Import `InfrastructureCapture` class
-- Add infrastructure options to `pull_complete_configuration()` method:
-  - `include_remote_networks`
-  - `include_service_connections`
-  - `include_ipsec_tunnels`
-  - `include_mobile_users`
-  - `include_hip`
-  - `include_regions`
-- Call infrastructure capture after security policy capture
-- Update progress reporting
-- Update statistics tracking
-
-**Estimated:** 50-100 lines of code
 
 #### 2. Create Application Selector Dialog (GUI)
 **File:** `gui/dialogs/application_selector.py` (NEW)
