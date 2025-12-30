@@ -524,31 +524,60 @@ class ComponentSelectionDialog(QDialog):
                 )
                 
                 if folder_item.checkState(0) == Qt.CheckState.Checked or has_content:
-                    # Update folder with selected contents (only if not fully checked)
-                    if folder_item.checkState(0) != Qt.CheckState.Checked:
-                        # Partially selected - only include selected items
-                        if selected_rules:
-                            folder['security_rules'] = selected_rules
-                        else:
-                            folder.pop('security_rules', None)
-                        
-                        if selected_objects:
-                            folder['objects'] = selected_objects
-                        else:
-                            folder.pop('objects', None)
-                        
-                        if selected_profiles:
-                            folder['profiles'] = selected_profiles
-                        else:
-                            folder.pop('profiles', None)
-                        
-                        if selected_hip:
-                            folder['hip'] = selected_hip
-                        else:
-                            folder.pop('hip', None)
-                    # else: Fully checked - keep all folder contents as-is
+                    # ALWAYS update folder with only selected contents
+                    # Even if folder checkbox is fully checked, we only want the items
+                    # that were actually checked, not all items in the folder
+                    if selected_rules:
+                        folder['security_rules'] = selected_rules
+                    else:
+                        folder.pop('security_rules', None)
+                    
+                    if selected_objects:
+                        folder['objects'] = selected_objects
+                    else:
+                        folder.pop('objects', None)
+                    
+                    if selected_profiles:
+                        folder['profiles'] = selected_profiles
+                    else:
+                        folder.pop('profiles', None)
+                    
+                    if selected_hip:
+                        folder['hip'] = selected_hip
+                    else:
+                        folder.pop('hip', None)
                     
                     folders.append(folder)
+                    
+                    # Debug logging after collection is complete
+                    print(f"\nDEBUG: Collected folder '{folder.get('name')}':")
+                    if selected_rules:
+                        print(f"  Rules: {len(selected_rules)} items")
+                        for rule in selected_rules[:3]:
+                            print(f"    - {rule.get('name', 'Unknown')}")
+                        if len(selected_rules) > 3:
+                            print(f"    ... and {len(selected_rules) - 3} more")
+                    if selected_objects:
+                        for obj_type, obj_list in selected_objects.items():
+                            print(f"  {obj_type}: {len(obj_list)} items")
+                            for obj in obj_list[:3]:
+                                print(f"    - {obj.get('name', 'Unknown')}")
+                            if len(obj_list) > 3:
+                                print(f"    ... and {len(obj_list) - 3} more")
+                    if selected_profiles:
+                        for prof_type, prof_list in selected_profiles.items():
+                            print(f"  {prof_type}: {len(prof_list)} items")
+                            for prof in prof_list[:3]:
+                                print(f"    - {prof.get('name', 'Unknown')}")
+                            if len(prof_list) > 3:
+                                print(f"    ... and {len(prof_list) - 3} more")
+                    if selected_hip:
+                        for hip_type, hip_list in selected_hip.items():
+                            print(f"  {hip_type}: {len(hip_list)} items")
+                            for hip_item in hip_list[:3]:
+                                print(f"    - {hip_item.get('name', 'Unknown')}")
+                            if len(hip_list) > 3:
+                                print(f"    ... and {len(hip_list) - 3} more")
         
         return folders
     
