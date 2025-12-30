@@ -708,13 +708,18 @@ class ComponentSelectionDialog(QDialog):
                 elif isinstance(value, list):
                     print(f"  {key}: {len(value)} items")
             
-            # Check if infrastructure items were selected
-            infra_count = sum(len(v) if isinstance(v, list) else 1 for v in selected.get('infrastructure', {}).values())
-            if infra_count > 0 and not required_deps:
-                print(f"NOTE: {infra_count} infrastructure item(s) selected. Infrastructure dependency analysis not yet implemented.")
-                print("      Please manually verify all required IKE Gateways, IPSec Tunnels, and Crypto Profiles are selected.")
-            
+            # Check if there are actually any dependencies (not just empty collections)
+            has_deps = False
             if required_deps:
+                has_deps = (
+                    len(required_deps.get('folders', [])) > 0 or
+                    len(required_deps.get('snippets', [])) > 0 or
+                    sum(len(v) for v in required_deps.get('objects', {}).values() if isinstance(v, list)) > 0 or
+                    len(required_deps.get('profiles', [])) > 0 or
+                    sum(len(v) if isinstance(v, list) else 1 for v in required_deps.get('infrastructure', {}).values()) > 0
+                )
+            
+            if has_deps:
                 # Show dependency confirmation dialog
                 dep_dialog = DependencyConfirmationDialog(required_deps, self)
                 if not dep_dialog.exec():
@@ -736,6 +741,8 @@ class ComponentSelectionDialog(QDialog):
                 # Merge tree selection with our already-merged selection
                 # (This ensures we don't lose anything)
                 selected = self._merge_dependencies(selected, tree_selected)
+            else:
+                print("\nDEBUG: No dependencies found - proceeding with original selection")
             
             # Store final selection
             self.selected_items = selected
