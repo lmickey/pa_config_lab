@@ -653,6 +653,7 @@ class PushConfigWidget(QWidget):
                 renamed = summary.get('renamed', 0) if isinstance(summary, dict) else 0
                 skipped = summary.get('skipped', 0) if isinstance(summary, dict) else 0
                 failed = summary.get('failed', 0) if isinstance(summary, dict) else 0
+                could_not_overwrite = summary.get('could_not_overwrite', 0) if isinstance(summary, dict) else 0
                 
                 try:
                     status_msg = f"✅ Push completed successfully! Created: {created}, Updated: {updated}"
@@ -663,6 +664,8 @@ class PushConfigWidget(QWidget):
                     status_msg += f", Skipped: {skipped}"
                     if failed > 0:
                         status_msg += f", Failed: {failed}"
+                    if could_not_overwrite > 0:
+                        status_msg += f", ⚠️ Could Not Overwrite: {could_not_overwrite}"
                     
                     self.status_label.setText(status_msg)
                     self.status_label.setStyleSheet(

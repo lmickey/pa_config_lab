@@ -44,6 +44,10 @@ class SelectivePushOrchestrator:
         # Track if delete phase had critical failures
         self.delete_phase_failed = False
         
+        # Track items that failed to delete (for OVERWRITE mode)
+        # Format: {(item_type, item_name, folder): error_message}
+        self.failed_deletes: Dict[tuple, str] = {}
+        
         # Results tracking
         self.results = {
             'summary': {
@@ -53,10 +57,12 @@ class SelectivePushOrchestrator:
                 'skipped': 0,
                 'failed': 0,
                 'renamed': 0,
-                'deleted': 0
+                'deleted': 0,
+                'could_not_overwrite': 0  # Items that couldn't be deleted in OVERWRITE mode
             },
             'details': [],
-            'errors': []
+            'errors': [],
+            'could_not_overwrite': []  # List of items that couldn't be overwritten
         }
 
     def set_progress_callback(self, callback: Callable[[str, int, int], None]):
@@ -148,6 +154,41 @@ class SelectivePushOrchestrator:
         else:
             logger.warning(log_msg)
 
+    def _check_failed_delete(self, item_type: str, item_name: str, folder: str, current_item: int) -> bool:
+        """
+        Check if an item failed to delete in Phase 1 (OVERWRITE mode).
+        If it did, record it as 'could_not_overwrite' and return True.
+        
+        Args:
+            item_type: Type of item
+            item_name: Name of item
+            folder: Folder name
+            current_item: Current item number (for tracking)
+            
+        Returns:
+            True if item failed to delete (should skip creation), False otherwise
+        """
+        key = (item_type, item_name, folder)
+        if key in self.failed_deletes:
+            error_msg = self.failed_deletes[key]
+            self._add_result(
+                item_type,
+                item_name,
+                folder,
+                'could_not_overwrite',
+                'failed',
+                f'Could not overwrite (delete failed: {error_msg})'
+            )
+            self.results['summary']['could_not_overwrite'] += 1
+            self.results['could_not_overwrite'].append({
+                'type': item_type,
+                'name': item_name,
+                'folder': folder,
+                'reason': error_msg
+            })
+            return True
+        return False
+    
     def _is_already_exists_error(self, error: Exception) -> bool:
         """
         Check if an error is an 'already exists' error from the API.
@@ -453,6 +494,15 @@ class SelectivePushOrchestrator:
             logger.info(f"Renamed: {self.results['summary']['renamed']}")
             logger.info(f"Skipped: {self.results['summary']['skipped']}")
             logger.info(f"Failed: {self.results['summary']['failed']}")
+            
+            # Log items that couldn't be overwritten
+            could_not_overwrite = self.results['summary'].get('could_not_overwrite', 0)
+            if could_not_overwrite > 0:
+                logger.warning(f"Could Not Overwrite: {could_not_overwrite}")
+                logger.warning("Items that could not be overwritten (delete failed):")
+                for item in self.results['could_not_overwrite']:
+                    logger.warning(f"  - {item['type']}: {item['name']} (folder: {item['folder']}) - {item['reason']}")
+            
             logger.info(f"Elapsed Time: {elapsed_time:.2f} seconds")
             logger.info("=" * 80)
             
@@ -1061,6 +1111,8 @@ class SelectivePushOrchestrator:
                                         'Deleted successfully'
                                     )
                                 else:
+                                    # Track failed delete
+                                    self.failed_deletes[(infra_type, infra_name, 'Infrastructure')] = 'ID not found'
                                     self._add_result(
                                         infra_type,
                                         infra_name,
@@ -1070,6 +1122,8 @@ class SelectivePushOrchestrator:
                                         'Infrastructure ID not found in destination config'
                                     )
                             except Exception as e:
+                                # Track failed delete
+                                self.failed_deletes[(infra_type, infra_name, 'Infrastructure')] = str(e)[:200]
                                 self._add_result(
                                     infra_type,
                                     infra_name,
@@ -1135,6 +1189,8 @@ class SelectivePushOrchestrator:
                                 'Deleted successfully'
                             )
                         else:
+                            # Track failed delete
+                            self.failed_deletes[(obj_type, obj_name, folder_name)] = 'ID not found'
                             self._add_result(
                                 obj_type,
                                 obj_name,
@@ -1144,6 +1200,8 @@ class SelectivePushOrchestrator:
                                 'Object ID not found in destination config'
                             )
                     except Exception as e:
+                        # Track failed delete
+                        self.failed_deletes[(obj_type, obj_name, folder_name)] = str(e)[:200]
                         self._add_result(
                             obj_type,
                             obj_name,
@@ -1233,6 +1291,11 @@ class SelectivePushOrchestrator:
                         current_item,
                         total_items
                     )
+                    
+                    # Check if this item failed to delete in Phase 1 (OVERWRITE mode)
+                    if self._check_failed_delete(obj_type, obj_name, folder_name, current_item):
+                        current_item += 1
+                        continue
                     
                     # Check if exists in destination
                     # Note: In OVERWRITE mode, items were already deleted in Phase 1,
@@ -1624,6 +1687,11 @@ class SelectivePushOrchestrator:
                     current_item,
                     total_items
                 )
+                
+                # Check if this item failed to delete in Phase 1 (OVERWRITE mode)
+                if self._check_failed_delete(infra_type, item_name, folder_name, current_item):
+                    current_item += 1
+                    continue
                 
                 # Check if exists in destination
                 # Note: In OVERWRITE mode, items were already deleted in Phase 1
