@@ -136,11 +136,8 @@ class MigrationWorkflowWidget(QWidget):
 
     def _on_push_completed(self, result):
         """Handle push completion."""
-        QMessageBox.information(
-            self,
-            "Push Complete",
-            "Configuration migration completed successfully!",
-        )
+        # Status is already shown in push_widget banner, no popup needed
+        pass
 
     def _save_current_config(self):
         """Save the current configuration to saved configs."""
