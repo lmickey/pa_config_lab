@@ -1417,7 +1417,20 @@ class SelectivePushOrchestrator:
             
             for item in infra_list:
                 item_name = item.get('name', item.get('id', 'Unknown'))
-                folder_name = item.get('folder', 'N/A')
+                
+                # Map infrastructure types to their required folders
+                # Some infra types have specific folder requirements
+                folder_map = {
+                    'service_connections': 'Service Connections',
+                    'remote_networks': 'Remote Networks',
+                    'ipsec_tunnels': 'Service Connections',  # IPsec tunnels go in Service Connections folder
+                    'ike_gateways': 'Service Connections',
+                    'ike_crypto_profiles': 'Service Connections',
+                    'ipsec_crypto_profiles': 'Service Connections',
+                }
+                
+                # Use the item's folder if present, otherwise use the default for this type
+                folder_name = item.get('folder') or folder_map.get(infra_type, 'Service Connections')
                 
                 self._report_progress(
                     f"Pushing {infra_type}: {item_name}",
