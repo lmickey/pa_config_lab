@@ -41,6 +41,9 @@ class SelectivePushOrchestrator:
         # Used to update references in dependent items
         self.name_mappings: Dict[str, str] = {}
         
+        # Track if delete phase had critical failures
+        self.delete_phase_failed = False
+        
         # Results tracking
         self.results = {
             'summary': {
@@ -143,6 +146,19 @@ class SelectivePushOrchestrator:
         else:
             logger.warning(log_msg)
 
+    def _is_already_exists_error(self, error: Exception) -> bool:
+        """
+        Check if an error is an 'already exists' error from the API.
+        
+        Args:
+            error: Exception to check
+            
+        Returns:
+            True if this is an 'already exists' error
+        """
+        error_str = str(error).lower()
+        return 'already exists' in error_str or 'object_already_exists' in error_str
+    
     def _update_references_in_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
         """
         Update references in a configuration item to use renamed names.
@@ -302,6 +318,14 @@ class SelectivePushOrchestrator:
                 
                 logger.info("-" * 80)
                 logger.info("PHASE 1 COMPLETE: All conflicting items deleted")
+                
+                # Check if there were delete failures
+                delete_failures = sum(1 for d in self.results['details'] if d.get('action') == 'deleted' and d.get('status') == 'failed')
+                if delete_failures > 0:
+                    logger.warning(f"⚠️  {delete_failures} items failed to delete in Phase 1")
+                    logger.warning("⚠️  Continuing with Phase 2, but some items may fail to create due to conflicts")
+                    self.delete_phase_failed = True
+                
                 logger.info("-" * 80)
             
             # PHASE 2: Create/Update items in FORWARD dependency order
@@ -1192,15 +1216,27 @@ class SelectivePushOrchestrator:
                                 'Created successfully'
                             )
                         except Exception as e:
-                            self._add_result(
-                                obj_type,
-                                obj_name,
-                                folder_name,
-                                'created',
-                                'failed',
-                                f'Failed to create: {str(e)}',
-                                error=e
-                            )
+                            # Check if this is an "already exists" error
+                            if self._is_already_exists_error(e):
+                                logger.warning(f"Item already exists (delete may have failed): {obj_name}")
+                                self._add_result(
+                                    obj_type,
+                                    obj_name,
+                                    folder_name,
+                                    'skipped',
+                                    'success',
+                                    'Already exists (could not delete in Phase 1)'
+                                )
+                            else:
+                                self._add_result(
+                                    obj_type,
+                                    obj_name,
+                                    folder_name,
+                                    'created',
+                                    'failed',
+                                    f'Failed to create: {str(e)}',
+                                    error=e
+                                )
                     
                     current_item += 1
         
@@ -1294,15 +1330,27 @@ class SelectivePushOrchestrator:
                                 'Created successfully'
                             )
                         except Exception as e:
-                            self._add_result(
-                                prof_type,
-                                prof_name,
-                                folder_name,
-                                'created',
-                                'failed',
-                                f'Failed to create: {str(e)}',
-                                error=e
-                            )
+                            # Check if this is an "already exists" error
+                            if self._is_already_exists_error(e):
+                                logger.warning(f"Item already exists (delete may have failed): {prof_name}")
+                                self._add_result(
+                                    prof_type,
+                                    prof_name,
+                                    folder_name,
+                                    'skipped',
+                                    'success',
+                                    'Already exists (could not delete in Phase 1)'
+                                )
+                            else:
+                                self._add_result(
+                                    prof_type,
+                                    prof_name,
+                                    folder_name,
+                                    'created',
+                                    'failed',
+                                    f'Failed to create: {str(e)}',
+                                    error=e
+                                )
                     
                     current_item += 1
         
@@ -1396,15 +1444,27 @@ class SelectivePushOrchestrator:
                                 'Created successfully'
                             )
                         except Exception as e:
-                            self._add_result(
-                                hip_type,
-                                hip_name,
-                                folder_name,
-                                'created',
-                                'failed',
-                                f'Failed to create: {str(e)}',
-                                error=e
-                            )
+                            # Check if this is an "already exists" error
+                            if self._is_already_exists_error(e):
+                                logger.warning(f"Item already exists (delete may have failed): {hip_name}")
+                                self._add_result(
+                                    hip_type,
+                                    hip_name,
+                                    folder_name,
+                                    'skipped',
+                                    'success',
+                                    'Already exists (could not delete in Phase 1)'
+                                )
+                            else:
+                                self._add_result(
+                                    hip_type,
+                                    hip_name,
+                                    folder_name,
+                                    'created',
+                                    'failed',
+                                    f'Failed to create: {str(e)}',
+                                    error=e
+                                )
                     
                     current_item += 1
         
@@ -1512,15 +1572,28 @@ class SelectivePushOrchestrator:
                             'Created successfully'
                         )
                     except Exception as e:
-                        self._add_result(
-                            infra_type,
-                            item_name,
-                            folder_name,
-                            'created',
-                            'failed',
-                            f'Failed to create: {str(e)}',
-                            error=e
-                        )
+                        # Check if this is an "already exists" error
+                        # This can happen in OVERWRITE mode if delete failed
+                        if self._is_already_exists_error(e):
+                            logger.warning(f"Item already exists (delete may have failed): {item_name}")
+                            self._add_result(
+                                infra_type,
+                                item_name,
+                                folder_name,
+                                'skipped',
+                                'success',
+                                'Already exists (could not delete in Phase 1)'
+                            )
+                        else:
+                            self._add_result(
+                                infra_type,
+                                item_name,
+                                folder_name,
+                                'created',
+                                'failed',
+                                f'Failed to create: {str(e)}',
+                                error=e
+                            )
                 
                 current_item += 1
         
@@ -1622,15 +1695,27 @@ class SelectivePushOrchestrator:
                             'Created successfully'
                         )
                     except Exception as e:
-                        self._add_result(
-                            'security_rule',
-                            rule_name,
-                            folder_name,
-                            'created',
-                            'failed',
-                            f'Failed to create: {str(e)}',
-                            error=e
-                        )
+                        # Check if this is an "already exists" error
+                        if self._is_already_exists_error(e):
+                            logger.warning(f"Item already exists (delete may have failed): {rule_name}")
+                            self._add_result(
+                                'security_rule',
+                                rule_name,
+                                folder_name,
+                                'skipped',
+                                'success',
+                                'Already exists (could not delete in Phase 1)'
+                            )
+                        else:
+                            self._add_result(
+                                'security_rule',
+                                rule_name,
+                                folder_name,
+                                'created',
+                                'failed',
+                                f'Failed to create: {str(e)}',
+                                error=e
+                            )
                 
                 current_item += 1
         
