@@ -445,17 +445,47 @@ class PushConfigWidget(QWidget):
             # Use tenant name if available, otherwise TSG ID
             dest_display = self.destination_name if self.destination_name else self.destination_client.tsg_id
             
-            status_text = f"✓ Ready to push {total_items} items to {dest_display}"
-            if status_parts:
-                status_text += f" ({', '.join(status_parts)})"
+            # Check if source and destination are the same tenant
+            is_same_tenant = (self.api_client and self.destination_client and 
+                            self.api_client.tsg_id == self.destination_client.tsg_id)
             
-            self.status_label.setText(status_text)
-            self.status_label.setStyleSheet(
-                "color: #2e7d32; padding: 12px; background-color: #e8f5e9; border-radius: 5px; font-size: 13px; border: 1px solid #4CAF50;"
-            )
+            if is_same_tenant:
+                # Warning: pushing to same tenant
+                status_text = f"⚠️ Warning: Pushing {total_items} items to the Same Tenant"
+                if status_parts:
+                    status_text += f" ({', '.join(status_parts)})"
+                
+                self.status_label.setText(status_text)
+                self.status_label.setStyleSheet(
+                    "color: #F57F17; padding: 12px; background-color: #FFF9C4; border-radius: 5px; "
+                    "font-size: 13px; border: 2px solid #FBC02D; font-weight: bold;"
+                )
+                # Make push button yellow too
+                self.push_btn.setStyleSheet(
+                    "QPushButton { background-color: #FBC02D; color: #000000; font-weight: bold; "
+                    "padding: 8px 16px; border-radius: 4px; border: 2px solid #F9A825; }"
+                    "QPushButton:hover { background-color: #F9A825; }"
+                    "QPushButton:pressed { background-color: #F57F17; }"
+                )
+                self.progress_label.setText("Warning: Same tenant")
+                self.progress_label.setStyleSheet("color: #F57F17; font-weight: bold;")
+            else:
+                # Normal: pushing to different tenant
+                status_text = f"✓ Ready to push {total_items} items to {dest_display}"
+                if status_parts:
+                    status_text += f" ({', '.join(status_parts)})"
+                
+                self.status_label.setText(status_text)
+                self.status_label.setStyleSheet(
+                    "color: #2e7d32; padding: 12px; background-color: #e8f5e9; border-radius: 5px; "
+                    "font-size: 13px; border: 1px solid #4CAF50;"
+                )
+                # Reset push button to default style
+                self.push_btn.setStyleSheet("")
+                self.progress_label.setText("Ready to push")
+                self.progress_label.setStyleSheet("color: green;")
+            
             self.push_btn.setEnabled(True)
-            self.progress_label.setText("Ready to push")
-            self.progress_label.setStyleSheet("color: green;")
 
     def _count_items(self) -> int:
         """Count total items in configuration."""
