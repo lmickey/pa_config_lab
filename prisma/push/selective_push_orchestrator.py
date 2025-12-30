@@ -112,6 +112,8 @@ class SelectivePushOrchestrator:
                 self.results['summary']['skipped'] += 1
             elif action == 'renamed':
                 self.results['summary']['renamed'] += 1
+            elif action == 'deleted':
+                self.results['summary']['deleted'] += 1
         elif status == 'failed':
             self.results['summary']['failed'] += 1
         
@@ -161,7 +163,8 @@ class SelectivePushOrchestrator:
                 'updated': 0,
                 'skipped': 0,
                 'failed': 0,
-                'renamed': 0
+                'renamed': 0,
+                'deleted': 0
             },
             'details': [],
             'errors': []
@@ -181,14 +184,71 @@ class SelectivePushOrchestrator:
             
             self._report_progress("Starting push operation", 0, total_items)
             
-            # Push in dependency order:
-            # 1. Folders (if creating new folders)
-            # 2. Objects
-            # 3. Profiles
-            # 4. HIP Objects & Profiles
-            # 5. Infrastructure
-            # 6. Security Rules
-            # 7. Snippets
+            # PHASE 1: If OVERWRITE mode, delete existing items in REVERSE dependency order
+            # (top-down: rules → profiles → hip → objects → infrastructure → folders)
+            if self.conflict_resolution == 'OVERWRITE' and destination_config:
+                logger.info("-" * 80)
+                logger.info("PHASE 1: Deleting existing conflicting items (reverse dependency order)")
+                logger.info("-" * 80)
+                
+                # Delete in reverse order: rules first, objects last
+                if 'folders' in selected_items:
+                    current_item = self._delete_security_rules(
+                        selected_items['folders'],
+                        destination_config,
+                        current_item,
+                        total_items
+                    )
+                
+                if 'snippets' in selected_items:
+                    current_item = self._delete_snippets(
+                        selected_items['snippets'],
+                        destination_config,
+                        current_item,
+                        total_items
+                    )
+                
+                if 'folders' in selected_items:
+                    current_item = self._delete_folder_hip(
+                        selected_items['folders'],
+                        destination_config,
+                        current_item,
+                        total_items
+                    )
+                
+                if 'folders' in selected_items:
+                    current_item = self._delete_folder_profiles(
+                        selected_items['folders'],
+                        destination_config,
+                        current_item,
+                        total_items
+                    )
+                
+                if 'infrastructure' in selected_items:
+                    current_item = self._delete_infrastructure(
+                        selected_items['infrastructure'],
+                        destination_config,
+                        current_item,
+                        total_items
+                    )
+                
+                if 'folders' in selected_items:
+                    current_item = self._delete_folder_objects(
+                        selected_items['folders'],
+                        destination_config,
+                        current_item,
+                        total_items
+                    )
+                
+                logger.info("-" * 80)
+                logger.info("PHASE 1 COMPLETE: All conflicting items deleted")
+                logger.info("-" * 80)
+            
+            # PHASE 2: Create/Update items in FORWARD dependency order
+            # (bottom-up: folders → objects → profiles → hip → infrastructure → rules → snippets)
+            logger.info("-" * 80)
+            logger.info("PHASE 2: Creating/updating items (forward dependency order)")
+            logger.info("-" * 80)
             
             # 1. Push folders (create if needed)
             if 'folders' in selected_items:
@@ -253,6 +313,10 @@ class SelectivePushOrchestrator:
                     total_items
                 )
             
+            logger.info("-" * 80)
+            logger.info("PHASE 2 COMPLETE: All items created/updated")
+            logger.info("-" * 80)
+            
             elapsed_time = time.time() - start_time
             
             self._report_progress("Push operation complete", total_items, total_items)
@@ -263,6 +327,7 @@ class SelectivePushOrchestrator:
             logger.info(f"Total Items: {self.results['summary']['total']}")
             logger.info(f"Created: {self.results['summary']['created']}")
             logger.info(f"Updated: {self.results['summary']['updated']}")
+            logger.info(f"Deleted: {self.results['summary']['deleted']}")
             logger.info(f"Skipped: {self.results['summary']['skipped']}")
             logger.info(f"Failed: {self.results['summary']['failed']}")
             logger.info(f"Elapsed Time: {elapsed_time:.2f} seconds")
@@ -331,6 +396,269 @@ class SelectivePushOrchestrator:
         
         return count
 
+    # ========================================================================
+    # DELETE METHODS (for OVERWRITE mode - reverse dependency order)
+    # ========================================================================
+    
+    def _delete_security_rules(
+        self,
+        folders: List[Dict[str, Any]],
+        destination_config: Optional[Dict[str, Any]],
+        current_item: int,
+        total_items: int
+    ) -> int:
+        """Delete existing security rules (Phase 1 - OVERWRITE mode)."""
+        for folder in folders:
+            folder_name = folder.get('name', 'Unknown')
+            
+            if 'security_rules' not in folder:
+                continue
+            
+            for rule in folder.get('security_rules', []):
+                rule_name = rule.get('name', 'Unknown')
+                
+                # Check if exists in destination
+                exists = False
+                if destination_config and 'security_rules' in destination_config:
+                    dest_rules = destination_config['security_rules'].get(folder_name, [])
+                    exists = any(r.get('name') == rule_name for r in dest_rules)
+                
+                if exists:
+                    self._report_progress(
+                        f"Deleting security_rule: {rule_name}",
+                        current_item,
+                        total_items
+                    )
+                    
+                    # TODO: Implement delete API call
+                    self._add_result(
+                        'security_rule',
+                        rule_name,
+                        folder_name,
+                        'deleted',
+                        'success',
+                        'Deleted (placeholder - API not implemented)'
+                    )
+                    current_item += 1
+        
+        return current_item
+    
+    def _delete_snippets(
+        self,
+        snippets: List[Dict[str, Any]],
+        destination_config: Optional[Dict[str, Any]],
+        current_item: int,
+        total_items: int
+    ) -> int:
+        """Delete existing snippets (Phase 1 - OVERWRITE mode)."""
+        for snippet in snippets:
+            snippet_name = snippet.get('name', 'Unknown')
+            
+            # Check if exists in destination
+            exists = False
+            if destination_config and 'snippets' in destination_config:
+                exists = any(s.get('name') == snippet_name for s in destination_config['snippets'])
+            
+            if exists:
+                self._report_progress(
+                    f"Deleting snippet: {snippet_name}",
+                    current_item,
+                    total_items
+                )
+                
+                # TODO: Implement delete API call
+                self._add_result(
+                    'snippet',
+                    snippet_name,
+                    'Global',
+                    'deleted',
+                    'success',
+                    'Deleted (placeholder - API not implemented)'
+                )
+                current_item += 1
+        
+        return current_item
+    
+    def _delete_folder_hip(
+        self,
+        folders: List[Dict[str, Any]],
+        destination_config: Optional[Dict[str, Any]],
+        current_item: int,
+        total_items: int
+    ) -> int:
+        """Delete existing HIP objects/profiles (Phase 1 - OVERWRITE mode)."""
+        for folder in folders:
+            folder_name = folder.get('name', 'Unknown')
+            
+            if 'hip' not in folder:
+                continue
+            
+            for hip_type, hip_list in folder.get('hip', {}).items():
+                for hip_item in hip_list:
+                    hip_name = hip_item.get('name', 'Unknown')
+                    
+                    # Check if exists in destination
+                    exists = False
+                    if destination_config and 'hip' in destination_config:
+                        dest_hip = destination_config['hip'].get(hip_type, {})
+                        exists = hip_name in dest_hip
+                    
+                    if exists:
+                        self._report_progress(
+                            f"Deleting {hip_type}: {hip_name}",
+                            current_item,
+                            total_items
+                        )
+                        
+                        # TODO: Implement delete API call
+                        self._add_result(
+                            hip_type,
+                            hip_name,
+                            folder_name,
+                            'deleted',
+                            'success',
+                            'Deleted (placeholder - API not implemented)'
+                        )
+                        current_item += 1
+        
+        return current_item
+    
+    def _delete_folder_profiles(
+        self,
+        folders: List[Dict[str, Any]],
+        destination_config: Optional[Dict[str, Any]],
+        current_item: int,
+        total_items: int
+    ) -> int:
+        """Delete existing profiles (Phase 1 - OVERWRITE mode)."""
+        for folder in folders:
+            folder_name = folder.get('name', 'Unknown')
+            
+            if 'profiles' not in folder:
+                continue
+            
+            for prof_type, prof_list in folder.get('profiles', {}).items():
+                for prof in prof_list:
+                    prof_name = prof.get('name', 'Unknown')
+                    
+                    # Check if exists in destination
+                    exists = False
+                    if destination_config and 'profiles' in destination_config:
+                        dest_profiles = destination_config['profiles'].get(prof_type, {})
+                        exists = prof_name in dest_profiles
+                    
+                    if exists:
+                        self._report_progress(
+                            f"Deleting {prof_type}: {prof_name}",
+                            current_item,
+                            total_items
+                        )
+                        
+                        # TODO: Implement delete API call
+                        self._add_result(
+                            prof_type,
+                            prof_name,
+                            folder_name,
+                            'deleted',
+                            'success',
+                            'Deleted (placeholder - API not implemented)'
+                        )
+                        current_item += 1
+        
+        return current_item
+    
+    def _delete_infrastructure(
+        self,
+        infrastructure: Dict[str, Any],
+        destination_config: Optional[Dict[str, Any]],
+        current_item: int,
+        total_items: int
+    ) -> int:
+        """Delete existing infrastructure items (Phase 1 - OVERWRITE mode)."""
+        for infra_type, infra_list in infrastructure.items():
+            if not isinstance(infra_list, list):
+                continue
+            
+            for infra_item in infra_list:
+                infra_name = infra_item.get('name', 'Unknown')
+                
+                # Check if exists in destination
+                exists = False
+                if destination_config and 'infrastructure' in destination_config:
+                    dest_infra = destination_config['infrastructure'].get(infra_type, [])
+                    if isinstance(dest_infra, list):
+                        exists = any(i.get('name') == infra_name for i in dest_infra)
+                    elif isinstance(dest_infra, dict):
+                        exists = infra_name in dest_infra
+                
+                if exists:
+                    self._report_progress(
+                        f"Deleting {infra_type}: {infra_name}",
+                        current_item,
+                        total_items
+                    )
+                    
+                    # TODO: Implement delete API call
+                    self._add_result(
+                        infra_type,
+                        infra_name,
+                        'Infrastructure',
+                        'deleted',
+                        'success',
+                        'Deleted (placeholder - API not implemented)'
+                    )
+                    current_item += 1
+        
+        return current_item
+    
+    def _delete_folder_objects(
+        self,
+        folders: List[Dict[str, Any]],
+        destination_config: Optional[Dict[str, Any]],
+        current_item: int,
+        total_items: int
+    ) -> int:
+        """Delete existing objects (Phase 1 - OVERWRITE mode)."""
+        for folder in folders:
+            folder_name = folder.get('name', 'Unknown')
+            
+            if 'objects' not in folder:
+                continue
+            
+            for obj_type, obj_list in folder.get('objects', {}).items():
+                for obj in obj_list:
+                    obj_name = obj.get('name', 'Unknown')
+                    
+                    # Check if exists in destination
+                    exists = False
+                    if destination_config and 'objects' in destination_config:
+                        dest_objects = destination_config['objects'].get(obj_type, {})
+                        exists = obj_name in dest_objects
+                    
+                    if exists:
+                        self._report_progress(
+                            f"Deleting {obj_type}: {obj_name}",
+                            current_item,
+                            total_items
+                        )
+                        
+                        # TODO: Implement delete API call
+                        self._add_result(
+                            obj_type,
+                            obj_name,
+                            folder_name,
+                            'deleted',
+                            'success',
+                            'Deleted (placeholder - API not implemented)'
+                        )
+                        current_item += 1
+        
+        return current_item
+    
+    # ========================================================================
+    # PUSH/CREATE METHODS (forward dependency order)
+    # ========================================================================
+    
     def _push_folders(
         self,
         folders: List[Dict[str, Any]],
@@ -405,10 +733,13 @@ class SelectivePushOrchestrator:
                     )
                     
                     # Check if exists in destination
+                    # Note: In OVERWRITE mode, items were already deleted in Phase 1,
+                    # so we should always CREATE, not UPDATE
                     exists = False
-                    if destination_config and 'objects' in destination_config:
-                        dest_objects = destination_config['objects'].get(obj_type, {})
-                        exists = obj_name in dest_objects
+                    if self.conflict_resolution != 'OVERWRITE':
+                        if destination_config and 'objects' in destination_config:
+                            dest_objects = destination_config['objects'].get(obj_type, {})
+                            exists = obj_name in dest_objects
                     
                     # Apply conflict resolution
                     if exists:
@@ -420,16 +751,6 @@ class SelectivePushOrchestrator:
                                 'skipped',
                                 'success',
                                 'Already exists, skipped per conflict resolution'
-                            )
-                        elif self.conflict_resolution == 'OVERWRITE':
-                            # TODO: Implement update API call
-                            self._add_result(
-                                obj_type,
-                                obj_name,
-                                folder_name,
-                                'updated',
-                                'success',
-                                'Updated (placeholder - API not implemented)'
                             )
                         elif self.conflict_resolution == 'RENAME':
                             # TODO: Implement create with renamed API call
@@ -443,7 +764,7 @@ class SelectivePushOrchestrator:
                                 f'Created as {new_name} (placeholder - API not implemented)'
                             )
                     else:
-                        # Create new
+                        # Create new (or recreate after delete in OVERWRITE mode)
                         # TODO: Implement create API call
                         self._add_result(
                             obj_type,
@@ -482,15 +803,45 @@ class SelectivePushOrchestrator:
                         total_items
                     )
                     
-                    # TODO: Implement profile push logic (similar to objects)
-                    self._add_result(
-                        prof_type,
-                        prof_name,
-                        folder_name,
-                        'created',
-                        'success',
-                        'Created (placeholder - API not implemented)'
-                    )
+                    # Check if exists in destination
+                    # Note: In OVERWRITE mode, items were already deleted in Phase 1
+                    exists = False
+                    if self.conflict_resolution != 'OVERWRITE':
+                        if destination_config and 'profiles' in destination_config:
+                            dest_profiles = destination_config['profiles'].get(prof_type, {})
+                            exists = prof_name in dest_profiles
+                    
+                    # Apply conflict resolution
+                    if exists:
+                        if self.conflict_resolution == 'SKIP':
+                            self._add_result(
+                                prof_type,
+                                prof_name,
+                                folder_name,
+                                'skipped',
+                                'success',
+                                'Already exists, skipped per conflict resolution'
+                            )
+                        elif self.conflict_resolution == 'RENAME':
+                            new_name = f"{prof_name}_imported"
+                            self._add_result(
+                                prof_type,
+                                new_name,
+                                folder_name,
+                                'renamed',
+                                'success',
+                                f'Created as {new_name} (placeholder - API not implemented)'
+                            )
+                    else:
+                        # Create new (or recreate after delete in OVERWRITE mode)
+                        self._add_result(
+                            prof_type,
+                            prof_name,
+                            folder_name,
+                            'created',
+                            'success',
+                            'Created (placeholder - API not implemented)'
+                        )
                     
                     current_item += 1
         
@@ -520,15 +871,45 @@ class SelectivePushOrchestrator:
                         total_items
                     )
                     
-                    # TODO: Implement HIP push logic
-                    self._add_result(
-                        hip_type,
-                        hip_name,
-                        folder_name,
-                        'created',
-                        'success',
-                        'Created (placeholder - API not implemented)'
-                    )
+                    # Check if exists in destination
+                    # Note: In OVERWRITE mode, items were already deleted in Phase 1
+                    exists = False
+                    if self.conflict_resolution != 'OVERWRITE':
+                        if destination_config and 'hip' in destination_config:
+                            dest_hip = destination_config['hip'].get(hip_type, {})
+                            exists = hip_name in dest_hip
+                    
+                    # Apply conflict resolution
+                    if exists:
+                        if self.conflict_resolution == 'SKIP':
+                            self._add_result(
+                                hip_type,
+                                hip_name,
+                                folder_name,
+                                'skipped',
+                                'success',
+                                'Already exists, skipped per conflict resolution'
+                            )
+                        elif self.conflict_resolution == 'RENAME':
+                            new_name = f"{hip_name}_imported"
+                            self._add_result(
+                                hip_type,
+                                new_name,
+                                folder_name,
+                                'renamed',
+                                'success',
+                                f'Created as {new_name} (placeholder - API not implemented)'
+                            )
+                    else:
+                        # Create new (or recreate after delete in OVERWRITE mode)
+                        self._add_result(
+                            hip_type,
+                            hip_name,
+                            folder_name,
+                            'created',
+                            'success',
+                            'Created (placeholder - API not implemented)'
+                        )
                     
                     current_item += 1
         
@@ -556,15 +937,48 @@ class SelectivePushOrchestrator:
                     total_items
                 )
                 
-                # TODO: Implement infrastructure push logic
-                self._add_result(
-                    infra_type,
-                    item_name,
-                    folder_name,
-                    'created',
-                    'success',
-                    'Created (placeholder - API not implemented)'
-                )
+                # Check if exists in destination
+                # Note: In OVERWRITE mode, items were already deleted in Phase 1
+                exists = False
+                if self.conflict_resolution != 'OVERWRITE':
+                    if destination_config and 'infrastructure' in destination_config:
+                        dest_infra = destination_config['infrastructure'].get(infra_type, [])
+                        if isinstance(dest_infra, list):
+                            exists = any(i.get('name') == item_name for i in dest_infra)
+                        elif isinstance(dest_infra, dict):
+                            exists = item_name in dest_infra
+                
+                # Apply conflict resolution
+                if exists:
+                    if self.conflict_resolution == 'SKIP':
+                        self._add_result(
+                            infra_type,
+                            item_name,
+                            folder_name,
+                            'skipped',
+                            'success',
+                            'Already exists, skipped per conflict resolution'
+                        )
+                    elif self.conflict_resolution == 'RENAME':
+                        new_name = f"{item_name}_imported"
+                        self._add_result(
+                            infra_type,
+                            new_name,
+                            folder_name,
+                            'renamed',
+                            'success',
+                            f'Created as {new_name} (placeholder - API not implemented)'
+                        )
+                else:
+                    # Create new (or recreate after delete in OVERWRITE mode)
+                    self._add_result(
+                        infra_type,
+                        item_name,
+                        folder_name,
+                        'created',
+                        'success',
+                        'Created (placeholder - API not implemented)'
+                    )
                 
                 current_item += 1
         
@@ -593,15 +1007,45 @@ class SelectivePushOrchestrator:
                     total_items
                 )
                 
-                # TODO: Implement security rule push logic
-                self._add_result(
-                    'security_rule',
-                    rule_name,
-                    folder_name,
-                    'created',
-                    'success',
-                    'Created (placeholder - API not implemented)'
-                )
+                # Check if exists in destination
+                # Note: In OVERWRITE mode, items were already deleted in Phase 1
+                exists = False
+                if self.conflict_resolution != 'OVERWRITE':
+                    if destination_config and 'security_rules' in destination_config:
+                        dest_rules = destination_config['security_rules'].get(folder_name, [])
+                        exists = any(r.get('name') == rule_name for r in dest_rules)
+                
+                # Apply conflict resolution
+                if exists:
+                    if self.conflict_resolution == 'SKIP':
+                        self._add_result(
+                            'security_rule',
+                            rule_name,
+                            folder_name,
+                            'skipped',
+                            'success',
+                            'Already exists, skipped per conflict resolution'
+                        )
+                    elif self.conflict_resolution == 'RENAME':
+                        new_name = f"{rule_name}_imported"
+                        self._add_result(
+                            'security_rule',
+                            new_name,
+                            folder_name,
+                            'renamed',
+                            'success',
+                            f'Created as {new_name} (placeholder - API not implemented)'
+                        )
+                else:
+                    # Create new (or recreate after delete in OVERWRITE mode)
+                    self._add_result(
+                        'security_rule',
+                        rule_name,
+                        folder_name,
+                        'created',
+                        'success',
+                        'Created (placeholder - API not implemented)'
+                    )
                 
                 current_item += 1
         
@@ -624,15 +1068,44 @@ class SelectivePushOrchestrator:
                 total_items
             )
             
-            # TODO: Implement snippet push logic
-            self._add_result(
-                'snippet',
-                snippet_name,
-                'N/A',
-                'created',
-                'success',
-                'Created (placeholder - API not implemented)'
-            )
+            # Check if exists in destination
+            # Note: In OVERWRITE mode, items were already deleted in Phase 1
+            exists = False
+            if self.conflict_resolution != 'OVERWRITE':
+                if destination_config and 'snippets' in destination_config:
+                    exists = any(s.get('name') == snippet_name for s in destination_config['snippets'])
+            
+            # Apply conflict resolution
+            if exists:
+                if self.conflict_resolution == 'SKIP':
+                    self._add_result(
+                        'snippet',
+                        snippet_name,
+                        'Global',
+                        'skipped',
+                        'success',
+                        'Already exists, skipped per conflict resolution'
+                    )
+                elif self.conflict_resolution == 'RENAME':
+                    new_name = f"{snippet_name}_imported"
+                    self._add_result(
+                        'snippet',
+                        new_name,
+                        'Global',
+                        'renamed',
+                        'success',
+                        f'Created as {new_name} (placeholder - API not implemented)'
+                    )
+            else:
+                # Create new (or recreate after delete in OVERWRITE mode)
+                self._add_result(
+                    'snippet',
+                    snippet_name,
+                    'Global',
+                    'created',
+                    'success',
+                    'Created (placeholder - API not implemented)'
+                )
             
             current_item += 1
         
