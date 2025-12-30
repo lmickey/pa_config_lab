@@ -37,6 +37,10 @@ class SelectivePushOrchestrator:
         # Progress callback
         self.progress_callback: Optional[Callable[[str, int, int], None]] = None
         
+        # Name mapping for RENAME mode (old_name -> new_name)
+        # Used to update references in dependent items
+        self.name_mappings: Dict[str, str] = {}
+        
         # Results tracking
         self.results = {
             'summary': {
@@ -45,7 +49,8 @@ class SelectivePushOrchestrator:
                 'updated': 0,
                 'skipped': 0,
                 'failed': 0,
-                'renamed': 0
+                'renamed': 0,
+                'deleted': 0
             },
             'details': [],
             'errors': []
@@ -138,6 +143,53 @@ class SelectivePushOrchestrator:
         else:
             logger.warning(log_msg)
 
+    def _update_references_in_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update references in a configuration item to use renamed names.
+        
+        Args:
+            item: Configuration item dictionary
+            
+        Returns:
+            Updated item with renamed references
+        """
+        if not self.name_mappings:
+            return item
+        
+        # Deep copy to avoid modifying original
+        import copy
+        updated_item = copy.deepcopy(item)
+        
+        # Common fields that may contain object references
+        reference_fields = [
+            'source', 'destination',  # Security rules
+            'source_address', 'destination_address',  # Various
+            'members',  # Address groups, service groups
+            'application',  # Security rules
+            'service',  # Security rules
+            'profile_setting',  # Security rules
+            'log_setting',  # Security rules
+            'schedule',  # Security rules
+        ]
+        
+        def update_value(value):
+            """Recursively update values that match renamed items."""
+            if isinstance(value, str):
+                # Check if this value matches any renamed item
+                return self.name_mappings.get(value, value)
+            elif isinstance(value, list):
+                return [update_value(v) for v in value]
+            elif isinstance(value, dict):
+                return {k: update_value(v) for k, v in value.items()}
+            return value
+        
+        # Update all reference fields
+        for field in reference_fields:
+            if field in updated_item:
+                updated_item[field] = update_value(updated_item[field])
+        
+        return updated_item
+
     def push_selected_items(
         self,
         selected_items: Dict[str, Any],
@@ -155,7 +207,8 @@ class SelectivePushOrchestrator:
         """
         start_time = time.time()
         
-        # Reset results
+        # Reset results and name mappings
+        self.name_mappings = {}
         self.results = {
             'summary': {
                 'total': 0,
@@ -753,8 +806,13 @@ class SelectivePushOrchestrator:
                                 'Already exists, skipped per conflict resolution'
                             )
                         elif self.conflict_resolution == 'RENAME':
+                            # Create with "-copy" suffix and track name mapping
+                            new_name = f"{obj_name}-copy"
+                            self.name_mappings[obj_name] = new_name
+                            
+                            logger.info(f"Name mapping: {obj_name} → {new_name}")
+                            
                             # TODO: Implement create with renamed API call
-                            new_name = f"{obj_name}_imported"
                             self._add_result(
                                 obj_type,
                                 new_name,
@@ -823,7 +881,12 @@ class SelectivePushOrchestrator:
                                 'Already exists, skipped per conflict resolution'
                             )
                         elif self.conflict_resolution == 'RENAME':
-                            new_name = f"{prof_name}_imported"
+                            # Create with "-copy" suffix and track name mapping
+                            new_name = f"{prof_name}-copy"
+                            self.name_mappings[prof_name] = new_name
+                            
+                            logger.info(f"Name mapping: {prof_name} → {new_name}")
+                            
                             self._add_result(
                                 prof_type,
                                 new_name,
@@ -891,7 +954,12 @@ class SelectivePushOrchestrator:
                                 'Already exists, skipped per conflict resolution'
                             )
                         elif self.conflict_resolution == 'RENAME':
-                            new_name = f"{hip_name}_imported"
+                            # Create with "-copy" suffix and track name mapping
+                            new_name = f"{hip_name}-copy"
+                            self.name_mappings[hip_name] = new_name
+                            
+                            logger.info(f"Name mapping: {hip_name} → {new_name}")
+                            
                             self._add_result(
                                 hip_type,
                                 new_name,
@@ -960,7 +1028,12 @@ class SelectivePushOrchestrator:
                             'Already exists, skipped per conflict resolution'
                         )
                     elif self.conflict_resolution == 'RENAME':
-                        new_name = f"{item_name}_imported"
+                        # Create with "-copy" suffix and track name mapping
+                        new_name = f"{item_name}-copy"
+                        self.name_mappings[item_name] = new_name
+                        
+                        logger.info(f"Name mapping: {item_name} → {new_name}")
+                        
                         self._add_result(
                             infra_type,
                             new_name,
@@ -1007,6 +1080,9 @@ class SelectivePushOrchestrator:
                     total_items
                 )
                 
+                # Update references in rule to use renamed items (RENAME mode)
+                updated_rule = self._update_references_in_item(rule)
+                
                 # Check if exists in destination
                 # Note: In OVERWRITE mode, items were already deleted in Phase 1
                 exists = False
@@ -1027,7 +1103,17 @@ class SelectivePushOrchestrator:
                             'Already exists, skipped per conflict resolution'
                         )
                     elif self.conflict_resolution == 'RENAME':
-                        new_name = f"{rule_name}_imported"
+                        # Create with "-copy" suffix and track name mapping
+                        new_name = f"{rule_name}-copy"
+                        self.name_mappings[rule_name] = new_name
+                        
+                        logger.info(f"Name mapping: {rule_name} → {new_name}")
+                        
+                        # Log reference updates if any
+                        if self.name_mappings:
+                            logger.info(f"  Updated references in rule: {list(self.name_mappings.keys())}")
+                        
+                        # TODO: Use updated_rule with renamed references
                         self._add_result(
                             'security_rule',
                             new_name,
@@ -1038,6 +1124,7 @@ class SelectivePushOrchestrator:
                         )
                 else:
                     # Create new (or recreate after delete in OVERWRITE mode)
+                    # TODO: Use updated_rule if in RENAME mode and there are mappings
                     self._add_result(
                         'security_rule',
                         rule_name,
@@ -1087,7 +1174,12 @@ class SelectivePushOrchestrator:
                         'Already exists, skipped per conflict resolution'
                     )
                 elif self.conflict_resolution == 'RENAME':
-                    new_name = f"{snippet_name}_imported"
+                    # Create with "-copy" suffix and track name mapping
+                    new_name = f"{snippet_name}-copy"
+                    self.name_mappings[snippet_name] = new_name
+                    
+                    logger.info(f"Name mapping: {snippet_name} → {new_name}")
+                    
                     self._add_result(
                         'snippet',
                         new_name,
