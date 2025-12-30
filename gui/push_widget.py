@@ -669,7 +669,9 @@ class PushConfigWidget(QWidget):
         self.dry_run_check.setEnabled(enabled)
         self.validate_check.setEnabled(enabled)
         # Phase 3: Enable push only if we have config, destination, AND selection
-        self.push_btn.setEnabled(enabled and self.destination_client and self.config and self.selected_items)
+        # Convert to bool to avoid passing dict to setEnabled
+        should_enable = enabled and bool(self.destination_client) and bool(self.config) and bool(self.selected_items)
+        self.push_btn.setEnabled(should_enable)
     
     # Phase 3: Receive selection from selection widget
     
