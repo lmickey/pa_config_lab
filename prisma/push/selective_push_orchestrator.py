@@ -567,7 +567,7 @@ class SelectivePushOrchestrator:
             try:
                 self._report_progress("Push operation complete", total_items, total_items)
             except Exception as prog_err:
-                print(f"Error reporting final progress: {prog_err}")
+                pass  # Silently ignore progress errors
             
             # Log completion summary (wrapped to prevent crashes)
             try:
@@ -575,7 +575,7 @@ class SelectivePushOrchestrator:
                 logger.info("PUSH OPERATION COMPLETED")
                 logger.info(f"Total Items: {self.results['summary']['total']}")
             except Exception as e:
-                print(f"Error logging completion header: {e}")
+                pass  # Silently ignore logging errors
             
             try:
                 logger.info(f"Created: {self.results['summary']['created']}")
@@ -585,7 +585,7 @@ class SelectivePushOrchestrator:
                 logger.info(f"Skipped: {self.results['summary']['skipped']}")
                 logger.info(f"Failed: {self.results['summary']['failed']}")
             except Exception as e:
-                print(f"Error logging summary counts: {e}")
+                pass  # Silently ignore logging errors
             
             # Log items that couldn't be overwritten
             try:
@@ -602,15 +602,15 @@ class SelectivePushOrchestrator:
                             item_reason = str(item.get('reason', 'unknown'))[:200]  # Truncate reason
                             logger.warning(f"  - {item_type}: {item_name} (folder: {item_folder}) - {item_reason}")
                         except Exception as item_err:
-                            logger.warning(f"  - (error logging item: {str(item_err)[:100]})")
+                            pass  # Silently ignore item logging errors
             except Exception as e:
-                print(f"Error logging could_not_overwrite: {e}")
+                pass  # Silently ignore logging errors
             
             try:
                 logger.info(f"Elapsed Time: {elapsed_time:.2f} seconds")
                 logger.info("=" * 80)
             except Exception as e:
-                print(f"Error logging completion footer: {e}")
+                pass  # Silently ignore logging errors
             
             # Build return dictionary safely
             try:
@@ -622,8 +622,7 @@ class SelectivePushOrchestrator:
                 }
                 return result_dict
             except Exception as ret_err:
-                print(f"Error building return dictionary: {ret_err}")
-                # Return minimal safe result
+                # Return minimal safe result (don't print from thread)
                 return {
                     'success': True,
                     'message': 'Push completed (error building full results)',
