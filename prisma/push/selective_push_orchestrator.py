@@ -321,14 +321,27 @@ class SelectivePushOrchestrator:
         
         # Common fields that may contain object references
         reference_fields = [
-            'source', 'destination',  # Security rules
-            'source_address', 'destination_address',  # Various
+            # Security rules
+            'source', 'destination',
+            'source_address', 'destination_address',
+            'application', 'service',
+            'profile_setting', 'log_setting', 'schedule',
+            
+            # Groups
             'members',  # Address groups, service groups
-            'application',  # Security rules
-            'service',  # Security rules
-            'profile_setting',  # Security rules
-            'log_setting',  # Security rules
-            'schedule',  # Security rules
+            
+            # Infrastructure - IPsec Tunnels
+            'auto_key',  # Contains ike_gateway reference
+            'tunnel_monitor',  # May contain destination_ip
+            
+            # Infrastructure - IKE Gateways  
+            'authentication',  # Contains pre_shared_key or certificate
+            'protocol',  # Contains ikev1/ikev2 settings
+            'protocol_common',  # Common protocol settings
+            
+            # Infrastructure - Service Connections
+            'ipsec_tunnel',  # Reference to IPsec tunnel name
+            'backup_SC',  # Backup service connection
         ]
         
         def update_value(value):
@@ -346,6 +359,28 @@ class SelectivePushOrchestrator:
         for field in reference_fields:
             if field in updated_item:
                 updated_item[field] = update_value(updated_item[field])
+        
+        # Special handling for infrastructure items with nested references
+        
+        # IPsec Tunnels: auto_key.ike_gateway is a direct reference
+        if 'auto_key' in updated_item and isinstance(updated_item['auto_key'], dict):
+            if 'ike_gateway' in updated_item['auto_key']:
+                old_gateway = updated_item['auto_key']['ike_gateway']
+                updated_item['auto_key']['ike_gateway'] = self.name_mappings.get(old_gateway, old_gateway)
+        
+        # IKE Gateways: protocol.ikev1/ikev2.ike_crypto_profile
+        if 'protocol' in updated_item and isinstance(updated_item['protocol'], dict):
+            for version in ['ikev1', 'ikev2']:
+                if version in updated_item['protocol'] and isinstance(updated_item['protocol'][version], dict):
+                    if 'ike_crypto_profile' in updated_item['protocol'][version]:
+                        old_profile = updated_item['protocol'][version]['ike_crypto_profile']
+                        updated_item['protocol'][version]['ike_crypto_profile'] = self.name_mappings.get(old_profile, old_profile)
+        
+        # IPsec Tunnels: anti_replay, copy_tos, enable_gre_encapsulation contain ipsec_crypto_profile in tunnel_interface
+        if 'tunnel_interface' in updated_item and isinstance(updated_item['tunnel_interface'], dict):
+            if 'ipsec_crypto_profile' in updated_item['tunnel_interface']:
+                old_profile = updated_item['tunnel_interface']['ipsec_crypto_profile']
+                updated_item['tunnel_interface']['ipsec_crypto_profile'] = self.name_mappings.get(old_profile, old_profile)
         
         return updated_item
 
@@ -1505,7 +1540,10 @@ class SelectivePushOrchestrator:
                             
                             # Create renamed object
                             try:
-                                renamed_obj = self._clean_item_for_api(obj)
+                                # Update references to other renamed items BEFORE renaming this one
+                                updated_obj = self._update_references_in_item(obj)
+                                
+                                renamed_obj = self._clean_item_for_api(updated_obj)
                                 renamed_obj['name'] = new_name
                                 
                                 result = self._create_object(obj_type, renamed_obj, folder_name)
@@ -1904,7 +1942,10 @@ class SelectivePushOrchestrator:
                         logger.info(f"Name mapping: {item_name} → {new_name}")
                         
                         try:
-                            renamed_item = self._clean_item_for_api(item)
+                            # Update references to other renamed items BEFORE renaming this one
+                            updated_item = self._update_references_in_item(item)
+                            
+                            renamed_item = self._clean_item_for_api(updated_item)
                             renamed_item['name'] = new_name
                             
                             result = self._create_infrastructure(infra_type, renamed_item, folder_name)
