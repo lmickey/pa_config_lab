@@ -774,8 +774,31 @@ class SelectivePushOrchestrator:
         return method(obj_id)
     
     def _create_security_rule(self, rule_data: Dict[str, Any], folder: str) -> Dict[str, Any]:
-        """Create a security rule."""
-        return self.api_client.create_security_rule(rule_data, folder)
+        """
+        Create a security rule and move it to the bottom of the rulebase.
+        
+        This ensures new rules don't interfere with existing traffic flow.
+        """
+        # Create the rule
+        result = self.api_client.create_security_rule(rule_data, folder)
+        
+        # Get the rule ID from the result
+        rule_id = result.get('id')
+        if rule_id:
+            try:
+                # Move the rule to the bottom of the pre-rulebase
+                logger.info(f"Moving security rule '{rule_data.get('name')}' to bottom of rulebase")
+                self.api_client.move_security_rule(
+                    rule_id=rule_id,
+                    folder=folder,
+                    destination="bottom",
+                    rulebase="pre"
+                )
+            except Exception as move_err:
+                # Log the error but don't fail the entire operation
+                logger.warning(f"Failed to move security rule to bottom: {move_err}")
+        
+        return result
     
     def _delete_security_rule(self, rule_id: str) -> Dict[str, Any]:
         """Delete a security rule."""

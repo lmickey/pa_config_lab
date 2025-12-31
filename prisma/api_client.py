@@ -1910,6 +1910,26 @@ class PrismaAccessAPIClient:
         url = APIEndpoints.security_rule(rule_id)
         return self._make_request("DELETE", url, use_cache=False)
     
+    def move_security_rule(self, rule_id: str, folder: str, destination: str = "bottom", rulebase: str = "pre") -> Dict[str, Any]:
+        """
+        Move a security rule to a specific position in the rulebase.
+        
+        Args:
+            rule_id: Rule ID to move
+            folder: Folder name
+            destination: Where to move the rule ("top", "bottom", "before", "after")
+            rulebase: Rulebase to use ("pre" or "post")
+            
+        Returns:
+            API response
+        """
+        url = f"{APIEndpoints.security_rule(rule_id)}:move{build_folder_query(folder)}"
+        data = {
+            "destination": destination,
+            "rulebase": rulebase
+        }
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
     # Snippets
     
     def create_snippet(self, data: Dict[str, Any]) -> Dict[str, Any]:
