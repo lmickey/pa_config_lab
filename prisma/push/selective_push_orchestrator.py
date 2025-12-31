@@ -1107,12 +1107,13 @@ class SelectivePushOrchestrator:
         """
         # Define the correct delete order for infrastructure
         infra_delete_order = [
-            'ipsec_tunnels',
-            'ike_gateways',
-            'ike_crypto_profiles',
-            'ipsec_crypto_profiles',
+            # Delete from top-down: things that reference others FIRST
+            'service_connections',   # FIRST! Service connections reference tunnels
+            'ipsec_tunnels',         # Tunnels reference gateways and crypto profiles
+            'ike_gateways',          # Gateways reference IKE crypto profiles
+            'ike_crypto_profiles',   # Crypto profiles are referenced by gateways
+            'ipsec_crypto_profiles', # Crypto profiles are referenced by tunnels
             'remote_networks',
-            'service_connections',
             'gp_gateways',
             'gp_portals',
             'agent_profiles',
@@ -1708,16 +1709,18 @@ class SelectivePushOrchestrator:
         """
         # Define the correct create order for infrastructure (reverse of delete)
         infra_create_order = [
+            # This should be the EXACT REVERSE of infra_delete_order
+            # Create from bottom-up: dependencies first, then things that depend on them
             'bandwidth_allocations',
             'agent_profiles',
             'gp_portals',
             'gp_gateways',
-            'service_connections',
             'remote_networks',
-            'ipsec_crypto_profiles',
-            'ike_crypto_profiles',
-            'ike_gateways',
-            'ipsec_tunnels',
+            'ipsec_crypto_profiles',   # Create crypto profiles BEFORE gateways/tunnels
+            'ike_crypto_profiles',      # Create IKE crypto BEFORE IKE gateways
+            'ike_gateways',             # Create gateways BEFORE tunnels
+            'ipsec_tunnels',            # Create tunnels BEFORE service connections
+            'service_connections',       # LAST! Service connections reference tunnels
         ]
         
         # Create in the specified order

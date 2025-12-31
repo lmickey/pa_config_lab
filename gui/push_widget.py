@@ -655,8 +655,10 @@ class PushConfigWidget(QWidget):
                 failed = summary.get('failed', 0) if isinstance(summary, dict) else 0
                 could_not_overwrite = summary.get('could_not_overwrite', 0) if isinstance(summary, dict) else 0
                 
-                # Calculate actual processed count (sum of all actions)
-                processed_count = created + updated + deleted + renamed + skipped + failed + could_not_overwrite
+                # Calculate actual processed count
+                # Note: could_not_overwrite items are ALSO counted in 'failed',
+                # so we subtract could_not_overwrite to avoid double-counting
+                processed_count = created + updated + deleted + renamed + skipped + failed
                 
                 # Determine status based on results
                 has_failures = (failed > 0 or could_not_overwrite > 0)
