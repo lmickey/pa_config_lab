@@ -229,8 +229,9 @@ class SelectivePushOrchestrator:
         Returns:
             Cleaned item without read-only fields
         """
-        import copy
-        cleaned = copy.deepcopy(item)
+        # Use simple dict copy instead of deepcopy to avoid memory issues
+        # We don't need deep copy since we're only modifying top-level keys
+        cleaned = dict(item)
         
         # List of read-only fields that should be removed
         readonly_fields = [
@@ -247,8 +248,7 @@ class SelectivePushOrchestrator:
         ]
         
         for field in readonly_fields:
-            if field in cleaned:
-                del cleaned[field]
+            cleaned.pop(field, None)  # Use pop with default instead of checking 'if field in'
         
         return cleaned
     
@@ -265,9 +265,8 @@ class SelectivePushOrchestrator:
         if not self.name_mappings:
             return item
         
-        # Deep copy to avoid modifying original
-        import copy
-        updated_item = copy.deepcopy(item)
+        # Shallow copy to avoid modifying original, but reuse nested structures
+        updated_item = dict(item)
         
         # Common fields that may contain object references
         reference_fields = [
