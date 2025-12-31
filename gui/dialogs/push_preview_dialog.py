@@ -43,23 +43,29 @@ class ConfigFetchWorker(QThread):
             # DISABLED: print(f"Selected items keys: {list(self.selected_items.keys())}")
             for key, value in self.selected_items.items():
                 if isinstance(value, dict):
-                    print(f"  {key}: {list(value.keys())} ({sum(len(v) for v in value.values() if isinstance(v, list))} items)")
+                    pass
+                    # DISABLED-THREAD: print(f"  {key}: {list(value.keys())} ({sum(len(v) for v in value.values() if isinstance(v, list))} items)")
                 elif isinstance(value, list):
-                    print(f"  {key}: {len(value)} items")
+                    # DISABLED-THREAD: print(f"  {key}: {len(value)} items")
                     # Show folder details
                     if key == 'folders' and len(value) > 0:
                         for folder in value[:2]:  # Show first 2 folders
-                            print(f"    Folder: {folder.get('name')}")
+                            # DISABLED-THREAD: print(f"    Folder: {folder.get('name')}")
                             if 'objects' in folder:
-                                print(f"      objects: {list(folder.get('objects', {}).keys())}")
+                                pass
+                                # DISABLED-THREAD: print(f"      objects: {list(folder.get('objects', {}).keys())}")
                             if 'security_rules' in folder:
-                                print(f"      security_rules: {len(folder.get('security_rules', []))} items")
+                                pass
+                                # DISABLED-THREAD: print(f"      security_rules: {len(folder.get('security_rules', []))} items")
                             if 'profiles' in folder:
-                                print(f"      profiles: {list(folder.get('profiles', {}).keys())}")
+                                pass
+                                # DISABLED-THREAD: print(f"      profiles: {list(folder.get('profiles', {}).keys())}")
                             if 'hip' in folder:
-                                print(f"      hip: {list(folder.get('hip', {}).keys())}")
+                                pass
+                                # DISABLED-THREAD: print(f"      hip: {list(folder.get('hip', {}).keys())}")
                 else:
-                    print(f"  {key}: {value}")
+                    pass
+                    # DISABLED-THREAD: print(f"  {key}: {value}")
             
             dest_config = {
                 'folders': {},
@@ -84,29 +90,31 @@ class ConfigFetchWorker(QThread):
             if folders:
                 self.progress.emit(f"Checking folders...", int((current / max(total_items, 1)) * 100))
                 try:
-                    print(f"  Fetching folders using get_security_policy_folders()")
+                    # DISABLED-THREAD: print(f"  Fetching folders using get_security_policy_folders()")
                     existing_folders = self.api_client.get_security_policy_folders()
-                    print(f"    Found {len(existing_folders)} existing folders")
+                    # DISABLED-THREAD: print(f"    Found {len(existing_folders)} existing folders")
                     for folder in existing_folders:
                         folder_name = folder.get('name')
                         if folder_name:
                             dest_config['folders'][folder_name] = folder
                             if len(dest_config['folders']) <= 5:
-                                print(f"      - {folder_name}")
+                                pass
+                                # DISABLED-THREAD: print(f"      - {folder_name}")
                     
                     if len(dest_config['folders']) > 5:
-                        print(f"      ... and {len(dest_config['folders']) - 5} more")
+                        pass
+                        # DISABLED-THREAD: print(f"      ... and {len(dest_config['folders']) - 5} more")
                     
                     # Also fetch objects/rules/profiles from folders for conflict checking
-                    print(f"  Fetching folder contents for conflict checking...")
+                    # DISABLED-THREAD: print(f"  Fetching folder contents for conflict checking...")
                     for folder in folders:
                         folder_name = folder.get('name', 'Unknown')
-                        print(f"    Folder: {folder_name}")
+                        # DISABLED-THREAD: print(f"    Folder: {folder_name}")
                         
                         # Fetch objects from this folder
                         folder_objects = folder.get('objects', {})
                         if folder_objects:
-                            print(f"      Fetching objects from folder: {list(folder_objects.keys())}")
+                            # DISABLED-THREAD: print(f"      Fetching objects from folder: {list(folder_objects.keys())}")
                             for obj_type in folder_objects.keys():
                                 if obj_type not in dest_config['objects']:
                                     dest_config['objects'][obj_type] = {}
@@ -115,20 +123,23 @@ class ConfigFetchWorker(QThread):
                         # Note: Rules are folder-specific, so we don't fetch them globally
                         folder_rules = folder.get('security_rules', [])
                         if folder_rules:
-                            print(f"      Rules: {len(folder_rules)} items (folder-specific)")
+                            pass
+                            # DISABLED-THREAD: print(f"      Rules: {len(folder_rules)} items (folder-specific)")
                         
                         # Note: Profiles are folder-specific
                         folder_profiles = folder.get('profiles', {})
                         if folder_profiles:
-                            print(f"      Profiles: {list(folder_profiles.keys())} (folder-specific)")
+                            pass
+                            # DISABLED-THREAD: print(f"      Profiles: {list(folder_profiles.keys())} (folder-specific)")
                         
                         # Note: HIP is folder-specific
                         folder_hip = folder.get('hip', {})
                         if folder_hip:
-                            print(f"      HIP: {list(folder_hip.keys())} (folder-specific)")
+                            pass
+                            # DISABLED-THREAD: print(f"      HIP: {list(folder_hip.keys())} (folder-specific)")
                     
                 except Exception as e:
-                    print(f"    ERROR fetching folders: {e}")
+                    # DISABLED-THREAD: print(f"    ERROR fetching folders: {e}")
                     import traceback
                     traceback.print_exc()
                 current += len(folders)
@@ -138,16 +149,16 @@ class ConfigFetchWorker(QThread):
             if snippets:
                 self.progress.emit(f"Checking snippets...", int((current / max(total_items, 1)) * 100))
                 try:
-                    print(f"  Fetching snippets using get_security_policy_snippets()")
+                    # DISABLED-THREAD: print(f"  Fetching snippets using get_security_policy_snippets()")
                     existing_snippets = self.api_client.get_security_policy_snippets()
-                    print(f"    Found {len(existing_snippets)} existing snippets")
+                    # DISABLED-THREAD: print(f"    Found {len(existing_snippets)} existing snippets")
                     for snippet in existing_snippets:
                         snippet_name = snippet.get('name')
                         if snippet_name:
                             dest_config['snippets'][snippet_name] = snippet
-                            print(f"      - {snippet_name}")
+                            # DISABLED-THREAD: print(f"      - {snippet_name}")
                 except Exception as e:
-                    print(f"    ERROR fetching snippets: {e}")
+                    # DISABLED-THREAD: print(f"    ERROR fetching snippets: {e}")
                     import traceback
                     traceback.print_exc()
                 current += len(snippets)
@@ -190,16 +201,16 @@ class ConfigFetchWorker(QThread):
                 
                 for obj_type, obj_list in objects.items():
                     if not isinstance(obj_list, list):
-                        print(f"  Skipping {obj_type} - not a list (type: {type(obj_list)})")
+                        # DISABLED-THREAD: print(f"  Skipping {obj_type} - not a list (type: {type(obj_list)})")
                         continue
                     
-                    print(f"  Checking {obj_type}: {len(obj_list)} items")
+                    # DISABLED-THREAD: print(f"  Checking {obj_type}: {len(obj_list)} items")
                     method_name = object_method_map.get(obj_type)
                     if method_name and hasattr(self.api_client, method_name):
                         try:
                             # Determine which folders to query for this object type
                             folders_to_check = object_folders.get(obj_type, set())
-                            print(f"    Folders to check: {list(folders_to_check) if folders_to_check else 'all'}")
+                            # DISABLED-THREAD: print(f"    Folders to check: {list(folders_to_check) if folders_to_check else 'all'}")
                             
                             # Fetch from each folder
                             all_existing_objects = []
@@ -208,54 +219,59 @@ class ConfigFetchWorker(QThread):
                             if folders_to_check:
                                 # Query each folder separately
                                 for folder in folders_to_check:
-                                    print(f"    Calling API method: {method_name}(folder='{folder}')")
+                                    # DISABLED-THREAD: print(f"    Calling API method: {method_name}(folder='{folder}')")
                                     try:
                                         folder_objects = method(folder=folder)
                                         if isinstance(folder_objects, list):
                                             all_existing_objects.extend(folder_objects)
                                     except Exception as folder_err:
-                                        print(f"      ERROR for folder '{folder}': {folder_err}")
+                                        pass
+                                        # DISABLED-THREAD: print(f"      ERROR for folder '{folder}': {folder_err}")
                             else:
                                 # No folder specified, try without folder parameter
-                                print(f"    Calling API method: {method_name}()")
+                                # DISABLED-THREAD: print(f"    Calling API method: {method_name}()")
                                 all_existing_objects = method()
                             
                             existing_objects = all_existing_objects
                             
                             if not isinstance(existing_objects, list):
-                                print(f"    WARNING: Expected list, got {type(existing_objects)}")
+                                # DISABLED-THREAD: print(f"    WARNING: Expected list, got {type(existing_objects)}")
                                 existing_objects = []
                             
-                            print(f"    Found {len(existing_objects)} existing items")
+                            # DISABLED-THREAD: print(f"    Found {len(existing_objects)} existing items")
                             
                             if obj_type not in dest_config['objects']:
                                 dest_config['objects'][obj_type] = {}
                             
                             for obj in existing_objects:
                                 if not isinstance(obj, dict):
-                                    print(f"      WARNING: Object is not a dict: {type(obj)}")
+                                    # DISABLED-THREAD: print(f"      WARNING: Object is not a dict: {type(obj)}")
                                     continue
                                 obj_name = obj.get('name')
                                 if obj_name:
                                     dest_config['objects'][obj_type][obj_name] = obj
                                     if len(dest_config['objects'][obj_type]) <= 5:  # Only print first 5
-                                        print(f"      - {obj_name}")
+                                        pass
+                                        # DISABLED-THREAD: print(f"      - {obj_name}")
                             
                             if len(dest_config['objects'][obj_type]) > 5:
-                                print(f"      ... and {len(dest_config['objects'][obj_type]) - 5} more")
+                                pass
+                                # DISABLED-THREAD: print(f"      ... and {len(dest_config['objects'][obj_type]) - 5} more")
                                 
                         except AttributeError as e:
-                            print(f"    ERROR: Method {method_name} not found: {e}")
+                            pass
+                            # DISABLED-THREAD: print(f"    ERROR: Method {method_name} not found: {e}")
                         except TypeError as e:
-                            print(f"    ERROR: Type error calling {method_name}: {e}")
+                            # DISABLED-THREAD: print(f"    ERROR: Type error calling {method_name}: {e}")
                             import traceback
                             traceback.print_exc()
                         except Exception as e:
-                            print(f"    ERROR fetching {obj_type}: {type(e).__name__}: {e}")
+                            # DISABLED-THREAD: print(f"    ERROR fetching {obj_type}: {type(e).__name__}: {e}")
                             import traceback
                             traceback.print_exc()
                     else:
-                        print(f"    ⚠️  WARNING: No API method for {obj_type} (mapped to: {method_name})")
+                        pass
+                        # DISABLED-THREAD: print(f"    ⚠️  WARNING: No API method for {obj_type} (mapped to: {method_name})")
                     
                     current += len(obj_list)
             
@@ -278,10 +294,10 @@ class ConfigFetchWorker(QThread):
                 
                 for infra_type, infra_list in infrastructure.items():
                     if not isinstance(infra_list, list):
-                        print(f"  Skipping {infra_type} - not a list (type: {type(infra_list)})")
+                        # DISABLED-THREAD: print(f"  Skipping {infra_type} - not a list (type: {type(infra_list)})")
                         continue
                     
-                    print(f"  Checking {infra_type}: {len(infra_list)} items")
+                    # DISABLED-THREAD: print(f"  Checking {infra_type}: {len(infra_list)} items")
                     method_name = infra_method_map.get(infra_type)
                     if method_name and hasattr(self.api_client, method_name):
                         try:
@@ -293,7 +309,7 @@ class ConfigFetchWorker(QThread):
                                 if item_folder:
                                     folders_to_check.add(item_folder)
                             
-                            print(f"    Folders to check: {list(folders_to_check) if folders_to_check else 'all'}")
+                            # DISABLED-THREAD: print(f"    Folders to check: {list(folders_to_check) if folders_to_check else 'all'}")
                             
                             # Fetch from each folder (or all if no folder specified)
                             all_existing_items = []
@@ -302,10 +318,10 @@ class ConfigFetchWorker(QThread):
                             if folders_to_check:
                                 # Query each folder separately
                                 for folder in folders_to_check:
-                                    print(f"    Calling API method: {method_name}(folder='{folder}')")
+                                    # DISABLED-THREAD: print(f"    Calling API method: {method_name}(folder='{folder}')")
                                     try:
                                         folder_items = method(folder=folder)
-                                        print(f"      Response type: {type(folder_items)}")
+                                        # DISABLED-THREAD: print(f"      Response type: {type(folder_items)}")
                                         if isinstance(folder_items, list):
                                             all_existing_items.extend(folder_items)
                                         elif isinstance(folder_items, dict):
@@ -314,10 +330,11 @@ class ConfigFetchWorker(QThread):
                                             all_existing_items = folder_items
                                             break  # Dict response, no need to continue
                                     except Exception as folder_err:
-                                        print(f"      ERROR for folder '{folder}': {folder_err}")
+                                        pass
+                                        # DISABLED-THREAD: print(f"      ERROR for folder '{folder}': {folder_err}")
                             else:
                                 # No folder specified, try without folder parameter
-                                print(f"    Calling API method: {method_name}()")
+                                # DISABLED-THREAD: print(f"    Calling API method: {method_name}()")
                                 all_existing_items = method()
                             
                             existing_items = all_existing_items
@@ -326,59 +343,64 @@ class ConfigFetchWorker(QThread):
                             if isinstance(existing_items, dict):
                                 # Some APIs return dict (e.g., agent_profiles)
                                 # Extract the profiles list from the dict
-                                print(f"    Response is dict with keys: {list(existing_items.keys())}")
+                                # DISABLED-THREAD: print(f"    Response is dict with keys: {list(existing_items.keys())}")
                                 
                                 # Try to find a profiles list in the dict
                                 if 'profiles' in existing_items:
                                     existing_items = existing_items['profiles']
-                                    print(f"    Extracted 'profiles' list: {len(existing_items) if isinstance(existing_items, list) else 'not a list'}")
+                                    # DISABLED-THREAD: print(f"    Extracted 'profiles' list: {len(existing_items) if isinstance(existing_items, list) else 'not a list'}")
                                     if isinstance(existing_items, list) and len(existing_items) > 0:
-                                        print(f"    First profile: {existing_items[0].get('name') if isinstance(existing_items[0], dict) else existing_items[0]}")
+                                        pass
+                                        # DISABLED-THREAD: print(f"    First profile: {existing_items[0].get('name') if isinstance(existing_items[0], dict) else existing_items[0]}")
                                 elif 'data' in existing_items:
                                     existing_items = existing_items['data']
-                                    print(f"    Extracted 'data': {len(existing_items) if isinstance(existing_items, list) else 'not a list'}")
+                                    # DISABLED-THREAD: print(f"    Extracted 'data': {len(existing_items) if isinstance(existing_items, list) else 'not a list'}")
                                 else:
                                     # Store the whole dict
-                                    print(f"    Storing entire dict response")
-                                    print(f"    Dict content sample: {str(existing_items)[:200]}")
+                                    # DISABLED-THREAD: print(f"    Storing entire dict response")
+                                    # DISABLED-THREAD: print(f"    Dict content sample: {str(existing_items)[:200]}")
                                     dest_config['infrastructure'][infra_type] = existing_items
                                     existing_items = []  # Skip item iteration below
                             
                             if not isinstance(existing_items, list):
-                                print(f"    WARNING: Expected list, got {type(existing_items)}")
+                                # DISABLED-THREAD: print(f"    WARNING: Expected list, got {type(existing_items)}")
                                 existing_items = []
                             
-                            print(f"    Found {len(existing_items)} existing items")
+                            # DISABLED-THREAD: print(f"    Found {len(existing_items)} existing items")
                             
                             if infra_type not in dest_config['infrastructure']:
                                 dest_config['infrastructure'][infra_type] = {}
                             
                             for item in existing_items:
                                 if not isinstance(item, dict):
-                                    print(f"      WARNING: Item is not a dict: {type(item)}")
+                                    # DISABLED-THREAD: print(f"      WARNING: Item is not a dict: {type(item)}")
                                     continue
                                 item_name = item.get('name', item.get('id'))
                                 if item_name:
                                     dest_config['infrastructure'][infra_type][item_name] = item
                                     if len(dest_config['infrastructure'][infra_type]) <= 5:  # Only print first 5
-                                        print(f"      - {item_name}")
+                                        pass
+                                        # DISABLED-THREAD: print(f"      - {item_name}")
                             
                             if len(dest_config['infrastructure'][infra_type]) > 5:
-                                print(f"      ... and {len(dest_config['infrastructure'][infra_type]) - 5} more")
+                                pass
+                                # DISABLED-THREAD: print(f"      ... and {len(dest_config['infrastructure'][infra_type]) - 5} more")
                                 
                         except AttributeError as e:
-                            print(f"    ERROR: Method {method_name} not found: {e}")
+                            pass
+                            # DISABLED-THREAD: print(f"    ERROR: Method {method_name} not found: {e}")
                         except TypeError as e:
-                            print(f"    ERROR: Type error calling {method_name}: {e}")
+                            # DISABLED-THREAD: print(f"    ERROR: Type error calling {method_name}: {e}")
                             import traceback
                             traceback.print_exc()
                         except Exception as e:
                             # Continue even if fetch fails (endpoint might not be available)
-                            print(f"    ERROR fetching {infra_type}: {type(e).__name__}: {e}")
+                            # DISABLED-THREAD: print(f"    ERROR fetching {infra_type}: {type(e).__name__}: {e}")
                             import traceback
                             traceback.print_exc()
                     else:
-                        print(f"    ⚠️  WARNING: No API method for {infra_type} (mapped to: {method_name})")
+                        pass
+                        # DISABLED-THREAD: print(f"    ⚠️  WARNING: No API method for {infra_type} (mapped to: {method_name})")
                     
                     current += len(infra_list)
             
@@ -408,7 +430,7 @@ class ConfigFetchWorker(QThread):
             
             if profile_folders:
                 self.progress.emit(f"Checking profiles...", int((current / max(total_items, 1)) * 100))
-                print(f"  Profile types to check: {list(profile_folders.keys())}")
+                # DISABLED-THREAD: print(f"  Profile types to check: {list(profile_folders.keys())}")
                 
                 # Map profile types to API methods
                 profile_method_map = {
@@ -428,7 +450,7 @@ class ConfigFetchWorker(QThread):
                     dest_config['profiles'] = {}
                 
                 for profile_type, folders_set in profile_folders.items():
-                    print(f"  Checking {profile_type} in folders: {list(folders_set)}")
+                    # DISABLED-THREAD: print(f"  Checking {profile_type} in folders: {list(folders_set)}")
                     method_name = profile_method_map.get(profile_type)
                     
                     if method_name and hasattr(self.api_client, method_name):
@@ -437,14 +459,15 @@ class ConfigFetchWorker(QThread):
                             method = getattr(self.api_client, method_name)
                             
                             for folder in folders_set:
-                                print(f"    Calling API method: {method_name}(folder='{folder}')")
+                                # DISABLED-THREAD: print(f"    Calling API method: {method_name}(folder='{folder}')")
                                 try:
                                     folder_profiles = method(folder=folder)
                                     if isinstance(folder_profiles, list):
                                         all_profiles.extend(folder_profiles)
-                                        print(f"      Found {len(folder_profiles)} items in folder '{folder}'")
+                                        # DISABLED-THREAD: print(f"      Found {len(folder_profiles)} items in folder '{folder}'")
                                 except Exception as folder_err:
-                                    print(f"      ERROR for folder '{folder}': {folder_err}")
+                                    pass
+                                    # DISABLED-THREAD: print(f"      ERROR for folder '{folder}': {folder_err}")
                             
                             if profile_type not in dest_config['profiles']:
                                 dest_config['profiles'][profile_type] = {}
@@ -455,14 +478,15 @@ class ConfigFetchWorker(QThread):
                                     if profile_name:
                                         dest_config['profiles'][profile_type][profile_name] = profile
                             
-                            print(f"    Total {profile_type}: {len(dest_config['profiles'][profile_type])} items")
+                            # DISABLED-THREAD: print(f"    Total {profile_type}: {len(dest_config['profiles'][profile_type])} items")
                             
                         except Exception as e:
-                            print(f"    ERROR fetching {profile_type}: {type(e).__name__}: {e}")
+                            # DISABLED-THREAD: print(f"    ERROR fetching {profile_type}: {type(e).__name__}: {e}")
                             import traceback
                             traceback.print_exc()
                     else:
-                        print(f"    ⚠️  WARNING: No API method for {profile_type} (mapped to: {method_name})")
+                        pass
+                        # DISABLED-THREAD: print(f"    ⚠️  WARNING: No API method for {profile_type} (mapped to: {method_name})")
             
             # Fetch HIP items from folders
             hip_folders = {}  # Track which folders contain which HIP types
@@ -480,7 +504,7 @@ class ConfigFetchWorker(QThread):
             if hip_folders:
                 # TEMPORARY: Skip HIP fetching - causing segfaults
                 # TODO: Investigate root cause of HIP API segfault
-                print(f"⚠️  Skipping HIP validation (known stability issue - will be fixed)")
+                # DISABLED-THREAD: print(f"⚠️  Skipping HIP validation (known stability issue - will be fixed)")
                 if 'hip' not in dest_config:
                     dest_config['hip'] = {}
                 # Skip ALL HIP processing - commented out to prevent crashes
@@ -496,13 +520,13 @@ class ConfigFetchWorker(QThread):
             
             if rule_folders:
                 self.progress.emit(f"Checking security rules...", int((current / max(total_items, 1)) * 100))
-                print(f"  Checking security rules in folders: {list(rule_folders)}")
+                # DISABLED-THREAD: print(f"  Checking security rules in folders: {list(rule_folders)}")
                 
                 if 'security_rules' not in dest_config:
                     dest_config['security_rules'] = {}
                 
                 for folder_name in rule_folders:
-                    print(f"    Calling API method: get_all_security_rules(folder='{folder_name}')")
+                    # DISABLED-THREAD: print(f"    Calling API method: get_all_security_rules(folder='{folder_name}')")
                     try:
                         rules = self.api_client.get_all_security_rules(folder=folder_name)
                         if isinstance(rules, list):
@@ -514,9 +538,10 @@ class ConfigFetchWorker(QThread):
                                     rule_name = rule.get('name')
                                     if rule_name:
                                         dest_config['security_rules'][folder_name][rule_name] = rule
-                            print(f"      Found {len(dest_config['security_rules'][folder_name])} rules in '{folder_name}'")
+                            # DISABLED-THREAD: print(f"      Found {len(dest_config['security_rules'][folder_name])} rules in '{folder_name}'")
                     except Exception as e:
-                        print(f"      ERROR fetching rules from '{folder_name}': {e}")
+                        pass
+                        # DISABLED-THREAD: print(f"      ERROR fetching rules from '{folder_name}': {e}")
             
             self.progress.emit("Analysis complete", 100)
             # Don't print from background thread - causes segfaults
@@ -723,18 +748,19 @@ class PushPreviewDialog(QDialog):
             for obj_type, obj_list in folder_objects.items():
                 if not isinstance(obj_list, list):
                     continue
-                print(f"  {obj_type}: {len(obj_list)} selected items")
+                # DISABLED-THREAD: print(f"  {obj_type}: {len(obj_list)} selected items")
                 if len(obj_list) > 0 and len(obj_list) <= 10:
-                    print(f"    Names: {[obj.get('name') for obj in obj_list]}")
+                    pass
+                    # DISABLED-THREAD: print(f"    Names: {[obj.get('name') for obj in obj_list]}")
                 dest_objects = self.destination_config.get('objects', {}).get(obj_type, {})
                 for obj in obj_list:
                     obj_name = obj.get('name', 'Unknown')
                     if obj_name in dest_objects:
                         conflicts.append((f"{obj_type} (from {name})", obj_name, obj))
-                        print(f"    ✓ Conflict: {obj_name}")
+                        # DISABLED-THREAD: print(f"    ✓ Conflict: {obj_name}")
                     else:
                         new_items.append((f"{obj_type} (from {name})", obj_name, obj))
-                        print(f"    ✗ New: {obj_name}")
+                        # DISABLED-THREAD: print(f"    ✗ New: {obj_name}")
             
             # Rules from folder
             folder_rules = folder.get('security_rules', [])
