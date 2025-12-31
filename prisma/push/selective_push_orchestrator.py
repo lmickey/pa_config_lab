@@ -622,7 +622,8 @@ class SelectivePushOrchestrator:
             logger.error(f"Error: {str(e)}")
             logger.error("=" * 80)
             import traceback
-            traceback.print_exc()
+            # Log traceback to file instead of console
+            logger.error(traceback.format_exc())
             
             # Create a safe copy of results to avoid serialization issues
             try:

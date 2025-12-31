@@ -141,7 +141,7 @@ class ConfigFetchWorker(QThread):
                 except Exception as e:
                     # DISABLED-THREAD: print(f"    ERROR fetching folders: {e}")
                     import traceback
-                    traceback.print_exc()
+                    # DISABLED-THREAD: traceback.print_exc()
                 current += len(folders)
             
             # Fetch snippets
@@ -160,7 +160,7 @@ class ConfigFetchWorker(QThread):
                 except Exception as e:
                     # DISABLED-THREAD: print(f"    ERROR fetching snippets: {e}")
                     import traceback
-                    traceback.print_exc()
+                    # DISABLED-THREAD: traceback.print_exc()
                 current += len(snippets)
             
             # Fetch objects (both top-level and from folders)
@@ -264,11 +264,11 @@ class ConfigFetchWorker(QThread):
                         except TypeError as e:
                             # DISABLED-THREAD: print(f"    ERROR: Type error calling {method_name}: {e}")
                             import traceback
-                            traceback.print_exc()
+                            # DISABLED-THREAD: traceback.print_exc()
                         except Exception as e:
                             # DISABLED-THREAD: print(f"    ERROR fetching {obj_type}: {type(e).__name__}: {e}")
                             import traceback
-                            traceback.print_exc()
+                            # DISABLED-THREAD: traceback.print_exc()
                     else:
                         pass
                         # DISABLED-THREAD: print(f"    ⚠️  WARNING: No API method for {obj_type} (mapped to: {method_name})")
@@ -392,12 +392,12 @@ class ConfigFetchWorker(QThread):
                         except TypeError as e:
                             # DISABLED-THREAD: print(f"    ERROR: Type error calling {method_name}: {e}")
                             import traceback
-                            traceback.print_exc()
+                            # DISABLED-THREAD: traceback.print_exc()
                         except Exception as e:
                             # Continue even if fetch fails (endpoint might not be available)
                             # DISABLED-THREAD: print(f"    ERROR fetching {infra_type}: {type(e).__name__}: {e}")
                             import traceback
-                            traceback.print_exc()
+                            # DISABLED-THREAD: traceback.print_exc()
                     else:
                         pass
                         # DISABLED-THREAD: print(f"    ⚠️  WARNING: No API method for {infra_type} (mapped to: {method_name})")
@@ -483,7 +483,7 @@ class ConfigFetchWorker(QThread):
                         except Exception as e:
                             # DISABLED-THREAD: print(f"    ERROR fetching {profile_type}: {type(e).__name__}: {e}")
                             import traceback
-                            traceback.print_exc()
+                            # DISABLED-THREAD: traceback.print_exc()
                     else:
                         pass
                         # DISABLED-THREAD: print(f"    ⚠️  WARNING: No API method for {profile_type} (mapped to: {method_name})")

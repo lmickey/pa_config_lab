@@ -720,14 +720,16 @@ class PushConfigWidget(QWidget):
                     )
                     self.status_label.setVisible(True)
                 except Exception as label_err:
-                    print(f"Error updating status label: {label_err}")
+                    # Avoid print in case this runs in thread context
+                    pass
                 
                 # Update progress label
                 try:
                     self.progress_label.setText(progress_text)
                     self.progress_label.setStyleSheet(f"color: {progress_color}; font-weight: bold;")
                 except Exception as prog_err:
-                    print(f"Error updating progress label: {prog_err}")
+                    # Avoid print in case this runs in thread context
+                    pass
                 
                 # Show detailed results in the output box
                 try:
@@ -872,15 +874,15 @@ class PushConfigWidget(QWidget):
                     self.copy_results_btn.setEnabled(True)
                     self.view_details_btn.setEnabled(True)
                 except Exception as results_err:
-                    print(f"Error updating results text: {results_err}")
-                    import traceback
-                    traceback.print_exc()
+                    # Avoid print in case this runs in thread context
+                    pass
 
                 # Emit signal (wrapped in try/except)
                 try:
                     self.push_completed.emit(result)
                 except Exception as e:
-                    print(f"Error emitting push_completed signal: {e}")
+                    # Avoid print in case this runs in thread context
+                    pass
             else:
                 # Update status banner with error message
                 self.status_label.setText(f"❌ Push failed: {message}")
@@ -894,9 +896,10 @@ class PushConfigWidget(QWidget):
                 self.progress_label.setStyleSheet("color: red;")
                 self.results_text.setPlainText(f"Error: {message}")
         except Exception as e:
-            print(f"Error in _on_push_finished: {e}")
-            import traceback
-            traceback.print_exc()
+            # Avoid print in case this runs in thread context
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error in _on_push_finished: {e}")
         finally:
             # Clean up worker after a delay to prevent premature garbage collection
             try:
