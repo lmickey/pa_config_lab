@@ -655,22 +655,43 @@ class PushConfigWidget(QWidget):
                 failed = summary.get('failed', 0) if isinstance(summary, dict) else 0
                 could_not_overwrite = summary.get('could_not_overwrite', 0) if isinstance(summary, dict) else 0
                 
+                # Calculate actual processed count (sum of all actions)
+                processed_count = created + updated + deleted + renamed + skipped + failed + could_not_overwrite
+                
+                # Determine status based on results
+                has_failures = (failed > 0 or could_not_overwrite > 0)
+                has_successes = (created > 0 or updated > 0 or deleted > 0 or renamed > 0)
+                
                 try:
-                    status_msg = f"✅ Push completed successfully! Created: {created}, Updated: {updated}"
-                    if deleted > 0:
-                        status_msg += f", Deleted: {deleted}"
-                    if renamed > 0:
-                        status_msg += f", Renamed: {renamed}"
-                    status_msg += f", Skipped: {skipped}"
-                    if failed > 0:
-                        status_msg += f", Failed: {failed}"
-                    if could_not_overwrite > 0:
-                        status_msg += f", ⚠️ Could Not Overwrite: {could_not_overwrite}"
+                    if has_failures and has_successes:
+                        # Partial success - yellow
+                        status_msg = f"⚠️ Push completed with issues ({processed_count} items processed)"
+                        status_color = "#F57F17"  # Dark yellow/amber
+                        status_bg = "#FFF9C4"     # Light yellow
+                        status_border = "#FBC02D" # Medium yellow
+                        progress_text = "Completed with issues"
+                        progress_color = "#F57F17"
+                    elif has_failures and not has_successes:
+                        # All failed - red
+                        status_msg = f"❌ Push failed ({processed_count} items processed)"
+                        status_color = "#c62828"  # Dark red
+                        status_bg = "#ffebee"     # Light red
+                        status_border = "#f44336" # Medium red
+                        progress_text = "Push failed"
+                        progress_color = "red"
+                    else:
+                        # All successful - green
+                        status_msg = f"✅ Push completed successfully ({processed_count} items processed)"
+                        status_color = "#2e7d32"  # Dark green
+                        status_bg = "#e8f5e9"     # Light green
+                        status_border = "#4CAF50" # Medium green
+                        progress_text = "Push completed successfully"
+                        progress_color = "green"
                     
                     self.status_label.setText(status_msg)
                     self.status_label.setStyleSheet(
-                        "color: #2e7d32; background-color: #e8f5e9; border: 1px solid #4CAF50; "
-                        "border-radius: 5px; padding: 10px; font-weight: bold;"
+                        f"color: {status_color}; background-color: {status_bg}; border: 2px solid {status_border}; "
+                        "border-radius: 5px; padding: 12px; font-weight: bold; font-size: 13px;"
                     )
                     self.status_label.setVisible(True)
                 except Exception as label_err:
@@ -678,15 +699,45 @@ class PushConfigWidget(QWidget):
                 
                 # Update progress label
                 try:
-                    self.progress_label.setText("Push completed successfully!")
-                    self.progress_label.setStyleSheet("color: green;")
+                    self.progress_label.setText(progress_text)
+                    self.progress_label.setStyleSheet(f"color: {progress_color}; font-weight: bold;")
                 except Exception as prog_err:
                     print(f"Error updating progress label: {prog_err}")
                 
-                # Show detailed results
+                # Show detailed results in the output box
                 try:
+                    details = []
+                    details.append("=" * 60)
+                    details.append("PUSH OPERATION SUMMARY")
+                    details.append("=" * 60)
+                    details.append(f"Total Items Processed: {processed_count}")
+                    details.append("")
+                    details.append("Results by Action:")
+                    if created > 0:
+                        details.append(f"  ✓ Created:              {created}")
+                    if updated > 0:
+                        details.append(f"  ✓ Updated:              {updated}")
+                    if deleted > 0:
+                        details.append(f"  ✓ Deleted:              {deleted}")
+                    if renamed > 0:
+                        details.append(f"  ✓ Renamed:              {renamed}")
+                    if skipped > 0:
+                        details.append(f"  ⊘ Skipped:              {skipped}")
+                    if failed > 0:
+                        details.append(f"  ✗ Failed:               {failed}")
+                    if could_not_overwrite > 0:
+                        details.append(f"  ⚠ Could Not Overwrite:  {could_not_overwrite}")
+                    details.append("")
+                    details.append("=" * 60)
+                    
+                    # Add original detailed message if available
                     if message and isinstance(message, str):
-                        self.results_text.setPlainText(message)
+                        details.append("")
+                        details.append("Detailed Log:")
+                        details.append("-" * 60)
+                        details.append(message)
+                    
+                    self.results_text.setPlainText("\n".join(details))
                 except Exception as results_err:
                     print(f"Error updating results text: {results_err}")
 
