@@ -189,6 +189,71 @@ class SelectivePushOrchestrator:
             return True
         return False
     
+    def _extract_409_references(self, error: Exception) -> str:
+        """
+        Extract reference information from a 409 Conflict error.
+        
+        Args:
+            error: Exception from API call
+            
+        Returns:
+            Human-readable string describing what references this item
+        """
+        # For requests.HTTPError, parse the response body
+        if hasattr(error, 'response') and error.response is not None:
+            try:
+                response_json = error.response.json()
+                errors = response_json.get('_errors', [])
+                
+                for err in errors:
+                    details = err.get('details', {})
+                    error_type = details.get('errorType', '')
+                    
+                    # Check if this is a "Reference Not Zero" error
+                    if error_type == 'Reference Not Zero':
+                        # Extract the reference paths
+                        messages = details.get('message', [])
+                        errors_list = details.get('errors', [])
+                        
+                        # Build a readable message
+                        references = []
+                        
+                        # Get the reference paths from messages
+                        for msg in messages:
+                            if isinstance(msg, str) and '->' in msg:
+                                # Clean up the path
+                                parts = [p.strip() for p in msg.split('->')]
+                                # Get the last few meaningful parts
+                                meaningful_parts = [p for p in parts if p and p != 'plugins' and p != 'cloud_services']
+                                if meaningful_parts:
+                                    references.append(' → '.join(meaningful_parts[-3:]))
+                        
+                        # Get additional details from errors list
+                        for error_detail in errors_list:
+                            if error_detail.get('type') == 'NON_ZERO_REFS':
+                                extra = error_detail.get('extra', [])
+                                for extra_path in extra:
+                                    if isinstance(extra_path, str):
+                                        # Extract the readable part from path like:
+                                        # "plugins/cloud_services/pbf-target/group/[Main SC]/target/[Azure SCM Lab]"
+                                        parts = extra_path.split('/')
+                                        # Find bracketed items which are the actual names
+                                        names = [p.strip('[]') for p in parts if '[' in p]
+                                        if names:
+                                            references.append(' → '.join(names))
+                        
+                        if references:
+                            # Deduplicate and format
+                            unique_refs = list(set(references))
+                            return f"Referenced by: {', '.join(unique_refs)}"
+                
+            except Exception as parse_err:
+                # If parsing fails, return generic message
+                pass
+        
+        # Default for non-409 or unparseable errors
+        return "Reference conflict (details unavailable)"
+    
     def _is_already_exists_error(self, error: Exception) -> bool:
         """
         Check if an error is an 'already exists' error from the API.
@@ -900,15 +965,24 @@ class SelectivePushOrchestrator:
                                 'Rule ID not found in destination config'
                             )
                     except Exception as e:
+                        # Extract 409 reference details if available
+                        error_msg = f'Failed to delete: {str(e)}'
+                        if '409' in str(e):
+                            ref_details = self._extract_409_references(e)
+                            error_msg = f'Failed to delete (409 Conflict): {ref_details}'
+                            logger.error(f"  security_rule: {rule_name} - {ref_details}")
+                        
                         self._add_result(
                             'security_rule',
                             rule_name,
                             folder_name,
                             'deleted',
                             'failed',
-                            f'Failed to delete: {str(e)}',
+                            error_msg,
                             error=e
                         )
+                        # Track failed delete for Phase 2
+                        self.failed_deletes[('security_rule', rule_name, folder_name)] = str(e)[:200]
                     current_item += 1
         
         return current_item
@@ -1070,15 +1144,24 @@ class SelectivePushOrchestrator:
                                     'Profile ID not found in destination config'
                                 )
                         except Exception as e:
+                            # Extract 409 reference details if available
+                            error_msg = f'Failed to delete: {str(e)}'
+                            if '409' in str(e):
+                                ref_details = self._extract_409_references(e)
+                                error_msg = f'Failed to delete (409 Conflict): {ref_details}'
+                                logger.error(f"  {prof_type}: {prof_name} - {ref_details}")
+                            
                             self._add_result(
                                 prof_type,
                                 prof_name,
                                 folder_name,
                                 'deleted',
                                 'failed',
-                                f'Failed to delete: {str(e)}',
+                                error_msg,
                                 error=e
                             )
+                            # Track failed delete for Phase 2 checking
+                            self.failed_deletes[(prof_type, prof_name, folder_name)] = str(e)[:200]
                         current_item += 1
         
         return current_item
@@ -1223,13 +1306,21 @@ class SelectivePushOrchestrator:
                             except Exception as e:
                                 # Track failed delete
                                 self.failed_deletes[(infra_type, infra_name, 'Infrastructure')] = str(e)[:200]
+                                
+                                # Extract 409 reference details if available
+                                error_msg = f'Failed to delete: {str(e)[:200]}'
+                                if '409' in str(e):
+                                    ref_details = self._extract_409_references(e)
+                                    error_msg = f'Failed to delete (409 Conflict): {ref_details}'
+                                    logger.error(f"  {infra_type}: {infra_name} - {ref_details}")
+                                
                                 self._add_result(
                                     infra_type,
                                     infra_name,
                                     'Infrastructure',
                                     'deleted',
                                     'failed',
-                                    f'Failed to delete: {str(e)[:200]}',  # Limit error message length
+                                    error_msg,
                                     error=e
                                 )
                                 # Mark all items that depend on this one for skipping
@@ -1308,13 +1399,21 @@ class SelectivePushOrchestrator:
                     except Exception as e:
                         # Track failed delete
                         self.failed_deletes[(obj_type, obj_name, folder_name)] = str(e)[:200]
+                        
+                        # Extract 409 reference details if available
+                        error_msg = f'Failed to delete: {str(e)}'
+                        if '409' in str(e):
+                            ref_details = self._extract_409_references(e)
+                            error_msg = f'Failed to delete (409 Conflict): {ref_details}'
+                            logger.error(f"  {obj_type}: {obj_name} - {ref_details}")
+                        
                         self._add_result(
                             obj_type,
                             obj_name,
                             folder_name,
                             'deleted',
                             'failed',
-                            f'Failed to delete: {str(e)}',
+                            error_msg,
                             error=e
                         )
                     current_item += 1
