@@ -1233,6 +1233,8 @@ class SelectivePushOrchestrator:
                         
                         # Check if this item should be skipped due to dependency failure
                         if item_key in dependency_failed_items:
+                            # Track as failed delete so Phase 2 also skips it
+                            self.failed_deletes[(infra_type, infra_name, 'Infrastructure')] = 'Skipped - dependency failed'
                             self._add_result(
                                 infra_type,
                                 infra_name,
