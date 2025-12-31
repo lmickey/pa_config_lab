@@ -71,6 +71,22 @@ class SavedConfigsSidebar(QWidget):
         header_layout.addWidget(self.menu_button)
         
         layout.addLayout(header_layout)
+        
+        # Error banner (initially hidden)
+        self.error_banner = QLabel()
+        self.error_banner.setWordWrap(True)
+        self.error_banner.setStyleSheet(
+            "QLabel {"
+            "    background-color: #f8d7da;"
+            "    color: #721c24;"
+            "    border: 1px solid #f5c6cb;"
+            "    border-radius: 4px;"
+            "    padding: 10px;"
+            "    margin: 5px 0;"
+            "}"
+        )
+        self.error_banner.setVisible(False)
+        layout.addWidget(self.error_banner)
 
         # Config list
         self.config_list = QListWidget()
@@ -148,6 +164,9 @@ class SavedConfigsSidebar(QWidget):
 
     def _load_selected(self):
         """Load the selected configuration."""
+        # Clear any previous errors
+        self.error_banner.setVisible(False)
+        
         config_meta = self._get_selected_config()
         if not config_meta:
             QMessageBox.information(self, "No Selection", "Please select a configuration to load.")
@@ -172,10 +191,14 @@ class SavedConfigsSidebar(QWidget):
         success, config, message = self.manager.load_config(name, password)
         
         if success:
+            # Clear error banner on success
+            self.error_banner.setVisible(False)
             # No success dialog - just emit the config
             self.config_loaded.emit(config)
         else:
-            QMessageBox.warning(self, "Load Failed", message)
+            # Show error in banner instead of dialog
+            self.error_banner.setText(f"❌ {message}")
+            self.error_banner.setVisible(True)
 
     def _on_item_double_clicked(self, item: QListWidgetItem):
         """Handle double-click on item."""
@@ -183,6 +206,9 @@ class SavedConfigsSidebar(QWidget):
 
     def _import_config(self):
         """Import a configuration from file."""
+        # Clear any previous errors
+        self.error_banner.setVisible(False)
+        
         filepath, _ = QFileDialog.getOpenFileName(
             self,
             "Import Configuration",
@@ -225,12 +251,16 @@ class SavedConfigsSidebar(QWidget):
         success, config, message = self.manager.import_config(filepath, name, password)
         
         if success:
+            # Clear error banner on success
+            self.error_banner.setVisible(False)
             # No success dialog - just refresh and emit
             self._refresh_list()
             if config:
                 self.config_loaded.emit(config)
         else:
-            QMessageBox.warning(self, "Import Failed", message)
+            # Show error in banner instead of dialog
+            self.error_banner.setText(f"❌ {message}")
+            self.error_banner.setVisible(True)
 
     def _show_context_menu(self, position):
         """Show context menu for config item."""
