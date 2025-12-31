@@ -1585,5 +1585,52 @@ class POVWorkflowWidget(QWidget):
         # Update defaults status
         self._update_fw_defaults_status()
         self._update_pa_defaults_status()
+    
+    def has_unsaved_work(self) -> bool:
+        """
+        Check if workflow has unsaved work that would be lost on switch.
+        
+        Returns:
+            True if there is unsaved work, False otherwise
+        """
+        # Check if there's loaded config data
+        if self.config_data:
+            return True
+        
+        # Check if there's an active connection
+        if self.api_client is not None:
+            return True
+        
+        # Check if any sources were loaded
+        if self.loaded_sources:
+            return True
+        
+        return False
+    
+    def clear_state(self):
+        """Clear all workflow state when switching workflows."""
+        # Clear config data
+        self.config_data = {}
+        
+        # Clear API client
+        self.api_client = None
+        
+        # Clear loaded sources
+        self.loaded_sources = []
+        
+        # Clear worker
+        if self.worker is not None:
+            self.worker = None
+        
+        # Reset UI elements
+        import json
+        self.config_review_text.setPlainText(json.dumps({}, indent=2))
+        self.load_status.setText("No configuration loaded")
+        self.load_status.setStyleSheet("color: gray;")
+        self.sources_summary.setText("<i>No sources loaded</i>")
+        
+        # Reset defaults status
+        self._update_fw_defaults_status()
+        self._update_pa_defaults_status()
         
         # No success message - config is now visible in viewer

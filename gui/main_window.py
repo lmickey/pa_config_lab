@@ -324,7 +324,45 @@ class PrismaConfigMainWindow(QMainWindow):
         self.stacked_widget.addWidget(page)
 
     def _on_workflow_changed(self, index: int):
-        """Handle workflow selection change."""
+        """Handle workflow selection change with confirmation if work in progress."""
+        # Get current workflow index before switching
+        current_index = self.stacked_widget.currentIndex()
+        
+        # If switching to same workflow, do nothing
+        if current_index == index:
+            return
+        
+        # Check if current workflow has unsaved work
+        current_widget = self.stacked_widget.widget(current_index)
+        if hasattr(current_widget, 'has_unsaved_work') and current_widget.has_unsaved_work():
+            # Prompt for confirmation
+            reply = QMessageBox.question(
+                self,
+                'Confirm Workflow Switch',
+                'You have work in progress. Switching workflows will clear all current selections, '
+                'loaded configurations, and connection states.\n\n'
+                'Are you sure you want to continue?',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No  # Default to No for safety
+            )
+            
+            if reply == QMessageBox.StandardButton.No:
+                # User cancelled - revert selection
+                self.workflow_list.blockSignals(True)
+                self.workflow_list.setCurrentRow(current_index)
+                self.workflow_list.blockSignals(False)
+                return
+        
+        # Clear state of current workflow before switching
+        if hasattr(current_widget, 'clear_state'):
+            try:
+                current_widget.clear_state()
+            except Exception as e:
+                # Log error but continue with switch
+                import logging
+                logging.getLogger(__name__).warning(f"Error clearing workflow state: {e}")
+        
+        # Switch to new workflow
         self.stacked_widget.setCurrentIndex(index)
 
         workflow_names = [

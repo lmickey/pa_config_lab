@@ -141,6 +141,66 @@ class MigrationWorkflowWidget(QWidget):
         except Exception as e:
             # Silently fail if tenants can't be loaded
             pass
+    
+    def has_unsaved_work(self) -> bool:
+        """
+        Check if workflow has unsaved work that would be lost on switch.
+        
+        Returns:
+            True if there is unsaved work, False otherwise
+        """
+        # Check if there's a pulled config that hasn't been saved
+        if self.current_config is not None:
+            return True
+        
+        # Check if there's an active connection
+        if self.api_client is not None:
+            return True
+        
+        # Check if push widget has selections or loaded config
+        if hasattr(self.push_widget, 'loaded_config') and self.push_widget.loaded_config is not None:
+            return True
+        
+        if hasattr(self.push_widget, 'selected_items') and self.push_widget.selected_items is not None:
+            return True
+        
+        return False
+    
+    def clear_state(self):
+        """Clear all workflow state when switching workflows."""
+        # Clear current config
+        self.current_config = None
+        
+        # Clear API client
+        self.api_client = None
+        
+        # Clear pull widget
+        if hasattr(self.pull_widget, 'api_client'):
+            self.pull_widget.set_api_client(None)
+            self.pull_widget.pulled_config = None
+        
+        # Clear config viewer
+        if hasattr(self.config_viewer, 'set_config'):
+            self.config_viewer.set_config(None)
+        
+        # Clear selection widget
+        if hasattr(self.selection_widget, 'set_config'):
+            self.selection_widget.set_config(None)
+        
+        # Clear push widget
+        if hasattr(self.push_widget, 'set_config'):
+            self.push_widget.set_config(None)
+        if hasattr(self.push_widget, 'loaded_config'):
+            self.push_widget.loaded_config = None
+        if hasattr(self.push_widget, 'selected_items'):
+            self.push_widget.selected_items = None
+        if hasattr(self.push_widget, 'destination_client'):
+            self.push_widget.destination_client = None
+        if hasattr(self.push_widget, 'destination_name'):
+            self.push_widget.destination_name = None
+        
+        # Reset to first tab
+        self.tabs.setCurrentIndex(0)
 
     def set_api_client(self, api_client, connection_name=None):
         """Set API client for all widgets."""
