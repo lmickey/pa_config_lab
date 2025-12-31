@@ -1106,6 +1106,18 @@ class SelectivePushOrchestrator:
         8. bandwidth_allocations
         """
         # Define the correct delete order for infrastructure
+        # Infrastructure dependency map
+        # Key: item type, Value: list of types that depend on it (must be deleted first)
+        infra_dependencies = {
+            'ipsec_crypto_profiles': ['ipsec_tunnels'],  # Tunnels depend on IPsec crypto
+            'ike_crypto_profiles': ['ike_gateways', 'ipsec_tunnels'],  # Gateways and tunnels depend on IKE crypto
+            'ike_gateways': ['ipsec_tunnels'],  # Tunnels depend on gateways
+            'ipsec_tunnels': ['service_connections'],  # Service connections depend on tunnels
+        }
+        
+        # Track items that should be skipped due to dependency failures
+        dependency_failed_items = set()  # {(item_type, item_name)}
+        
         infra_delete_order = [
             # Delete from top-down: things that reference others FIRST
             'service_connections',   # FIRST! Service connections reference tunnels
@@ -1134,6 +1146,20 @@ class SelectivePushOrchestrator:
                 for infra_item in infra_list:
                     try:
                         infra_name = infra_item.get('name', 'Unknown')
+                        item_key = (infra_type, infra_name)
+                        
+                        # Check if this item should be skipped due to dependency failure
+                        if item_key in dependency_failed_items:
+                            self._add_result(
+                                infra_type,
+                                infra_name,
+                                'Infrastructure',
+                                'skipped',
+                                'success',
+                                'Skipped - dependent item failed to delete'
+                            )
+                            current_item += 1
+                            continue
                         
                         # Check if exists in destination
                         exists = False
@@ -1186,6 +1212,12 @@ class SelectivePushOrchestrator:
                                         'failed',
                                         'Infrastructure ID not found in destination config'
                                     )
+                                    # Mark all items that depend on this one for skipping
+                                    for dep_type in infra_dependencies.get(infra_type, []):
+                                        if dep_type in infrastructure:
+                                            for dep_item in infrastructure[dep_type]:
+                                                dep_name = dep_item.get('name', 'Unknown')
+                                                dependency_failed_items.add((dep_type, dep_name))
                             except Exception as e:
                                 # Track failed delete
                                 self.failed_deletes[(infra_type, infra_name, 'Infrastructure')] = str(e)[:200]
@@ -1198,6 +1230,12 @@ class SelectivePushOrchestrator:
                                     f'Failed to delete: {str(e)[:200]}',  # Limit error message length
                                     error=e
                                 )
+                                # Mark all items that depend on this one for skipping
+                                for dep_type in infra_dependencies.get(infra_type, []):
+                                    if dep_type in infrastructure:
+                                        for dep_item in infrastructure[dep_type]:
+                                            dep_name = dep_item.get('name', 'Unknown')
+                                            dependency_failed_items.add((dep_type, dep_name))
                         current_item += 1
                     except Exception as item_error:
                         logger.error(f"Error processing infrastructure item: {str(item_error)[:200]}")
@@ -1307,29 +1345,15 @@ class SelectivePushOrchestrator:
                 exists = folder_name in destination_config['folders']
             
             if exists:
-                # Folder exists - skip (folders themselves are not updated)
-                self._add_result(
-                    'folder',
-                    folder_name,
-                    folder_name,
-                    'skipped',
-                    'success',
-                    'Folder already exists'
-                )
+                # Folder exists - skip silently (folders are containers, not items to push/count)
+                pass
             else:
-                # Create folder
+                # Folder doesn't exist - would need to be created
                 # TODO: Implement folder creation API call
-                # For now, just track as placeholder
-                self._add_result(
-                    'folder',
-                    folder_name,
-                    folder_name,
-                    'created',
-                    'success',
-                    'Folder created (placeholder - API not implemented)'
-                )
+                # For now, skip silently - folders are created automatically when items are added
+                pass
             
-            current_item += 1
+            # Don't increment current_item or add results - folders are not counted as items
         
         return current_item
 
