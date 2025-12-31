@@ -157,7 +157,7 @@ class SelectivePushOrchestrator:
     def _check_failed_delete(self, item_type: str, item_name: str, folder: str, current_item: int) -> bool:
         """
         Check if an item failed to delete in Phase 1 (OVERWRITE mode).
-        If it did, record it as 'could_not_overwrite' and return True.
+        If it did, skip creation attempt (item already counted in Phase 1).
         
         Args:
             item_type: Type of item
@@ -170,22 +170,8 @@ class SelectivePushOrchestrator:
         """
         key = (item_type, item_name, folder)
         if key in self.failed_deletes:
-            error_msg = self.failed_deletes[key]
-            self._add_result(
-                item_type,
-                item_name,
-                folder,
-                'could_not_overwrite',
-                'failed',
-                f'Could not overwrite (delete failed: {error_msg})'
-            )
-            self.results['summary']['could_not_overwrite'] += 1
-            self.results['could_not_overwrite'].append({
-                'type': item_type,
-                'name': item_name,
-                'folder': folder,
-                'reason': error_msg
-            })
+            # Item already has a result from Phase 1 (delete failed or skipped)
+            # Don't add another result or increment counts - just skip the create
             return True
         return False
     
