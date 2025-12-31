@@ -498,36 +498,73 @@ class SelectivePushOrchestrator:
             
             elapsed_time = time.time() - start_time
             
-            self._report_progress("Push operation complete", total_items, total_items)
+            # Report final progress (wrapped to prevent crashes)
+            try:
+                self._report_progress("Push operation complete", total_items, total_items)
+            except Exception as prog_err:
+                print(f"Error reporting final progress: {prog_err}")
             
-            # Log completion summary
-            logger.info("=" * 80)
-            logger.info("PUSH OPERATION COMPLETED")
-            logger.info(f"Total Items: {self.results['summary']['total']}")
-            logger.info(f"Created: {self.results['summary']['created']}")
-            logger.info(f"Updated: {self.results['summary']['updated']}")
-            logger.info(f"Deleted: {self.results['summary']['deleted']}")
-            logger.info(f"Renamed: {self.results['summary']['renamed']}")
-            logger.info(f"Skipped: {self.results['summary']['skipped']}")
-            logger.info(f"Failed: {self.results['summary']['failed']}")
+            # Log completion summary (wrapped to prevent crashes)
+            try:
+                logger.info("=" * 80)
+                logger.info("PUSH OPERATION COMPLETED")
+                logger.info(f"Total Items: {self.results['summary']['total']}")
+            except Exception as e:
+                print(f"Error logging completion header: {e}")
+            
+            try:
+                logger.info(f"Created: {self.results['summary']['created']}")
+                logger.info(f"Updated: {self.results['summary']['updated']}")
+                logger.info(f"Deleted: {self.results['summary']['deleted']}")
+                logger.info(f"Renamed: {self.results['summary']['renamed']}")
+                logger.info(f"Skipped: {self.results['summary']['skipped']}")
+                logger.info(f"Failed: {self.results['summary']['failed']}")
+            except Exception as e:
+                print(f"Error logging summary counts: {e}")
             
             # Log items that couldn't be overwritten
-            could_not_overwrite = self.results['summary'].get('could_not_overwrite', 0)
-            if could_not_overwrite > 0:
-                logger.warning(f"Could Not Overwrite: {could_not_overwrite}")
-                logger.warning("Items that could not be overwritten (delete failed):")
-                for item in self.results['could_not_overwrite']:
-                    logger.warning(f"  - {item['type']}: {item['name']} (folder: {item['folder']}) - {item['reason']}")
+            try:
+                could_not_overwrite = self.results['summary'].get('could_not_overwrite', 0)
+                if could_not_overwrite > 0:
+                    logger.warning(f"Could Not Overwrite: {could_not_overwrite}")
+                    logger.warning("Items that could not be overwritten (delete failed):")
+                    # Safely iterate with error handling
+                    for item in self.results.get('could_not_overwrite', []):
+                        try:
+                            item_type = item.get('type', 'unknown')
+                            item_name = item.get('name', 'unknown')
+                            item_folder = item.get('folder', 'unknown')
+                            item_reason = str(item.get('reason', 'unknown'))[:200]  # Truncate reason
+                            logger.warning(f"  - {item_type}: {item_name} (folder: {item_folder}) - {item_reason}")
+                        except Exception as item_err:
+                            logger.warning(f"  - (error logging item: {str(item_err)[:100]})")
+            except Exception as e:
+                print(f"Error logging could_not_overwrite: {e}")
             
-            logger.info(f"Elapsed Time: {elapsed_time:.2f} seconds")
-            logger.info("=" * 80)
+            try:
+                logger.info(f"Elapsed Time: {elapsed_time:.2f} seconds")
+                logger.info("=" * 80)
+            except Exception as e:
+                print(f"Error logging completion footer: {e}")
             
-            return {
-                'success': True,
-                'message': 'Push completed',
-                'results': self.results,
-                'elapsed_seconds': elapsed_time
-            }
+            # Build return dictionary safely
+            try:
+                result_dict = {
+                    'success': True,
+                    'message': 'Push completed',
+                    'results': self.results,
+                    'elapsed_seconds': elapsed_time
+                }
+                return result_dict
+            except Exception as ret_err:
+                print(f"Error building return dictionary: {ret_err}")
+                # Return minimal safe result
+                return {
+                    'success': True,
+                    'message': 'Push completed (error building full results)',
+                    'results': {'summary': {'total': 0}},
+                    'elapsed_seconds': elapsed_time
+                }
             
         except Exception as e:
             logger.error("=" * 80)
