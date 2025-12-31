@@ -35,6 +35,55 @@ class ConfigFetchWorker(QThread):
         self.api_client = api_client
         self.selected_items = selected_items
     
+    def _count_validation_items(self) -> int:
+        """
+        Count total items that need validation.
+        
+        Returns accurate count for progress bar calculation.
+        Each category counts as 1 fetch operation for progress.
+        """
+        count = 0
+        
+        # Count folders
+        folders = self.selected_items.get('folders', [])
+        if folders:
+            count += 1  # 1 fetch for all folders
+            
+            # Count objects in folders
+            for folder in folders:
+                objects = folder.get('objects', {})
+                for obj_type, obj_list in objects.items():
+                    if obj_list:
+                        count += 1  # 1 fetch per object type
+                
+                # Count profiles in folders
+                profiles = folder.get('profiles', {})
+                for prof_type, prof_list in profiles.items():
+                    if prof_list:
+                        count += 1  # 1 fetch per profile type
+                
+                # Count HIP in folders
+                hip = folder.get('hip', {})
+                for hip_type, hip_list in hip.items():
+                    if hip_list:
+                        count += 1  # 1 fetch per HIP type
+                
+                # Count security rules
+                if folder.get('security_rules'):
+                    count += 1  # 1 fetch for rules
+        
+        # Count snippets
+        if self.selected_items.get('snippets'):
+            count += 1  # 1 fetch for snippets
+        
+        # Count infrastructure
+        infrastructure = self.selected_items.get('infrastructure', {})
+        for infra_type, infra_list in infrastructure.items():
+            if infra_list:
+                count += 1  # 1 fetch per infrastructure type
+        
+        return max(count, 1)  # Ensure at least 1 for division
+    
     def run(self):
         """Fetch configurations from destination tenant."""
         try:
@@ -74,13 +123,8 @@ class ConfigFetchWorker(QThread):
                 'infrastructure': {}
             }
             
-            total_items = 0
-            for category in ['folders', 'snippets', 'objects', 'infrastructure']:
-                items = self.selected_items.get(category, [])
-                if isinstance(items, dict):
-                    total_items += sum(len(v) for v in items.values() if isinstance(v, list))
-                else:
-                    total_items += len(items)
+            # Count total items accurately for progress calculation
+            total_items = self._count_validation_items()
             
             # DISABLED: print(f"Total items to check: {total_items}")
             current = 0
@@ -142,7 +186,7 @@ class ConfigFetchWorker(QThread):
                     # DISABLED-THREAD: print(f"    ERROR fetching folders: {e}")
                     import traceback
                     # DISABLED-THREAD: traceback.print_exc()
-                current += len(folders)
+                current += 1  # Increment by 1 for folder fetch operation
             
             # Fetch snippets
             snippets = self.selected_items.get('snippets', [])
@@ -161,7 +205,7 @@ class ConfigFetchWorker(QThread):
                     # DISABLED-THREAD: print(f"    ERROR fetching snippets: {e}")
                     import traceback
                     # DISABLED-THREAD: traceback.print_exc()
-                current += len(snippets)
+                current += 1  # Increment by 1 for snippet fetch operation
             
             # Fetch objects (both top-level and from folders)
             objects = self.selected_items.get('objects', {})
@@ -273,7 +317,7 @@ class ConfigFetchWorker(QThread):
                         pass
                         # DISABLED-THREAD: print(f"    ⚠️  WARNING: No API method for {obj_type} (mapped to: {method_name})")
                     
-                    current += len(obj_list)
+                    current += 1  # Increment by 1 for each object type fetch
             
             # Fetch infrastructure components
             infrastructure = self.selected_items.get('infrastructure', {})
@@ -402,7 +446,7 @@ class ConfigFetchWorker(QThread):
                         pass
                         # DISABLED-THREAD: print(f"    ⚠️  WARNING: No API method for {infra_type} (mapped to: {method_name})")
                     
-                    current += len(infra_list)
+                    current += 1  # Increment by 1 for each infrastructure type fetch
             
             # Fetch profiles from folders
             # Profiles are folder-specific and need to be fetched per folder
@@ -487,6 +531,8 @@ class ConfigFetchWorker(QThread):
                     else:
                         pass
                         # DISABLED-THREAD: print(f"    ⚠️  WARNING: No API method for {profile_type} (mapped to: {method_name})")
+                    
+                    current += 1  # Increment by 1 for each profile type fetch
             
             # Fetch HIP items from folders
             hip_folders = {}  # Track which folders contain which HIP types
@@ -542,6 +588,8 @@ class ConfigFetchWorker(QThread):
                     except Exception as e:
                         pass
                         # DISABLED-THREAD: print(f"      ERROR fetching rules from '{folder_name}': {e}")
+                
+                current += 1  # Increment by 1 for security rules fetch
             
             self.progress.emit("Analysis complete", 100)
             # Don't print from background thread - causes segfaults

@@ -473,8 +473,9 @@ class SelectivePushOrchestrator:
         }
         
         try:
-            # Count total items for progress
+            # Count total items and operations for progress
             total_items = self._count_items(selected_items)
+            total_operations = self._count_total_operations(selected_items)
             current_item = 0
             
             logger.info("=" * 80)
@@ -482,9 +483,10 @@ class SelectivePushOrchestrator:
             logger.info(f"Destination Tenant: {self.api_client.tsg_id}")
             logger.info(f"Conflict Resolution: {self.conflict_resolution}")
             logger.info(f"Total Items to Push: {total_items}")
+            logger.info(f"Total Operations: {total_operations} ({'2x for OVERWRITE mode' if self.conflict_resolution == 'OVERWRITE' else '1x per item'})")
             logger.info("=" * 80)
             
-            self._report_progress("Starting push operation", 0, total_items)
+            self._report_progress("Starting push operation", 0, total_operations)
             
             # PHASE 1: If OVERWRITE mode, delete existing items in REVERSE dependency order
             # (top-down: rules → snippets → infrastructure → hip → profiles → objects → folders)
@@ -501,7 +503,7 @@ class SelectivePushOrchestrator:
                         selected_items['folders'],
                         destination_config,
                         current_item,
-                        total_items
+                        total_operations
                     )
                 
                 # 2. Snippets
@@ -510,7 +512,7 @@ class SelectivePushOrchestrator:
                         selected_items['snippets'],
                         destination_config,
                         current_item,
-                        total_items
+                        total_operations
                     )
                 
                 # 3. Infrastructure (uses profiles, so delete BEFORE profiles)
@@ -519,7 +521,7 @@ class SelectivePushOrchestrator:
                         selected_items['infrastructure'],
                         destination_config,
                         current_item,
-                        total_items
+                        total_operations
                     )
                 
                 # 4. HIP (may use profiles)
@@ -528,7 +530,7 @@ class SelectivePushOrchestrator:
                         selected_items['folders'],
                         destination_config,
                         current_item,
-                        total_items
+                        total_operations
                     )
                 
                 # 5. Profiles (used by infrastructure and HIP)
@@ -537,7 +539,7 @@ class SelectivePushOrchestrator:
                         selected_items['folders'],
                         destination_config,
                         current_item,
-                        total_items
+                        total_operations
                     )
                 
                 # 6. Objects (used by rules and profiles)
@@ -546,7 +548,7 @@ class SelectivePushOrchestrator:
                         selected_items['folders'],
                         destination_config,
                         current_item,
-                        total_items
+                        total_operations
                     )
                 
                 logger.info("-" * 80)
@@ -573,7 +575,7 @@ class SelectivePushOrchestrator:
                     selected_items['folders'],
                     destination_config,
                     current_item,
-                    total_items
+                    total_operations
                 )
             
             # 2. Push objects
@@ -582,7 +584,7 @@ class SelectivePushOrchestrator:
                     selected_items['folders'],
                     destination_config,
                     current_item,
-                    total_items
+                    total_operations
                 )
             
             # 3. Push profiles
@@ -591,7 +593,7 @@ class SelectivePushOrchestrator:
                     selected_items['folders'],
                     destination_config,
                     current_item,
-                    total_items
+                    total_operations
                 )
             
             # 4. Push HIP
@@ -600,7 +602,7 @@ class SelectivePushOrchestrator:
                     selected_items['folders'],
                     destination_config,
                     current_item,
-                    total_items
+                    total_operations
                 )
             
             # 5. Push infrastructure
@@ -609,7 +611,7 @@ class SelectivePushOrchestrator:
                     selected_items['infrastructure'],
                     destination_config,
                     current_item,
-                    total_items
+                    total_operations
                 )
             
             # 6. Push security rules
@@ -618,7 +620,7 @@ class SelectivePushOrchestrator:
                     selected_items['folders'],
                     destination_config,
                     current_item,
-                    total_items
+                    total_operations
                 )
             
             # 7. Push snippets
@@ -627,7 +629,16 @@ class SelectivePushOrchestrator:
                     selected_items['snippets'],
                     destination_config,
                     current_item,
-                    total_items
+                    total_operations
+                )
+            
+            # 7. Push snippets
+            if 'snippets' in selected_items:
+                current_item = self._push_snippets(
+                    selected_items['snippets'],
+                    destination_config,
+                    current_item,
+                    total_operations
                 )
             
             logger.info("-" * 80)
@@ -638,7 +649,7 @@ class SelectivePushOrchestrator:
             
             # Report final progress (wrapped to prevent crashes)
             try:
-                self._report_progress("Push operation complete", total_items, total_items)
+                self._report_progress("Push operation complete", total_operations, total_operations)
             except Exception as prog_err:
                 pass  # Silently ignore progress errors
             
@@ -731,14 +742,20 @@ class SelectivePushOrchestrator:
             }
 
     def _count_items(self, selected_items: Dict[str, Any]) -> int:
-        """Count total items to push."""
+        """
+        Count total items to push.
+        
+        Note: Folders are not counted as they are not actually pushed (only created if needed).
+        In OVERWRITE mode, items are counted once here, but progress will count twice
+        (once for delete, once for create) - handled in _count_total_operations().
+        """
         count = 0
         
         # Count folders
         if 'folders' in selected_items:
             for folder in selected_items['folders']:
-                # Count folder itself
-                count += 1
+                # Don't count folder itself - folders are not pushed, only created if needed
+                # (This was causing off-by-one errors in progress calculation)
                 
                 # Count objects in folder
                 if 'objects' in folder:
@@ -770,6 +787,24 @@ class SelectivePushOrchestrator:
             count += len(selected_items['snippets'])
         
         return count
+    
+    def _count_total_operations(self, selected_items: Dict[str, Any]) -> int:
+        """
+        Count total operations for progress tracking.
+        
+        In OVERWRITE mode, each item requires 2 operations (delete + create).
+        In SKIP/RENAME mode, each item requires 1 operation (create only).
+        
+        Returns:
+            Total number of operations for accurate progress calculation.
+        """
+        base_count = self._count_items(selected_items)
+        
+        # In OVERWRITE mode, double the count (delete + create)
+        if self.conflict_resolution == 'OVERWRITE':
+            return base_count * 2
+        else:
+            return base_count
 
     # ========================================================================
     # HELPER METHODS - API Call Wrappers
