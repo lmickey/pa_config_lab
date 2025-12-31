@@ -1106,13 +1106,14 @@ class SelectivePushOrchestrator:
         8. bandwidth_allocations
         """
         # Define the correct delete order for infrastructure
-        # Infrastructure dependency map
-        # Key: item type, Value: list of types that depend on it (must be deleted first)
+        # Infrastructure dependency map  
+        # Key: item type that failed, Value: list of types that DEPEND on it (should be skipped)
+        # When X fails to delete, skip all items in infra_dependencies[X]
         infra_dependencies = {
-            'ipsec_crypto_profiles': ['ipsec_tunnels'],  # Tunnels depend on IPsec crypto
-            'ike_crypto_profiles': ['ike_gateways', 'ipsec_tunnels'],  # Gateways and tunnels depend on IKE crypto
-            'ike_gateways': ['ipsec_tunnels'],  # Tunnels depend on gateways
-            'ipsec_tunnels': ['service_connections'],  # Service connections depend on tunnels
+            'service_connections': ['ipsec_tunnels', 'ike_gateways', 'ike_crypto_profiles', 'ipsec_crypto_profiles'],  # If SC fails, can't delete anything it references
+            'ipsec_tunnels': ['ike_gateways', 'ike_crypto_profiles', 'ipsec_crypto_profiles'],  # If tunnel fails, can't delete what it references
+            'ike_gateways': ['ike_crypto_profiles'],  # If gateway fails, can't delete the crypto it uses
+            # Note: crypto profiles don't have dependencies (they're at the bottom)
         }
         
         # Track items that should be skipped due to dependency failures
@@ -1218,6 +1219,7 @@ class SelectivePushOrchestrator:
                                             for dep_item in infrastructure[dep_type]:
                                                 dep_name = dep_item.get('name', 'Unknown')
                                                 dependency_failed_items.add((dep_type, dep_name))
+                                                logger.info(f"  → Marking {dep_type}: {dep_name} to skip (depends on failed {infra_type})")
                             except Exception as e:
                                 # Track failed delete
                                 self.failed_deletes[(infra_type, infra_name, 'Infrastructure')] = str(e)[:200]
@@ -1236,6 +1238,7 @@ class SelectivePushOrchestrator:
                                         for dep_item in infrastructure[dep_type]:
                                             dep_name = dep_item.get('name', 'Unknown')
                                             dependency_failed_items.add((dep_type, dep_name))
+                                            logger.info(f"  → Marking {dep_type}: {dep_name} to skip (depends on failed {infra_type})")
                         current_item += 1
                     except Exception as item_error:
                         logger.error(f"Error processing infrastructure item: {str(item_error)[:200]}")
