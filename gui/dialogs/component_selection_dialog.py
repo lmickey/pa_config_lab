@@ -451,7 +451,9 @@ class ComponentSelectionDialog(QDialog):
                     if content_type == 'rules_parent':
                         for k in range(content_item.childCount()):
                             rule_item = content_item.child(k)
-                            if rule_item.checkState(0) == Qt.CheckState.Checked:
+                            # Only collect if checked AND enabled (filters out CIE-dependent rules)
+                            if (rule_item.checkState(0) == Qt.CheckState.Checked and
+                                rule_item.flags() & Qt.ItemFlag.ItemIsEnabled):
                                 rule_data = rule_item.data(0, Qt.ItemDataRole.UserRole)
                                 if rule_data:
                                     selected_rules.append(rule_data.get('data'))
@@ -467,7 +469,9 @@ class ComponentSelectionDialog(QDialog):
                                 # Collect individual objects
                                 for m in range(obj_type_item.childCount()):
                                     obj_item = obj_type_item.child(m)
-                                    if obj_item.checkState(0) == Qt.CheckState.Checked:
+                                    # Only collect if checked AND enabled
+                                    if (obj_item.checkState(0) == Qt.CheckState.Checked and
+                                        obj_item.flags() & Qt.ItemFlag.ItemIsEnabled):
                                         obj_data = obj_item.data(0, Qt.ItemDataRole.UserRole)
                                         if obj_data:
                                             if obj_type not in selected_objects:
@@ -485,7 +489,9 @@ class ComponentSelectionDialog(QDialog):
                                 # Collect individual profiles
                                 for m in range(prof_type_item.childCount()):
                                     profile_item = prof_type_item.child(m)
-                                    if profile_item.checkState(0) == Qt.CheckState.Checked:
+                                    # Only collect if checked AND enabled (filters out CIE profiles)
+                                    if (profile_item.checkState(0) == Qt.CheckState.Checked and 
+                                        profile_item.flags() & Qt.ItemFlag.ItemIsEnabled):
                                         profile_data = profile_item.data(0, Qt.ItemDataRole.UserRole)
                                         if profile_data:
                                             if profile_type not in selected_profiles:
@@ -502,7 +508,9 @@ class ComponentSelectionDialog(QDialog):
                             # Collect HIP Objects or HIP Profiles
                             for m in range(hip_type_item.childCount()):
                                 hip_item = hip_type_item.child(m)
-                                if hip_item.checkState(0) == Qt.CheckState.Checked:
+                                # Only collect if checked AND enabled
+                                if (hip_item.checkState(0) == Qt.CheckState.Checked and
+                                    hip_item.flags() & Qt.ItemFlag.ItemIsEnabled):
                                     hip_data = hip_item.data(0, Qt.ItemDataRole.UserRole)
                                     if hip_data:
                                         if "HIP Objects" in hip_type_name:
@@ -606,7 +614,9 @@ class ComponentSelectionDialog(QDialog):
                 
                 for j in range(type_item.childCount()):
                     obj_item = type_item.child(j)
-                    if obj_item.checkState(0) == Qt.CheckState.Checked:
+                    # Only collect if checked AND enabled
+                    if (obj_item.checkState(0) == Qt.CheckState.Checked and
+                        obj_item.flags() & Qt.ItemFlag.ItemIsEnabled):
                         obj_data = obj_item.data(0, Qt.ItemDataRole.UserRole)
                         if obj_data:
                             objects[obj_type].append(obj_data.get('data'))
@@ -632,8 +642,10 @@ class ComponentSelectionDialog(QDialog):
             if item_data and item_data.get('type') == 'infrastructure':
                 # This is an infrastructure item
                 print(f"{indent}  -> Is infrastructure item")
-                if item.checkState(0) == Qt.CheckState.Checked:
-                    print(f"{indent}  -> Is CHECKED")
+                # Only collect if checked AND enabled
+                if (item.checkState(0) == Qt.CheckState.Checked and
+                    item.flags() & Qt.ItemFlag.ItemIsEnabled):
+                    print(f"{indent}  -> Is CHECKED and ENABLED")
                     infra_type = item_data.get('infra_type')
                     data = item_data.get('data')
                     
