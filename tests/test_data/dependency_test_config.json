@@ -1,0 +1,589 @@
+{
+  "metadata": {
+    "name": "Dependency Test Configuration",
+    "description": "Comprehensive test config with multiple dependency chains for validation testing",
+    "created": "2024-12-24",
+    "version": "1.0"
+  },
+  "security_policies": {
+    "folders": [
+      {
+        "name": "Dependency Test Folder",
+        "folder": "Dependency Test Folder",
+        "description": "Test folder with complex dependency chains",
+        "security_rules": [
+          {
+            "name": "Rule-With-Object-Dependencies",
+            "folder": "Dependency Test Folder",
+            "description": "Rule depending on address objects, groups, and profiles",
+            "source": ["Internal-Network", "VPN-Users", "Address-Group-1"],
+            "source_user": ["any"],
+            "destination": ["External-Servers", "Web-Servers", "Address-Group-2"],
+            "application": ["web-browsing", "ssl", "App-Group-1"],
+            "service": ["Service-Group-1", "application-default"],
+            "category": ["any"],
+            "action": "allow",
+            "profile_setting": {
+              "group": ["Security-Profile-Group-1"]
+            },
+            "log_setting": "Default-Logging",
+            "disabled": false
+          },
+          {
+            "name": "Rule-With-Auth-Profile",
+            "folder": "Dependency Test Folder",
+            "description": "Rule depending on authentication profile",
+            "source": ["any"],
+            "source_user": ["any"],
+            "destination": ["any"],
+            "application": ["web-browsing"],
+            "service": ["application-default"],
+            "category": ["any"],
+            "action": "allow",
+            "profile_setting": {
+              "profiles": [
+                {
+                  "url_filtering": ["URL-Filter-Profile-1"],
+                  "file_blocking": ["File-Block-Profile-1"],
+                  "antivirus": ["AV-Profile-1"],
+                  "anti_spyware": ["Anti-Spyware-Profile-1"],
+                  "vulnerability": ["Vuln-Profile-1"]
+                }
+              ]
+            },
+            "source_hip": ["HIP-Profile-Mobile"],
+            "disabled": false
+          },
+          {
+            "name": "Rule-With-Decryption",
+            "folder": "Dependency Test Folder",
+            "description": "Rule with decryption profile dependency",
+            "source": ["any"],
+            "source_user": ["any"],
+            "destination": ["any"],
+            "application": ["ssl", "web-browsing"],
+            "service": ["application-default"],
+            "category": ["any"],
+            "action": "allow",
+            "disabled": false,
+            "negate_source": false,
+            "negate_destination": false
+          }
+        ],
+        "objects": {
+          "address_objects": [
+            {
+              "name": "Internal-Network",
+              "folder": "Dependency Test Folder",
+              "description": "Internal network range",
+              "ip_netmask": "10.0.0.0/8"
+            },
+            {
+              "name": "VPN-Users",
+              "folder": "Dependency Test Folder",
+              "description": "VPN user subnet",
+              "ip_netmask": "172.16.0.0/16"
+            },
+            {
+              "name": "External-Servers",
+              "folder": "Dependency Test Folder",
+              "description": "External server range",
+              "ip_netmask": "203.0.113.0/24"
+            },
+            {
+              "name": "Web-Servers",
+              "folder": "Dependency Test Folder",
+              "description": "Web server pool",
+              "ip_range": "192.168.1.10-192.168.1.20"
+            },
+            {
+              "name": "DMZ-Host-1",
+              "folder": "Dependency Test Folder",
+              "description": "DMZ host for group",
+              "ip_netmask": "192.168.100.10/32"
+            },
+            {
+              "name": "DMZ-Host-2",
+              "folder": "Dependency Test Folder",
+              "description": "DMZ host for group",
+              "ip_netmask": "192.168.100.11/32"
+            }
+          ],
+          "address_groups": [
+            {
+              "name": "Address-Group-1",
+              "folder": "Dependency Test Folder",
+              "description": "Address group depending on multiple addresses",
+              "static": ["VPN-Users", "Internal-Network"]
+            },
+            {
+              "name": "Address-Group-2",
+              "folder": "Dependency Test Folder",
+              "description": "Address group depending on other addresses",
+              "static": ["External-Servers", "Web-Servers"]
+            },
+            {
+              "name": "Nested-Address-Group",
+              "folder": "Dependency Test Folder",
+              "description": "Group depending on another group (nested)",
+              "static": ["Address-Group-1", "DMZ-Host-1", "DMZ-Host-2"]
+            }
+          ],
+          "service_objects": [
+            {
+              "name": "Custom-TCP-8080",
+              "folder": "Dependency Test Folder",
+              "description": "Custom TCP service",
+              "protocol": {
+                "tcp": {
+                  "port": "8080"
+                }
+              }
+            },
+            {
+              "name": "Custom-TCP-9000",
+              "folder": "Dependency Test Folder",
+              "description": "Custom TCP service",
+              "protocol": {
+                "tcp": {
+                  "port": "9000-9100"
+                }
+              }
+            },
+            {
+              "name": "Custom-UDP-5000",
+              "folder": "Dependency Test Folder",
+              "description": "Custom UDP service",
+              "protocol": {
+                "udp": {
+                  "port": "5000"
+                }
+              }
+            }
+          ],
+          "service_groups": [
+            {
+              "name": "Service-Group-1",
+              "folder": "Dependency Test Folder",
+              "description": "Service group depending on custom services",
+              "members": ["Custom-TCP-8080", "Custom-TCP-9000", "Custom-UDP-5000"]
+            }
+          ],
+          "application_groups": [
+            {
+              "name": "App-Group-1",
+              "folder": "Dependency Test Folder",
+              "description": "Application group",
+              "members": ["ssl", "web-browsing", "dns"]
+            }
+          ]
+        },
+        "profiles": {
+          "authentication": [
+            {
+              "name": "LDAP-Auth-Profile",
+              "folder": "Dependency Test Folder",
+              "description": "LDAP auth profile depending on server profile",
+              "method": {
+                "ldap": {
+                  "server_profile": "LDAP-Server-Corp",
+                  "login_attribute": "uid",
+                  "password_exp_warning_days": 7
+                }
+              },
+              "user_domain": "corp.example.com",
+              "username_modifier": "%USERINPUT%@corp.example.com"
+            },
+            {
+              "name": "RADIUS-Auth-Profile",
+              "folder": "Dependency Test Folder",
+              "description": "RADIUS auth profile depending on server profile",
+              "method": {
+                "radius": {
+                  "server_profile": "RADIUS-Server-MFA",
+                  "checkgroup": true
+                }
+              }
+            },
+            {
+              "name": "SAML-Auth-Profile",
+              "folder": "Dependency Test Folder",
+              "description": "SAML auth profile depending on certificate",
+              "method": {
+                "saml": {
+                  "identity_provider_id": "okta-idp",
+                  "single_sign_on_url": "https://sso.example.com/saml",
+                  "certificate": "SAML-Signing-Cert"
+                }
+              }
+            }
+          ],
+          "url_filtering": [
+            {
+              "name": "URL-Filter-Profile-1",
+              "folder": "Dependency Test Folder",
+              "description": "URL filtering profile",
+              "action": "block",
+              "block": ["adult", "malware", "phishing"],
+              "allow": ["business-and-economy"],
+              "alert": ["gambling"],
+              "credential_enforcement": {
+                "mode": {
+                  "ip_user": {}
+                },
+                "log_severity": "medium"
+              }
+            }
+          ],
+          "file_blocking": [
+            {
+              "name": "File-Block-Profile-1",
+              "folder": "Dependency Test Folder",
+              "description": "File blocking profile",
+              "rules": [
+                {
+                  "name": "Block-Executables",
+                  "applications": ["any"],
+                  "file_type": ["pe", "msi"],
+                  "direction": "download",
+                  "action": "block"
+                }
+              ]
+            }
+          ],
+          "antivirus": [
+            {
+              "name": "AV-Profile-1",
+              "folder": "Dependency Test Folder",
+              "description": "Antivirus profile",
+              "rules": [
+                {
+                  "name": "AV-Rule-1",
+                  "applications": ["any"],
+                  "direction": "download",
+                  "file_type": ["any"],
+                  "analysis": "public-cloud"
+                }
+              ],
+              "mlav_exception": []
+            }
+          ],
+          "anti_spyware": [
+            {
+              "name": "Anti-Spyware-Profile-1",
+              "folder": "Dependency Test Folder",
+              "description": "Anti-spyware profile",
+              "rules": [
+                {
+                  "name": "Default-Rule",
+                  "threat_name": "any",
+                  "severity": ["critical", "high", "medium"],
+                  "category": "any",
+                  "action": {
+                    "reset_both": {}
+                  }
+                }
+              ]
+            }
+          ],
+          "vulnerability": [
+            {
+              "name": "Vuln-Profile-1",
+              "folder": "Dependency Test Folder",
+              "description": "Vulnerability protection profile",
+              "rules": [
+                {
+                  "name": "Block-Critical-High",
+                  "threat_name": "any",
+                  "severity": ["critical", "high"],
+                  "cve": ["any"],
+                  "vendor_id": ["any"],
+                  "category": "any",
+                  "action": {
+                    "reset_both": {}
+                  }
+                }
+              ]
+            }
+          ],
+          "decryption": [
+            {
+              "name": "Decryption-Profile-1",
+              "folder": "Dependency Test Folder",
+              "description": "Decryption profile with SSL forward proxy",
+              "ssl_forward_proxy": {
+                "auto_include_altname": true,
+                "block_client_cert": false,
+                "block_expired_certificate": true,
+                "block_untrusted_issuer": true,
+                "strip_alpn": false
+              }
+            }
+          ],
+          "security_profile_groups": [
+            {
+              "name": "Security-Profile-Group-1",
+              "folder": "Dependency Test Folder",
+              "description": "Security profile group depending on multiple profiles",
+              "url_filtering": ["URL-Filter-Profile-1"],
+              "file_blocking": ["File-Block-Profile-1"],
+              "antivirus": ["AV-Profile-1"],
+              "anti_spyware": ["Anti-Spyware-Profile-1"],
+              "vulnerability": ["Vuln-Profile-1"]
+            }
+          ]
+        },
+        "hip": {
+          "hip_objects": [
+            {
+              "name": "HIP-Object-Antivirus",
+              "folder": "Dependency Test Folder",
+              "description": "HIP object checking antivirus",
+              "anti_malware": {
+                "criteria": {
+                  "is_enabled": "yes",
+                  "is_installed": true
+                }
+              }
+            },
+            {
+              "name": "HIP-Object-Firewall",
+              "folder": "Dependency Test Folder",
+              "description": "HIP object checking firewall",
+              "host_info": {
+                "criteria": {
+                  "os": {
+                    "contains": {
+                      "Microsoft": "All"
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "hip_profiles": [
+            {
+              "name": "HIP-Profile-Mobile",
+              "folder": "Dependency Test Folder",
+              "description": "HIP profile depending on HIP objects",
+              "match": "HIP-Object-Antivirus and HIP-Object-Firewall"
+            }
+          ]
+        }
+      }
+    ],
+    "snippets": []
+  },
+  "infrastructure": {
+    "service_connections": [
+      {
+        "name": "Service-Connection-AWS",
+        "ipsec_tunnel": "IPSec-Tunnel-AWS",
+        "onboarding_type": "classic",
+        "region": "us-east-1",
+        "subnets": ["10.100.0.0/16", "10.101.0.0/16"]
+      },
+      {
+        "name": "Service-Connection-Azure",
+        "ipsec_tunnel": "IPSec-Tunnel-Azure",
+        "onboarding_type": "classic",
+        "region": "us-west-1",
+        "subnets": ["10.200.0.0/16"]
+      }
+    ],
+    "remote_networks": [
+      {
+        "name": "Remote-Network-HQ",
+        "ipsec_tunnel": "IPSec-Tunnel-HQ",
+        "region": "us-east-1",
+        "spn_name": "Remote-Network-HQ",
+        "license_type": "FWAAS-AGGREGATE",
+        "subnets": ["192.168.0.0/16"]
+      }
+    ],
+    "ipsec_tunnels": [
+      {
+        "name": "IPSec-Tunnel-AWS",
+        "auto_key": {
+          "ike_gateway": [
+            {
+              "name": "IKE-Gateway-AWS"
+            }
+          ],
+          "ipsec_crypto_profile": "IPSec-Crypto-Strong"
+        },
+        "tunnel_monitor": {
+          "enable": true,
+          "destination_ip": "169.254.1.1"
+        },
+        "anti_replay": true,
+        "copy_tos": false,
+        "enable_gre_encapsulation": false
+      },
+      {
+        "name": "IPSec-Tunnel-Azure",
+        "auto_key": {
+          "ike_gateway": [
+            {
+              "name": "IKE-Gateway-Azure"
+            }
+          ],
+          "ipsec_crypto_profile": "IPSec-Crypto-Strong"
+        },
+        "tunnel_monitor": {
+          "enable": true,
+          "destination_ip": "169.254.2.1"
+        },
+        "anti_replay": true
+      },
+      {
+        "name": "IPSec-Tunnel-HQ",
+        "auto_key": {
+          "ike_gateway": [
+            {
+              "name": "IKE-Gateway-HQ"
+            }
+          ],
+          "ipsec_crypto_profile": "IPSec-Crypto-AES256"
+        },
+        "tunnel_monitor": {
+          "enable": true,
+          "destination_ip": "192.168.255.1"
+        },
+        "anti_replay": true
+      }
+    ],
+    "ike_gateways": [
+      {
+        "name": "IKE-Gateway-AWS",
+        "authentication": {
+          "pre_shared_key": {
+            "key": "***ENCRYPTED***"
+          }
+        },
+        "peer_address": {
+          "ip": "203.0.113.10"
+        },
+        "peer_id": {
+          "type": "ipaddr",
+          "id": "203.0.113.10"
+        },
+        "protocol": {
+          "ikev2": {
+            "ike_crypto_profile": "IKE-Crypto-Strong"
+          }
+        },
+        "protocol_common": {
+          "nat_traversal": {
+            "enable": true
+          },
+          "fragmentation": {
+            "enable": false
+          }
+        }
+      },
+      {
+        "name": "IKE-Gateway-Azure",
+        "authentication": {
+          "pre_shared_key": {
+            "key": "***ENCRYPTED***"
+          }
+        },
+        "peer_address": {
+          "ip": "203.0.113.20"
+        },
+        "peer_id": {
+          "type": "ipaddr",
+          "id": "203.0.113.20"
+        },
+        "protocol": {
+          "ikev2": {
+            "ike_crypto_profile": "IKE-Crypto-Strong"
+          }
+        },
+        "protocol_common": {
+          "nat_traversal": {
+            "enable": true
+          }
+        }
+      },
+      {
+        "name": "IKE-Gateway-HQ",
+        "authentication": {
+          "pre_shared_key": {
+            "key": "***ENCRYPTED***"
+          }
+        },
+        "peer_address": {
+          "ip": "198.51.100.1"
+        },
+        "peer_id": {
+          "type": "ipaddr",
+          "id": "198.51.100.1"
+        },
+        "protocol": {
+          "ikev2": {
+            "ike_crypto_profile": "IKE-Crypto-AES256"
+          }
+        },
+        "protocol_common": {
+          "nat_traversal": {
+            "enable": true
+          }
+        }
+      }
+    ],
+    "ike_crypto_profiles": [
+      {
+        "name": "IKE-Crypto-Strong",
+        "dh_group": ["group14", "group19"],
+        "encryption": ["aes-256-cbc"],
+        "authentication": ["sha256"],
+        "lifetime": {
+          "hours": 8
+        }
+      },
+      {
+        "name": "IKE-Crypto-AES256",
+        "dh_group": ["group20"],
+        "encryption": ["aes-256-gcm"],
+        "authentication": ["sha384"],
+        "lifetime": {
+          "hours": 12
+        }
+      }
+    ],
+    "ipsec_crypto_profiles": [
+      {
+        "name": "IPSec-Crypto-Strong",
+        "esp": {
+          "encryption": ["aes-256-gcm"],
+          "authentication": ["sha256"]
+        },
+        "lifetime": {
+          "hours": 1
+        },
+        "dh_group": "group14"
+      },
+      {
+        "name": "IPSec-Crypto-AES256",
+        "esp": {
+          "encryption": ["aes-256-cbc"],
+          "authentication": ["sha384"]
+        },
+        "lifetime": {
+          "hours": 2
+        },
+        "dh_group": "group20"
+      }
+    ],
+    "mobile_users": {
+      "agent_profiles": [
+        {
+          "name": "Mobile-Agent-Profile-Corp",
+          "authentication": "LDAP-Auth-Profile"
+        }
+      ]
+    }
+  }
+}
