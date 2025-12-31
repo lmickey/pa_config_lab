@@ -116,6 +116,31 @@ class MigrationWorkflowWidget(QWidget):
 
         # Add main content to layout
         layout.addWidget(main_content)
+        
+        # Populate tenant dropdowns from saved tenants
+        self._populate_tenant_dropdowns()
+
+    def _populate_tenant_dropdowns(self):
+        """Populate source and destination tenant dropdowns with saved tenants."""
+        try:
+            from config.tenant_manager import TenantManager
+            
+            tenant_mgr = TenantManager()
+            tenants = tenant_mgr.list_tenants()
+            
+            # Populate pull widget source dropdown
+            if hasattr(self.pull_widget, 'populate_source_tenants'):
+                self.pull_widget.populate_source_tenants(tenants)
+            
+            # Populate push widget destination dropdown
+            if hasattr(self.push_widget, 'populate_destination_tenants'):
+                # Convert tenant list to format expected by push widget
+                tenant_list = [{"name": t.get('name'), "data": t} for t in tenants]
+                self.push_widget.populate_destination_tenants(tenant_list)
+                
+        except Exception as e:
+            # Silently fail if tenants can't be loaded
+            pass
 
     def set_api_client(self, api_client, connection_name=None):
         """Set API client for all widgets."""
