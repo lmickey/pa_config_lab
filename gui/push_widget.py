@@ -763,6 +763,9 @@ class PushConfigWidget(QWidget):
                     
                     p2_created_success = [d for d in phase2_creates if d.get('status') == 'success']
                     p2_created_failed = [d for d in phase2_creates if d.get('status') == 'failed']
+                    p2_updated_success = [d for d in phase2_updates if d.get('status') == 'success']
+                    p2_renamed_success = [d for d in phase2_renamed if d.get('status') == 'success']
+                    p2_renamed_failed = [d for d in phase2_renamed if d.get('status') == 'failed']
                     
                     details = []
                     details.append("=" * 70)
@@ -783,10 +786,12 @@ class PushConfigWidget(QWidget):
                     details.append(f"  ✓ Created:   {len(p2_created_success)}")
                     if len(p2_created_failed) > 0:
                         details.append(f"  ✗ Failed:    {len(p2_created_failed)}")
-                    if len(phase2_updates) > 0:
-                        details.append(f"  ✓ Updated:   {len(phase2_updates)}")
-                    if len(phase2_renamed) > 0:
-                        details.append(f"  ✓ Renamed:   {len(phase2_renamed)}")
+                    if len(p2_renamed_success) > 0:
+                        details.append(f"  ✓ Renamed:   {len(p2_renamed_success)}")
+                    if len(p2_renamed_failed) > 0:
+                        details.append(f"  ✗ Failed (Rename): {len(p2_renamed_failed)}")
+                    if len(p2_updated_success) > 0:
+                        details.append(f"  ✓ Updated:   {len(p2_updated_success)}")
                     details.append("")
                     
                     # PHASE 1 DETAILS
@@ -838,6 +843,23 @@ class PushConfigWidget(QWidget):
                             if msg:
                                 details.append(f"    Reason: {msg}")
                     
+                    # Failed renames
+                    if p2_renamed_failed:
+                        details.append("")
+                        details.append(f"✗ Failed to Rename ({len(p2_renamed_failed)}):")
+                        for item in p2_renamed_failed:
+                            old_name = item.get('name', 'unknown')
+                            # For failed renames, the 'name' field is the new name (e.g., "item-copy")
+                            # Strip -copy to show the original name
+                            if old_name.endswith('-copy'):
+                                original_name = old_name[:-5]  # Remove "-copy"
+                            else:
+                                original_name = old_name
+                            details.append(f"  • {item.get('type', 'unknown')}: {original_name} → {old_name} ({item.get('folder', 'unknown')})")
+                            msg = item.get('message', 'No reason provided')
+                            if msg:
+                                details.append(f"    Reason: {msg}")
+                    
                     # Successfully created
                     if p2_created_success:
                         details.append("")
@@ -846,20 +868,25 @@ class PushConfigWidget(QWidget):
                             details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
                     
                     # Successfully updated
-                    if phase2_updates:
+                    if p2_updated_success:
                         details.append("")
-                        details.append(f"✓ Successfully Updated ({len(phase2_updates)}):")
-                        for item in phase2_updates:
+                        details.append(f"✓ Successfully Updated ({len(p2_updated_success)}):")
+                        for item in p2_updated_success:
                             details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
                     
-                    # Renamed items
-                    if phase2_renamed:
+                    # Successfully renamed items
+                    if p2_renamed_success:
                         details.append("")
-                        details.append(f"✓ Renamed ({len(phase2_renamed)}):")
-                        for item in phase2_renamed:
-                            old_name = item.get('name', 'unknown')
-                            new_name = item.get('new_name', 'unknown')
-                            details.append(f"  • {item.get('type', 'unknown')}: {old_name} → {new_name} ({item.get('folder', 'unknown')})")
+                        details.append(f"✓ Successfully Renamed ({len(p2_renamed_success)}):")
+                        for item in p2_renamed_success:
+                            # For renamed items, extract original and new names
+                            # The 'name' in results is the new name (with -copy)
+                            new_name = item.get('name', 'unknown')
+                            if new_name.endswith('-copy'):
+                                original_name = new_name[:-5]
+                            else:
+                                original_name = 'unknown'
+                            details.append(f"  • {item.get('type', 'unknown')}: {original_name} → {new_name} ({item.get('folder', 'unknown')})")
                     
                     details.append("")
                     

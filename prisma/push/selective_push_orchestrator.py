@@ -366,7 +366,9 @@ class SelectivePushOrchestrator:
         if 'auto_key' in updated_item and isinstance(updated_item['auto_key'], dict):
             if 'ike_gateway' in updated_item['auto_key']:
                 old_gateway = updated_item['auto_key']['ike_gateway']
-                updated_item['auto_key']['ike_gateway'] = self.name_mappings.get(old_gateway, old_gateway)
+                # Only update if it's a string (name reference)
+                if isinstance(old_gateway, str):
+                    updated_item['auto_key']['ike_gateway'] = self.name_mappings.get(old_gateway, old_gateway)
         
         # IKE Gateways: protocol.ikev1/ikev2.ike_crypto_profile
         if 'protocol' in updated_item and isinstance(updated_item['protocol'], dict):
@@ -374,13 +376,17 @@ class SelectivePushOrchestrator:
                 if version in updated_item['protocol'] and isinstance(updated_item['protocol'][version], dict):
                     if 'ike_crypto_profile' in updated_item['protocol'][version]:
                         old_profile = updated_item['protocol'][version]['ike_crypto_profile']
-                        updated_item['protocol'][version]['ike_crypto_profile'] = self.name_mappings.get(old_profile, old_profile)
+                        # Only update if it's a string (name reference)
+                        if isinstance(old_profile, str):
+                            updated_item['protocol'][version]['ike_crypto_profile'] = self.name_mappings.get(old_profile, old_profile)
         
         # IPsec Tunnels: anti_replay, copy_tos, enable_gre_encapsulation contain ipsec_crypto_profile in tunnel_interface
         if 'tunnel_interface' in updated_item and isinstance(updated_item['tunnel_interface'], dict):
             if 'ipsec_crypto_profile' in updated_item['tunnel_interface']:
                 old_profile = updated_item['tunnel_interface']['ipsec_crypto_profile']
-                updated_item['tunnel_interface']['ipsec_crypto_profile'] = self.name_mappings.get(old_profile, old_profile)
+                # Only update if it's a string (name reference)
+                if isinstance(old_profile, str):
+                    updated_item['tunnel_interface']['ipsec_crypto_profile'] = self.name_mappings.get(old_profile, old_profile)
         
         return updated_item
 
