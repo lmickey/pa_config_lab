@@ -734,31 +734,13 @@ class PushConfigWidget(QWidget):
                     # Get detailed results from the orchestrator
                     results_data = result.get('results', {}) if isinstance(result, dict) else {}
                     all_details = results_data.get('details', []) if isinstance(results_data, dict) else []
-                    errors_list = results_data.get('errors', []) if isinstance(results_data, dict) else []
-                    could_not_overwrite_list = results_data.get('could_not_overwrite', []) if isinstance(results_data, dict) else []
                     
-                    # Show skipped items
-                    if skipped > 0:
-                        details.append("-" * 70)
-                        details.append(f"SKIPPED ITEMS ({skipped}):")
-                        details.append("-" * 70)
-                        skipped_items = [d for d in all_details if d.get('action') == 'skipped']
-                        for item in skipped_items:
-                            item_type = item.get('type', 'unknown')
-                            item_name = item.get('name', 'unknown')
-                            folder = item.get('folder', 'unknown')
-                            msg = item.get('message', 'No reason provided')
-                            details.append(f"  • {item_type}: {item_name}")
-                            details.append(f"    Location: {folder}")
-                            details.append(f"    Reason: {msg}")
-                            details.append("")
-                    
-                    # Show failed items
+                    # Show failed items FIRST (most important)
                     if failed > 0:
                         details.append("-" * 70)
                         details.append(f"FAILED ITEMS ({failed}):")
                         details.append("-" * 70)
-                        failed_items = [d for d in all_details if d.get('status') == 'failed' and d.get('action') != 'could_not_overwrite']
+                        failed_items = [d for d in all_details if d.get('status') == 'failed']
                         for item in failed_items:
                             item_type = item.get('type', 'unknown')
                             item_name = item.get('name', 'unknown')
@@ -778,19 +760,77 @@ class PushConfigWidget(QWidget):
                                     details.append(f"    Details: {error_str}")
                             details.append("")
                     
-                    # Show could not overwrite items
-                    if could_not_overwrite > 0:
+                    # Show skipped items
+                    if skipped > 0:
                         details.append("-" * 70)
-                        details.append(f"COULD NOT OVERWRITE ({could_not_overwrite}):")
+                        details.append(f"SKIPPED ITEMS ({skipped}):")
                         details.append("-" * 70)
-                        for item in could_not_overwrite_list:
+                        skipped_items = [d for d in all_details if d.get('action') == 'skipped']
+                        for item in skipped_items:
                             item_type = item.get('type', 'unknown')
                             item_name = item.get('name', 'unknown')
                             folder = item.get('folder', 'unknown')
-                            reason = item.get('reason', 'Delete failed')
+                            msg = item.get('message', 'No reason provided')
                             details.append(f"  • {item_type}: {item_name}")
                             details.append(f"    Location: {folder}")
-                            details.append(f"    Reason: {reason}")
+                            details.append(f"    Reason: {msg}")
+                            details.append("")
+                    
+                    # Show successfully created items
+                    if created > 0:
+                        details.append("-" * 70)
+                        details.append(f"CREATED ITEMS ({created}):")
+                        details.append("-" * 70)
+                        created_items = [d for d in all_details if d.get('action') == 'created' and d.get('status') == 'success']
+                        for item in created_items:
+                            item_type = item.get('type', 'unknown')
+                            item_name = item.get('name', 'unknown')
+                            folder = item.get('folder', 'unknown')
+                            details.append(f"  • {item_type}: {item_name}")
+                            details.append(f"    Location: {folder}")
+                            details.append("")
+                    
+                    # Show successfully deleted items
+                    if deleted > 0:
+                        details.append("-" * 70)
+                        details.append(f"DELETED ITEMS ({deleted}):")
+                        details.append("-" * 70)
+                        deleted_items = [d for d in all_details if d.get('action') == 'deleted' and d.get('status') == 'success']
+                        for item in deleted_items:
+                            item_type = item.get('type', 'unknown')
+                            item_name = item.get('name', 'unknown')
+                            folder = item.get('folder', 'unknown')
+                            details.append(f"  • {item_type}: {item_name}")
+                            details.append(f"    Location: {folder}")
+                            details.append("")
+                    
+                    # Show renamed items (if any)
+                    if renamed > 0:
+                        details.append("-" * 70)
+                        details.append(f"RENAMED ITEMS ({renamed}):")
+                        details.append("-" * 70)
+                        renamed_items = [d for d in all_details if d.get('action') == 'renamed']
+                        for item in renamed_items:
+                            item_type = item.get('type', 'unknown')
+                            old_name = item.get('name', 'unknown')
+                            new_name = item.get('new_name', 'unknown')
+                            folder = item.get('folder', 'unknown')
+                            details.append(f"  • {item_type}: {old_name} → {new_name}")
+                            details.append(f"    Location: {folder}")
+                            details.append("")
+                    
+                    # Show updated items (if any)
+                    if updated > 0:
+                        details.append("-" * 70)
+                        details.append(f"UPDATED ITEMS ({updated}):")
+                        details.append("-" * 70)
+                        updated_items = [d for d in all_details if d.get('action') == 'updated' and d.get('status') == 'success']
+                        for item in updated_items:
+                            item_type = item.get('type', 'unknown')
+                            item_name = item.get('name', 'unknown')
+                            folder = item.get('folder', 'unknown')
+                            details.append(f"  • {item_type}: {item_name}")
+                            details.append(f"    Location: {folder}")
                             details.append("")
                     
                     details.append("=" * 70)
