@@ -38,9 +38,9 @@ class ConfigFetchWorker(QThread):
     def run(self):
         """Fetch configurations from destination tenant."""
         try:
-            print(f"\n=== ConfigFetchWorker.run() starting ===")
-            print(f"API Client: {self.api_client}")
-            print(f"Selected items keys: {list(self.selected_items.keys())}")
+            # DISABLED: print(f"\n=== ConfigFetchWorker.run() starting ===")
+            # DISABLED: print(f"API Client: {self.api_client}")
+            # DISABLED: print(f"Selected items keys: {list(self.selected_items.keys())}")
             for key, value in self.selected_items.items():
                 if isinstance(value, dict):
                     print(f"  {key}: {list(value.keys())} ({sum(len(v) for v in value.values() if isinstance(v, list))} items)")
@@ -76,7 +76,7 @@ class ConfigFetchWorker(QThread):
                 else:
                     total_items += len(items)
             
-            print(f"Total items to check: {total_items}")
+            # DISABLED: print(f"Total items to check: {total_items}")
             current = 0
             
             # Fetch folders and their contents
@@ -261,7 +261,7 @@ class ConfigFetchWorker(QThread):
             
             # Fetch infrastructure components
             infrastructure = self.selected_items.get('infrastructure', {})
-            print(f"\nInfrastructure to check: {list(infrastructure.keys()) if infrastructure else 'None'}")
+            # DISABLED: print(f"\nInfrastructure to check: {list(infrastructure.keys()) if infrastructure else 'None'}")
             if infrastructure:
                 self.progress.emit(f"Checking infrastructure...", int((current / max(total_items, 1)) * 100))
                 
@@ -519,22 +519,12 @@ class ConfigFetchWorker(QThread):
                         print(f"      ERROR fetching rules from '{folder_name}': {e}")
             
             self.progress.emit("Analysis complete", 100)
-            print(f"\n=== ConfigFetchWorker.run() complete ===")
-            print(f"Destination config keys: {list(dest_config.keys())}")
-            for key, value in dest_config.items():
-                if isinstance(value, dict):
-                    print(f"  {key}: {len(value)} items")
-                    for subkey in list(value.keys())[:5]:  # Show first 5
-                        print(f"    - {subkey}")
-            print("=" * 50)
+            # Don't print from background thread - causes segfaults
             self.finished.emit(dest_config)
             
         except Exception as e:
-            print(f"\n=== ConfigFetchWorker ERROR ===")
-            print(f"Error: {e}")
-            import traceback
-            traceback.print_exc()
-            print("=" * 50)
+            # Don't print from background thread - causes segfaults
+            # Just emit error signal
             self.error.emit(f"Error fetching destination config: {str(e)}")
 
 
@@ -729,7 +719,7 @@ class PushPreviewDialog(QDialog):
             # ALWAYS analyze folder contents (even for built-in folders)
             # Objects from folder
             folder_objects = folder.get('objects', {})
-            print(f"\nDEBUG: Analyzing folder '{name}' objects:")
+            # DISABLED: print(f"\nDEBUG: Analyzing folder '{name}' objects:")
             for obj_type, obj_list in folder_objects.items():
                 if not isinstance(obj_list, list):
                     continue
