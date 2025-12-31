@@ -709,9 +709,9 @@ class PushConfigWidget(QWidget):
                 # Show detailed results in the output box
                 try:
                     details = []
-                    details.append("=" * 60)
+                    details.append("=" * 70)
                     details.append("PUSH OPERATION SUMMARY")
-                    details.append("=" * 60)
+                    details.append("=" * 70)
                     details.append(f"Total Items Processed: {processed_count}")
                     details.append("")
                     details.append("Results by Action:")
@@ -730,18 +730,79 @@ class PushConfigWidget(QWidget):
                     if could_not_overwrite > 0:
                         details.append(f"  ⚠ Could Not Overwrite:  {could_not_overwrite}")
                     details.append("")
-                    details.append("=" * 60)
                     
-                    # Add original detailed message if available
-                    if message and isinstance(message, str):
-                        details.append("")
-                        details.append("Detailed Log:")
-                        details.append("-" * 60)
-                        details.append(message)
+                    # Get detailed results from the orchestrator
+                    results_data = result.get('results', {}) if isinstance(result, dict) else {}
+                    all_details = results_data.get('details', []) if isinstance(results_data, dict) else []
+                    errors_list = results_data.get('errors', []) if isinstance(results_data, dict) else []
+                    could_not_overwrite_list = results_data.get('could_not_overwrite', []) if isinstance(results_data, dict) else []
+                    
+                    # Show skipped items
+                    if skipped > 0:
+                        details.append("-" * 70)
+                        details.append(f"SKIPPED ITEMS ({skipped}):")
+                        details.append("-" * 70)
+                        skipped_items = [d for d in all_details if d.get('action') == 'skipped']
+                        for item in skipped_items:
+                            item_type = item.get('type', 'unknown')
+                            item_name = item.get('name', 'unknown')
+                            folder = item.get('folder', 'unknown')
+                            msg = item.get('message', 'No reason provided')
+                            details.append(f"  • {item_type}: {item_name}")
+                            details.append(f"    Location: {folder}")
+                            details.append(f"    Reason: {msg}")
+                            details.append("")
+                    
+                    # Show failed items
+                    if failed > 0:
+                        details.append("-" * 70)
+                        details.append(f"FAILED ITEMS ({failed}):")
+                        details.append("-" * 70)
+                        failed_items = [d for d in all_details if d.get('status') == 'failed' and d.get('action') != 'could_not_overwrite']
+                        for item in failed_items:
+                            item_type = item.get('type', 'unknown')
+                            item_name = item.get('name', 'unknown')
+                            folder = item.get('folder', 'unknown')
+                            action = item.get('action', 'unknown')
+                            msg = item.get('message', 'No reason provided')
+                            details.append(f"  • {item_type}: {item_name}")
+                            details.append(f"    Location: {folder}")
+                            details.append(f"    Action: {action}")
+                            details.append(f"    Error: {msg}")
+                            
+                            # Try to get more detailed error if available
+                            error_detail = item.get('error')
+                            if error_detail:
+                                error_str = str(error_detail)[:200]  # Truncate to 200 chars
+                                if error_str and error_str != msg:
+                                    details.append(f"    Details: {error_str}")
+                            details.append("")
+                    
+                    # Show could not overwrite items
+                    if could_not_overwrite > 0:
+                        details.append("-" * 70)
+                        details.append(f"COULD NOT OVERWRITE ({could_not_overwrite}):")
+                        details.append("-" * 70)
+                        for item in could_not_overwrite_list:
+                            item_type = item.get('type', 'unknown')
+                            item_name = item.get('name', 'unknown')
+                            folder = item.get('folder', 'unknown')
+                            reason = item.get('reason', 'Delete failed')
+                            details.append(f"  • {item_type}: {item_name}")
+                            details.append(f"    Location: {folder}")
+                            details.append(f"    Reason: {reason}")
+                            details.append("")
+                    
+                    details.append("=" * 70)
+                    details.append("")
+                    details.append("See activity.log for complete details")
+                    details.append("")
                     
                     self.results_text.setPlainText("\n".join(details))
                 except Exception as results_err:
                     print(f"Error updating results text: {results_err}")
+                    import traceback
+                    traceback.print_exc()
 
                 # Emit signal (wrapped in try/except)
                 try:
