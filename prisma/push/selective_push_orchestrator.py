@@ -267,6 +267,52 @@ class SelectivePushOrchestrator:
         
         return False
     
+    def _extract_api_error_message(self, error: Exception) -> str:
+        """
+        Extract a detailed error message from an API error response.
+        
+        Args:
+            error: Exception from API call
+            
+        Returns:
+            Detailed error message or generic fallback
+        """
+        # Try to extract JSON error details from response
+        if hasattr(error, 'response') and error.response is not None:
+            try:
+                error_json = error.response.json()
+                
+                # Check for _errors array (SCM API format)
+                if '_errors' in error_json and isinstance(error_json['_errors'], list):
+                    for err in error_json['_errors']:
+                        # Check for nested details
+                        if 'details' in err:
+                            details = err['details']
+                            # Get errorType and message
+                            error_type = details.get('errorType', '')
+                            message = details.get('message', '')
+                            
+                            if error_type and message:
+                                return f"{error_type}: {message}"
+                            elif message:
+                                return message
+                        
+                        # Fall back to top-level message
+                        if 'message' in err:
+                            return err['message']
+                
+                # Check for error key
+                if 'error' in error_json:
+                    if isinstance(error_json['error'], dict):
+                        return error_json['error'].get('message', str(error_json['error']))
+                    else:
+                        return str(error_json['error'])
+            except:
+                pass
+        
+        # Fall back to string representation
+        return f'Failed to create: {str(error)}'
+    
     def _clean_item_for_api(self, item: Dict[str, Any]) -> Dict[str, Any]:
         """
         Remove read-only fields from an item before sending to API.
@@ -1586,15 +1632,29 @@ class SelectivePushOrchestrator:
                                     f'Created as {new_name}'
                                 )
                             except Exception as e:
-                                self._add_result(
-                                    obj_type,
-                                    new_name,
-                                    folder_name,
-                                    'renamed',
-                                    'failed',
-                                    f'Failed to create: {str(e)}',
-                                    error=e
-                                )
+                                # Check if this is an "already exists" error
+                                if self._is_already_exists_error(e):
+                                    logger.warning(f"Item already exists (rename conflict): {new_name}")
+                                    self._add_result(
+                                        obj_type,
+                                        new_name,
+                                        folder_name,
+                                        'skipped',
+                                        'success',
+                                        'Already exists (rename conflict)'
+                                    )
+                                else:
+                                    # Extract detailed error message from API response
+                                    error_msg = self._extract_api_error_message(e)
+                                    self._add_result(
+                                        obj_type,
+                                        new_name,
+                                        folder_name,
+                                        'renamed',
+                                        'failed',
+                                        error_msg,
+                                        error=e
+                                    )
                     else:
                         # Create new (or recreate after delete in OVERWRITE mode)
                         try:
@@ -1988,15 +2048,29 @@ class SelectivePushOrchestrator:
                                 f'Created as {new_name}'
                             )
                         except Exception as e:
-                            self._add_result(
-                                infra_type,
-                                new_name,
-                                folder_name,
-                                'renamed',
-                                'failed',
-                                f'Failed to create: {str(e)}',
-                                error=e
-                            )
+                            # Check if this is an "already exists" error
+                            if self._is_already_exists_error(e):
+                                logger.warning(f"Item already exists (rename conflict): {new_name}")
+                                self._add_result(
+                                    infra_type,
+                                    new_name,
+                                    folder_name,
+                                    'skipped',
+                                    'success',
+                                    'Already exists (rename conflict)'
+                                )
+                            else:
+                                # Extract detailed error message from API response
+                                error_msg = self._extract_api_error_message(e)
+                                self._add_result(
+                                    infra_type,
+                                    new_name,
+                                    folder_name,
+                                    'renamed',
+                                    'failed',
+                                    error_msg,
+                                    error=e
+                                )
                 else:
                     # Create new (or recreate after delete in OVERWRITE mode)
                     try:
@@ -2112,15 +2186,29 @@ class SelectivePushOrchestrator:
                                 f'Created as {new_name}'
                             )
                         except Exception as e:
-                            self._add_result(
-                                'security_rule',
-                                new_name,
-                                folder_name,
-                                'renamed',
-                                'failed',
-                                f'Failed to create: {str(e)}',
-                                error=e
-                            )
+                            # Check if this is an "already exists" error
+                            if self._is_already_exists_error(e):
+                                logger.warning(f"Item already exists (rename conflict): {new_name}")
+                                self._add_result(
+                                    'security_rule',
+                                    new_name,
+                                    folder_name,
+                                    'skipped',
+                                    'success',
+                                    'Already exists (rename conflict)'
+                                )
+                            else:
+                                # Extract detailed error message from API response
+                                error_msg = self._extract_api_error_message(e)
+                                self._add_result(
+                                    'security_rule',
+                                    new_name,
+                                    folder_name,
+                                    'renamed',
+                                    'failed',
+                                    error_msg,
+                                    error=e
+                                )
                 else:
                     # Create new (or recreate after delete in OVERWRITE mode)
                     try:
