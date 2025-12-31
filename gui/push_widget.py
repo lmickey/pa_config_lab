@@ -674,10 +674,14 @@ class PushConfigWidget(QWidget):
                 failed = summary.get('failed', 0) if isinstance(summary, dict) else 0
                 could_not_overwrite = summary.get('could_not_overwrite', 0) if isinstance(summary, dict) else 0
                 
-                # Calculate actual processed count
-                # Note: could_not_overwrite items are ALSO counted in 'failed',
-                # so we subtract could_not_overwrite to avoid double-counting
-                processed_count = created + updated + deleted + renamed + skipped + failed
+                # Calculate unique items from detailed results
+                results_data = result.get('results', {}) if isinstance(result, dict) else {}
+                all_details = results_data.get('details', []) if isinstance(results_data, dict) else []
+                unique_items = set()
+                for d in all_details:
+                    item_key = (d.get('type'), d.get('name'), d.get('folder'))
+                    unique_items.add(item_key)
+                unique_count = len(unique_items)
                 
                 # Determine status based on results
                 has_failures = (failed > 0 or could_not_overwrite > 0)
@@ -686,7 +690,7 @@ class PushConfigWidget(QWidget):
                 try:
                     if has_failures and has_successes:
                         # Partial success - yellow
-                        status_msg = f"⚠️ Push completed with issues ({processed_count} items processed)"
+                        status_msg = f"⚠️ Push completed with issues ({unique_count} items)"
                         status_color = "#F57F17"  # Dark yellow/amber
                         status_bg = "#FFF9C4"     # Light yellow
                         status_border = "#FBC02D" # Medium yellow
@@ -694,7 +698,7 @@ class PushConfigWidget(QWidget):
                         progress_color = "#F57F17"
                     elif has_failures and not has_successes:
                         # All failed - red
-                        status_msg = f"❌ Push failed ({processed_count} items processed)"
+                        status_msg = f"❌ Push failed ({unique_count} items)"
                         status_color = "#c62828"  # Dark red
                         status_bg = "#ffebee"     # Light red
                         status_border = "#f44336" # Medium red
@@ -702,7 +706,7 @@ class PushConfigWidget(QWidget):
                         progress_color = "red"
                     else:
                         # All successful - green
-                        status_msg = f"✅ Push completed successfully ({processed_count} items processed)"
+                        status_msg = f"✅ Push completed successfully ({unique_count} items)"
                         status_color = "#2e7d32"  # Dark green
                         status_bg = "#e8f5e9"     # Light green
                         status_border = "#4CAF50" # Medium green
@@ -727,127 +731,135 @@ class PushConfigWidget(QWidget):
                 
                 # Show detailed results in the output box
                 try:
-                    details = []
-                    details.append("=" * 70)
-                    details.append("PUSH OPERATION SUMMARY")
-                    details.append("=" * 70)
-                    details.append(f"Total Items Processed: {processed_count}")
-                    details.append("")
-                    details.append("Results by Action:")
-                    if created > 0:
-                        details.append(f"  ✓ Created:              {created}")
-                    if updated > 0:
-                        details.append(f"  ✓ Updated:              {updated}")
-                    if deleted > 0:
-                        details.append(f"  ✓ Deleted:              {deleted}")
-                    if renamed > 0:
-                        details.append(f"  ✓ Renamed:              {renamed}")
-                    if skipped > 0:
-                        details.append(f"  ⊘ Skipped:              {skipped}")
-                    if failed > 0:
-                        details.append(f"  ✗ Failed:               {failed}")
-                    if could_not_overwrite > 0:
-                        details.append(f"  ⚠ Could Not Overwrite:  {could_not_overwrite}")
-                    details.append("")
-                    
                     # Get detailed results from the orchestrator
                     results_data = result.get('results', {}) if isinstance(result, dict) else {}
                     all_details = results_data.get('details', []) if isinstance(results_data, dict) else []
                     
-                    # Separate results by phase (delete vs create actions)
-                    delete_phase = [d for d in all_details if d.get('action') in ['deleted', 'skipped'] and 
-                                   ('Phase 1' in d.get('message', '') or 'Failed to delete' in d.get('message', '') or 
-                                    'dependent item failed' in d.get('message', ''))]
-                    create_phase = [d for d in all_details if d.get('action') in ['created', 'updated', 'renamed']]
+                    # Count unique items (items that went through BOTH delete and create are one item)
+                    # Track unique items by (type, name, folder)
+                    unique_items = set()
+                    for d in all_details:
+                        item_key = (d.get('type'), d.get('name'), d.get('folder'))
+                        unique_items.add(item_key)
                     
-                    # Show PHASE 1: DELETE RESULTS
-                    if delete_phase or deleted > 0:
-                        details.append("=" * 70)
-                        details.append("PHASE 1: DELETE OPERATIONS (OVERWRITE MODE)")
-                        details.append("=" * 70)
-                        
-                        # Successful deletes
-                        successful_deletes = [d for d in delete_phase if d.get('action') == 'deleted' and d.get('status') == 'success']
-                        if successful_deletes:
-                            details.append("")
-                            details.append(f"✓ Successfully Deleted ({len(successful_deletes)}):")
-                            for item in successful_deletes:
-                                details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
-                        
-                        # Failed deletes (with reasons)
-                        failed_deletes = [d for d in all_details if d.get('action') == 'deleted' and d.get('status') == 'failed']
-                        if failed_deletes:
-                            details.append("")
-                            details.append(f"✗ Failed to Delete ({len(failed_deletes)}):")
-                            for item in failed_deletes:
-                                details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
-                                msg = item.get('message', 'No reason provided')
-                                if msg:
-                                    details.append(f"    Reason: {msg}")
-                        
-                        # Skipped deletes (dependencies)
-                        skipped_deletes = [d for d in delete_phase if d.get('action') == 'skipped']
-                        if skipped_deletes:
-                            details.append("")
-                            details.append(f"⊘ Skipped Deletes ({len(skipped_deletes)}):")
-                            for item in skipped_deletes:
-                                details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
-                                msg = item.get('message', 'No reason provided')
-                                if msg:
-                                    details.append(f"    Reason: {msg}")
-                        
-                        details.append("")
+                    total_unique_items = len(unique_items)
                     
-                    # Show PHASE 2: CREATE RESULTS
-                    if create_phase or created > 0:
-                        details.append("=" * 70)
-                        details.append("PHASE 2: CREATE/UPDATE OPERATIONS")
-                        details.append("=" * 70)
-                        
-                        # Successfully created
-                        successful_creates = [d for d in create_phase if d.get('action') == 'created' and d.get('status') == 'success']
-                        if successful_creates:
-                            details.append("")
-                            details.append(f"✓ Successfully Created ({len(successful_creates)}):")
-                            for item in successful_creates:
-                                details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
-                        
-                        # Successfully updated
-                        successful_updates = [d for d in create_phase if d.get('action') == 'updated' and d.get('status') == 'success']
-                        if successful_updates:
-                            details.append("")
-                            details.append(f"✓ Successfully Updated ({len(successful_updates)}):")
-                            for item in successful_updates:
-                                details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
-                        
-                        # Renamed items
-                        renamed_items = [d for d in create_phase if d.get('action') == 'renamed']
-                        if renamed_items:
-                            details.append("")
-                            details.append(f"✓ Renamed ({len(renamed_items)}):")
-                            for item in renamed_items:
-                                old_name = item.get('name', 'unknown')
-                                new_name = item.get('new_name', 'unknown')
-                                details.append(f"  • {item.get('type', 'unknown')}: {old_name} → {new_name} ({item.get('folder', 'unknown')})")
-                        
-                        details.append("")
+                    # Separate results by phase
+                    phase1_deletes = [d for d in all_details if d.get('action') == 'deleted']
+                    phase1_skipped = [d for d in all_details if d.get('action') == 'skipped' and 
+                                     ('dependent item failed' in d.get('message', '') or 
+                                      'Skipped - dependency' in d.get('message', ''))]
                     
-                    # Show items that couldn't be created (not in delete or create phases)
-                    items_not_created = [d for d in all_details if d not in delete_phase and d not in create_phase]
-                    if items_not_created:
-                        details.append("=" * 70)
-                        details.append("ITEMS NOT PROCESSED")
-                        details.append("=" * 70)
+                    phase2_creates = [d for d in all_details if d.get('action') == 'created']
+                    phase2_updates = [d for d in all_details if d.get('action') == 'updated']
+                    phase2_renamed = [d for d in all_details if d.get('action') == 'renamed']
+                    
+                    # Count by status within each phase
+                    p1_deleted_success = [d for d in phase1_deletes if d.get('status') == 'success']
+                    p1_deleted_failed = [d for d in phase1_deletes if d.get('status') == 'failed']
+                    p1_skipped = phase1_skipped
+                    
+                    p2_created_success = [d for d in phase2_creates if d.get('status') == 'success']
+                    p2_created_failed = [d for d in phase2_creates if d.get('status') == 'failed']
+                    
+                    details = []
+                    details.append("=" * 70)
+                    details.append("PUSH OPERATION SUMMARY")
+                    details.append("=" * 70)
+                    details.append(f"Total Unique Items: {total_unique_items}")
+                    details.append("")
+                    
+                    # Phase 1 Summary
+                    details.append("Phase 1 - Delete Operations:")
+                    details.append(f"  ✓ Deleted:   {len(p1_deleted_success)}")
+                    details.append(f"  ✗ Failed:    {len(p1_deleted_failed)}")
+                    details.append(f"  ⊘ Skipped:   {len(p1_skipped)}")
+                    details.append("")
+                    
+                    # Phase 2 Summary
+                    details.append("Phase 2 - Create/Update Operations:")
+                    details.append(f"  ✓ Created:   {len(p2_created_success)}")
+                    if len(p2_created_failed) > 0:
+                        details.append(f"  ✗ Failed:    {len(p2_created_failed)}")
+                    if len(phase2_updates) > 0:
+                        details.append(f"  ✓ Updated:   {len(phase2_updates)}")
+                    if len(phase2_renamed) > 0:
+                        details.append(f"  ✓ Renamed:   {len(phase2_renamed)}")
+                    details.append("")
+                    
+                    # PHASE 1 DETAILS
+                    details.append("=" * 70)
+                    details.append("PHASE 1: DELETE OPERATIONS")
+                    details.append("=" * 70)
+                    
+                    # Failed deletes FIRST (most important)
+                    if p1_deleted_failed:
                         details.append("")
-                        for item in items_not_created:
-                            action = item.get('action', 'unknown')
-                            status = item.get('status', 'unknown')
+                        details.append(f"✗ Failed to Delete ({len(p1_deleted_failed)}):")
+                        for item in p1_deleted_failed:
                             details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
-                            details.append(f"    Action: {action}, Status: {status}")
-                            msg = item.get('message', '')
+                            msg = item.get('message', 'No reason provided')
                             if msg:
-                                details.append(f"    Message: {msg}")
-                            details.append("")
+                                details.append(f"    Reason: {msg}")
+                    
+                    # Skipped deletes (dependencies)
+                    if p1_skipped:
+                        details.append("")
+                        details.append(f"⊘ Skipped Deletes ({len(p1_skipped)}):")
+                        for item in p1_skipped:
+                            details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
+                            msg = item.get('message', 'No reason provided')
+                            if msg:
+                                details.append(f"    Reason: {msg}")
+                    
+                    # Successful deletes
+                    if p1_deleted_success:
+                        details.append("")
+                        details.append(f"✓ Successfully Deleted ({len(p1_deleted_success)}):")
+                        for item in p1_deleted_success:
+                            details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
+                    
+                    details.append("")
+                    
+                    # PHASE 2 DETAILS
+                    details.append("=" * 70)
+                    details.append("PHASE 2: CREATE/UPDATE OPERATIONS")
+                    details.append("=" * 70)
+                    
+                    # Failed creates FIRST
+                    if p2_created_failed:
+                        details.append("")
+                        details.append(f"✗ Failed to Create ({len(p2_created_failed)}):")
+                        for item in p2_created_failed:
+                            details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
+                            msg = item.get('message', 'No reason provided')
+                            if msg:
+                                details.append(f"    Reason: {msg}")
+                    
+                    # Successfully created
+                    if p2_created_success:
+                        details.append("")
+                        details.append(f"✓ Successfully Created ({len(p2_created_success)}):")
+                        for item in p2_created_success:
+                            details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
+                    
+                    # Successfully updated
+                    if phase2_updates:
+                        details.append("")
+                        details.append(f"✓ Successfully Updated ({len(phase2_updates)}):")
+                        for item in phase2_updates:
+                            details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
+                    
+                    # Renamed items
+                    if phase2_renamed:
+                        details.append("")
+                        details.append(f"✓ Renamed ({len(phase2_renamed)}):")
+                        for item in phase2_renamed:
+                            old_name = item.get('name', 'unknown')
+                            new_name = item.get('new_name', 'unknown')
+                            details.append(f"  • {item.get('type', 'unknown')}: {old_name} → {new_name} ({item.get('folder', 'unknown')})")
+                    
+                    details.append("")
                     
                     details.append("=" * 70)
                     details.append("")
