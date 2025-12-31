@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QButtonGroup,
     QComboBox,
+    QApplication,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -195,6 +196,24 @@ class PushConfigWidget(QWidget):
         self.results_text.setMaximumHeight(150)
         self.results_text.setPlaceholderText("Push results will appear here...")
         results_layout.addWidget(self.results_text)
+        
+        # Add buttons for results actions
+        results_buttons_layout = QHBoxLayout()
+        
+        self.copy_results_btn = QPushButton("📋 Copy Results")
+        self.copy_results_btn.setToolTip("Copy all results to clipboard")
+        self.copy_results_btn.clicked.connect(self._copy_results)
+        self.copy_results_btn.setEnabled(False)
+        results_buttons_layout.addWidget(self.copy_results_btn)
+        
+        self.view_details_btn = QPushButton("📄 View Full Details")
+        self.view_details_btn.setToolTip("Open detailed log viewer")
+        self.view_details_btn.clicked.connect(self._view_full_details)
+        self.view_details_btn.setEnabled(False)
+        results_buttons_layout.addWidget(self.view_details_btn)
+        
+        results_buttons_layout.addStretch()
+        results_layout.addLayout(results_buttons_layout)
 
         results_group.setLayout(results_layout)
         layout.addWidget(results_group)
@@ -735,102 +754,99 @@ class PushConfigWidget(QWidget):
                     results_data = result.get('results', {}) if isinstance(result, dict) else {}
                     all_details = results_data.get('details', []) if isinstance(results_data, dict) else []
                     
-                    # Show failed items FIRST (most important)
-                    if failed > 0:
-                        details.append("-" * 70)
-                        details.append(f"FAILED ITEMS ({failed}):")
-                        details.append("-" * 70)
-                        failed_items = [d for d in all_details if d.get('status') == 'failed']
-                        for item in failed_items:
-                            item_type = item.get('type', 'unknown')
-                            item_name = item.get('name', 'unknown')
-                            folder = item.get('folder', 'unknown')
+                    # Separate results by phase (delete vs create actions)
+                    delete_phase = [d for d in all_details if d.get('action') in ['deleted', 'skipped'] and 
+                                   ('Phase 1' in d.get('message', '') or 'Failed to delete' in d.get('message', '') or 
+                                    'dependent item failed' in d.get('message', ''))]
+                    create_phase = [d for d in all_details if d.get('action') in ['created', 'updated', 'renamed']]
+                    
+                    # Show PHASE 1: DELETE RESULTS
+                    if delete_phase or deleted > 0:
+                        details.append("=" * 70)
+                        details.append("PHASE 1: DELETE OPERATIONS (OVERWRITE MODE)")
+                        details.append("=" * 70)
+                        
+                        # Successful deletes
+                        successful_deletes = [d for d in delete_phase if d.get('action') == 'deleted' and d.get('status') == 'success']
+                        if successful_deletes:
+                            details.append("")
+                            details.append(f"✓ Successfully Deleted ({len(successful_deletes)}):")
+                            for item in successful_deletes:
+                                details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
+                        
+                        # Failed deletes (with reasons)
+                        failed_deletes = [d for d in all_details if d.get('action') == 'deleted' and d.get('status') == 'failed']
+                        if failed_deletes:
+                            details.append("")
+                            details.append(f"✗ Failed to Delete ({len(failed_deletes)}):")
+                            for item in failed_deletes:
+                                details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
+                                msg = item.get('message', 'No reason provided')
+                                if msg:
+                                    details.append(f"    Reason: {msg}")
+                        
+                        # Skipped deletes (dependencies)
+                        skipped_deletes = [d for d in delete_phase if d.get('action') == 'skipped']
+                        if skipped_deletes:
+                            details.append("")
+                            details.append(f"⊘ Skipped Deletes ({len(skipped_deletes)}):")
+                            for item in skipped_deletes:
+                                details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
+                                msg = item.get('message', 'No reason provided')
+                                if msg:
+                                    details.append(f"    Reason: {msg}")
+                        
+                        details.append("")
+                    
+                    # Show PHASE 2: CREATE RESULTS
+                    if create_phase or created > 0:
+                        details.append("=" * 70)
+                        details.append("PHASE 2: CREATE/UPDATE OPERATIONS")
+                        details.append("=" * 70)
+                        
+                        # Successfully created
+                        successful_creates = [d for d in create_phase if d.get('action') == 'created' and d.get('status') == 'success']
+                        if successful_creates:
+                            details.append("")
+                            details.append(f"✓ Successfully Created ({len(successful_creates)}):")
+                            for item in successful_creates:
+                                details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
+                        
+                        # Successfully updated
+                        successful_updates = [d for d in create_phase if d.get('action') == 'updated' and d.get('status') == 'success']
+                        if successful_updates:
+                            details.append("")
+                            details.append(f"✓ Successfully Updated ({len(successful_updates)}):")
+                            for item in successful_updates:
+                                details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
+                        
+                        # Renamed items
+                        renamed_items = [d for d in create_phase if d.get('action') == 'renamed']
+                        if renamed_items:
+                            details.append("")
+                            details.append(f"✓ Renamed ({len(renamed_items)}):")
+                            for item in renamed_items:
+                                old_name = item.get('name', 'unknown')
+                                new_name = item.get('new_name', 'unknown')
+                                details.append(f"  • {item.get('type', 'unknown')}: {old_name} → {new_name} ({item.get('folder', 'unknown')})")
+                        
+                        details.append("")
+                    
+                    # Show items that couldn't be created (not in delete or create phases)
+                    items_not_created = [d for d in all_details if d not in delete_phase and d not in create_phase]
+                    if items_not_created:
+                        details.append("=" * 70)
+                        details.append("ITEMS NOT PROCESSED")
+                        details.append("=" * 70)
+                        details.append("")
+                        for item in items_not_created:
                             action = item.get('action', 'unknown')
-                            msg = item.get('message', 'No reason provided')
-                            details.append(f"  • {item_type}: {item_name}")
-                            details.append(f"    Location: {folder}")
-                            details.append(f"    Action: {action}")
-                            details.append(f"    Error: {msg}")
-                            
-                            # Try to get more detailed error if available
-                            error_detail = item.get('error')
-                            if error_detail:
-                                error_str = str(error_detail)[:200]  # Truncate to 200 chars
-                                if error_str and error_str != msg:
-                                    details.append(f"    Details: {error_str}")
-                            details.append("")
-                    
-                    # Show skipped items
-                    if skipped > 0:
-                        details.append("-" * 70)
-                        details.append(f"SKIPPED ITEMS ({skipped}):")
-                        details.append("-" * 70)
-                        skipped_items = [d for d in all_details if d.get('action') == 'skipped']
-                        for item in skipped_items:
-                            item_type = item.get('type', 'unknown')
-                            item_name = item.get('name', 'unknown')
-                            folder = item.get('folder', 'unknown')
-                            msg = item.get('message', 'No reason provided')
-                            details.append(f"  • {item_type}: {item_name}")
-                            details.append(f"    Location: {folder}")
-                            details.append(f"    Reason: {msg}")
-                            details.append("")
-                    
-                    # Show successfully created items
-                    if created > 0:
-                        details.append("-" * 70)
-                        details.append(f"CREATED ITEMS ({created}):")
-                        details.append("-" * 70)
-                        created_items = [d for d in all_details if d.get('action') == 'created' and d.get('status') == 'success']
-                        for item in created_items:
-                            item_type = item.get('type', 'unknown')
-                            item_name = item.get('name', 'unknown')
-                            folder = item.get('folder', 'unknown')
-                            details.append(f"  • {item_type}: {item_name}")
-                            details.append(f"    Location: {folder}")
-                            details.append("")
-                    
-                    # Show successfully deleted items
-                    if deleted > 0:
-                        details.append("-" * 70)
-                        details.append(f"DELETED ITEMS ({deleted}):")
-                        details.append("-" * 70)
-                        deleted_items = [d for d in all_details if d.get('action') == 'deleted' and d.get('status') == 'success']
-                        for item in deleted_items:
-                            item_type = item.get('type', 'unknown')
-                            item_name = item.get('name', 'unknown')
-                            folder = item.get('folder', 'unknown')
-                            details.append(f"  • {item_type}: {item_name}")
-                            details.append(f"    Location: {folder}")
-                            details.append("")
-                    
-                    # Show renamed items (if any)
-                    if renamed > 0:
-                        details.append("-" * 70)
-                        details.append(f"RENAMED ITEMS ({renamed}):")
-                        details.append("-" * 70)
-                        renamed_items = [d for d in all_details if d.get('action') == 'renamed']
-                        for item in renamed_items:
-                            item_type = item.get('type', 'unknown')
-                            old_name = item.get('name', 'unknown')
-                            new_name = item.get('new_name', 'unknown')
-                            folder = item.get('folder', 'unknown')
-                            details.append(f"  • {item_type}: {old_name} → {new_name}")
-                            details.append(f"    Location: {folder}")
-                            details.append("")
-                    
-                    # Show updated items (if any)
-                    if updated > 0:
-                        details.append("-" * 70)
-                        details.append(f"UPDATED ITEMS ({updated}):")
-                        details.append("-" * 70)
-                        updated_items = [d for d in all_details if d.get('action') == 'updated' and d.get('status') == 'success']
-                        for item in updated_items:
-                            item_type = item.get('type', 'unknown')
-                            item_name = item.get('name', 'unknown')
-                            folder = item.get('folder', 'unknown')
-                            details.append(f"  • {item_type}: {item_name}")
-                            details.append(f"    Location: {folder}")
+                            status = item.get('status', 'unknown')
+                            details.append(f"  • {item.get('type', 'unknown')}: {item.get('name', 'unknown')} ({item.get('folder', 'unknown')})")
+                            details.append(f"    Action: {action}, Status: {status}")
+                            msg = item.get('message', '')
+                            if msg:
+                                details.append(f"    Message: {msg}")
                             details.append("")
                     
                     details.append("=" * 70)
@@ -839,6 +855,10 @@ class PushConfigWidget(QWidget):
                     details.append("")
                     
                     self.results_text.setPlainText("\n".join(details))
+                    
+                    # Enable results action buttons
+                    self.copy_results_btn.setEnabled(True)
+                    self.view_details_btn.setEnabled(True)
                 except Exception as results_err:
                     print(f"Error updating results text: {results_err}")
                     import traceback
@@ -908,3 +928,78 @@ class PushConfigWidget(QWidget):
         """Set the selected items from selection widget."""
         self.selected_items = selected_items
         self._update_status()
+    
+    def _copy_results(self):
+        """Copy results text to clipboard."""
+        try:
+            from PyQt6.QtWidgets import QApplication
+            clipboard = QApplication.clipboard()
+            clipboard.setText(self.results_text.toPlainText())
+            
+            # Show brief feedback
+            original_text = self.copy_results_btn.text()
+            self.copy_results_btn.setText("✓ Copied!")
+            self.copy_results_btn.setStyleSheet("background-color: #4CAF50; color: white;")
+            
+            # Reset after 2 seconds
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(2000, lambda: (
+                self.copy_results_btn.setText(original_text),
+                self.copy_results_btn.setStyleSheet("")
+            ))
+        except Exception as e:
+            QMessageBox.warning(self, "Copy Failed", f"Failed to copy results: {e}")
+    
+    def _view_full_details(self):
+        """Open a dialog to view full activity log details."""
+        try:
+            from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout
+            
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Push Operation - Full Details")
+            dialog.resize(1000, 700)
+            
+            layout = QVBoxLayout(dialog)
+            
+            # Add header
+            from PyQt6.QtWidgets import QLabel
+            header = QLabel("<h3>Complete Activity Log</h3>")
+            layout.addWidget(header)
+            
+            # Text area with full log
+            log_text = QTextEdit()
+            log_text.setReadOnly(True)
+            log_text.setStyleSheet("font-family: monospace; font-size: 10pt;")
+            
+            # Read activity.log
+            try:
+                with open('activity.log', 'r') as f:
+                    # Get last 500 lines to avoid overwhelming the viewer
+                    lines = f.readlines()
+                    log_content = ''.join(lines[-500:])
+                    log_text.setPlainText(log_content)
+                    
+                    # Scroll to bottom
+                    log_text.verticalScrollBar().setValue(log_text.verticalScrollBar().maximum())
+            except Exception as read_err:
+                log_text.setPlainText(f"Error reading activity.log: {read_err}")
+            
+            layout.addWidget(log_text)
+            
+            # Close button
+            button_layout = QHBoxLayout()
+            button_layout.addStretch()
+            
+            copy_log_btn = QPushButton("📋 Copy Full Log")
+            copy_log_btn.clicked.connect(lambda: QApplication.clipboard().setText(log_text.toPlainText()))
+            button_layout.addWidget(copy_log_btn)
+            
+            close_btn = QPushButton("Close")
+            close_btn.clicked.connect(dialog.close)
+            button_layout.addWidget(close_btn)
+            
+            layout.addLayout(button_layout)
+            
+            dialog.exec()
+        except Exception as e:
+            QMessageBox.warning(self, "View Details Failed", f"Failed to open details viewer: {e}")
