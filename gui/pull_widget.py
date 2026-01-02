@@ -23,6 +23,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 
 from gui.workers import PullWorker
 from gui.toast_notification import ToastManager, DismissibleErrorNotification
+from gui.widgets import TenantSelectorWidget
 
 
 class PullConfigWidget(QWidget):
@@ -67,33 +68,16 @@ class PullConfigWidget(QWidget):
         info.setStyleSheet("color: gray; margin-bottom: 10px;")
         layout.addWidget(info)
         
-        # Source tenant selection (NEW - embedded like Push widget)
-        from PyQt6.QtWidgets import QComboBox
-        
-        source_group = QGroupBox("Source Tenant")
-        source_layout = QVBoxLayout()
-        
-        tenant_select_layout = QHBoxLayout()
-        tenant_select_layout.addWidget(QLabel("Pull from:"))
-        
-        self.source_combo = QComboBox()
-        self.source_combo.addItem("-- Select Source Tenant --", None)
-        self.source_combo.currentIndexChanged.connect(self._on_source_selected)
-        tenant_select_layout.addWidget(self.source_combo, 1)
-        
-        connect_btn = QPushButton("Connect to Tenant...")
-        connect_btn.clicked.connect(self._connect_source)
-        tenant_select_layout.addWidget(connect_btn)
-        
-        source_layout.addLayout(tenant_select_layout)
-        
-        # Source connection status
-        self.source_status_label = QLabel("No source tenant connected")
-        self.source_status_label.setStyleSheet("color: gray; padding: 8px; margin-top: 5px;")
-        source_layout.addWidget(self.source_status_label)
-        
-        source_group.setLayout(source_layout)
-        layout.addWidget(source_group)
+        # Source tenant selection (using reusable widget)
+        self.tenant_selector = TenantSelectorWidget(
+            parent=self,
+            title="Source Tenant",
+            label="Pull from:",
+            show_toast=lambda msg, typ, dur: self.toast_manager.show_toast(msg, typ, dur),
+            show_error=lambda msg: self.error_notification.show_error(msg)
+        )
+        self.tenant_selector.connection_changed.connect(self._on_connection_changed)
+        layout.addWidget(self.tenant_selector)
 
         # Scroll area for options
         scroll = QScrollArea()
@@ -260,30 +244,18 @@ class PullConfigWidget(QWidget):
         """
         Set the API client for pull operations.
         
-        This method is called from main_window when a connection is established.
-        It also updates the source combo dropdown to reflect the new connection.
+        This method is called from main_window when a connection is established,
+        or internally via the tenant selector widget.
         """
         self.api_client = api_client
         self.connection_name = connection_name or "Manual"
-        self.pull_btn.setEnabled(api_client is not None)
-        self.folder_select_btn.setEnabled(api_client is not None)  # NEW
-
-        if api_client:
-            # Update connection status
-            self.source_status_label.setText(f"✓ Connected to {self.connection_name}")
-            self.source_status_label.setStyleSheet("color: green; padding: 8px; margin-top: 5px; font-weight: bold;")
-            
-            self.progress_label.setText(
-                f"Connected to {self.connection_name} - Ready to pull"
-            )
-            self.progress_label.setStyleSheet("color: green;")
-        else:
-            # Clear connection status
-            self.source_status_label.setText("No source tenant connected")
-            self.source_status_label.setStyleSheet("color: gray; padding: 8px; margin-top: 5px;")
-            
-            self.progress_label.setText("Connect to a source tenant to begin")
-            self.progress_label.setStyleSheet("color: gray;")
+        
+        # Update tenant selector if called externally
+        if api_client and connection_name:
+            self.tenant_selector.set_connection(api_client, connection_name)
+        
+        # Update UI state
+        self._update_ui_for_connection()
     
     def populate_source_tenants(self, tenants: list):
         """
@@ -292,152 +264,37 @@ class PullConfigWidget(QWidget):
         Args:
             tenants: List of tenant dictionaries with 'name' key
         """
-        # Clear existing items except the placeholder
-        self.source_combo.clear()
-        self.source_combo.addItem("-- Select Source Tenant --", None)
-        
-        # Add saved tenants
-        for tenant in tenants:
-            tenant_name = tenant.get('name', 'Unknown')
-            self.source_combo.addItem(tenant_name, tenant)
+        self.tenant_selector.populate_tenants(tenants)
     
-    def _on_source_selected(self, index):
-        """Handle source tenant selection from dropdown."""
-        try:
-            data = self.source_combo.currentData()
-            
-            if data is None:
-                # Placeholder selected
-                self.api_client = None
-                self.connection_name = None
-                self.source_status_label.setText("No source tenant connected")
-                self.source_status_label.setStyleSheet("color: gray; padding: 8px; margin-top: 5px;")
-                self.pull_btn.setEnabled(False)
-                self.folder_select_btn.setEnabled(False)
-                self.progress_label.setText("Connect to a source tenant to begin")
-                self.progress_label.setStyleSheet("color: gray;")
-                return
-            
-            # Connect to selected tenant
-            self._connect_to_saved_tenant(data)
-            
-        except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Error",
-                f"Failed to select source tenant: {str(e)}"
-            )
+    def _on_connection_changed(self, api_client, tenant_name: str):
+        """
+        Handle connection changes from the tenant selector.
+        
+        Args:
+            api_client: The API client (or None if disconnected)
+            tenant_name: Name of the tenant (or empty string if disconnected)
+        """
+        self.api_client = api_client
+        self.connection_name = tenant_name if tenant_name else None
+        self._update_ui_for_connection()
     
-    def _connect_to_saved_tenant(self, tenant_data: Dict[str, Any]):
-        """Connect to a saved tenant."""
-        import logging
-        logger = logging.getLogger(__name__)
+    def _update_ui_for_connection(self):
+        """Update UI elements based on connection state."""
+        connected = self.api_client is not None
         
-        from gui.connection_dialog import ConnectionDialog
-        from PyQt6.QtCore import QCoreApplication
-        from PyQt6.QtWidgets import QProgressDialog
+        # Update button states
+        self.pull_btn.setEnabled(connected)
+        self.folder_select_btn.setEnabled(connected)
         
-        tenant_name = tenant_data.get('name', 'Unknown')
-        logger.info(f"Pull widget: Attempting to connect to saved tenant: {tenant_name}")
-        
-        try:
-            # Show progress
-            progress = QProgressDialog("Connecting to source tenant...", None, 0, 0, self)
-            progress.setWindowModality(Qt.WindowModality.WindowModal)
-            progress.setMinimumDuration(0)
-            
-            try:
-                progress.show()
-                QCoreApplication.processEvents()
-                
-                logger.info(f"Creating ConnectionDialog for tenant: {tenant_name}")
-                
-                # Attempt connection using saved credentials
-                dialog = ConnectionDialog(self)
-                logger.info(f"Calling connect_with_saved_tenant for: {tenant_name}")
-                client = dialog.connect_with_saved_tenant(tenant_data)
-                
-                if client:
-                    logger.info(f"✓ Connection successful for tenant: {tenant_name}")
-                    self.set_api_client(client, tenant_name)
-                    
-                    # Show success
-                    self.toast_manager.show_toast(
-                        f"✓ Connected to {tenant_name}",
-                        "success",
-                        duration=2000
-                    )
-                else:
-                    logger.error(f"✗ Connection failed for tenant: {tenant_name} - client is None")
-                    
-                    # Show error after closing progress
-                    progress.close()
-                    
-                    self.error_notification.show_error(
-                        f"Connection Failed: Failed to connect to {tenant_name}. Please check credentials."
-                    )
-                    
-                    # Reset combo to placeholder
-                    self.source_combo.setCurrentIndex(0)
-            finally:
-                # Safely close progress dialog
-                if progress:
-                    progress.close()
-                    progress.deleteLater()
-                    
-        except Exception as e:
-            logger.error(f"Exception connecting to tenant '{tenant_name}': {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            
-            self.error_notification.show_error(
-                f"Connection Error: Error connecting to tenant: {str(e)}"
+        # Update progress label
+        if connected:
+            self.progress_label.setText(
+                f"Connected to {self.connection_name} - Ready to pull"
             )
-            # Reset combo to placeholder
-            self.source_combo.setCurrentIndex(0)
-    
-    def _connect_source(self):
-        """Open connection dialog for source tenant."""
-        from gui.connection_dialog import ConnectionDialog
-        from PyQt6.QtCore import QCoreApplication
-        
-        try:
-            dialog = ConnectionDialog(self)
-            result = dialog.exec()
-            
-            QCoreApplication.processEvents()
-            
-            if result and dialog.api_client:
-                # Get tenant name
-                tenant_name = dialog.tenant_name if hasattr(dialog, 'tenant_name') else "Manual Connection"
-                
-                self.set_api_client(dialog.api_client, tenant_name)
-                
-                # Show success
-                self.toast_manager.show_toast(
-                    f"✓ Connected to {tenant_name}",
-                    "success",
-                    duration=2000
-                )
-                
-                # Add to combo if not already there
-                # Check if this tenant is in the combo
-                found = False
-                for i in range(self.source_combo.count()):
-                    if self.source_combo.itemText(i) == tenant_name:
-                        self.source_combo.setCurrentIndex(i)
-                        found = True
-                        break
-                
-                if not found and tenant_name != "Manual Connection":
-                    # Add to combo
-                    self.source_combo.addItem(tenant_name, {"name": tenant_name})
-                    self.source_combo.setCurrentIndex(self.source_combo.count() - 1)
-                    
-        except Exception as e:
-            self.error_notification.show_error(
-                f"Connection Error: Error opening connection dialog: {str(e)}"
-            )
+            self.progress_label.setStyleSheet("color: green;")
+        else:
+            self.progress_label.setText("Connect to a source tenant to begin")
+            self.progress_label.setStyleSheet("color: gray;")
 
     def _open_folder_selection(self):
         """Open folder selection dialog."""

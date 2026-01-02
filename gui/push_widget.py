@@ -25,6 +25,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from gui.workers import PushWorker
+from gui.widgets import TenantSelectorWidget
+from gui.toast_notification import ToastManager, DismissibleErrorNotification
 
 
 class PushConfigWidget(QWidget):
@@ -48,6 +50,10 @@ class PushConfigWidget(QWidget):
         self.selected_items = None  # Selected components to push
         self.saved_configs_manager = None  # Will be set by parent
         self.push_completed_successfully = False  # Track if push just completed
+        
+        # Toast and error notification managers
+        self.toast_manager = ToastManager(self)
+        self.error_notification = DismissibleErrorNotification(self)
 
         self._init_ui()
 
@@ -67,31 +73,16 @@ class PushConfigWidget(QWidget):
         info.setStyleSheet("color: gray; margin-bottom: 10px;")
         layout.addWidget(info)
 
-        # Destination tenant selection
-        dest_group = QGroupBox("Destination Tenant")
-        dest_layout = QVBoxLayout()
-        
-        tenant_select_layout = QHBoxLayout()
-        tenant_select_layout.addWidget(QLabel("Push to:"))
-        
-        self.destination_combo = QComboBox()
-        self.destination_combo.addItem("-- Select Destination --", None)
-        self.destination_combo.currentIndexChanged.connect(self._on_destination_selected)
-        tenant_select_layout.addWidget(self.destination_combo, 1)
-        
-        connect_btn = QPushButton("Connect to Different Tenant...")
-        connect_btn.clicked.connect(self._connect_destination)
-        tenant_select_layout.addWidget(connect_btn)
-        
-        dest_layout.addLayout(tenant_select_layout)
-        
-        # Destination status
-        self.dest_status_label = QLabel("No destination selected")
-        self.dest_status_label.setStyleSheet("color: gray; padding: 8px; margin-top: 5px;")
-        dest_layout.addWidget(self.dest_status_label)
-        
-        dest_group.setLayout(dest_layout)
-        layout.addWidget(dest_group)
+        # Destination tenant selection (using reusable widget)
+        self.tenant_selector = TenantSelectorWidget(
+            parent=self,
+            title="Destination Tenant",
+            label="Push to:",
+            show_toast=lambda msg, typ, dur: self.toast_manager.show_toast(msg, typ, dur),
+            show_error=lambda msg: self.error_notification.show_error(msg)
+        )
+        self.tenant_selector.connection_changed.connect(self._on_destination_changed)
+        layout.addWidget(self.tenant_selector)
 
         # Two-column layout for options
         options_container = QHBoxLayout()
@@ -258,160 +249,26 @@ class PushConfigWidget(QWidget):
         # Re-enable signals
         self.destination_combo.blockSignals(False)
     
-    def _on_destination_selected(self, index):
-        """Handle destination tenant selection."""
-        try:
-            data = self.destination_combo.currentData()
-            
-            if data is None:
-                # No selection
-                self.destination_client = None
-                self.destination_name = None
-                self.dest_status_label.setText("No destination selected")
-                self.dest_status_label.setStyleSheet("color: gray; padding: 5px;")
-            elif data["type"] == "source":
-                # Use source tenant
-                self.destination_client = data["client"]
-                self.destination_name = "Source Tenant"
-                self.dest_status_label.setText(f"✓ Using source tenant: {self.destination_client.tsg_id}")
-                self.dest_status_label.setStyleSheet("color: green; padding: 5px;")
-            elif data["type"] == "saved":
-                # Saved tenant - need to connect
-                tenant = data["tenant"]
-                self._connect_to_tenant(tenant)
-            
-            self._update_status()
-            
-        except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Selection Error",
-                f"Error selecting destination tenant:\n\n{str(e)}\n\nPlease check the console for details."
-            )
-            import traceback
-            traceback.print_exc()
-            self.destination_combo.setCurrentIndex(0)
-            self.destination_client = None
-            self._update_status()
+    def _on_destination_changed(self, api_client, tenant_name: str):
+        """
+        Handle destination connection changes from the tenant selector.
+        
+        Args:
+            api_client: The API client (or None if disconnected)
+            tenant_name: Name of the tenant (or empty string if disconnected)
+        """
+        self.destination_client = api_client
+        self.destination_name = tenant_name if tenant_name else None
+        self._update_status()
     
-    def _connect_to_tenant(self, tenant):
-        """Connect to a saved tenant."""
-        from prisma.api_client import PrismaAccessAPIClient
-        from PyQt6.QtWidgets import QProgressDialog
-        from PyQt6.QtCore import QTimer, QCoreApplication
+    def populate_destination_tenants(self, tenants: list):
+        """
+        Populate the destination tenant dropdown with saved tenants.
         
-        # Show progress
-        progress = QProgressDialog("Connecting to destination tenant...", None, 0, 0, self)
-        progress.setWindowModality(Qt.WindowModality.WindowModal)
-        progress.setMinimumDuration(0)
-        
-        try:
-            # Process events before showing to avoid issues
-            QCoreApplication.processEvents()
-            progress.show()
-            QCoreApplication.processEvents()
-            
-            # Create client
-            client = PrismaAccessAPIClient(
-                tsg_id=tenant['tsg_id'],
-                api_user=tenant['client_id'],
-                api_secret=tenant['client_secret']
-            )
-            
-            # Test authentication
-            if client.token:
-                self.destination_client = client
-                self.destination_name = tenant['name']  # Store tenant name
-                self.dest_status_label.setText(f"✓ Connected to: {tenant['name']}")
-                self.dest_status_label.setStyleSheet("color: green; padding: 5px;")
-                
-                # Mark as used
-                from config.tenant_manager import TenantManager
-                manager = TenantManager()
-                manager.mark_used(tenant['id'])
-            else:
-                self.destination_combo.setCurrentIndex(0)
-                self.destination_client = None
-                # Show error after closing progress
-                progress.close()
-                QCoreApplication.processEvents()
-                QMessageBox.critical(self, "Connection Failed", "Failed to authenticate with destination tenant.")
-                return
-                
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            self.destination_combo.setCurrentIndex(0)
-            self.destination_client = None
-            # Show error after closing progress
-            progress.close()
-            QCoreApplication.processEvents()
-            QMessageBox.critical(
-                self, 
-                "Connection Error", 
-                f"Error connecting to tenant:\n\n{str(e)}"
-            )
-            return
-        finally:
-            # Safely close progress dialog
-            if progress:
-                progress.close()
-                progress.deleteLater()
-            # Process events to ensure clean close
-            QCoreApplication.processEvents()
-            # Update status after a brief delay
-            QTimer.singleShot(100, self._update_status)
-    
-    def _connect_destination(self):
-        """Open connection dialog for destination tenant."""
-        from gui.connection_dialog import ConnectionDialog
-        from PyQt6.QtCore import QCoreApplication
-        
-        try:
-            dialog = ConnectionDialog(self)
-            result = dialog.exec()
-            
-            # Process events to ensure dialog is fully closed
-            QCoreApplication.processEvents()
-            
-            if result:
-                # Get data before dialog is deleted
-                client = dialog.get_api_client()
-                connection_name = dialog.get_connection_name() or "Manual"
-                
-                # Delete dialog explicitly
-                dialog.deleteLater()
-                QCoreApplication.processEvents()
-                
-                if client:
-                    self.destination_client = client
-                    self.destination_name = connection_name  # Store connection name
-                    
-                    # Add to combo if not already there
-                    self.destination_combo.blockSignals(True)
-                    self.destination_combo.addItem(
-                        f"{connection_name} ({client.tsg_id})",
-                        {"type": "manual", "client": client}
-                    )
-                    self.destination_combo.setCurrentIndex(self.destination_combo.count() - 1)
-                    self.destination_combo.blockSignals(False)
-                    
-                    self.dest_status_label.setText(f"✓ Connected to: {connection_name}")
-                    self.dest_status_label.setStyleSheet("color: green; padding: 5px;")
-                    self._update_status()
-            else:
-                # Dialog cancelled
-                dialog.deleteLater()
-                QCoreApplication.processEvents()
-                
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            QMessageBox.critical(
-                self,
-                "Connection Error",
-                f"Error connecting to destination tenant:\n\n{str(e)}"
-            )
+        Args:
+            tenants: List of tenant dictionaries with 'name' key
+        """
+        self.tenant_selector.populate_tenants(tenants)
 
     def set_config(self, config: Optional[Dict[str, Any]]):
         """Set the configuration to push."""
