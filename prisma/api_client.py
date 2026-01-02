@@ -873,6 +873,42 @@ class PrismaAccessAPIClient:
         def api_func(offset=0, limit=100):
             return self.get_decryption_profiles(folder=folder, limit=limit, offset=offset)
         return paginate_api_request(api_func)
+    
+    def get_profile_groups(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get profile groups.
+        
+        Args:
+            folder: Optional folder name to filter results
+            snippet: Optional snippet name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+            
+        Returns:
+            List of profile group dictionaries
+        """
+        url = APIEndpoints.PROFILE_GROUPS
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        elif snippet:
+            url += f"?snippet={snippet}"
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+    
+    def get_all_profile_groups(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all profile groups with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_profile_groups(folder=folder, snippet=snippet, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
 
     # Security Profiles
     def get_anti_spyware_profiles(
@@ -2066,6 +2102,25 @@ class PrismaAccessAPIClient:
     def delete_authentication_profile(self, profile_id: str) -> Dict[str, Any]:
         """Delete an authentication profile."""
         url = APIEndpoints.authentication_profile(profile_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    def create_profile_group(self, data: Dict[str, Any], folder: Optional[str] = None, snippet: Optional[str] = None) -> Dict[str, Any]:
+        """Create a profile group."""
+        url = APIEndpoints.PROFILE_GROUPS
+        if folder:
+            url += build_folder_query(folder)
+        elif snippet:
+            url += f"?snippet={snippet}"
+        return self._make_request("POST", url, data=data, use_cache=False)
+    
+    def update_profile_group(self, group_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update a profile group."""
+        url = APIEndpoints.profile_group(group_id)
+        return self._make_request("PUT", url, data=data, use_cache=False)
+    
+    def delete_profile_group(self, group_id: str) -> Dict[str, Any]:
+        """Delete a profile group."""
+        url = APIEndpoints.profile_group(group_id)
         return self._make_request("DELETE", url, use_cache=False)
     
     # HIP Objects and Profiles

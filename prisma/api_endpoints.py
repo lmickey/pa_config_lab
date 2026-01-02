@@ -170,6 +170,9 @@ class APIEndpoints:
 
     # Profiles - Decryption Profiles (SASE API)
     DECRYPTION_PROFILES = f"{SASE_BASE_URL}/decryption-profiles"
+    
+    # Profiles - Profile Groups (SASE API)
+    PROFILE_GROUPS = f"{SASE_BASE_URL}/profile-groups"
 
     @staticmethod
     def anti_spyware_profile(profile_id: str) -> str:
@@ -215,6 +218,11 @@ class APIEndpoints:
     def decryption_profile(profile_id: str) -> str:
         """Get endpoint for specific decryption profile."""
         return f"{APIEndpoints.DECRYPTION_PROFILES}/{profile_id}"
+    
+    @staticmethod
+    def profile_group(group_id: str) -> str:
+        """Get endpoint for specific profile group."""
+        return f"{APIEndpoints.PROFILE_GROUPS}/{group_id}"
 
     # Network - IKE Crypto Profiles (SASE API)
     IKE_CRYPTO_PROFILES = f"{SASE_BASE_URL}/ike-crypto-profiles"
