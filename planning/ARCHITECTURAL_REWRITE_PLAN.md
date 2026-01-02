@@ -484,43 +484,59 @@ not rule-based policy from Day 4). All infrastructure items REQUIRE folder, not 
 
 ### Day 6: Create Container Classes
 
-**Goal:** Create classes to organize configuration items (FolderConfig, SnippetConfig, Configuration)
+**Goal:** Create classes to organize configuration items (FolderConfig, SnippetConfig, InfrastructureConfig, Configuration)
+
+**Important:** Infrastructure items (Remote Networks, Mobile Users) have their own organizational structure separate from folders/snippets, requiring a dedicated `InfrastructureConfig` container.
 
 **Tasks:**
 
 1. **Create `config/models/containers.py`**
    - `FolderConfig` - Represents a folder and its contents
+     - Contains: objects, profiles, rules for a specific folder
+     - Location: folder name
    - `SnippetConfig` - Represents a snippet and its contents
+     - Contains: objects, profiles, rules for a specific snippet
+     - Location: snippet name
+     - Note: Snippet items can have ONLY snippet property (no folder)
+   - `InfrastructureConfig` - Represents infrastructure items ⭐ NEW
+     - Contains: Remote Networks (IKE/IPsec crypto, gateways, tunnels, service connections)
+     - Contains: Mobile Users (agent profiles, portals, gateways)
+     - Note: Infrastructure items MUST have folder, organized by category
    - `Configuration` - Top-level container for entire config
+     - Contains: multiple FolderConfig, SnippetConfig, and InfrastructureConfig
 
 2. **Implement container features:**
    - Add/remove items
    - Query items by name, type, location
    - Filter items (by default status, enabled/disabled, etc.)
    - Bulk operations (mark all for deletion, validate all)
-   - Dependency resolution across containers
+   - Dependency resolution across containers (including infrastructure)
+   - InfrastructureConfig-specific: query by category (Remote Networks, Mobile Users)
 
 3. **Add test examples:** ⭐ NEW
    - Create `tests/examples/config/containers/`:
-     - `folder_mobile_users.json` - Complete folder with items
-     - `folder_remote_networks.json` - Folder with infrastructure
-     - `snippet_production.json` - Complete snippet
-     - `configuration_minimal.json` - Full config with folders/snippets
+     - `folder_mobile_users.json` - Complete folder with objects/profiles/rules
+     - `snippet_production.json` - Complete snippet with configuration
+     - `infrastructure_remote_networks.json` - Remote Networks infrastructure ⭐ NEW
+     - `infrastructure_mobile_users.json` - Mobile Users infrastructure ⭐ NEW
+     - `configuration_minimal.json` - Full config with folders/snippets/infrastructure
 
 4. **Create `tests/config/models/test_containers.py`** ⭐ NEW
    - Test FolderConfig creation and manipulation
    - Test SnippetConfig creation and manipulation
-   - Test Configuration aggregation
-   - Test querying across containers
+   - Test InfrastructureConfig creation and manipulation ⭐ NEW
+   - Test Configuration aggregation (all 3 container types)
+   - Test querying across containers (including infrastructure)
    - Test bulk operations
+   - Test infrastructure-specific queries (by category)
    - Use example loader
 
 5. **Update INDEX.md** ⭐ NEW
 
 **Deliverables:**
-- `config/models/containers.py` with 3 classes
-- 4+ new example configurations
-- `tests/config/models/test_containers.py` with 30+ tests
+- `config/models/containers.py` with 4 classes (revised from 3)
+- 5+ new example configurations (revised from 4+)
+- `tests/config/models/test_containers.py` with 35+ tests (revised from 30+)
 - All tests passing
 
 ---
