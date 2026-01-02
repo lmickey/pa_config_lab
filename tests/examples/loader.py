@@ -422,6 +422,46 @@ class Examples:
     def unknown_item_type() -> Dict[str, Any]:
         return load_example('factory', 'unknown_item_type')
     
+    # API Response Examples
+    @staticmethod
+    def create_response_success() -> Dict[str, Any]:
+        return load_api_example('create_response_success')
+    
+    @staticmethod
+    def create_response_error() -> Dict[str, Any]:
+        return load_api_example('create_response_error')
+    
+    @staticmethod
+    def update_response_success() -> Dict[str, Any]:
+        return load_api_example('update_response_success')
+    
+    @staticmethod
+    def delete_response_409_conflict() -> Dict[str, Any]:
+        return load_api_example('delete_response_409_conflict')
+    
+    @staticmethod
+    def get_response_paginated() -> Dict[str, Any]:
+        return load_api_example('get_response_paginated')
+    
+    @staticmethod
+    def get_response_page2() -> Dict[str, Any]:
+        return load_api_example('get_response_page2')
+
+
+def load_api_example(filename: str) -> Dict[str, Any]:
+    """Load an API response example"""
+    # API examples are in tests/examples/api/
+    if not filename.endswith('.json'):
+        filename = f"{filename}.json"
+    
+    file_path = Path(__file__).parent / "api" / filename
+    
+    if not file_path.exists():
+        raise FileNotFoundError(f"API example file not found: {file_path}")
+    
+    with open(file_path, 'r') as f:
+        return json.load(f)
+    
     # Profiles
     @staticmethod
     def auth_profile() -> Dict[str, Any]:

@@ -1,0 +1,12 @@
+{
+  "id": "addr-123",
+  "name": "updated-address",
+  "folder": "Mobile Users",
+  "value": "10.2.2.0/24",
+  "type": "ip-netmask",
+  "description": "Updated description",
+  "created": "2025-01-01T10:00:00Z",
+  "updated": "2025-01-02T15:35:00Z",
+  "created_by": "admin@example.com",
+  "updated_by": "api-client@example.com"
+}

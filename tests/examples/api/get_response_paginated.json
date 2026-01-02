@@ -1,0 +1,28 @@
+{
+  "data": [
+    {
+      "id": "addr-1",
+      "name": "address-1",
+      "folder": "Mobile Users",
+      "value": "10.0.1.0/24",
+      "type": "ip-netmask"
+    },
+    {
+      "id": "addr-2",
+      "name": "address-2",
+      "folder": "Mobile Users",
+      "value": "10.0.2.0/24",
+      "type": "ip-netmask"
+    },
+    {
+      "id": "addr-3",
+      "name": "address-3",
+      "folder": "Mobile Users",
+      "value": "10.0.3.0/24",
+      "type": "ip-netmask"
+    }
+  ],
+  "total": 250,
+  "limit": 3,
+  "offset": 0
+}

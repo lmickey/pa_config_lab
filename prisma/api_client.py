@@ -217,6 +217,285 @@ class PrismaAccessAPIClient:
 
         return result
 
+    # ========================================================================
+    # ConfigItem-Aware Methods (New Object-Oriented API)
+    # ========================================================================
+    
+    def create_item(self, item: 'ConfigItem') -> bool:
+        """
+        Create a configuration item using its api_endpoint and to_dict().
+        
+        Args:
+            item: ConfigItem instance to create
+            
+        Returns:
+            True if successful, False otherwise
+            
+        Example:
+            >>> address = AddressObject({'name': 'test', 'folder': 'Mobile Users', ...})
+            >>> success = client.create_item(address)
+        """
+        from config.models.base import ConfigItem
+        
+        if not isinstance(item, ConfigItem):
+            raise TypeError(f"Expected ConfigItem, got {type(item)}")
+        
+        if not item.api_endpoint:
+            raise ValueError(f"No API endpoint defined for {item.item_type}")
+        
+        try:
+            # Build URL with folder or snippet parameter
+            url = item.api_endpoint
+            if item.folder:
+                url += f"?folder={quote(item.folder, safe='')}"
+            elif item.snippet:
+                url += f"?snippet={quote(item.snippet, safe='')}"
+            
+            # Get data from item (removes internal fields)
+            data = item.to_dict()
+            
+            # Make request
+            response = self._make_request("POST", url, data=data, use_cache=False)
+            
+            # Update item with response ID if available
+            if isinstance(response, dict) and 'id' in response:
+                item.id = response['id']
+                item.raw_config['id'] = response['id']
+            
+            return True
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error creating {item.item_type} '{item.name}': {e}")
+            return False
+    
+    def update_item(self, item: 'ConfigItem') -> bool:
+        """
+        Update a configuration item using its api_endpoint and ID.
+        
+        Args:
+            item: ConfigItem instance to update
+            
+        Returns:
+            True if successful, False otherwise
+            
+        Example:
+            >>> address.value = '10.0.0.0/24'
+            >>> success = client.update_item(address)
+        """
+        from config.models.base import ConfigItem
+        
+        if not isinstance(item, ConfigItem):
+            raise TypeError(f"Expected ConfigItem, got {type(item)}")
+        
+        if not item.id:
+            raise ValueError(f"Cannot update {item.item_type} '{item.name}': no ID set")
+        
+        if not item.api_endpoint:
+            raise ValueError(f"No API endpoint defined for {item.item_type}")
+        
+        try:
+            # Build URL with item ID
+            url = f"{item.api_endpoint}/{item.id}"
+            
+            # Get data from item (removes internal fields)
+            data = item.to_dict()
+            
+            # Make request
+            self._make_request("PUT", url, data=data, use_cache=False)
+            
+            return True
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error updating {item.item_type} '{item.name}': {e}")
+            return False
+    
+    def delete_item(self, item: 'ConfigItem') -> bool:
+        """
+        Delete a configuration item using its api_endpoint and ID.
+        
+        Args:
+            item: ConfigItem instance to delete
+            
+        Returns:
+            True if successful, False otherwise
+            
+        Example:
+            >>> success = client.delete_item(address)
+        """
+        from config.models.base import ConfigItem
+        
+        if not isinstance(item, ConfigItem):
+            raise TypeError(f"Expected ConfigItem, got {type(item)}")
+        
+        if not item.id:
+            raise ValueError(f"Cannot delete {item.item_type} '{item.name}': no ID set")
+        
+        if not item.api_endpoint:
+            raise ValueError(f"No API endpoint defined for {item.item_type}")
+        
+        try:
+            # Build URL with item ID
+            url = f"{item.api_endpoint}/{item.id}"
+            
+            # Make request
+            self._make_request("DELETE", url, use_cache=False)
+            
+            return True
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error deleting {item.item_type} '{item.name}': {e}")
+            return False
+    
+    def get_items(
+        self,
+        item_class: type,
+        location: str,
+        is_snippet: bool = False,
+        use_factory: bool = True
+    ) -> List['ConfigItem']:
+        """
+        Get all items of a specific type from a location.
+        
+        Args:
+            item_class: ConfigItem subclass (e.g., AddressObject)
+            location: Folder or snippet name
+            is_snippet: Whether location is a snippet (vs folder)
+            use_factory: Whether to use ConfigItemFactory (vs direct instantiation)
+            
+        Returns:
+            List of ConfigItem instances
+            
+        Example:
+            >>> from config.models.objects import AddressObject
+            >>> addresses = client.get_items(AddressObject, 'Mobile Users')
+        """
+        from config.models.base import ConfigItem
+        
+        if not hasattr(item_class, 'api_endpoint') or not item_class.api_endpoint:
+            raise ValueError(f"No API endpoint defined for {item_class.__name__}")
+        
+        try:
+            # Build URL with location parameter
+            url = item_class.api_endpoint
+            param = "snippet" if is_snippet else "folder"
+            url += f"?{param}={quote(location, safe='')}"
+            
+            # Make request
+            response = self._make_request("GET", url)
+            
+            # Extract items from response
+            if isinstance(response, dict):
+                raw_items = response.get('data', [])
+            elif isinstance(response, list):
+                raw_items = response
+            else:
+                return []
+            
+            # Instantiate ConfigItem objects
+            items = []
+            
+            if use_factory:
+                from config.models.factory import ConfigItemFactory
+                for raw_item in raw_items:
+                    try:
+                        item = ConfigItemFactory.create_from_dict(
+                            item_class.item_type,
+                            raw_item
+                        )
+                        items.append(item)
+                    except Exception as e:
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning(f"Skipping item due to error: {e}")
+            else:
+                for raw_item in raw_items:
+                    try:
+                        item = item_class(raw_item)
+                        items.append(item)
+                    except Exception as e:
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning(f"Skipping item due to error: {e}")
+            
+            return items
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error fetching {item_class.__name__} from {location}: {e}")
+            return []
+    
+    def get_item_by_name(
+        self,
+        item_class: type,
+        name: str,
+        location: str,
+        is_snippet: bool = False
+    ) -> Optional['ConfigItem']:
+        """
+        Get a specific item by name from a location.
+        
+        Args:
+            item_class: ConfigItem subclass
+            name: Item name to find
+            location: Folder or snippet name
+            is_snippet: Whether location is a snippet
+            
+        Returns:
+            ConfigItem instance or None if not found
+            
+        Example:
+            >>> address = client.get_item_by_name(
+            ...     AddressObject,
+            ...     'internal-network',
+            ...     'Mobile Users'
+            ... )
+        """
+        items = self.get_items(item_class, location, is_snippet)
+        
+        for item in items:
+            if item.name == name:
+                return item
+        
+        return None
+    
+    def bulk_get_items(
+        self,
+        item_class: type,
+        locations: List[str],
+        is_snippet: bool = False
+    ) -> Dict[str, List['ConfigItem']]:
+        """
+        Get items from multiple locations in parallel.
+        
+        Args:
+            item_class: ConfigItem subclass
+            locations: List of folder or snippet names
+            is_snippet: Whether locations are snippets
+            
+        Returns:
+            Dict mapping location name to list of items
+            
+        Example:
+            >>> items_by_folder = client.bulk_get_items(
+            ...     AddressObject,
+            ...     ['Mobile Users', 'Remote Networks']
+            ... )
+        """
+        results = {}
+        
+        for location in locations:
+            items = self.get_items(item_class, location, is_snippet)
+            results[location] = items
+        
+        return results
+
     # Infrastructure endpoints
 
     def get_shared_infrastructure_settings(self) -> Dict[str, Any]:
