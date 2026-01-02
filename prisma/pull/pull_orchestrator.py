@@ -547,7 +547,7 @@ class PullOrchestrator:
                             object_capture=self.object_capture,
                             profile_capture=self.profile_capture,
                             rule_capture=self.rule_capture,
-                            hip_capture=self.hip_capture,
+                            hip_capture=self.infrastructure_capture,
                             default_detector=self.default_detector
                         )
                         if snippet_config:
@@ -562,7 +562,7 @@ class PullOrchestrator:
                     object_capture=self.object_capture,
                     profile_capture=self.profile_capture,
                     rule_capture=self.rule_capture,
-                    hip_capture=self.hip_capture,
+                    hip_capture=self.infrastructure_capture,
                     default_detector=self.default_detector
                 )
                 

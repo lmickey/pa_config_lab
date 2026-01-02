@@ -323,7 +323,7 @@ class SnippetCapture:
             # Capture HIP objects and profiles (snippet name is used as folder parameter)
             if include_hip and hip_capture:
                 try:
-                    hip_data = hip_capture.capture_hip_for_folder(actual_name)
+                    hip_data = hip_capture.capture_hip_objects_and_profiles(folder=actual_name)
                     snippet_config["hip"] = hip_data
                 except Exception as e:
                     logger.warning(f"Error capturing HIP for snippet '{actual_name}': {e}")
