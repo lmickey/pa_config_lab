@@ -42,8 +42,8 @@ class TenantSelectorWidget(QWidget):
         parent=None,
         title: str = "Tenant",
         label: str = "Select:",
-        show_toast: Optional[Callable] = None,
-        show_error: Optional[Callable] = None
+        show_success_toast: Optional[Callable] = None,
+        show_error_banner: Optional[Callable] = None
     ):
         """
         Initialize the tenant selector widget.
@@ -52,16 +52,16 @@ class TenantSelectorWidget(QWidget):
             parent: Parent widget
             title: Title for the group box (e.g., "Source Tenant", "Destination Tenant")
             label: Label for the dropdown (e.g., "Pull from:", "Push to:")
-            show_toast: Optional callback for showing success toasts (message, type, duration)
-            show_error: Optional callback for showing error messages (message)
+            show_success_toast: Optional callback for showing success toasts (message, duration)
+            show_error_banner: Optional callback for showing error messages (message)
         """
         super().__init__(parent)
         
         self.logger = logging.getLogger(__name__)
         self.api_client = None
         self.connection_name = None
-        self.show_toast = show_toast
-        self.show_error = show_error
+        self.show_success_toast = show_success_toast
+        self.show_error_banner = show_error_banner
         
         self._title = title
         self._label = label
@@ -138,8 +138,8 @@ class TenantSelectorWidget(QWidget):
             import traceback
             self.logger.error(traceback.format_exc())
             
-            if self.show_error:
-                self.show_error(f"Selection Error: Failed to select tenant: {str(e)}")
+            if self.show_error_banner:
+                self.show_error_banner(f"Selection Error: Failed to select tenant: {str(e)}")
     
     def _connect_to_saved_tenant(self, tenant_name: str):
         """
@@ -173,8 +173,8 @@ class TenantSelectorWidget(QWidget):
                     available = [t.get('name') for t in manager.list_tenants()]
                     self.logger.info(f"Available tenants: {available}")
                     
-                    if self.show_error:
-                        self.show_error(f"Connection Failed: Tenant '{tenant_name}' not found.")
+                    if self.show_error_banner:
+                        self.show_error_banner(f"Connection Failed: Tenant '{tenant_name}' not found.")
                     
                     self.tenant_combo.setCurrentIndex(0)
                     return
@@ -189,8 +189,8 @@ class TenantSelectorWidget(QWidget):
                 if not all([tsg_id, api_user, api_secret]):
                     self.logger.error(f"Missing credentials for tenant: {tenant_name}")
                     
-                    if self.show_error:
-                        self.show_error(f"Connection Failed: Incomplete credentials for '{tenant_name}'.")
+                    if self.show_error_banner:
+                        self.show_error_banner(f"Connection Failed: Incomplete credentials for '{tenant_name}'.")
                     
                     self.tenant_combo.setCurrentIndex(0)
                     return
@@ -215,13 +215,13 @@ class TenantSelectorWidget(QWidget):
                     self.set_connection(api_client, tenant_name)
                     
                     # Show success
-                    if self.show_toast:
-                        self.show_toast(f"✓ Connected to {tenant_name}", "success", 2000)
+                    if self.show_success_toast:
+                        self.show_success_toast(f"✓ Connected to {tenant_name}", 2000)
                 else:
                     self.logger.error(f"Authentication failed for: {tenant_name}")
                     
-                    if self.show_error:
-                        self.show_error(f"Connection Failed: Authentication failed for '{tenant_name}'. Check credentials.")
+                    if self.show_error_banner:
+                        self.show_error_banner(f"Connection Failed: Authentication failed for '{tenant_name}'. Check credentials.")
                     
                     self.tenant_combo.setCurrentIndex(0)
                     
@@ -235,8 +235,8 @@ class TenantSelectorWidget(QWidget):
             import traceback
             self.logger.error(traceback.format_exc())
             
-            if self.show_error:
-                self.show_error(f"Connection Error: {str(e)}")
+            if self.show_error_banner:
+                self.show_error_banner(f"Connection Error: {str(e)}")
             
             self.tenant_combo.setCurrentIndex(0)
     
@@ -262,8 +262,8 @@ class TenantSelectorWidget(QWidget):
                 self.set_connection(dialog.api_client, tenant_name)
                 
                 # Show success
-                if self.show_toast:
-                    self.show_toast(f"✓ Connected to {tenant_name}", "success", 2000)
+                if self.show_success_toast:
+                    self.show_success_toast(f"✓ Connected to {tenant_name}", 2000)
                 
                 # Update combo if this is a saved tenant
                 found = False
@@ -285,8 +285,8 @@ class TenantSelectorWidget(QWidget):
             import traceback
             self.logger.error(traceback.format_exc())
             
-            if self.show_error:
-                self.show_error(f"Connection Error: {str(e)}")
+            if self.show_error_banner:
+                self.show_error_banner(f"Connection Error: {str(e)}")
     
     def set_connection(self, api_client, tenant_name: str):
         """

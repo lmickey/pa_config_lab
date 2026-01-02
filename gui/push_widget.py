@@ -78,8 +78,8 @@ class PushConfigWidget(QWidget):
             parent=self,
             title="Destination Tenant",
             label="Push to:",
-            show_toast=lambda msg, typ, dur: self.toast_manager.show_toast(msg, typ, dur),
-            show_error=lambda msg: self.error_notification.show_error(msg)
+            show_success_toast=lambda msg, dur: self.toast_manager.show_success(msg, dur),
+            show_error_banner=lambda msg: self.error_notification.show_error(msg)
         )
         self.tenant_selector.connection_changed.connect(self._on_destination_changed)
         layout.addWidget(self.tenant_selector)
