@@ -120,7 +120,7 @@ class Examples:
         >>> config = Examples.security_rule_full()
     """
     
-    # Objects
+    # Objects - Addresses
     @staticmethod
     def address_minimal() -> Dict[str, Any]:
         return load_object_example('address_minimal')
@@ -134,16 +134,51 @@ class Examples:
         return load_object_example('address_snippet')
     
     @staticmethod
+    def address_fqdn() -> Dict[str, Any]:
+        return load_object_example('address_fqdn')
+    
+    @staticmethod
+    def address_range() -> Dict[str, Any]:
+        return load_object_example('address_range')
+    
+    @staticmethod
     def address_group() -> Dict[str, Any]:
         return load_object_example('address_group_minimal')
     
+    @staticmethod
+    def address_group_dynamic() -> Dict[str, Any]:
+        return load_object_example('address_group_dynamic')
+    
+    # Objects - Services
     @staticmethod
     def service() -> Dict[str, Any]:
         return load_object_example('service_minimal')
     
     @staticmethod
+    def service_group() -> Dict[str, Any]:
+        return load_object_example('service_group_minimal')
+    
+    # Objects - Applications
+    @staticmethod
     def application() -> Dict[str, Any]:
         return load_object_example('application_minimal')
+    
+    @staticmethod
+    def application_group() -> Dict[str, Any]:
+        return load_object_example('application_group_minimal')
+    
+    @staticmethod
+    def application_filter() -> Dict[str, Any]:
+        return load_object_example('application_filter_minimal')
+    
+    # Objects - Schedules
+    @staticmethod
+    def schedule() -> Dict[str, Any]:
+        return load_object_example('schedule_minimal')
+    
+    @staticmethod
+    def schedule_non_recurring() -> Dict[str, Any]:
+        return load_object_example('schedule_non_recurring')
     
     # Policies
     @staticmethod

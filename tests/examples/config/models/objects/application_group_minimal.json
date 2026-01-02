@@ -1,0 +1,6 @@
+{
+  "name": "collaboration-apps",
+  "folder": "Mobile Users",
+  "members": ["ms-teams", "zoom", "webex"],
+  "description": "Collaboration application group"
+}

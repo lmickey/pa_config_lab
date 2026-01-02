@@ -13,10 +13,31 @@ from .base import (
     RuleItem,
 )
 
+from .objects import (
+    AddressObject,
+    AddressGroup,
+    ServiceObject,
+    ServiceGroup,
+    ApplicationObject,
+    ApplicationGroup,
+    ApplicationFilter,
+    Schedule,
+)
+
 __all__ = [
+    # Base classes
     'ConfigItem',
     'PolicyItem',
     'ObjectItem',
     'ProfileItem',
     'RuleItem',
+    # Object models
+    'AddressObject',
+    'AddressGroup',
+    'ServiceObject',
+    'ServiceGroup',
+    'ApplicationObject',
+    'ApplicationGroup',
+    'ApplicationFilter',
+    'Schedule',
 ]

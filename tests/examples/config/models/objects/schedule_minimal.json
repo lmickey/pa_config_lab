@@ -1,0 +1,16 @@
+{
+  "name": "business-hours",
+  "folder": "Mobile Users",
+  "schedule_type": {
+    "recurring": {
+      "weekly": {
+        "monday": ["08:00-17:00"],
+        "tuesday": ["08:00-17:00"],
+        "wednesday": ["08:00-17:00"],
+        "thursday": ["08:00-17:00"],
+        "friday": ["08:00-17:00"]
+      }
+    }
+  },
+  "description": "Standard business hours schedule"
+}

@@ -4,14 +4,39 @@ This index provides a quick reference to all example configuration files.
 
 ## Objects (`objects/`)
 
+### Addresses
+
 | File | Description | Key Features |
 |------|-------------|--------------|
-| `address_minimal.json` | Basic address object | Folder-based, minimal fields |
+| `address_minimal.json` | Basic address object | Folder-based, ip_netmask, minimal fields |
 | `address_full.json` | Complete address object | All metadata, tags, timestamps |
 | `address_snippet.json` | Snippet-based address | Shows snippet usage |
-| `address_group_minimal.json` | Address group | Static members (dependencies) |
+| `address_fqdn.json` | FQDN address | Domain-based addressing |
+| `address_range.json` | IP range address | IP range format (start-end) |
+| `address_group_minimal.json` | Static address group | Static members (dependencies) |
+| `address_group_dynamic.json` | Dynamic address group | Tag-based filter |
+
+### Services
+
+| File | Description | Key Features |
+|------|-------------|--------------|
 | `service_minimal.json` | TCP service | Custom port definition |
+| `service_group_minimal.json` | Service group | Multiple service members |
+
+### Applications
+
+| File | Description | Key Features |
+|------|-------------|--------------|
 | `application_minimal.json` | Custom application | Category/risk attributes |
+| `application_group_minimal.json` | Application group | Multiple application members |
+| `application_filter_minimal.json` | Application filter | Dynamic filtering by category/risk |
+
+### Schedules
+
+| File | Description | Key Features |
+|------|-------------|--------------|
+| `schedule_minimal.json` | Recurring schedule | Weekly business hours |
+| `schedule_non_recurring.json` | Non-recurring schedule | Specific date ranges |
 
 ## Policies (`policies/`)
 

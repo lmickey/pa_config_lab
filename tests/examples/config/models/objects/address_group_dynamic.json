@@ -1,0 +1,8 @@
+{
+  "name": "production-servers",
+  "folder": "Mobile Users",
+  "dynamic": {
+    "filter": "'production' and 'server'"
+  },
+  "description": "Dynamic address group using tag filtering"
+}
