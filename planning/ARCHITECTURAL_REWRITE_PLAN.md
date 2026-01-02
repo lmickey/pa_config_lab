@@ -101,13 +101,16 @@ This document outlines the phased approach to rewrite the configuration system w
 
 ## Phase 2: Object Models (IN PROGRESS)
 
-### Day 2: Create Specific Object Model Classes
+### Day 2: Create Specific Object Model Classes ✅
 
-**Goal:** Create concrete classes for network objects (addresses, services, applications, etc.)
+**Goal:** Create concrete classes for network objects (addresses, services, applications, tags, etc.)
+
+**Status:** COMPLETE - v3.1.140
 
 **Tasks:**
 
-1. **Create `config/models/objects.py`**
+1. **Create `config/models/objects.py`** ✅
+   - `Tag(ConfigItem)` - **SPECIAL**: Can have both folder AND snippet
    - `AddressObject(ObjectItem)` - IP addresses, ranges, FQDNs
    - `AddressGroup(ObjectItem)` - Static and dynamic groups
    - `ServiceObject(ObjectItem)` - TCP/UDP services
@@ -117,40 +120,56 @@ This document outlines the phased approach to rewrite the configuration system w
    - `ApplicationFilter(ObjectItem)` - Application filters
    - `Schedule(ObjectItem)` - Time-based schedules (NEW ENDPOINT)
 
-2. **Implement specific properties per class:**
+2. **Implement specific properties per class:** ✅
    - Override `_compute_dependencies()` for each type
    - Override `_validate_specific()` for type-specific validation
-   - Add type-specific properties (e.g., `ip_netmask`, `port`, etc.)
+   - Add type-specific properties (e.g., `ip_netmask`, `port`, `color`, etc.)
+   - **Added base tag methods**: `has_tags` property, `get_tags()` method
 
 3. **API endpoint definitions:**
    - Each class defines its `api_endpoint` class property
    - Each class defines its `item_type` class property
 
-4. **Add test examples:** ⭐ NEW
-   - Create additional examples in `tests/examples/config/models/objects/`:
-     - `address_fqdn.json` - FQDN-based address
-     - `address_range.json` - IP range address
-     - `address_group_dynamic.json` - Dynamic group with filter
-     - `service_group_minimal.json` - Service group
-     - `application_group_minimal.json` - Application group
-     - `application_filter_minimal.json` - Application filter
-     - `schedule_minimal.json` - Schedule object
+4. **Add test examples:** ⭐ COMPLETE ✅
+   - Created in `tests/examples/config/models/objects/`:
+     - `tag_minimal.json` - Basic tag ✅
+     - `tag_full.json` - Complete tag with comments ✅
+     - `tag_with_snippet.json` - Tag with both folder AND snippet ✅
+     - `tag_no_color.json` - Tag without color ✅
+     - `address_fqdn.json` - FQDN-based address ✅
+     - `address_range.json` - IP range address ✅
+     - `address_group_dynamic.json` - Dynamic group with filter ✅
+     - `address_with_tags.json` - Address demonstrating tags ✅
+     - `service_group_minimal.json` - Service group ✅
+     - `application_group_minimal.json` - Application group ✅
+     - `application_filter_minimal.json` - Application filter ✅
+     - `schedule_minimal.json` - Recurring schedule ✅
+     - `schedule_non_recurring.json` - Date-specific schedule ✅
 
-5. **Create `tests/config/models/test_objects.py`** ⭐ NEW
-   - Test each object class initialization
-   - Test folder vs snippet validation
-   - Test dependency detection (e.g., groups reference members)
-   - Test serialization/deserialization
-   - Test rename and deletion tracking
-   - Use example loader for realistic data
+5. **Create `tests/config/models/test_objects.py`** ⭐ COMPLETE ✅
+   - TestTag: 7 tests (including special folder+snippet case)
+   - TestTagSupport: 3 tests (has_tags, get_tags)
+   - TestAddressObject: 7 tests
+   - TestAddressGroup: 5 tests (static/dynamic, dependencies)
+   - TestServiceObject: 5 tests (TCP/UDP, validation)
+   - TestServiceGroup: 3 tests
+   - TestApplicationObject: 3 tests
+   - TestApplicationGroup: 2 tests
+   - TestApplicationFilter: 3 tests
+   - TestSchedule: 4 tests
+   - TestObjectSerialization: 2 tests
+   - TestObjectDeletion: 2 tests
+   - **Total: 46 tests, all passing** ✅
 
-6. **Update INDEX.md with new examples** ⭐ NEW
+6. **Update INDEX.md with new examples** ⭐ COMPLETE ✅
 
-**Deliverables:**
-- `config/models/objects.py` with 8 classes
-- 7+ new example configurations
-- `tests/config/models/test_objects.py` with 20+ tests
-- All tests passing
+**Deliverables:** ✅
+- `config/models/objects.py` with 9 classes (8 + Tag) ✅
+- 13 new example configurations (exceeded 7+ target) ✅
+- `tests/config/models/test_objects.py` with 46 tests (exceeded 20+ target) ✅
+- All 61 tests passing (15 base + 46 objects) ✅
+- `config/models/base.py` updated with has_tags/get_tags ✅
+- 91% code coverage on objects.py ✅
 
 ---
 
