@@ -389,8 +389,20 @@ Examples:
                 return 0
     
     # Decrypt credentials
-    from config.storage.crypto_utils import decrypt_data, load_cipher
-    cipher = load_cipher()
+    # TenantManager automatically handles encryption using system password
+    from config.storage.crypto_utils import derive_key_secure, decrypt_data
+    import platform
+    
+    # Generate system password (same as TenantManager)
+    system_info = f"{platform.node()}-{platform.system()}"
+    cipher, _ = derive_key_secure(system_info)
+    
+    # Re-derive with stored salt if present
+    if 'salt' in tenant:
+        import base64
+        salt = base64.b64decode(tenant['salt'])
+        cipher, _ = derive_key_secure(system_info, salt)
+    
     tsg_id = decrypt_data(tenant['tsg_id'], cipher).decode()
     api_user = decrypt_data(tenant['api_user'], cipher).decode()
     api_secret = decrypt_data(tenant['api_secret'], cipher).decode()
