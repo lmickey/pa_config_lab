@@ -216,12 +216,27 @@ class PullWorker(QThread):
                 if hip_profiles_count > 0:
                     stats["hip_profiles"] = hip_profiles_count
             
-            message = self._format_stats_message(stats)
+            # Format stats message with error handling
+            try:
+                message = self._format_stats_message(stats)
+            except Exception as e:
+                # Fallback to simple message if stats formatting fails
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error formatting stats message: {e}")
+                message = "Pull completed successfully!"
 
             # Store config and signal completion
             # IMPORTANT: Don't pass large config object in signal - causes Qt threading issues
             self.config = config
-            self.finished.emit(True, message, None)  # Pass None instead of config to avoid threading issues
+            
+            # Emit signal with error handling
+            try:
+                self.finished.emit(True, message, None)  # Pass None instead of config to avoid threading issues
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error emitting finished signal: {e}")
 
         except Exception as e:
             import traceback
@@ -233,36 +248,81 @@ class PullWorker(QThread):
 
     def _format_stats_message(self, stats: Dict[str, Any]) -> str:
         """Format statistics into a readable message."""
-        lines = ["Pull completed successfully!\n"]
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            lines = ["Pull completed successfully!\n"]
 
-        # Core components
-        if stats.get("folders_captured", 0) > 0:
-            lines.append(f"Folders: {stats['folders_captured']}")
-        if stats.get("snippets_captured", 0) > 0:
-            lines.append(f"Snippets: {stats['snippets_captured']}")
-        if stats.get("rules_captured", 0) > 0:
-            lines.append(f"Security Rules: {stats['rules_captured']}")
-        if stats.get("objects_captured", 0) > 0:
-            lines.append(f"Objects: {stats['objects_captured']}")
-        if stats.get("profiles_captured", 0) > 0:
-            lines.append(f"Profiles: {stats['profiles_captured']}")
+            # Core components - use .get() with defaults for safety
+            try:
+                if stats.get("folders_captured", 0) > 0:
+                    lines.append(f"Folders: {stats['folders_captured']}")
+            except Exception as e:
+                logger.warning(f"Error formatting folders stat: {e}")
+                
+            try:
+                if stats.get("snippets_captured", 0) > 0:
+                    lines.append(f"Snippets: {stats['snippets_captured']}")
+            except Exception as e:
+                logger.warning(f"Error formatting snippets stat: {e}")
+                
+            try:
+                if stats.get("rules_captured", 0) > 0:
+                    lines.append(f"Security Rules: {stats['rules_captured']}")
+            except Exception as e:
+                logger.warning(f"Error formatting rules stat: {e}")
+                
+            try:
+                if stats.get("objects_captured", 0) > 0:
+                    lines.append(f"Objects: {stats['objects_captured']}")
+            except Exception as e:
+                logger.warning(f"Error formatting objects stat: {e}")
+                
+            try:
+                if stats.get("profiles_captured", 0) > 0:
+                    lines.append(f"Profiles: {stats['profiles_captured']}")
+            except Exception as e:
+                logger.warning(f"Error formatting profiles stat: {e}")
 
-        # Infrastructure components (NEW)
-        if stats.get("remote_networks", 0) > 0:
-            lines.append(f"Remote Networks: {stats['remote_networks']}")
-        if stats.get("service_connections", 0) > 0:
-            lines.append(f"Service Connections: {stats['service_connections']}")
-        if stats.get("gp_gateways", 0) > 0:
-            lines.append(f"GP Gateways: {stats['gp_gateways']}")
-        if stats.get("bandwidth_allocations", 0) > 0:
-            lines.append(f"Bandwidth Allocations: {stats['bandwidth_allocations']}")
+            # Infrastructure components (NEW)
+            try:
+                if stats.get("remote_networks", 0) > 0:
+                    lines.append(f"Remote Networks: {stats['remote_networks']}")
+            except Exception as e:
+                logger.warning(f"Error formatting remote_networks stat: {e}")
+                
+            try:
+                if stats.get("service_connections", 0) > 0:
+                    lines.append(f"Service Connections: {stats['service_connections']}")
+            except Exception as e:
+                logger.warning(f"Error formatting service_connections stat: {e}")
+                
+            try:
+                if stats.get("gp_gateways", 0) > 0:
+                    lines.append(f"GP Gateways: {stats['gp_gateways']}")
+            except Exception as e:
+                logger.warning(f"Error formatting gp_gateways stat: {e}")
+                
+            try:
+                if stats.get("bandwidth_allocations", 0) > 0:
+                    lines.append(f"Bandwidth Allocations: {stats['bandwidth_allocations']}")
+            except Exception as e:
+                logger.warning(f"Error formatting bandwidth_allocations stat: {e}")
 
-        # Errors
-        errors = stats.get("errors", [])
-        if errors and len(errors) > 0:
-            lines.append(f"\n⚠ Warnings/Errors: {len(errors)}")
+            # Errors
+            try:
+                errors = stats.get("errors", [])
+                if errors and len(errors) > 0:
+                    lines.append(f"\n⚠ Warnings/Errors: {len(errors)}")
+            except Exception as e:
+                logger.warning(f"Error formatting errors stat: {e}")
 
-        return "\n".join(lines)
+            return "\n".join(lines)
+            
+        except Exception as e:
+            logger.error(f"Critical error in _format_stats_message: {e}")
+            return "Pull completed successfully!"
     
     def stop(self):
         """Stop the worker thread gracefully."""
