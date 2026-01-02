@@ -674,11 +674,206 @@ not rule-based policy from Day 4). All infrastructure items REQUIRE folder, not 
 
 ---
 
-## Phase 6: Bulk Operations & Optimization
+## Phase 5.5: Production Example Capture & Validation
 
-### Day 10-11: Efficient Bulk Capture
+### Day 9.5: Capture and Validate with Real Data
 
-**Goal:** Rewrite pull orchestrator to use bulk queries (one per type for all folders/snippets)
+**Goal:** Capture real production examples NOW (with working API) and validate models before refactoring orchestrators
+
+**Rationale:**
+- We now have working API client with ConfigItem-aware methods
+- We have ConfigItemFactory for instantiation
+- Validate models against REAL data BEFORE refactoring pull/push
+- Discover missing properties and edge cases early
+- Build comprehensive test examples from production
+
+**Tasks:**
+
+1. **Create production capture script:** ⭐ PRIORITY
+   - Create `scripts/capture_production_examples.py`
+   - Use existing API client + ConfigItemFactory
+   - Capture from production tenant:
+     * All object types (addresses, services, applications, etc.)
+     * All profile types (security, decryption, authentication, etc.)
+     * All rule types (security, decryption, auth, QoS)
+     * All infrastructure types (IKE, IPsec, tunnels, connections, agent, portals)
+   - Save raw API responses to `tests/examples/production/raw/`
+   - Group by type: objects/, profiles/, policies/, infrastructure/
+
+2. **Sanitize production examples:** ⭐ PRIORITY
+   - Create `scripts/sanitize_examples.py`
+   - Replace real IPs with RFC 5737 test IPs (203.0.113.x, 198.51.100.x)
+   - Replace real FQDNs with example.com/example.net
+   - Replace passwords/secrets with "********"
+   - Replace real names with generic names (keep structure)
+   - Save to `tests/examples/production/`
+
+3. **Validate models against production data:** ⭐ PRIORITY
+   - Create `scripts/validate_production_models.py`
+   - Load production examples through ConfigItemFactory
+   - Test instantiation of each item
+   - Test validation (ConfigItem.validate())
+   - Test serialization roundtrip (to_dict/from_dict)
+   - Document failures and missing properties
+   - Generate validation report
+
+4. **Analyze production property types:** ⭐ PRIORITY
+   - Create `scripts/analyze_config_properties.py`
+   - Analyze all property types in production data:
+     * String vs number vs boolean vs list vs dict
+     * Required vs optional fields
+     * Common patterns and edge cases
+   - Create `docs/PROPERTY_TYPES.md`
+   - Matrix of all types and their properties with annotations
+
+5. **Identify default configuration criteria:** ⭐ PRIORITY
+   - Analyze production data for default/predefined patterns
+   - Document in `docs/DEFAULT_IDENTIFICATION.md`:
+     * `is_default` flag
+     * Snippet type: "predefined", "readonly"
+     * Name patterns
+     * Folder associations
+   - Update `config/defaults/default_detector.py` with validated criteria
+   - Test default detection against production examples
+
+6. **Create production test suite:** ⭐ PRIORITY
+   - Create `tests/config/models/test_production_examples.py`
+   - Parametrized tests using all production examples
+   - Test each example loads successfully
+   - Test validation passes
+   - Test serialization roundtrip
+   - Test dependency detection
+   - Test property accessors
+   - Document any incompatibilities
+
+7. **Update models based on findings:** ⭐ PRIORITY
+   - Add missing properties discovered in production
+   - Add validation rules for production patterns
+   - Update property accessors
+   - Add edge case handling
+   - Fix any model bugs discovered
+
+**Deliverables:**
+- `scripts/capture_production_examples.py` - Capture script using API client
+- `scripts/sanitize_examples.py` - Sanitization script
+- `scripts/validate_production_models.py` - Validation script
+- `scripts/analyze_config_properties.py` - Property analysis
+- `tests/examples/production/` - Sanitized examples (20-50 files)
+- `tests/examples/production/raw/` - Raw API responses
+- `tests/config/models/test_production_examples.py` - Production test suite
+- `docs/PROPERTY_TYPES.md` - Property type documentation
+- `docs/DEFAULT_IDENTIFICATION.md` - Default criteria documentation
+- Updated model classes with production-validated properties
+- Updated `default_detector.py` with validated criteria
+- Validation report showing model compatibility
+
+**Success Criteria:**
+- At least 20 production examples captured across all types
+- All examples successfully sanitized
+- 90%+ of production examples validate successfully
+- All property types documented
+- Default detection validated against production
+- Any incompatibilities documented with workarounds
+- Models updated to handle production patterns
+
+---
+
+## Phase 6: Workflow Standardization
+
+### Day 10: Standardize Workflow Architecture
+
+**Goal:** Create workflow base infrastructure BEFORE refactoring pull/push orchestrators
+
+**Rationale:**
+- Establish patterns for workflows to follow
+- Define how defaults are managed
+- Create reusable workflow components
+- Easier to refactor pull/push with standard patterns
+
+**Tasks:**
+
+1. **Create workflow configuration system:**
+   - Create `config/workflows/workflow_config.py`
+   - Define workflow settings:
+     * Default folders to process
+     * Default filters (include defaults, enabled only, etc.)
+     * Validation rules
+     * Error handling behavior
+   - Load from config file or defaults
+
+2. **Create workflow result classes:**
+   - Create `config/workflows/workflow_results.py`
+   - WorkflowResult class:
+     * success: bool
+     * items_processed: int
+     * items_created: int
+     * items_updated: int
+     * items_skipped: int
+     * items_failed: int
+     * errors: List[Dict]
+     * warnings: List[Dict]
+   - Standardized result format for all workflows
+
+3. **Create workflow utilities:**
+   - Create `config/workflows/workflow_utils.py`
+   - Common utility functions:
+     * validate_configuration()
+     * filter_defaults()
+     * resolve_dependencies()
+     * build_execution_order()
+     * handle_workflow_error()
+
+4. **Create default management system:**
+   - Create `config/workflows/default_manager.py`
+   - DefaultManager class:
+     * load_default_rules() - Load from config
+     * is_default(item: ConfigItem) -> bool
+     * filter_defaults(items: List[ConfigItem]) -> List[ConfigItem]
+     * get_default_folders() -> List[str]
+     * get_default_snippets() -> List[str]
+   - Centralized default handling
+
+5. **Create workflow state tracking:**
+   - Create `config/workflows/workflow_state.py`
+   - WorkflowState class:
+     * Track current operation
+     * Store intermediate results
+     * Enable pause/resume (future)
+     * Enable rollback on error (future)
+
+6. **Document workflow patterns:**
+   - Create `docs/WORKFLOW_PATTERNS.md`
+   - Standard workflow structure:
+     1. Initialize
+     2. Validate inputs
+     3. Load configuration
+     4. Process items
+     5. Handle errors
+     6. Return results
+   - Best practices for workflow implementation
+
+**Deliverables:**
+- `config/workflows/workflow_config.py` - Workflow configuration
+- `config/workflows/workflow_results.py` - Result classes
+- `config/workflows/workflow_utils.py` - Utility functions
+- `config/workflows/default_manager.py` - Default management
+- `config/workflows/workflow_state.py` - State tracking
+- `docs/WORKFLOW_PATTERNS.md` - Workflow documentation
+- Tests for workflow components
+
+**Success Criteria:**
+- Workflow infrastructure ready for pull/push refactoring
+- Default management centralized and tested
+- Result format standardized
+- Documentation clear and comprehensive
+
+---
+
+## Phase 7: Bulk Operations & Optimization
+
+### Day 11-12: Efficient Bulk Capture
+
+**Goal:** Rewrite pull orchestrator to use bulk queries and new workflow infrastructure
 
 **Tasks:**
 
@@ -722,9 +917,9 @@ not rule-based policy from Day 4). All infrastructure items REQUIRE folder, not 
 
 ---
 
-## Phase 7: Push Operations
+## Phase 8: Push Operations
 
-### Day 12-13: Update Push Orchestrator
+### Day 13-14: Update Push Orchestrator
 
 **Goal:** Update push operations to work with ConfigItem objects
 
@@ -766,126 +961,9 @@ not rule-based policy from Day 4). All infrastructure items REQUIRE folder, not 
 
 ---
 
-## Phase 7.5: Production Example Capture & Analysis
+## Phase 9: Logging Integration
 
-### Day 13.5: Capture Real-World Examples
-
-**Goal:** Pull production configurations to create comprehensive test examples and validate model implementation
-
-**Why This Phase:**
-- All model classes are complete (objects, policies, profiles, infrastructure)
-- Factory pattern is implemented
-- Before GUI integration, we validate with real data
-- Identify any missing properties or edge cases
-- Create comprehensive test suite with production data
-
-**Tasks:**
-
-1. **Create/repurpose capture script:**
-   - Create `scripts/capture_production_examples.py`
-   - Use existing API client and pull orchestrator
-   - Connect to production tenant (or lab tenant with production-like config)
-   - Capture all configuration types we've modeled
-   - Save raw API responses to `tests/examples/production/raw/`
-
-2. **Analyze captured configurations:** ⭐ NEW
-   - Create `scripts/analyze_config_properties.py`
-   - Parse all captured configurations
-   - Identify property types for each config item:
-     - **String properties**: name, description, comments
-     - **Number properties**: risk, port, position, timeout
-     - **Boolean properties**: disabled, enabled, source_nat
-     - **List properties**: members, tag, source, destination
-     - **Dict properties**: protocol, bgp_peer, ssl_protocol_settings
-     - **Reference properties**: profile_group, ike_gateway, authentication_profile
-   - Document required vs optional fields
-   - Identify common patterns and edge cases
-   - Generate property type matrix for each model class
-
-3. **Create sanitized production examples:** ⭐ NEW
-   - Create `scripts/sanitize_examples.py`
-   - Process raw captures and sanitize:
-     - Replace real IPs with RFC 5737 test IPs (203.0.113.x, 198.51.100.x)
-     - Replace real FQDNs with example.com/example.net
-     - Replace passwords/secrets with "********"
-     - Replace real names with generic names
-     - Keep structure and relationships intact
-   - Save to `tests/examples/production/`
-   - Organize by type: objects/, policies/, profiles/, infrastructure/
-
-4. **Validate models against production data:** ⭐ NEW
-   - Create `scripts/validate_production_models.py`
-   - Load production examples through ConfigItemFactory
-   - Validate each item using ConfigItem.validate()
-   - Test serialization/deserialization (to_dict/from_dict)
-   - Identify any validation failures
-   - Document missing properties or unsupported patterns
-
-5. **Create comprehensive production test suite:** ⭐ NEW
-   - Create `tests/config/models/test_production_examples.py`
-   - Parametrized tests using all production examples
-   - Test each example can be loaded
-   - Test validation passes
-   - Test serialization roundtrip
-   - Test dependency detection
-   - Test all property accessors
-   - Document any failures or limitations
-
-6. **Update models based on findings:** ⭐ NEW
-   - Add missing properties discovered in production data
-   - Add validation rules for discovered patterns
-   - Update property accessors for new fields
-   - Add edge case handling
-   - Update documentation with production patterns
-
-7. **Document property types:** ⭐ NEW
-   - Create `docs/PROPERTY_TYPES.md`
-   - Matrix of all configuration types and their properties
-   - Type annotations for each property (str, int, bool, List[str], Dict, etc.)
-   - Required vs optional indicators
-   - Default values where applicable
-   - Example values from production
-   - Relationship indicators (references other config items)
-
-8. **Identify default configuration criteria:** ⭐ NEW
-   - Analyze production data to identify default/predefined configurations
-   - Document criteria/properties that indicate default status:
-     - `is_default` flag
-     - Snippet type: `predefined`, `readonly`
-     - Name patterns: starts with "default", "predefined"
-     - Folder: "Shared" or "All" with specific snippet associations
-     - Cannot be deleted/modified flags
-   - Create `docs/DEFAULT_IDENTIFICATION.md`
-   - Add default detection logic to `config/defaults/default_detector.py`
-   - Test default detection against production examples
-
-**Deliverables:**
-- `scripts/capture_production_examples.py` - Capture script
-- `scripts/analyze_config_properties.py` - Property analysis
-- `scripts/sanitize_examples.py` - Sanitization script
-- `scripts/validate_production_models.py` - Validation script
-- `tests/examples/production/` - Sanitized production examples (20-50 files)
-- `tests/examples/production/raw/` - Raw API responses (for reference)
-- `tests/config/models/test_production_examples.py` - Production test suite
-- `docs/PROPERTY_TYPES.md` - Property type documentation
-- `docs/DEFAULT_IDENTIFICATION.md` - Default configuration criteria ⭐ NEW
-- Updated model classes with discovered properties
-- Updated `config/defaults/default_detector.py` with production-validated criteria ⭐ NEW
-- Test results showing compatibility with production data
-
-**Success Criteria:**
-- At least 20 production examples captured
-- All examples successfully sanitized
-- 90%+ of production examples validate successfully
-- All discovered property types documented
-- Default identification criteria validated against production data ⭐ NEW
-- Any incompatibilities documented with workarounds
-
----
-
-## Phase 8: Logging Integration
-
-### Day 14: Integrate Activity Logging into Base Classes
+### Day 15: Integrate Activity Logging into Base Classes
 
 **Goal:** Build comprehensive logging into class structure with debug mode support
 
@@ -972,9 +1050,9 @@ not rule-based policy from Day 4). All infrastructure items REQUIRE folder, not 
 
 ---
 
-## Phase 9: Configuration Serialization
+## Phase 10: Configuration Serialization
 
-### Day 15: Implement Configuration Save/Load
+### Day 16: Implement Configuration Save/Load
 
 **Goal:** Implement file-based serialization for Configuration objects
 
@@ -1081,9 +1159,9 @@ not rule-based policy from Day 4). All infrastructure items REQUIRE folder, not 
 
 ---
 
-## Phase 10: GUI Integration & Standards
+## Phase 11: GUI Integration & Standards
 
-### Day 16: Create GUI Standards & Base Classes
+### Day 17: Create GUI Standards & Base Classes
 
 **Goal:** Establish standardized GUI components and workflow base classes
 
@@ -1199,7 +1277,7 @@ not rule-based policy from Day 4). All infrastructure items REQUIRE folder, not 
 
 ---
 
-### Day 17: Migrate Existing Code
+### Day 18: Migrate Existing Code
 
 **Goal:** Update all existing code to use new object model and GUI standards
 
@@ -1236,7 +1314,7 @@ not rule-based policy from Day 4). All infrastructure items REQUIRE folder, not 
 
 ---
 
-### Day 18: Final Testing & Documentation
+### Day 19: Final Testing & Documentation
 
 **Goal:** Comprehensive testing, performance validation, and documentation
 
@@ -1298,7 +1376,7 @@ not rule-based policy from Day 4). All infrastructure items REQUIRE folder, not 
 
 ## Timeline Summary
 
-### Revised Timeline (with new phases):
+### Revised Timeline (REORDERED for Production Validation First):
 
 | Phase | Days | Focus | Deliverables |
 |-------|------|-------|--------------|
@@ -1306,21 +1384,27 @@ not rule-based policy from Day 4). All infrastructure items REQUIRE folder, not 
 | **Phase 2** | Day 2-5 | Object Models | 37 model classes (✅ COMPLETE) |
 | **Phase 3** | Day 6 | Container Classes | 4 container classes (✅ COMPLETE) |
 | **Phase 4** | Day 7 | Factory Pattern | ConfigItemFactory (✅ COMPLETE) |
-| **Phase 5** | Day 8-9 | API Integration | API client refactor, deprecate api_endpoints.py |
-| **Phase 6** | Day 10-11 | Bulk Operations | Rewrite pull orchestrator, new endpoints |
-| **Phase 7** | Day 12-13 | Push Operations | Update push orchestrator |
-| **Phase 7.5** | Day 13.5 | Production Examples | Capture, sanitize, validate, document defaults |
-| **Phase 8** | Day 14 | Logging Integration | Activity log in base classes, debug mode |
-| **Phase 9** | Day 15 | Config Serialization | save_to_file(), load_from_file(), GUI integration |
-| **Phase 10** | Day 16-18 | GUI Standards & Migration | Notifications, progress bars, workflow base, migration, docs |
+| **Phase 5** | Day 8-9 | API Integration | API helpers, ConfigItem methods (⏳ IN PROGRESS) |
+| **Phase 5.5** | Day 9.5 | **Production Examples** | Capture, sanitize, validate with real data (⚠️ NEXT) |
+| **Phase 6** | Day 10 | **Workflow Standards** | Workflow base, default management (⚠️ NEW) |
+| **Phase 7** | Day 11-12 | Bulk Operations | Rewrite pull orchestrator with standards |
+| **Phase 8** | Day 13-14 | Push Operations | Update push orchestrator with standards |
+| **Phase 9** | Day 15 | Logging Integration | Activity log in base classes, debug mode |
+| **Phase 10** | Day 16 | Config Serialization | save_to_file(), load_from_file(), GUI integration |
+| **Phase 11** | Day 17-19 | GUI Standards & Migration | Notifications, progress bars, workflow base, migration, docs |
 
-**Total Timeline:** ~18 days (was 15.5 days)
+**Total Timeline:** ~19 days (was 15.5 days, then 18 days)
 
-**Key Changes:**
-- Added Phase 8 (Logging Integration) - 1 day
-- Added Phase 9 (Configuration Serialization) - 1 day
-- Expanded Phase 10 (GUI Standards & Migration) - 3 days (was 2 days)
-- Total increase: 3 days for critical integration work
+**Key Reordering Rationale:**
+- **Phase 5.5 moved EARLIER** (was Phase 7.5 at Day 13.5, now Day 9.5)
+  * Validate models with production data BEFORE refactoring pull/push
+  * Use newly created API helpers and ConfigItemFactory
+  * Discover issues early, not late
+- **Phase 6 added** (Day 10): Workflow Standardization
+  * Create patterns BEFORE refactoring pull/push
+  * Centralize default management
+  * Define workflow result formats
+- **Total increase:** 4 days for validation + workflow standards
 
 ---
 
