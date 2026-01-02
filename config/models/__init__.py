@@ -62,6 +62,13 @@ from .infrastructure import (
     Gateway,
 )
 
+from .containers import (
+    FolderConfig,
+    SnippetConfig,
+    InfrastructureConfig,
+    Configuration,
+)
+
 __all__ = [
     # Base classes
     'ConfigItem',
@@ -110,4 +117,9 @@ __all__ = [
     'AgentProfile',
     'Portal',
     'Gateway',
+    # Container models
+    'FolderConfig',
+    'SnippetConfig',
+    'InfrastructureConfig',
+    'Configuration',
 ]

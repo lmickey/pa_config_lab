@@ -1,0 +1,51 @@
+{
+  "name": "Mobile Users",
+  "parent": null,
+  "items": [
+    {
+      "name": "internal-network",
+      "folder": "Mobile Users",
+      "item_type": "address_object",
+      "value": "10.0.0.0/8",
+      "type": "ip-netmask"
+    },
+    {
+      "name": "web-servers",
+      "folder": "Mobile Users",
+      "item_type": "address_object",
+      "value": "192.168.1.0/24",
+      "type": "ip-netmask"
+    },
+    {
+      "name": "collaboration-apps",
+      "folder": "Mobile Users",
+      "item_type": "application_group",
+      "members": ["ms-teams", "zoom", "webex"]
+    },
+    {
+      "name": "best-practice",
+      "folder": "Mobile Users",
+      "item_type": "profile_group",
+      "virus_and_wildfire_analysis": ["default"],
+      "spyware": ["strict"],
+      "vulnerability": ["strict"],
+      "url_filtering": ["default"]
+    },
+    {
+      "name": "allow-collaboration",
+      "folder": "Mobile Users",
+      "item_type": "security_rule",
+      "from": ["any"],
+      "to": ["any"],
+      "source": ["any"],
+      "destination": ["any"],
+      "application": ["ms-teams", "zoom", "webex"],
+      "service": ["application-default"],
+      "action": "allow",
+      "profile_setting": {
+        "group": ["best-practice"]
+      },
+      "log_setting": "default"
+    }
+  ]
+}

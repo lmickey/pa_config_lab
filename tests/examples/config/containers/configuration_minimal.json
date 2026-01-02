@@ -1,0 +1,55 @@
+{
+  "folders": {
+    "Mobile Users": {
+      "name": "Mobile Users",
+      "parent": null,
+      "items": [
+        {
+          "name": "internal-network",
+          "folder": "Mobile Users",
+          "item_type": "address_object",
+          "value": "10.0.0.0/8",
+          "type": "ip-netmask"
+        },
+        {
+          "name": "allow-internal",
+          "folder": "Mobile Users",
+          "item_type": "security_rule",
+          "from": ["any"],
+          "to": ["any"],
+          "source": ["internal-network"],
+          "destination": ["any"],
+          "application": ["any"],
+          "service": ["any"],
+          "action": "allow"
+        }
+      ]
+    }
+  },
+  "snippets": {
+    "production-snippet": {
+      "name": "production-snippet",
+      "snippet_type": "custom",
+      "items": [
+        {
+          "name": "production-tag",
+          "snippet": "production-snippet",
+          "item_type": "tag",
+          "color": "Red"
+        }
+      ]
+    }
+  },
+  "infrastructure": {
+    "items": [
+      {
+        "name": "default-ike-crypto",
+        "folder": "Remote Networks",
+        "item_type": "ike_crypto_profile",
+        "encryption": ["aes-256-cbc"],
+        "authentication": ["sha256"],
+        "dh_group": ["group14"]
+      }
+    ]
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "production-snippet",
+  "snippet_type": "custom",
+  "items": [
+    {
+      "name": "production-tag",
+      "snippet": "production-snippet",
+      "item_type": "tag",
+      "color": "Red",
+      "comments": "Production environment tag"
+    },
+    {
+      "name": "prod-servers",
+      "snippet": "production-snippet",
+      "item_type": "address_object",
+      "value": "172.16.0.0/16",
+      "type": "ip-netmask",
+      "tag": ["production-tag"]
+    },
+    {
+      "name": "block-high-risk",
+      "snippet": "production-snippet",
+      "item_type": "security_rule",
+      "from": ["any"],
+      "to": ["any"],
+      "source": ["any"],
+      "destination": ["any"],
+      "application": ["bittorrent", "tor"],
+      "service": ["any"],
+      "action": "deny",
+      "tag": ["production-tag"]
+    }
+  ]
+}

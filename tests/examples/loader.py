@@ -384,6 +384,27 @@ class Examples:
     def gateway_minimal() -> Dict[str, Any]:
         return load_infrastructure_example('gateway_minimal')
     
+    # Containers
+    @staticmethod
+    def folder_mobile_users() -> Dict[str, Any]:
+        return load_example('config/containers/folder_mobile_users')
+    
+    @staticmethod
+    def snippet_production() -> Dict[str, Any]:
+        return load_example('config/containers/snippet_production')
+    
+    @staticmethod
+    def infrastructure_remote_networks() -> Dict[str, Any]:
+        return load_example('config/containers/infrastructure_remote_networks')
+    
+    @staticmethod
+    def infrastructure_mobile_users() -> Dict[str, Any]:
+        return load_example('config/containers/infrastructure_mobile_users')
+    
+    @staticmethod
+    def configuration_minimal() -> Dict[str, Any]:
+        return load_example('config/containers/configuration_minimal')
+    
     # Profiles
     @staticmethod
     def auth_profile() -> Dict[str, Any]:
