@@ -252,7 +252,7 @@ class ConnectionDialog(QDialog):
         Connect to a saved tenant programmatically (without showing dialog).
         
         Args:
-            tenant_data: Dictionary with tenant credentials
+            tenant_data: Dictionary with at least 'name' key, or can be a string tenant name
             
         Returns:
             API client if successful, None otherwise
@@ -264,7 +264,12 @@ class ConnectionDialog(QDialog):
             from prisma.api_client import PrismaAccessAPIClient
             from config.tenant_manager import TenantManager
             
-            tenant_name = tenant_data.get('name')
+            # Handle both dict and string inputs
+            if isinstance(tenant_data, str):
+                tenant_name = tenant_data
+            else:
+                tenant_name = tenant_data.get('name')
+            
             logger.info(f"Attempting to connect to saved tenant: {tenant_name}")
             
             if not tenant_name:
@@ -276,9 +281,12 @@ class ConnectionDialog(QDialog):
             logger.info(f"Loading tenant details from TenantManager for: {tenant_name}")
             
             # Load full tenant details (including decrypted credentials)
-            tenant = manager.get_tenant(tenant_name)
+            # Use get_tenant_by_name since we have the name, not the ID
+            tenant = manager.get_tenant_by_name(tenant_name)
             if not tenant:
                 logger.error(f"Tenant not found in TenantManager: {tenant_name}")
+                available = [t.get('name') for t in manager.list_tenants()]
+                logger.info(f"Available tenants: {available}")
                 return None
             
             logger.info(f"Tenant loaded successfully: {tenant_name}")
