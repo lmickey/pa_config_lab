@@ -364,59 +364,68 @@ This allows tags to be:
 
 ---
 
-### Day 4: Create Policy/Rule Model Classes
+### Day 4: Create Policy/Rule Model Classes ✅
 
-**Goal:** Create concrete classes for security policies and rules
+**Status:** COMPLETE - Commits: 98af385, df1a1b7  
+**Version:** v3.1.145
 
-**Tasks:**
+**Scope Clarification:** NAT and PBF rules are only available in on-prem firewall (ngfw-shared) 
+configuration, NOT in Prisma Access folder/snippet workflows. These were removed from this phase.
+NAT configuration may be added as properties within ServiceConnection infrastructure objects (Day 5).
 
-1. **Create `config/models/policies.py`**
-   - `SecurityRule(RuleItem)` - Security policy rules
-   - `NATRule(RuleItem)` - NAT policy rules
+**Implemented:**
+
+1. **Created `config/models/policies.py`** ✅
+   - `SecurityRule(RuleItem)` - Security policy rules (90% coverage)
    - `DecryptionRule(RuleItem)` - Decryption rules (NEW ENDPOINT)
    - `AuthenticationRule(RuleItem)` - Auth rules (NEW ENDPOINT)
    - `QoSPolicyRule(RuleItem)` - QoS rules (NEW ENDPOINT)
-   - `PBFRule(RuleItem)` - Policy-Based Forwarding
+   - ❌ ~~`NATRule`~~ - Removed (not applicable to Prisma Access)
+   - ❌ ~~`PBFRule`~~ - Removed (not applicable to Prisma Access)
 
-2. **Implement rule-specific features:**
+2. **Implemented rule-specific features:** ✅
    - Rule position tracking
    - Rule enablement state
    - Rule move operations (to bottom of rulebase)
    - Dependency extraction from rule fields
+   - Smart 'any' value handling in dependency detection
+   - Profile group dependency detection
 
-3. **Add test examples:** ⭐ NEW
-   - Expand `tests/examples/config/models/policies/`:
-     - `nat_rule_minimal.json`
-     - `nat_rule_full.json`
-     - `decryption_rule_minimal.json`
-     - `authentication_rule_minimal.json`
-     - `qos_rule_minimal.json`
-     - `pbf_rule_minimal.json`
-     - `security_rule_with_profile_group.json`
-     - `security_rule_multiple_positions.json`
+3. **Added test examples:** ✅ (6 examples)
+   - `security_rule_allow_apps.json` - Allow collaboration apps
+   - `security_rule_deny.json` - Deny high-risk apps
+   - `decryption_rule_minimal.json` - Decrypt outbound
+   - `decryption_rule_no_decrypt.json` - No-decrypt financial
+   - `authentication_rule_minimal.json` - Require SAML auth
+   - `qos_rule_minimal.json` - Prioritize voice/video
 
-4. **Create `tests/config/models/test_policies.py`** ⭐ NEW
-   - Test each rule type
-   - Test position tracking
-   - Test enablement state
-   - Test dependency extraction
-   - Test rule with profile group references
-   - Test rule with multiple object references
-   - Use example loader
+4. **Created `tests/config/models/test_policies.py`** ✅ (21 tests)
+   - TestSecurityRule: 6 tests (zones, dependencies, profile groups, disabled, validation)
+   - TestDecryptionRule: 4 tests (decrypt/no-decrypt actions, dependencies, validation)
+   - TestAuthenticationRule: 2 tests (creation, dependencies)
+   - TestQoSPolicyRule: 2 tests (creation, dependencies)
+   - TestRuleProperties: 2 tests (position, enabled state)
+   - TestPolicySerialization: 2 tests
+   - TestPolicyDeletion: 2 tests
+   - TestPolicyWithTags: 1 test
 
-5. **Update INDEX.md** ⭐ NEW
+5. **Updated INDEX.md** ✅
 
 **Deliverables:**
-- `config/models/policies.py` with 6 classes
-- 8+ new example configurations
-- `tests/config/models/test_policies.py` with 25+ tests
-- All tests passing
+- ✅ `config/models/policies.py` with 4 classes (revised from 6)
+- ✅ 6 new example configurations (revised from 8+, NAT/PBF removed)
+- ✅ `tests/config/models/test_policies.py` with 21 tests (revised from 25+)
+- ✅ All tests passing (111 total: 15 base + 46 objects + 29 profiles + 21 policies)
+- ✅ 88% code coverage for policies.py
 
 ---
 
 ### Day 5: Create Infrastructure Model Classes
 
 **Goal:** Create concrete classes for infrastructure configuration
+
+**Scope Note:** ServiceConnection may include NAT configuration properties (hard-coded config,
+not rule-based policy from Day 4). PBF is not applicable to Prisma Access.
 
 **Tasks:**
 
@@ -425,7 +434,7 @@ This allows tags to be:
    - `IPsecCryptoProfile(ConfigItem)` - Phase 2 crypto
    - `IKEGateway(ConfigItem)` - IKE peer configuration
    - `IPsecTunnel(ConfigItem)` - IPsec tunnel configuration
-   - `ServiceConnection(ConfigItem)` - Remote network connections
+   - `ServiceConnection(ConfigItem)` - Remote network connections (may include NAT properties)
    - `AgentProfile(ConfigItem)` - GlobalProtect agent settings
    - `Portal(ConfigItem)` - GlobalProtect portal settings
    - `Gateway(ConfigItem)` - GlobalProtect gateway settings
@@ -434,6 +443,7 @@ This allows tags to be:
    - Deep dependency chains (Service Connection → IPsec Tunnel → IKE Gateway → Crypto Profiles)
    - Folder requirements for certain infrastructure items
    - Reference validation
+   - NAT configuration properties within ServiceConnection (if applicable)
 
 3. **Add test examples:** ⭐ NEW
    - Expand `tests/examples/config/models/infrastructure/`:
@@ -441,7 +451,8 @@ This allows tags to be:
      - `ipsec_crypto_profile_full.json`
      - `ike_gateway_full.json`
      - `ipsec_tunnel_full.json`
-     - `service_connection_with_pbf.json` - For PBF dependency testing
+     - `service_connection_minimal.json` - Basic service connection
+     - `service_connection_with_nat.json` - If NAT properties are applicable
      - `agent_profile_full.json`
      - `portal_minimal.json`
      - `gateway_minimal.json`
@@ -452,7 +463,7 @@ This allows tags to be:
    - Test dependency chain detection
    - Test folder requirements
    - Test reference validation
-   - Test service connection → PBF implicit dependency
+   - Test NAT properties (if applicable)
    - Use example loader
 
 5. **Update INDEX.md** ⭐ NEW
