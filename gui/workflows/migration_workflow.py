@@ -211,13 +211,18 @@ class MigrationWorkflowWidget(QWidget):
 
     def _on_pull_completed(self, config):
         """Handle pull completion."""
-        self.current_config = config
-        self.config_viewer.set_config(config)
-        self.push_widget.set_config(config)
-        self.selection_widget.set_config(config)  # Phase 3: Update selection widget
+        # Get config from pull_widget instead of signal parameter to avoid memory issues
+        # The signal parameter is now None to prevent memory corruption
+        config = self.pull_widget.get_pulled_config()
+        
+        if config:
+            self.current_config = config
+            self.config_viewer.set_config(config)
+            self.push_widget.set_config(config)
+            self.selection_widget.set_config(config)  # Phase 3: Update selection widget
 
-        # Move to view tab
-        self.tabs.setCurrentIndex(1)
+            # Move to view tab
+            self.tabs.setCurrentIndex(1)
 
     def _on_push_completed(self, result):
         """Handle push completion."""

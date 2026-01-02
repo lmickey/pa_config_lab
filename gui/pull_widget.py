@@ -536,10 +536,11 @@ class PullConfigWidget(QWidget):
                 else:
                     self.pulled_config = config  # Fallback to parameter if worker unavailable
                 
-                # Emit signal for other components after a brief delay to ensure thread safety
+                # Emit signal WITHOUT the config object to avoid memory corruption
+                # Other components should call get_pulled_config() to retrieve it
                 if self.pulled_config:
-                    # Use QTimer to emit from main thread to avoid memory corruption
-                    QTimer.singleShot(100, lambda: self.pull_completed.emit(self.pulled_config))
+                    # Use QTimer to emit from main thread - pass None to avoid memory issues
+                    QTimer.singleShot(100, lambda: self.pull_completed.emit(None))
                 
                 # Show toast notification instead of dialog
                 self.toast_manager.show_success("✓ Configuration pulled successfully!")
