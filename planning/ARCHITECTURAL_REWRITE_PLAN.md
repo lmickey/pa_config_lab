@@ -26,12 +26,45 @@ This document outlines the phased approach to rewrite the configuration system w
 
 **Architecture:**
 - Configuration items as objects with properties (ConfigItem base class)
-- `folder` and `snippet` properties are mutually exclusive, one must be set
+- `folder` and `snippet` properties are mutually exclusive for most items, one must be set
+- **EXCEPTION**: Tags can have both `folder` AND `snippet` simultaneously
 - Lightweight properties: `has_parent`, `has_child`, `has_dependencies`
 - `deleted` flag and `delete_success` status for tracking
 - `refresh()` method for individual items with post-action UI prompts (defer UI for now)
 - Each ConfigItem subclass defines its `api_endpoint` property
 - All API interaction through class instances
+
+### Folder and Snippet Relationship (IMPORTANT)
+
+**Folder Hierarchy:**
+- Folders form a hierarchical structure (All → Shared → Remote Networks, Mobile Users, etc.)
+- Configuration items in folders inherit the folder context
+- Items have `folder` property when directly associated with a folder
+
+**Snippet Associations:**
+- Snippets are NOT hierarchical - they can be applied at any folder level(s)
+- Snippets can be applied to MULTIPLE folders
+- Snippets themselves have a `folder` property indicating where they're applied
+- Snippets can be shared across tenants via trust relationships (future workflow)
+- Configuration items IN a snippet have `snippet` property instead of `folder`
+- **Key Point**: If snippet is not assigned to a folder, its child config objects won't have a `folder` property
+
+**Item Location Logic:**
+```python
+# Most configuration items:
+if item.folder:
+    location = f"folder: {item.folder}"
+elif item.snippet:
+    location = f"snippet: {item.snippet}"
+
+# Tags (special case):
+if item.folder and item.snippet:
+    location = f"folder: {item.folder}, snippet: {item.snippet}"
+elif item.folder:
+    location = f"folder: {item.folder}"
+elif item.snippet:
+    location = f"snippet: {item.snippet}"
+```
 
 **Migration Strategy:**
 - Migrate away from `prisma/api_endpoints.py` - remove dependencies
@@ -48,6 +81,103 @@ This document outlines the phased approach to rewrite the configuration system w
 **Deferred Features:**
 - `clone()` method - not needed now, add to backlog
 - Refresh UI prompts - defer until refresh method is tested
+
+---
+
+## Understanding Configuration Hierarchy
+
+### Folder Hierarchy
+
+```
+All (Global)
+├── Shared (Prisma Access)
+│   ├── Remote Networks
+│   ├── Mobile Users
+│   ├── Mobile Users Explicit Proxy
+│   └── Service Connections
+└── [Custom Folders can be added at any level]
+```
+
+**Folder Rules:**
+- Hierarchical structure with parent-child relationships
+- Configuration inherits folder context
+- Items in folders have `folder` property set
+- Example: `{"name": "web-rule", "folder": "Mobile Users"}`
+
+### Snippet Associations
+
+```
+Snippet: "production-snippet"
+├── Applied to: ["Mobile Users", "Remote Networks"]  # Can apply to multiple
+├── Contains: [Objects, Profiles, Rules, HIP]
+└── Shareable: Can be shared across tenants (future)
+```
+
+**Snippet Rules:**
+- NOT hierarchical - flat structure
+- Can be applied to ANY folder(s)
+- Can be applied to MULTIPLE folders simultaneously
+- Snippets have `folder` property indicating where they're applied
+- Configuration items IN snippet have `snippet` property (not `folder`)
+- **Important**: If snippet not assigned to folder, child items have NO `folder` property
+- Can be shared across tenants via trust relationships (future workflow)
+
+### Tag Exception
+
+Tags are UNIQUE - they can have BOTH `folder` AND `snippet`:
+
+```json
+{
+  "name": "Web Security Global",
+  "folder": "All",
+  "snippet": "Web-Security-Default",
+  "color": "Green"
+}
+```
+
+This allows tags to be:
+- Defined at a folder level (visible in that folder)
+- Associated with a snippet (travels with the snippet)
+- Shared when snippet is shared across tenants
+
+### Configuration Item Location Examples
+
+**Folder-based Address:**
+```json
+{
+  "name": "internal-network",
+  "folder": "Mobile Users",
+  "ip_netmask": "192.168.1.0/24"
+}
+```
+
+**Snippet-based Address:**
+```json
+{
+  "name": "dmz-network",
+  "snippet": "datacenter-snippet",
+  "ip_netmask": "10.100.0.0/24"
+}
+```
+
+**Tag with Both:**
+```json
+{
+  "name": "production",
+  "folder": "All",
+  "snippet": "production-snippet",
+  "color": "Red"
+}
+```
+
+**Snippet Definition:**
+```json
+{
+  "name": "production-snippet",
+  "folder": "Mobile Users",  // Applied at this folder
+  "type": "custom"
+}
+```
 
 ---
 
@@ -563,11 +693,113 @@ This document outlines the phased approach to rewrite the configuration system w
 
 ---
 
+## Phase 7.5: Production Example Capture & Analysis
+
+### Day 13.5: Capture Real-World Examples
+
+**Goal:** Pull production configurations to create comprehensive test examples and validate model implementation
+
+**Why This Phase:**
+- All model classes are complete (objects, policies, profiles, infrastructure)
+- Factory pattern is implemented
+- Before GUI integration, we validate with real data
+- Identify any missing properties or edge cases
+- Create comprehensive test suite with production data
+
+**Tasks:**
+
+1. **Create/repurpose capture script:**
+   - Create `scripts/capture_production_examples.py`
+   - Use existing API client and pull orchestrator
+   - Connect to production tenant (or lab tenant with production-like config)
+   - Capture all configuration types we've modeled
+   - Save raw API responses to `tests/examples/production/raw/`
+
+2. **Analyze captured configurations:** ⭐ NEW
+   - Create `scripts/analyze_config_properties.py`
+   - Parse all captured configurations
+   - Identify property types for each config item:
+     - **String properties**: name, description, comments
+     - **Number properties**: risk, port, position, timeout
+     - **Boolean properties**: disabled, enabled, source_nat
+     - **List properties**: members, tag, source, destination
+     - **Dict properties**: protocol, bgp_peer, ssl_protocol_settings
+     - **Reference properties**: profile_group, ike_gateway, authentication_profile
+   - Document required vs optional fields
+   - Identify common patterns and edge cases
+   - Generate property type matrix for each model class
+
+3. **Create sanitized production examples:** ⭐ NEW
+   - Create `scripts/sanitize_examples.py`
+   - Process raw captures and sanitize:
+     - Replace real IPs with RFC 5737 test IPs (203.0.113.x, 198.51.100.x)
+     - Replace real FQDNs with example.com/example.net
+     - Replace passwords/secrets with "********"
+     - Replace real names with generic names
+     - Keep structure and relationships intact
+   - Save to `tests/examples/production/`
+   - Organize by type: objects/, policies/, profiles/, infrastructure/
+
+4. **Validate models against production data:** ⭐ NEW
+   - Create `scripts/validate_production_models.py`
+   - Load production examples through ConfigItemFactory
+   - Validate each item using ConfigItem.validate()
+   - Test serialization/deserialization (to_dict/from_dict)
+   - Identify any validation failures
+   - Document missing properties or unsupported patterns
+
+5. **Create comprehensive production test suite:** ⭐ NEW
+   - Create `tests/config/models/test_production_examples.py`
+   - Parametrized tests using all production examples
+   - Test each example can be loaded
+   - Test validation passes
+   - Test serialization roundtrip
+   - Test dependency detection
+   - Test all property accessors
+   - Document any failures or limitations
+
+6. **Update models based on findings:** ⭐ NEW
+   - Add missing properties discovered in production data
+   - Add validation rules for discovered patterns
+   - Update property accessors for new fields
+   - Add edge case handling
+   - Update documentation with production patterns
+
+7. **Document property types:** ⭐ NEW
+   - Create `docs/PROPERTY_TYPES.md`
+   - Matrix of all configuration types and their properties
+   - Type annotations for each property (str, int, bool, List[str], Dict, etc.)
+   - Required vs optional indicators
+   - Default values where applicable
+   - Example values from production
+   - Relationship indicators (references other config items)
+
+**Deliverables:**
+- `scripts/capture_production_examples.py` - Capture script
+- `scripts/analyze_config_properties.py` - Property analysis
+- `scripts/sanitize_examples.py` - Sanitization script
+- `scripts/validate_production_models.py` - Validation script
+- `tests/examples/production/` - Sanitized production examples (20-50 files)
+- `tests/examples/production/raw/` - Raw API responses (for reference)
+- `tests/config/models/test_production_examples.py` - Production test suite
+- `docs/PROPERTY_TYPES.md` - Property type documentation
+- Updated model classes with discovered properties
+- Test results showing compatibility with production data
+
+**Success Criteria:**
+- At least 20 production examples captured
+- All examples successfully sanitized
+- 90%+ of production examples validate successfully
+- All discovered property types documented
+- Any incompatibilities documented with workarounds
+
+---
+
 ## Phase 8: Migration & Cleanup
 
-### Day 14: Migrate Existing Code
+### Day 14.5: Migrate Existing Code
 
-**Goal:** Update all existing code to use new object model
+**Goal:** Update all existing code to use new object model (after production validation)
 
 **Tasks:**
 
@@ -608,9 +840,9 @@ This document outlines the phased approach to rewrite the configuration system w
 
 ---
 
-### Day 15: Final Testing & Documentation
+### Day 15.5: Final Testing & Documentation
 
-**Goal:** Comprehensive testing and documentation
+**Goal:** Comprehensive testing and documentation with production validation
 
 **Tasks:**
 
@@ -631,17 +863,18 @@ This document outlines the phased approach to rewrite the configuration system w
    - Verify bulk operations are efficient
    - Profile memory usage
 
-4. **Create examples from production:** ⭐ NEW
-   - Pull configuration from production tenant
-   - Sanitize and add to `tests/examples/production/`
-   - Document sanitization process
-   - Use for final validation
+4. **Validate with production examples:**
+   - Use examples captured in Phase 7.5
+   - Run production test suite
+   - Verify all workflows with real data
+   - Document any remaining incompatibilities
 
 **Deliverables:**
 - Complete test coverage report
 - Updated documentation
 - Performance report
-- Production example configurations
+- Production validation report
+- Final compatibility matrix
 
 ---
 
