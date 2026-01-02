@@ -339,6 +339,14 @@ class InfrastructureConfig:
         ipsec = self.get_items_by_type('ipsec_crypto_profile')
         return ike + ipsec
     
+    def get_ike_gateways(self) -> List[ConfigItem]:
+        """Get all IKE gateways"""
+        return self.get_items_by_type('ike_gateway')
+    
+    def get_ipsec_tunnels(self) -> List[ConfigItem]:
+        """Get all IPsec tunnels"""
+        return self.get_items_by_type('ipsec_tunnel')
+    
     def filter_defaults(self) -> List[ConfigItem]:
         """Get only non-default items"""
         return [item for item in self.items if not item.is_default]
@@ -435,13 +443,42 @@ class Configuration:
     
     Contains multiple FolderConfig, SnippetConfig, and InfrastructureConfig instances.
     Provides cross-container querying and dependency resolution.
+    
+    Metadata includes source information, version tracking, and push history.
     """
     
-    def __init__(self):
-        """Initialize configuration"""
+    def __init__(self, 
+                 source_tsg: Optional[str] = None,
+                 source_file: Optional[str] = None,
+                 load_type: Optional[str] = None,
+                 saved_credentials_ref: Optional[str] = None):
+        """
+        Initialize configuration.
+        
+        Args:
+            source_tsg: Source Tenant Service Group ID
+            source_file: Source file path (if loaded from file)
+            load_type: How config was loaded ('file', 'pull', 'api')
+            saved_credentials_ref: Reference to saved credentials (tenant name)
+        """
         self.folders: Dict[str, FolderConfig] = {}
         self.snippets: Dict[str, SnippetConfig] = {}
         self.infrastructure: InfrastructureConfig = InfrastructureConfig()
+        
+        # Metadata
+        self.source_tsg = source_tsg
+        self.source_file = source_file
+        self.load_type = load_type  # 'file', 'pull', 'api'
+        self.saved_credentials_ref = saved_credentials_ref
+        
+        # Version tracking (for future use)
+        self.version: Optional[str] = None
+        self.created_at: Optional[str] = None
+        self.modified_at: Optional[str] = None
+        
+        # Push history (for future use)
+        self.push_history: List[Dict[str, Any]] = []
+        # Format: [{'timestamp': '...', 'destination_tsg': '...', 'items_pushed': N, 'status': 'success/failure', ...}]
     
     def add_folder(self, folder: FolderConfig) -> None:
         """Add a folder to the configuration"""
@@ -609,9 +646,64 @@ class Configuration:
         
         return deps
     
+    def save_to_file(self, file_path: str) -> None:
+        """
+        Save configuration to file.
+        
+        TODO: Implement serialization to JSON/YAML format.
+        Should include metadata, version info, and all containers.
+        
+        Args:
+            file_path: Path to save configuration file
+        """
+        raise NotImplementedError("save_to_file() will be implemented in future phase")
+    
+    @classmethod
+    def load_from_file(cls, file_path: str) -> 'Configuration':
+        """
+        Load configuration from file.
+        
+        TODO: Implement deserialization from JSON/YAML format.
+        Should recreate all folders, snippets, infrastructure, and metadata.
+        
+        Args:
+            file_path: Path to configuration file
+            
+        Returns:
+            Configuration instance
+        """
+        raise NotImplementedError("load_from_file() will be implemented in future phase")
+    
+    def push_to_destination(self, api_client) -> Dict[str, Any]:
+        """
+        Push configuration to destination tenant.
+        
+        TODO: Implement push logic using SelectivePushOrchestrator.
+        Should validate, resolve dependencies, handle conflicts, and push items.
+        
+        Args:
+            api_client: PrismaAccessAPIClient instance with destination connection
+            
+        Returns:
+            Dict with push results (created, updated, failed, skipped counts)
+        """
+        raise NotImplementedError("push_to_destination() will be implemented in future phase")
+    
+    def add_push_history_entry(self, entry: Dict[str, Any]) -> None:
+        """
+        Add an entry to push history.
+        
+        Args:
+            entry: Dict with push details (timestamp, destination_tsg, items_pushed, status, etc.)
+        """
+        self.push_history.append(entry)
+        logger.info(f"Added push history entry: {entry.get('status')} to {entry.get('destination_tsg')}")
+    
     def __len__(self) -> int:
         """Get total number of items across all containers"""
         return len(self.get_all_items())
     
     def __repr__(self) -> str:
-        return f"<Configuration(folders={len(self.folders)}, snippets={len(self.snippets)}, infrastructure_items={len(self.infrastructure)}, total_items={len(self)})>"
+        source = f", source_tsg={self.source_tsg}" if self.source_tsg else ""
+        load = f", load_type={self.load_type}" if self.load_type else ""
+        return f"<Configuration(folders={len(self.folders)}, snippets={len(self.snippets)}, infrastructure_items={len(self.infrastructure)}, total_items={len(self)}{source}{load})>"

@@ -506,12 +506,20 @@ not rule-based policy from Day 4). All infrastructure items REQUIRE folder, not 
      - Contains: Mobile Users (agent profiles, portals, gateways)
      - Methods: get_remote_network_items, get_mobile_user_items
      - Methods: get_service_connections, get_crypto_profiles
+     - Methods: get_ike_gateways, get_ipsec_tunnels ⭐ ADDED
      - Methods: resolve_dependency_chain (full SC→Tunnel→Gateway→Crypto)
      - Note: Enforces folder requirement for all infrastructure items
+     - Note: Infrastructure scoped to folder ("Remote Networks", "Service Connections")
    - `Configuration` - Top-level container for entire config
      - Contains: multiple FolderConfig, SnippetConfig, and InfrastructureConfig
+     - Metadata: source_tsg, source_file, load_type, saved_credentials_ref
+     - Version tracking: version, created_at, modified_at (for future use)
+     - Push history: List of push operations (for future use)
      - Methods: Cross-container queries, filtering, validation
      - Methods: resolve_dependencies (across all containers)
+     - Methods: save_to_file, load_from_file (placeholders for future)
+     - Methods: push_to_destination (placeholder for future)
+     - Methods: add_push_history_entry (for tracking pushes)
 
 2. **Implemented container features:** ✅
    - Add/remove items (with validation)
@@ -813,6 +821,18 @@ not rule-based policy from Day 4). All infrastructure items REQUIRE folder, not 
    - Example values from production
    - Relationship indicators (references other config items)
 
+8. **Identify default configuration criteria:** ⭐ NEW
+   - Analyze production data to identify default/predefined configurations
+   - Document criteria/properties that indicate default status:
+     - `is_default` flag
+     - Snippet type: `predefined`, `readonly`
+     - Name patterns: starts with "default", "predefined"
+     - Folder: "Shared" or "All" with specific snippet associations
+     - Cannot be deleted/modified flags
+   - Create `docs/DEFAULT_IDENTIFICATION.md`
+   - Add default detection logic to `config/defaults/default_detector.py`
+   - Test default detection against production examples
+
 **Deliverables:**
 - `scripts/capture_production_examples.py` - Capture script
 - `scripts/analyze_config_properties.py` - Property analysis
@@ -822,7 +842,9 @@ not rule-based policy from Day 4). All infrastructure items REQUIRE folder, not 
 - `tests/examples/production/raw/` - Raw API responses (for reference)
 - `tests/config/models/test_production_examples.py` - Production test suite
 - `docs/PROPERTY_TYPES.md` - Property type documentation
+- `docs/DEFAULT_IDENTIFICATION.md` - Default configuration criteria ⭐ NEW
 - Updated model classes with discovered properties
+- Updated `config/defaults/default_detector.py` with production-validated criteria ⭐ NEW
 - Test results showing compatibility with production data
 
 **Success Criteria:**
@@ -830,6 +852,7 @@ not rule-based policy from Day 4). All infrastructure items REQUIRE folder, not 
 - All examples successfully sanitized
 - 90%+ of production examples validate successfully
 - All discovered property types documented
+- Default identification criteria validated against production data ⭐ NEW
 - Any incompatibilities documented with workarounds
 
 ---
