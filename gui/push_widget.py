@@ -208,46 +208,13 @@ class PushConfigWidget(QWidget):
 
         results_group.setLayout(results_layout)
         layout.addWidget(results_group)
-        
-        # Load destination tenants on initialization
-        self._load_destination_tenants()
 
         layout.addStretch()
 
     def set_api_client(self, api_client):
         """Set the API client for push operations (source tenant)."""
         self.api_client = api_client
-        self._load_destination_tenants()
         self._update_status()
-    
-    def _load_destination_tenants(self):
-        """Load available destination tenants."""
-        from config.tenant_manager import TenantManager
-        
-        # Block signals during load
-        self.destination_combo.blockSignals(True)
-        
-        # Clear existing (except first item)
-        while self.destination_combo.count() > 1:
-            self.destination_combo.removeItem(1)
-        
-        # Add "Use Source Tenant" option if connected
-        if self.api_client:
-            self.destination_combo.addItem(
-                f"Use Source Tenant ({self.api_client.tsg_id})",
-                {"type": "source", "client": self.api_client}
-            )
-        
-        # Add saved tenants
-        manager = TenantManager()
-        tenants = manager.list_tenants(sort_by="last_used")
-        
-        for tenant in tenants:
-            display_name = f"{tenant['name']} ({tenant['tsg_id']})"
-            self.destination_combo.addItem(display_name, {"type": "saved", "tenant": tenant})
-        
-        # Re-enable signals
-        self.destination_combo.blockSignals(False)
     
     def _on_destination_changed(self, api_client, tenant_name: str):
         """
