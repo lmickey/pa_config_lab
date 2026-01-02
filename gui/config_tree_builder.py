@@ -282,7 +282,7 @@ class ConfigTreeBuilder:
         parent.addChild(folders_item)
     
     def _build_snippets_section(self, parent: QTreeWidgetItem, sec_policies: Dict[str, Any]):
-        """Build snippets section with filtering and display_name support."""
+        """Build snippets section with full drill-down (like folders)."""
         snippets = sec_policies.get("snippets", [])
         if not snippets:
             return
@@ -329,9 +329,167 @@ class ConfigTreeBuilder:
             else:
                 type_indicator = "custom"
             
-            # Store snippet data directly (not wrapped) for easy collection
-            snip_item = self._create_item([name, type_indicator, ""])
-            snip_item.setData(0, Qt.ItemDataRole.UserRole, snippet)
+            # Create snippet item
+            snip_item = self._create_item([name, type_indicator, ""], data=snippet, item_type="snippet")
+            
+            # Security Rules
+            security_rules = snippet.get("security_rules", [])
+            if security_rules:
+                rules_item = self._create_item(["Security Rules", "list", str(len(security_rules))], item_type="rules_parent")
+                rules_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'rules_parent', 'snippet': name})
+                for rule in security_rules:
+                    rule_name = rule.get("name", "Unknown")
+                    rule_child = self._create_item([rule_name, "security_rule", ""], data=rule, item_type="security_rule")
+                    rule_child.setData(0, Qt.ItemDataRole.UserRole, {'type': 'security_rule', 'snippet': name, 'data': rule})
+                    rules_item.addChild(rule_child)
+                snip_item.addChild(rules_item)
+            
+            # Objects (by type)
+            objects_in_snippet = snippet.get("objects", {})
+            if objects_in_snippet:
+                total_objects = sum(len(v) for v in objects_in_snippet.values() if isinstance(v, list))
+                if total_objects > 0:
+                    objects_item = self._create_item(["Objects", "container", str(total_objects)])
+                    
+                    # Address Objects
+                    if objects_in_snippet.get("address_objects"):
+                        addr_item = self._create_item(["Addresses", "list", str(len(objects_in_snippet["address_objects"]))], item_type="snippet_object_type")
+                        addr_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'snippet_object_type', 'object_type': 'address_objects', 'snippet': name})
+                        for obj in objects_in_snippet["address_objects"]:
+                            obj_name = obj.get("name", "Unknown")
+                            obj_child = self._create_item([obj_name, "address", ""], data=obj, item_type="snippet_object")
+                            obj_child.setData(0, Qt.ItemDataRole.UserRole, {'type': 'snippet_object', 'object_type': 'address_objects', 'snippet': name, 'data': obj})
+                            addr_item.addChild(obj_child)
+                        objects_item.addChild(addr_item)
+                    
+                    # Address Groups
+                    if objects_in_snippet.get("address_groups"):
+                        ag_item = self._create_item(["Address Groups", "list", str(len(objects_in_snippet["address_groups"]))], item_type="snippet_object_type")
+                        ag_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'snippet_object_type', 'object_type': 'address_groups', 'snippet': name})
+                        for obj in objects_in_snippet["address_groups"]:
+                            obj_name = obj.get("name", "Unknown")
+                            obj_child = self._create_item([obj_name, "address_group", ""], data=obj, item_type="snippet_object")
+                            obj_child.setData(0, Qt.ItemDataRole.UserRole, {'type': 'snippet_object', 'object_type': 'address_groups', 'snippet': name, 'data': obj})
+                            ag_item.addChild(obj_child)
+                        objects_item.addChild(ag_item)
+                    
+                    # Service Objects
+                    if objects_in_snippet.get("service_objects"):
+                        svc_item = self._create_item(["Services", "list", str(len(objects_in_snippet["service_objects"]))], item_type="snippet_object_type")
+                        svc_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'snippet_object_type', 'object_type': 'service_objects', 'snippet': name})
+                        for obj in objects_in_snippet["service_objects"]:
+                            obj_name = obj.get("name", "Unknown")
+                            obj_child = self._create_item([obj_name, "service", ""], data=obj, item_type="snippet_object")
+                            obj_child.setData(0, Qt.ItemDataRole.UserRole, {'type': 'snippet_object', 'object_type': 'service_objects', 'snippet': name, 'data': obj})
+                            svc_item.addChild(obj_child)
+                        objects_item.addChild(svc_item)
+                    
+                    # Service Groups
+                    if objects_in_snippet.get("service_groups"):
+                        sg_item = self._create_item(["Service Groups", "list", str(len(objects_in_snippet["service_groups"]))], item_type="snippet_object_type")
+                        sg_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'snippet_object_type', 'object_type': 'service_groups', 'snippet': name})
+                        for obj in objects_in_snippet["service_groups"]:
+                            obj_name = obj.get("name", "Unknown")
+                            obj_child = self._create_item([obj_name, "service_group", ""], data=obj, item_type="snippet_object")
+                            obj_child.setData(0, Qt.ItemDataRole.UserRole, {'type': 'snippet_object', 'object_type': 'service_groups', 'snippet': name, 'data': obj})
+                            sg_item.addChild(obj_child)
+                        objects_item.addChild(sg_item)
+                    
+                    # Applications
+                    if objects_in_snippet.get("applications"):
+                        app_item = self._create_item(["Applications", "list", str(len(objects_in_snippet["applications"]))], item_type="snippet_object_type")
+                        app_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'snippet_object_type', 'object_type': 'applications', 'snippet': name})
+                        for obj in objects_in_snippet["applications"]:
+                            obj_name = obj.get("name", "Unknown")
+                            obj_child = self._create_item([obj_name, "application", ""], data=obj, item_type="snippet_object")
+                            obj_child.setData(0, Qt.ItemDataRole.UserRole, {'type': 'snippet_object', 'object_type': 'applications', 'snippet': name, 'data': obj})
+                            app_item.addChild(obj_child)
+                        objects_item.addChild(app_item)
+                    
+                    snip_item.addChild(objects_item)
+            
+            # Profiles (by type)
+            profiles_in_snippet = snippet.get("profiles", {})
+            if profiles_in_snippet:
+                total_profiles = sum(len(v) for v in profiles_in_snippet.values() if isinstance(v, list))
+                if total_profiles > 0:
+                    profiles_item = self._create_item(["Profiles", "container", str(total_profiles)])
+                    
+                    # Authentication Profiles
+                    if profiles_in_snippet.get("authentication_profiles"):
+                        auth_item = self._create_item(["Authentication", "list", str(len(profiles_in_snippet["authentication_profiles"]))], item_type="snippet_profile_type")
+                        auth_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'snippet_profile_type', 'profile_type': 'authentication_profiles', 'snippet': name})
+                        for prof in profiles_in_snippet["authentication_profiles"]:
+                            prof_name = prof.get("name", "Unknown")
+                            prof_child = self._create_item([prof_name, "authentication_profile", ""], data=prof, item_type="snippet_profile")
+                            prof_child.setData(0, Qt.ItemDataRole.UserRole, {'type': 'snippet_profile', 'profile_type': 'authentication_profiles', 'snippet': name, 'data': prof})
+                            auth_item.addChild(prof_child)
+                        profiles_item.addChild(auth_item)
+                    
+                    # Decryption Profiles
+                    if profiles_in_snippet.get("decryption_profiles"):
+                        dec_item = self._create_item(["Decryption", "list", str(len(profiles_in_snippet["decryption_profiles"]))], item_type="snippet_profile_type")
+                        dec_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'snippet_profile_type', 'profile_type': 'decryption_profiles', 'snippet': name})
+                        for prof in profiles_in_snippet["decryption_profiles"]:
+                            prof_name = prof.get("name", "Unknown")
+                            prof_child = self._create_item([prof_name, "decryption_profile", ""], data=prof, item_type="snippet_profile")
+                            prof_child.setData(0, Qt.ItemDataRole.UserRole, {'type': 'snippet_profile', 'profile_type': 'decryption_profiles', 'snippet': name, 'data': prof})
+                            dec_item.addChild(prof_child)
+                        profiles_item.addChild(dec_item)
+                    
+                    # Security Profiles (various types)
+                    security_profile_types = [
+                        ("anti_spyware_profiles", "Anti-Spyware"),
+                        ("vulnerability_profiles", "Vulnerability"),
+                        ("url_filtering_profiles", "URL Filtering"),
+                        ("file_blocking_profiles", "File Blocking"),
+                        ("wildfire_profiles", "WildFire"),
+                        ("dns_security_profiles", "DNS Security"),
+                    ]
+                    
+                    for key, display_name in security_profile_types:
+                        if profiles_in_snippet.get(key):
+                            prof_type_item = self._create_item([display_name, "list", str(len(profiles_in_snippet[key]))], item_type="snippet_profile_type")
+                            prof_type_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'snippet_profile_type', 'profile_type': key, 'snippet': name})
+                            for prof in profiles_in_snippet[key]:
+                                prof_name = prof.get("name", "Unknown")
+                                prof_child = self._create_item([prof_name, key, ""], data=prof, item_type="snippet_profile")
+                                prof_child.setData(0, Qt.ItemDataRole.UserRole, {'type': 'snippet_profile', 'profile_type': key, 'snippet': name, 'data': prof})
+                                prof_type_item.addChild(prof_child)
+                            profiles_item.addChild(prof_type_item)
+                    
+                    snip_item.addChild(profiles_item)
+            
+            # HIP (Host Information Profile) objects and profiles
+            hip_data = snippet.get("hip", {})
+            if hip_data:
+                hip_objects = hip_data.get("hip_objects", [])
+                hip_profiles = hip_data.get("hip_profiles", [])
+                total_hip = len(hip_objects) + len(hip_profiles)
+                
+                if total_hip > 0:
+                    hip_item = self._create_item(["HIP", "container", str(total_hip)])
+                    
+                    # HIP Objects
+                    if hip_objects:
+                        hip_obj_item = self._create_item(["HIP Objects", "list", str(len(hip_objects))])
+                        for hip_obj in hip_objects:
+                            obj_name = hip_obj.get("name", "Unknown")
+                            obj_child = self._create_item([obj_name, "hip_object", ""], hip_obj)
+                            hip_obj_item.addChild(obj_child)
+                        hip_item.addChild(hip_obj_item)
+                    
+                    # HIP Profiles
+                    if hip_profiles:
+                        hip_prof_item = self._create_item(["HIP Profiles", "list", str(len(hip_profiles))])
+                        for hip_prof in hip_profiles:
+                            prof_name = hip_prof.get("name", "Unknown")
+                            prof_child = self._create_item([prof_name, "hip_profile", ""], hip_prof)
+                            hip_prof_item.addChild(prof_child)
+                        hip_item.addChild(hip_prof_item)
+                    
+                    snip_item.addChild(hip_item)
+            
             snippets_item.addChild(snip_item)
         
         parent.addChild(snippets_item)
