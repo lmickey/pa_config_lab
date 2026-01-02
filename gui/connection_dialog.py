@@ -247,6 +247,64 @@ class ConnectionDialog(QDialog):
             # Refresh tenant list
             self._load_saved_tenants()
     
+    def connect_with_saved_tenant(self, tenant_data: dict):
+        """
+        Connect to a saved tenant programmatically (without showing dialog).
+        
+        Args:
+            tenant_data: Dictionary with tenant credentials
+            
+        Returns:
+            API client if successful, None otherwise
+        """
+        try:
+            from prisma.api_client import PrismaAccessAPIClient
+            from config.tenant_manager import TenantManager
+            
+            # Get credentials from tenant manager
+            manager = TenantManager()
+            tenant_name = tenant_data.get('name')
+            
+            if not tenant_name:
+                return None
+            
+            # Load full tenant details (including decrypted credentials)
+            tenant = manager.get_tenant(tenant_name)
+            if not tenant:
+                return None
+            
+            # Extract credentials
+            tsg_id = tenant.get('tsg_id')
+            api_user = tenant.get('client_id')
+            api_secret = tenant.get('client_secret')
+            
+            if not all([tsg_id, api_user, api_secret]):
+                return None
+            
+            # Create API client
+            api_client = PrismaAccessAPIClient(
+                tsg_id=tsg_id,
+                api_user=api_user,
+                api_secret=api_secret
+            )
+            
+            # Verify connection by checking token
+            if api_client.token:
+                self.api_client = api_client
+                self.connection_name = tenant_name
+                
+                # Update last used timestamp
+                manager.update_last_used(tenant_name)
+                
+                return api_client
+            else:
+                return None
+                
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Error connecting to saved tenant: {e}")
+            return None
+    
 
     def _save_as_tenant(self, tsg_id: str, api_user: str, api_secret: str):
         """Save credentials as a new tenant."""
