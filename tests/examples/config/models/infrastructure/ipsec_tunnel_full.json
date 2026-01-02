@@ -1,0 +1,27 @@
+{
+  "id": "tunnel-abc-123",
+  "name": "hq-tunnel",
+  "folder": "Remote Networks",
+  "auto_key": {
+    "ike_gateway": "hq-ike-gateway",
+    "ipsec_crypto_profile": "ipsec-with-pfs",
+    "proxy_id": [
+      {
+        "name": "proxy-1",
+        "protocol": {
+          "any": {}
+        },
+        "local": "10.0.0.0/8",
+        "remote": "192.168.0.0/16"
+      }
+    ]
+  },
+  "anti_replay": true,
+  "copy_tos": false,
+  "enable_gre_encapsulation": false,
+  "tunnel_monitor": {
+    "enable": true,
+    "destination_ip": "192.168.1.1",
+    "proxy_id": "proxy-1"
+  }
+}

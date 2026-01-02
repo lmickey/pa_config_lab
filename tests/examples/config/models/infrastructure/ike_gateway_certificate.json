@@ -1,0 +1,41 @@
+{
+  "id": "ike-gw-789",
+  "name": "hq-ike-gateway",
+  "folder": "Remote Networks",
+  "peer_address": {
+    "fqdn": "vpn.headquarters.example.com"
+  },
+  "authentication": {
+    "certificate": {
+      "local_certificate": {
+        "name": "site-certificate"
+      },
+      "certificate_profile": "strict-validation"
+    }
+  },
+  "protocol": {
+    "ikev2": {
+      "dpd": {
+        "enable": true,
+        "interval": 10
+      }
+    }
+  },
+  "protocol_common": {
+    "nat_traversal": {
+      "enable": true
+    },
+    "fragmentation": {
+      "enable": true
+    },
+    "ike_crypto_profile": "strong-ike-crypto"
+  },
+  "local_id": {
+    "id": "headquarters@example.com",
+    "type": "ufqdn"
+  },
+  "peer_id": {
+    "id": "branch@example.com",
+    "type": "ufqdn"
+  }
+}

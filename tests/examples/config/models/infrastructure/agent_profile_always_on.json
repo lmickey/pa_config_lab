@@ -1,0 +1,25 @@
+{
+  "id": "agent-profile-123",
+  "name": "always-on-agent",
+  "folder": "Mobile Users",
+  "connect_method": "user-logon",
+  "authentication": {
+    "allow_authentication_with_user_credentials": true,
+    "certificate": {
+      "certificate_profile": "user-cert-profile"
+    }
+  },
+  "app_settings": {
+    "refresh_connect_on_network_change": {
+      "delay_in_seconds": 5
+    },
+    "connect_on_demand": {
+      "priority": "always-on"
+    }
+  },
+  "split_tunneling": {
+    "enable": true,
+    "include_domains": ["*.internal.example.com"],
+    "exclude_applications": ["netflix", "spotify"]
+  }
+}

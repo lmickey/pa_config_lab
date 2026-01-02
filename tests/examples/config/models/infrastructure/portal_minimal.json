@@ -1,0 +1,9 @@
+{
+  "name": "gp-portal",
+  "folder": "Mobile Users",
+  "authentication": {
+    "saml": {
+      "server_profile": "okta-saml"
+    }
+  }
+}

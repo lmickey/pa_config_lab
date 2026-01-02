@@ -1,0 +1,22 @@
+{
+  "id": "sc-def-456",
+  "name": "hq-bgp-connection",
+  "folder": "Remote Networks",
+  "ipsec_tunnel": "hq-tunnel",
+  "bgp_peer": {
+    "local_ip_address": "169.254.1.1/30",
+    "peer_ip_address": "169.254.1.2",
+    "peer_as": "65001",
+    "enable_mp_bgp": false,
+    "peering_type": "exchange-v4-over-v4",
+    "secret": "***BGP_SECRET***",
+    "same_as_primary": false
+  },
+  "subnets": ["192.168.0.0/16"],
+  "region": "us-west-2",
+  "onboarding_type": "classic",
+  "qos": {
+    "enable": true,
+    "qos_profile": "voice-priority"
+  }
+}

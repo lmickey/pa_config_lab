@@ -1,10 +1,13 @@
 {
-  "name": "corporate-gp-agent",
-  "portal": "corporate-portal",
-  "authentication_profile": "saml-auth",
-  "split_tunneling": {
-    "enabled": true,
-    "include_domains": ["*.corp.example.com"],
-    "exclude_domains": ["*.public.example.com"]
+  "name": "default-agent",
+  "folder": "Mobile Users",
+  "connect_method": "on-demand",
+  "authentication": {
+    "allow_authentication_with_user_credentials": true
+  },
+  "app_settings": {
+    "connect_on_demand": {
+      "priority": "user-choice"
+    }
   }
 }

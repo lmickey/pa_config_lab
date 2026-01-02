@@ -317,6 +317,73 @@ class Examples:
     def qos_rule() -> Dict[str, Any]:
         return load_policy_example('qos_rule_minimal')
     
+    # Infrastructure - IKE Crypto Profiles
+    @staticmethod
+    def ike_crypto_minimal() -> Dict[str, Any]:
+        return load_infrastructure_example('ike_crypto_profile_minimal')
+    
+    @staticmethod
+    def ike_crypto_strong() -> Dict[str, Any]:
+        return load_infrastructure_example('ike_crypto_profile_strong')
+    
+    # Infrastructure - IPsec Crypto Profiles
+    @staticmethod
+    def ipsec_crypto_minimal() -> Dict[str, Any]:
+        return load_infrastructure_example('ipsec_crypto_profile_minimal')
+    
+    @staticmethod
+    def ipsec_crypto_pfs() -> Dict[str, Any]:
+        return load_infrastructure_example('ipsec_crypto_profile_pfs')
+    
+    # Infrastructure - IKE Gateways
+    @staticmethod
+    def ike_gateway_minimal() -> Dict[str, Any]:
+        return load_infrastructure_example('ike_gateway_minimal')
+    
+    @staticmethod
+    def ike_gateway_certificate() -> Dict[str, Any]:
+        return load_infrastructure_example('ike_gateway_certificate')
+    
+    # Infrastructure - IPsec Tunnels
+    @staticmethod
+    def ipsec_tunnel_minimal() -> Dict[str, Any]:
+        return load_infrastructure_example('ipsec_tunnel_minimal')
+    
+    @staticmethod
+    def ipsec_tunnel_full() -> Dict[str, Any]:
+        return load_infrastructure_example('ipsec_tunnel_full')
+    
+    # Infrastructure - Service Connections
+    @staticmethod
+    def service_connection_minimal() -> Dict[str, Any]:
+        return load_infrastructure_example('service_connection_minimal')
+    
+    @staticmethod
+    def service_connection_bgp() -> Dict[str, Any]:
+        return load_infrastructure_example('service_connection_with_bgp')
+    
+    @staticmethod
+    def service_connection_nat() -> Dict[str, Any]:
+        return load_infrastructure_example('service_connection_with_nat')
+    
+    # Infrastructure - Agent Profiles
+    @staticmethod
+    def agent_profile_minimal() -> Dict[str, Any]:
+        return load_infrastructure_example('agent_profile_minimal')
+    
+    @staticmethod
+    def agent_profile_always_on() -> Dict[str, Any]:
+        return load_infrastructure_example('agent_profile_always_on')
+    
+    # Infrastructure - Portals & Gateways
+    @staticmethod
+    def portal_minimal() -> Dict[str, Any]:
+        return load_infrastructure_example('portal_minimal')
+    
+    @staticmethod
+    def gateway_minimal() -> Dict[str, Any]:
+        return load_infrastructure_example('gateway_minimal')
+    
     # Profiles
     @staticmethod
     def auth_profile() -> Dict[str, Any]:

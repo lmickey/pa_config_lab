@@ -1,8 +1,9 @@
 {
-  "name": "default-ike-crypto",
-  "authentication": ["sha256"],
-  "encryption": ["aes-256-cbc"],
-  "dh_group": ["group14"],
+  "name": "default-ikev2",
+  "folder": "Remote Networks",
+  "encryption": ["aes-256-cbc", "aes-128-cbc"],
+  "authentication": ["sha256", "sha1"],
+  "dh_group": ["group14", "group5"],
   "lifetime": {
     "hours": 8
   }

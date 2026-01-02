@@ -1,0 +1,12 @@
+{
+  "id": "ike-crypto-123",
+  "name": "strong-ike-crypto",
+  "folder": "Remote Networks",
+  "encryption": ["aes-256-gcm", "aes-256-cbc"],
+  "authentication": ["sha512", "sha384"],
+  "dh_group": ["group20", "group19"],
+  "lifetime": {
+    "hours": 4
+  },
+  "description": "Strong cryptography for high-security sites"
+}

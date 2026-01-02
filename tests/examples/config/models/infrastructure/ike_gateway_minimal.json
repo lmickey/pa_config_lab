@@ -1,24 +1,28 @@
 {
-  "name": "branch-office-gateway",
-  "authentication": {
-    "pre_shared_key": {
-      "key": "********"
-    }
-  },
+  "name": "branch-office-ike",
+  "folder": "Remote Networks",
   "peer_address": {
     "ip": "203.0.113.10"
   },
-  "protocol": {
-    "ikev2": {
-      "ike_crypto_profile": "default-ike-crypto"
+  "authentication": {
+    "pre_shared_key": {
+      "key": "***SECRET***"
     }
   },
-  "local_id": {
-    "id": "hq@example.com",
-    "type": "ufqdn"
+  "protocol": {
+    "ikev2": {
+      "dpd": {
+        "enable": true
+      }
+    }
   },
-  "peer_id": {
-    "id": "branch@example.com",
-    "type": "ufqdn"
+  "protocol_common": {
+    "nat_traversal": {
+      "enable": true
+    },
+    "fragmentation": {
+      "enable": false
+    },
+    "ike_crypto_profile": "default-ikev2"
   }
 }

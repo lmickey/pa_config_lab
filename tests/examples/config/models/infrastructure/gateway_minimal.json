@@ -1,0 +1,14 @@
+{
+  "name": "gp-gateway",
+  "folder": "Mobile Users",
+  "authentication": {
+    "saml": {
+      "server_profile": "okta-saml"
+    }
+  },
+  "tunnel_settings": {
+    "udp": {
+      "enable": true
+    }
+  }
+}

@@ -51,6 +51,17 @@ from .policies import (
     QoSPolicyRule,
 )
 
+from .infrastructure import (
+    IKECryptoProfile,
+    IPsecCryptoProfile,
+    IKEGateway,
+    IPsecTunnel,
+    ServiceConnection,
+    AgentProfile,
+    Portal,
+    Gateway,
+)
+
 __all__ = [
     # Base classes
     'ConfigItem',
@@ -90,4 +101,13 @@ __all__ = [
     'DecryptionRule',
     'AuthenticationRule',
     'QoSPolicyRule',
+    # Infrastructure models (Remote Networks & Mobile Users)
+    'IKECryptoProfile',
+    'IPsecCryptoProfile',
+    'IKEGateway',
+    'IPsecTunnel',
+    'ServiceConnection',
+    'AgentProfile',
+    'Portal',
+    'Gateway',
 ]

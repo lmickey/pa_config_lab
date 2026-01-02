@@ -1,12 +1,8 @@
 {
-  "name": "branch-dc-connection",
-  "region": "us-east",
-  "ipsec_tunnel": "branch-office-tunnel",
-  "backup_SC": "backup-connection",
-  "bgp_peer": {
-    "local_ip_address": "169.254.10.1/30",
-    "peer_ip_address": "169.254.10.2",
-    "secret": "********"
-  },
-  "subnets": ["10.100.0.0/16", "10.200.0.0/16"]
+  "name": "branch-connection",
+  "folder": "Remote Networks",
+  "ipsec_tunnel": "branch-tunnel",
+  "subnets": ["10.20.0.0/16", "10.21.0.0/16"],
+  "region": "us-east-1",
+  "onboarding_type": "classic"
 }
