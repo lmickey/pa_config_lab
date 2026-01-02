@@ -300,7 +300,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Capture from saved tenant
+  # Interactive tenant selection (will prompt)
+  python scripts/capture_production_examples.py
+  
+  # Use specific saved tenant
   python scripts/capture_production_examples.py --tenant "Lab Tenant"
   
   # Capture specific type
@@ -313,7 +316,7 @@ Examples:
     
     parser.add_argument(
         '--tenant',
-        help='Saved tenant name to connect to'
+        help='Saved tenant name (optional - will prompt if not provided)'
     )
     parser.add_argument(
         '--type',
@@ -339,29 +342,63 @@ Examples:
     args = parser.parse_args()
     
     # Get tenant credentials
+    manager = TenantManager()
+    
     if args.tenant:
-        manager = TenantManager()
+        # Use specified tenant
         tenant = manager.get_tenant_by_name(args.tenant)
         if not tenant:
             print(f"Error: Tenant '{args.tenant}' not found")
+            print("\nAvailable tenants:")
+            for t in manager.list_tenants():
+                print(f"  - {t['name']}")
+            return 1
+    else:
+        # Interactive tenant selection
+        tenants = manager.list_tenants()
+        
+        if not tenants:
+            print("Error: No saved tenants found")
+            print("\nPlease save a tenant first using the GUI or CLI")
             return 1
         
-        # Decrypt credentials
-        from config.storage.crypto_utils import decrypt_data, load_cipher
-        cipher = load_cipher()
-        tsg_id = decrypt_data(tenant['tsg_id'], cipher).decode()
-        api_user = decrypt_data(tenant['api_user'], cipher).decode()
-        api_secret = decrypt_data(tenant['api_secret'], cipher).decode()
-    else:
-        print("Error: --tenant is required")
+        print("=" * 60)
+        print("SELECT TENANT")
+        print("=" * 60)
         print("Available tenants:")
-        manager = TenantManager()
-        for t in manager.list_tenants():
-            print(f"  - {t['name']}")
-        return 1
+        for i, t in enumerate(tenants, 1):
+            print(f"  {i}. {t['name']}")
+        print()
+        
+        # Prompt for selection
+        while True:
+            try:
+                choice = input("Select tenant (1-{}): ".format(len(tenants)))
+                idx = int(choice) - 1
+                if 0 <= idx < len(tenants):
+                    tenant = tenants[idx]
+                    print(f"Selected: {tenant['name']}")
+                    print()
+                    break
+                else:
+                    print(f"Invalid choice. Please enter 1-{len(tenants)}")
+            except ValueError:
+                print("Invalid input. Please enter a number.")
+            except KeyboardInterrupt:
+                print("\n\nCancelled by user")
+                return 0
+    
+    # Decrypt credentials
+    from config.storage.crypto_utils import decrypt_data, load_cipher
+    cipher = load_cipher()
+    tsg_id = decrypt_data(tenant['tsg_id'], cipher).decode()
+    api_user = decrypt_data(tenant['api_user'], cipher).decode()
+    api_secret = decrypt_data(tenant['api_secret'], cipher).decode()
+    
+    tenant_name = tenant['name']
     
     # Connect to API
-    print(f"Connecting to tenant: {args.tenant}")
+    print(f"Connecting to tenant: {tenant_name}")
     try:
         client = PrismaAccessAPIClient(tsg_id, api_user, api_secret)
         print("✓ Connected successfully")
