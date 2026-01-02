@@ -1,5 +1,5 @@
 """
-Tests for configuration models.
+Tests for config.models.base module.
 
 Tests the base ConfigItem class and specialized base classes.
 """
@@ -8,14 +8,14 @@ import pytest
 from config.models.base import ConfigItem, ObjectItem, PolicyItem, ProfileItem, RuleItem
 
 
-class TestAddress(ObjectItem):
-    """Test implementation of AddressObject for testing"""
+class MockAddressObject(ObjectItem):
+    """Mock implementation of AddressObject for testing"""
     api_endpoint = "https://api.sase.paloaltonetworks.com/sse/config/v1/addresses"
     item_type = "address_object"
 
 
-class TestSecurityRule(RuleItem):
-    """Test implementation of SecurityRule for testing"""
+class MockSecurityRule(RuleItem):
+    """Mock implementation of SecurityRule for testing"""
     api_endpoint = "https://api.sase.paloaltonetworks.com/sse/config/v1/security-rules"
     item_type = "security_rule"
 
@@ -31,7 +31,7 @@ class TestConfigItem:
             'ip_netmask': '192.168.1.0/24'
         }
         
-        item = TestAddress(raw_config)
+        item = MockAddressObject(raw_config)
         
         assert item.name == 'test-address'
         assert item.folder == 'Mobile Users'
@@ -48,7 +48,7 @@ class TestConfigItem:
             'ip_netmask': '10.0.0.0/8'
         }
         
-        item = TestAddress(raw_config)
+        item = MockAddressObject(raw_config)
         
         assert item.name == 'test-address'
         assert item.folder is None
@@ -65,7 +65,7 @@ class TestConfigItem:
         }
         
         with pytest.raises(ValueError, match="Either folder or snippet must be set"):
-            TestAddress(raw_config)
+            MockAddressObject(raw_config)
     
     def test_create_with_both_locations_raises_error(self):
         """Test that creating item with both folder and snippet raises error"""
@@ -77,7 +77,7 @@ class TestConfigItem:
         }
         
         with pytest.raises(ValueError, match="Cannot set both folder and snippet"):
-            TestAddress(raw_config)
+            MockAddressObject(raw_config)
     
     def test_has_dependencies_property(self):
         """Test has_dependencies property"""
@@ -87,7 +87,7 @@ class TestConfigItem:
             'folder': 'Mobile Users',
             'ip_netmask': '192.168.1.0/24'
         }
-        item = TestAddress(raw_config)
+        item = MockAddressObject(raw_config)
         assert not item.has_dependencies
         
         # Rule with dependencies
@@ -98,7 +98,7 @@ class TestConfigItem:
             'destination': ['any'],
             'service': ['tcp-443']
         }
-        rule = TestSecurityRule(rule_config)
+        rule = MockSecurityRule(rule_config)
         assert rule.has_dependencies
     
     def test_rename(self):
@@ -109,7 +109,7 @@ class TestConfigItem:
             'ip_netmask': '192.168.1.0/24'
         }
         
-        item = TestAddress(raw_config)
+        item = MockAddressObject(raw_config)
         assert item.name == 'old-name'
         
         item.rename('new-name')
@@ -125,7 +125,7 @@ class TestConfigItem:
             'ip_netmask': '192.168.1.0/24'
         }
         
-        item = TestAddress(raw_config)
+        item = MockAddressObject(raw_config)
         assert not item.deleted
         assert item.delete_success is None
         
@@ -142,7 +142,7 @@ class TestConfigItem:
             'ip_netmask': '192.168.1.0/24'
         }
         
-        item = TestAddress(raw_config)
+        item = MockAddressObject(raw_config)
         item.mark_for_deletion()
         item.delete_success = False
         
@@ -160,7 +160,7 @@ class TestConfigItem:
             'id': 'abc123'  # Should be removed
         }
         
-        item = TestAddress(raw_config)
+        item = MockAddressObject(raw_config)
         item.push_strategy = 'overwrite'
         
         data = item.to_dict()
@@ -183,7 +183,7 @@ class TestConfigItem:
             'delete_success': True
         }
         
-        item = TestAddress.from_dict(data)
+        item = MockAddressObject.from_dict(data)
         
         assert item.name == 'test-address'
         assert item.folder == 'Mobile Users'
@@ -199,7 +199,7 @@ class TestConfigItem:
             'folder': 'Mobile Users',
             'ip_netmask': '192.168.1.0/24'
         }
-        item = TestAddress(raw_config)
+        item = MockAddressObject(raw_config)
         errors = item.validate()
         assert len(errors) == 0
         
@@ -209,7 +209,7 @@ class TestConfigItem:
             'folder': 'Mobile Users',
             'ip_netmask': '192.168.1.0/24'
         }
-        item = TestAddress(raw_config)
+        item = MockAddressObject(raw_config)
         item.name = ''  # Force empty name
         errors = item.validate()
         assert len(errors) > 0
@@ -227,7 +227,7 @@ class TestRuleItem:
             'folder': 'Mobile Users',
             'action': 'allow'
         }
-        rule = TestSecurityRule(rule_config)
+        rule = MockSecurityRule(rule_config)
         assert rule.is_enabled
         
         # Disabled rule
@@ -237,7 +237,7 @@ class TestRuleItem:
             'action': 'allow',
             'disabled': True
         }
-        rule = TestSecurityRule(rule_config)
+        rule = MockSecurityRule(rule_config)
         assert not rule.is_enabled
         
         # Explicitly enabled rule
@@ -247,7 +247,7 @@ class TestRuleItem:
             'action': 'allow',
             'disabled': False
         }
-        rule = TestSecurityRule(rule_config)
+        rule = MockSecurityRule(rule_config)
         assert rule.is_enabled
 
 
