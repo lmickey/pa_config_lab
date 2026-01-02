@@ -420,59 +420,63 @@ NAT configuration may be added as properties within ServiceConnection infrastruc
 
 ---
 
-### Day 5: Create Infrastructure Model Classes
+### Day 5: Create Infrastructure Model Classes ✅
 
-**Goal:** Create concrete classes for infrastructure configuration
+**Status:** COMPLETE - Commit: 3d32851  
+**Version:** v3.1.147
 
-**Scope Note:** ServiceConnection may include NAT configuration properties (hard-coded config,
-not rule-based policy from Day 4). PBF is not applicable to Prisma Access.
+**Scope Note:** ServiceConnection includes NAT configuration properties (hard-coded config,
+not rule-based policy from Day 4). All infrastructure items REQUIRE folder, not snippet.
 
-**Tasks:**
+**Implemented:**
 
-1. **Create `config/models/infrastructure.py`**
-   - `IKECryptoProfile(ConfigItem)` - Phase 1 crypto
-   - `IPsecCryptoProfile(ConfigItem)` - Phase 2 crypto
-   - `IKEGateway(ConfigItem)` - IKE peer configuration
-   - `IPsecTunnel(ConfigItem)` - IPsec tunnel configuration
-   - `ServiceConnection(ConfigItem)` - Remote network connections (may include NAT properties)
+1. **Created `config/models/infrastructure.py`** ✅
+   - `IKECryptoProfile(ConfigItem)` - Phase 1 crypto (encryption, auth, DH groups)
+   - `IPsecCryptoProfile(ConfigItem)` - Phase 2 crypto (ESP settings, PFS)
+   - `IKEGateway(ConfigItem)` - IKE peer configuration (depends on IKECryptoProfile)
+   - `IPsecTunnel(ConfigItem)` - IPsec tunnel (depends on IKEGateway, IPsecCryptoProfile)
+   - `ServiceConnection(ConfigItem)` - Remote networks (depends on IPsecTunnel, includes NAT)
    - `AgentProfile(ConfigItem)` - GlobalProtect agent settings
-   - `Portal(ConfigItem)` - GlobalProtect portal settings
-   - `Gateway(ConfigItem)` - GlobalProtect gateway settings
+   - `Portal(ConfigItem)` - GlobalProtect portal (may depend on CertificateProfile)
+   - `Gateway(ConfigItem)` - GlobalProtect gateway (may depend on CertificateProfile)
 
-2. **Implement infrastructure-specific features:**
+2. **Implemented infrastructure-specific features:** ✅
    - Deep dependency chains (Service Connection → IPsec Tunnel → IKE Gateway → Crypto Profiles)
-   - Folder requirements for certain infrastructure items
-   - Reference validation
-   - NAT configuration properties within ServiceConnection (if applicable)
+   - Folder requirement enforced in `__init__` (raises ValueError if snippet without folder)
+   - Reference validation in `_validate_specific()` for each class
+   - NAT configuration properties: `nat_pool`, `source_nat` in ServiceConnection
+   - Override `has_dependencies` property for proper dependency detection in nested configs
 
-3. **Add test examples:** ⭐ NEW
-   - Expand `tests/examples/config/models/infrastructure/`:
-     - `ike_crypto_profile_full.json`
-     - `ipsec_crypto_profile_full.json`
-     - `ike_gateway_full.json`
-     - `ipsec_tunnel_full.json`
-     - `service_connection_minimal.json` - Basic service connection
-     - `service_connection_with_nat.json` - If NAT properties are applicable
-     - `agent_profile_full.json`
-     - `portal_minimal.json`
-     - `gateway_minimal.json`
-     - Examples showing dependency chains
+3. **Added test examples:** ✅ (15 examples, exceeded 8+ target)
+   - `ike_crypto_profile_minimal.json`, `ike_crypto_profile_strong.json`
+   - `ipsec_crypto_profile_minimal.json`, `ipsec_crypto_profile_pfs.json`
+   - `ike_gateway_minimal.json`, `ike_gateway_certificate.json`
+   - `ipsec_tunnel_minimal.json`, `ipsec_tunnel_full.json`
+   - `service_connection_minimal.json`, `service_connection_with_bgp.json`, `service_connection_with_nat.json`
+   - `agent_profile_minimal.json`, `agent_profile_always_on.json`
+   - `portal_minimal.json`, `gateway_minimal.json`
 
-4. **Create `tests/config/models/test_infrastructure.py`** ⭐ NEW
-   - Test each infrastructure class
-   - Test dependency chain detection
-   - Test folder requirements
-   - Test reference validation
-   - Test NAT properties (if applicable)
-   - Use example loader
+4. **Created `tests/config/models/test_infrastructure.py`** ✅ (39 tests)
+   - TestIKECryptoProfile: 4 tests (creation, strong crypto, folder requirement, validation)
+   - TestIPsecCryptoProfile: 4 tests (creation, PFS, folder requirement, validation)
+   - TestIKEGateway: 5 tests (minimal/cert, dependencies, folder requirement, validation)
+   - TestIPsecTunnel: 5 tests (minimal/full, dependencies, folder requirement, validation)
+   - TestServiceConnection: 7 tests (minimal/BGP/NAT, dependencies, backup SC, folder requirement)
+   - TestAgentProfile: 4 tests (minimal/always-on, folder requirement, validation)
+   - TestPortal: 3 tests (creation, folder requirement, cert profile dependency)
+   - TestGateway: 3 tests (creation, folder requirement, cert profile dependency)
+   - TestInfrastructureDependencyChains: 1 test (full dependency chain validation)
+   - TestInfrastructureSerialization: 1 test
+   - TestInfrastructureDeletion: 2 tests
 
-5. **Update INDEX.md** ⭐ NEW
+5. **Updated INDEX.md** ✅
 
 **Deliverables:**
-- `config/models/infrastructure.py` with 8 classes
-- 8+ new example configurations
-- `tests/config/models/test_infrastructure.py` with 25+ tests
-- All tests passing
+- ✅ `config/models/infrastructure.py` with 8 classes
+- ✅ 15 new example configurations (exceeded 8+ target)
+- ✅ `tests/config/models/test_infrastructure.py` with 39 tests (exceeded 25+ target)
+- ✅ All 150 tests passing (15 base + 46 objects + 29 profiles + 21 policies + 39 infrastructure)
+- ✅ Total examples: 67
 
 ---
 
