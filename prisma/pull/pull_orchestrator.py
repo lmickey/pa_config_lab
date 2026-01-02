@@ -504,14 +504,26 @@ class PullOrchestrator:
         return folder_configs
 
     def pull_snippets(
-        self, snippet_names: Optional[List[str]] = None
+        self,
+        snippet_names: Optional[List[str]] = None,
+        include_objects: bool = True,
+        include_profiles: bool = True,
+        include_rules: bool = True,
+        include_hip: bool = True
     ) -> List[Dict[str, Any]]:
         """
-        Pull snippet configurations.
+        Pull snippet configurations with their complete contents.
+        
+        Note: Snippets use the folder parameter in API calls - snippet names are passed
+        as folder parameters to existing API methods.
 
         Args:
             snippet_names: Optional list of snippet names/IDs to pull (None = all)
                           Can be list of strings (names) or list of dicts with 'id' and 'name'
+            include_objects: Whether to capture objects
+            include_profiles: Whether to capture profiles
+            include_rules: Whether to capture security rules
+            include_hip: Whether to capture HIP objects and profiles
 
         Returns:
             List of snippet configurations with defaults detected
@@ -526,19 +538,39 @@ class PullOrchestrator:
                     snippet_name = snippet_info.get('name')
                     if snippet_id:
                         snippet_config = self.snippet_capture.capture_snippet_configuration(
-                            snippet_id, snippet_name
+                            snippet_id=snippet_id,
+                            snippet_name=snippet_name,
+                            include_objects=include_objects,
+                            include_profiles=include_profiles,
+                            include_rules=include_rules,
+                            include_hip=include_hip,
+                            object_capture=self.object_capture,
+                            profile_capture=self.profile_capture,
+                            rule_capture=self.rule_capture,
+                            hip_capture=self.hip_capture,
+                            default_detector=self.default_detector
                         )
                         if snippet_config:
                             snippets.append(snippet_config)
             else:
                 # Legacy: Pull all and filter by name (slow)
-                snippets = self.snippet_capture.capture_all_snippets()
+                snippets = self.snippet_capture.capture_all_snippets(
+                    include_objects=include_objects,
+                    include_profiles=include_profiles,
+                    include_rules=include_rules,
+                    include_hip=include_hip,
+                    object_capture=self.object_capture,
+                    profile_capture=self.profile_capture,
+                    rule_capture=self.rule_capture,
+                    hip_capture=self.hip_capture,
+                    default_detector=self.default_detector
+                )
                 
                 # Filter to specific snippets if requested
                 if snippet_names:
                     snippets = [s for s in snippets if s.get("name", "") in snippet_names]
 
-            # Detect defaults in snippets
+            # Detect defaults in snippets (already done in capture, but ensure it's set)
             if self.default_detector:
                 detected_snippets = []
                 for snippet in snippets:
@@ -549,6 +581,19 @@ class PullOrchestrator:
                 snippets = detected_snippets
 
             self.stats["snippets_captured"] = len(snippets)
+            
+            # Count snippet contents in stats
+            for snippet in snippets:
+                self.stats["rules_captured"] += len(snippet.get("security_rules", []))
+                objects = snippet.get("objects", {})
+                self.stats["objects_captured"] += sum(len(objs) for objs in objects.values())
+                profiles = snippet.get("profiles", {})
+                # Count all profile types
+                self.stats["profiles_captured"] += len(profiles.get("authentication_profiles", []))
+                self.stats["profiles_captured"] += len(profiles.get("decryption_profiles", []))
+                sec_profiles = profiles.get("security_profiles", {})
+                self.stats["profiles_captured"] += sum(len(profs) for profs in sec_profiles.values())
+            
             return snippets
         except Exception as e:
             self._handle_error("Error pulling snippets", e)
@@ -633,7 +678,13 @@ class PullOrchestrator:
             # Pull snippets (skip if snippet_names is explicitly empty list)
             if include_snippets and (snippet_names is None or len(snippet_names) > 0):
                 self._report_progress("Pulling snippet configurations", 60, 100)
-                snippet_configs = self.pull_snippets(snippet_names=snippet_names)
+                snippet_configs = self.pull_snippets(
+                    snippet_names=snippet_names,
+                    include_objects=include_objects,
+                    include_profiles=include_profiles,
+                    include_rules=True,  # Always include rules for snippets
+                    include_hip=include_hip
+                )
                 config["security_policies"]["snippets"] = snippet_configs
 
                 # Count defaults in snippets

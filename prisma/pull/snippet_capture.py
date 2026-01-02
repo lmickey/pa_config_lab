@@ -226,46 +226,139 @@ class SnippetCapture:
             return None
 
     def capture_snippet_configuration(
-        self, snippet_id: str, snippet_name: Optional[str] = None
+        self, snippet_id: str, snippet_name: Optional[str] = None,
+        include_objects: bool = True,
+        include_profiles: bool = True,
+        include_rules: bool = True,
+        include_hip: bool = True,
+        object_capture=None,
+        profile_capture=None,
+        rule_capture=None,
+        hip_capture=None,
+        default_detector=None
     ) -> Dict[str, Any]:
         """
         Capture complete configuration for a snippet by ID.
+        
+        Note: Snippets use the folder parameter in API calls - snippet name is passed
+        as the folder parameter to existing API methods.
 
         Args:
             snippet_id: ID of the snippet (required for API access)
             snippet_name: Optional name of the snippet (for display/logging)
+            include_objects: Whether to capture objects
+            include_profiles: Whether to capture profiles
+            include_rules: Whether to capture security rules
+            include_hip: Whether to capture HIP objects and profiles
+            object_capture: ObjectCapture instance (required if include_objects=True)
+            profile_capture: ProfileCapture instance (required if include_profiles=True)
+            rule_capture: RuleCapture instance (required if include_rules=True)
+            hip_capture: HIPCapture instance (required if include_hip=True)
+            default_detector: DefaultDetector instance for detecting defaults
 
         Returns:
             Complete snippet configuration dictionary
         """
-        # Reduced verbosity - only print errors, not success details
+        import logging
+        logger = logging.getLogger(__name__)
+        
         # Get snippet details using ID
         snippet_info = self.get_snippet_details(snippet_id)
         if not snippet_info:
             display_name = snippet_name or snippet_id
-            if not self.suppress_output:
-                print(
-                    f"  ✗ FAILED: Could not retrieve snippet details for {display_name} (ID: {snippet_id})"
-                )
-                print(
-                    f"    API URL: https://api.strata.paloaltonetworks.com/config/setup/v1/snippets/{snippet_id}"
-                )
-                print(f"    Check error log for detailed API request/response information")
+            logger.error(f"Could not retrieve snippet details for {display_name} (ID: {snippet_id})")
             return {}
 
-        # Snippets are high-level configuration parameters (like folders), not containers
-        # They don't contain rules, objects, or profiles - those are associated with folders
-        # The snippet detail response contains:
-        # - id, name, last_update, created_in, folders (list), shared_in
-        # So we just return the snippet info as-is without trying to capture nested data
+        # Use the actual snippet name from the API response
+        actual_name = snippet_info.get("name", snippet_name or "Unknown")
+        
+        # Initialize configuration structure
+        snippet_config = {
+            "name": actual_name,
+            "id": snippet_id,
+            "type": snippet_info.get("type", ""),
+            "is_default": snippet_info.get("is_default", False),
+            "security_rules": [],
+            "objects": {},
+            "profiles": {},
+            "hip": {},
+        }
+        
+        # Copy metadata fields
+        for key in ["display_name", "folder_names", "folders", "metadata"]:
+            if key in snippet_info:
+                snippet_config[key] = snippet_info[key]
 
-        # No verbose output for successful captures - errors are already logged
+        try:
+            # Capture security rules (snippet name is used as folder parameter)
+            if include_rules and rule_capture:
+                rules = rule_capture.capture_rules_from_snippet(actual_name)
+                
+                # Detect defaults in rules
+                if default_detector:
+                    rules = default_detector.detect_defaults_in_rules(rules)
+                
+                snippet_config["security_rules"] = rules
 
-        return snippet_info
+            # Capture objects (snippet name is used as folder parameter)
+            if include_objects and object_capture:
+                objects = object_capture.capture_all_objects(folder=actual_name)
+                
+                # Detect defaults in objects
+                if default_detector:
+                    objects = default_detector.detect_defaults_in_objects(objects)
+                
+                snippet_config["objects"] = objects
 
-    def capture_all_snippets(self) -> List[Dict[str, Any]]:
+            # Capture profiles (snippet name is used as folder parameter)
+            if include_profiles and profile_capture:
+                profiles = profile_capture.capture_all_profiles(folder=actual_name)
+                
+                # Detect defaults in profiles
+                if default_detector:
+                    profiles = default_detector.detect_defaults_in_profiles(profiles)
+                
+                snippet_config["profiles"] = profiles
+
+            # Capture HIP objects and profiles (snippet name is used as folder parameter)
+            if include_hip and hip_capture:
+                try:
+                    hip_data = hip_capture.capture_hip_for_folder(actual_name)
+                    snippet_config["hip"] = hip_data
+                except Exception as e:
+                    logger.warning(f"Error capturing HIP for snippet '{actual_name}': {e}")
+                    snippet_config["hip"] = {}
+
+        except Exception as e:
+            logger.error(f"Error capturing configuration for snippet '{actual_name}': {e}")
+
+        return snippet_config
+
+    def capture_all_snippets(
+        self,
+        include_objects: bool = True,
+        include_profiles: bool = True,
+        include_rules: bool = True,
+        include_hip: bool = True,
+        object_capture=None,
+        profile_capture=None,
+        rule_capture=None,
+        hip_capture=None,
+        default_detector=None
+    ) -> List[Dict[str, Any]]:
         """
         Capture all snippets with their complete configurations.
+
+        Args:
+            include_objects: Whether to capture objects
+            include_profiles: Whether to capture profiles
+            include_rules: Whether to capture security rules
+            include_hip: Whether to capture HIP objects and profiles
+            object_capture: ObjectCapture instance (required if include_objects=True)
+            profile_capture: ProfileCapture instance (required if include_profiles=True)
+            rule_capture: RuleCapture instance (required if include_rules=True)
+            hip_capture: HIPCapture instance (required if include_hip=True)
+            default_detector: DefaultDetector instance for detecting defaults
 
         Returns:
             List of complete snippet configurations
@@ -279,12 +372,25 @@ class SnippetCapture:
 
             if snippet_id:
                 # Use ID for API access, name for display/logging
-                config = self.capture_snippet_configuration(snippet_id, snippet_name)
+                config = self.capture_snippet_configuration(
+                    snippet_id=snippet_id,
+                    snippet_name=snippet_name,
+                    include_objects=include_objects,
+                    include_profiles=include_profiles,
+                    include_rules=include_rules,
+                    include_hip=include_hip,
+                    object_capture=object_capture,
+                    profile_capture=profile_capture,
+                    rule_capture=rule_capture,
+                    hip_capture=hip_capture,
+                    default_detector=default_detector
+                )
                 if config:
                     captured_snippets.append(config)
             else:
-                if not self.suppress_output:
-                    print(f"  ⚠ WARNING: Snippet '{snippet_name}' has no ID, skipping")
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Snippet '{snippet_name}' has no ID, skipping")
 
         return captured_snippets
 
