@@ -362,8 +362,7 @@ class PullConfigWidget(QWidget):
                     progress.close()
                     
                     self.error_notification.show_error(
-                        "Connection Failed",
-                        f"Failed to connect to {tenant_data.get('name', 'Unknown')}. Please check credentials."
+                        f"Connection Failed: Failed to connect to {tenant_data.get('name', 'Unknown')}. Please check credentials."
                     )
                     
                     # Reset combo to placeholder
@@ -376,8 +375,7 @@ class PullConfigWidget(QWidget):
                     
         except Exception as e:
             self.error_notification.show_error(
-                "Connection Error",
-                f"Error connecting to tenant: {str(e)}"
+                f"Connection Error: Error connecting to tenant: {str(e)}"
             )
             # Reset combo to placeholder
             self.source_combo.setCurrentIndex(0)
@@ -422,8 +420,7 @@ class PullConfigWidget(QWidget):
                     
         except Exception as e:
             self.error_notification.show_error(
-                "Connection Error",
-                f"Error opening connection dialog: {str(e)}"
+                f"Connection Error: Error opening connection dialog: {str(e)}"
             )
 
     def _open_folder_selection(self):
@@ -431,8 +428,7 @@ class PullConfigWidget(QWidget):
         if not self.api_client:
             # Show inline error instead of dialog
             self.error_notification.show_error(
-                "Not Connected",
-                "Please connect to a source tenant before selecting folders."
+                "Not Connected: Please connect to a source tenant before selecting folders."
             )
             return
         
@@ -534,8 +530,7 @@ class PullConfigWidget(QWidget):
         if not self.api_client:
             # Show inline error instead of dialog
             self.error_notification.show_error(
-                "Not Connected",
-                "Please connect to a source tenant before pulling configuration."
+                "Not Connected: Please connect to a source tenant before pulling configuration."
             )
             return
         
