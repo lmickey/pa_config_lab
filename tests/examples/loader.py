@@ -405,6 +405,23 @@ class Examples:
     def configuration_minimal() -> Dict[str, Any]:
         return load_example('config/containers/configuration_minimal')
     
+    # Factory
+    @staticmethod
+    def api_response_addresses() -> Dict[str, Any]:
+        return load_example('factory', 'api_response_addresses')
+    
+    @staticmethod
+    def api_response_security_rules() -> Dict[str, Any]:
+        return load_example('factory', 'api_response_security_rules')
+    
+    @staticmethod
+    def api_response_with_defaults() -> Dict[str, Any]:
+        return load_example('factory', 'api_response_with_defaults')
+    
+    @staticmethod
+    def unknown_item_type() -> Dict[str, Any]:
+        return load_example('factory', 'unknown_item_type')
+    
     # Profiles
     @staticmethod
     def auth_profile() -> Dict[str, Any]:

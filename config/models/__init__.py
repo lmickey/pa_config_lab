@@ -69,6 +69,8 @@ from .containers import (
     Configuration,
 )
 
+from .factory import ConfigItemFactory
+
 __all__ = [
     # Base classes
     'ConfigItem',
@@ -122,4 +124,6 @@ __all__ = [
     'SnippetConfig',
     'InfrastructureConfig',
     'Configuration',
+    # Factory
+    'ConfigItemFactory',
 ]

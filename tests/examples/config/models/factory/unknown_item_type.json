@@ -1,0 +1,8 @@
+{
+  "name": "mysterious-config",
+  "folder": "Mobile Users",
+  "unknown_property": "some_value",
+  "another_unknown": {
+    "nested": "data"
+  }
+}

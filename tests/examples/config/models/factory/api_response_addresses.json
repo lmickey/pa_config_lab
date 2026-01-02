@@ -1,0 +1,22 @@
+{
+  "data": [
+    {
+      "id": "addr-123",
+      "name": "internal-network",
+      "folder": "Mobile Users",
+      "value": "10.0.0.0/8",
+      "type": "ip-netmask",
+      "description": "Internal network range"
+    },
+    {
+      "id": "addr-456",
+      "name": "web-servers",
+      "folder": "Mobile Users",
+      "value": "192.168.1.0/24",
+      "type": "ip-netmask"
+    }
+  ],
+  "total": 2,
+  "limit": 200,
+  "offset": 0
+}
