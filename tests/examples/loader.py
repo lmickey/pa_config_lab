@@ -273,7 +273,7 @@ class Examples:
     def qos_profile() -> Dict[str, Any]:
         return load_profile_example('qos_profile_minimal')
     
-    # Policies
+    # Policies - Security Rules
     @staticmethod
     def security_rule_minimal() -> Dict[str, Any]:
         return load_policy_example('security_rule_minimal')
@@ -289,6 +289,47 @@ class Examples:
     @staticmethod
     def security_rule_with_dependencies() -> Dict[str, Any]:
         return load_policy_example('security_rule_with_dependencies')
+    
+    @staticmethod
+    def security_rule_allow_apps() -> Dict[str, Any]:
+        return load_policy_example('security_rule_allow_apps')
+    
+    @staticmethod
+    def security_rule_deny() -> Dict[str, Any]:
+        return load_policy_example('security_rule_deny')
+    
+    # Policies - NAT Rules
+    @staticmethod
+    def nat_rule_minimal() -> Dict[str, Any]:
+        return load_policy_example('nat_rule_minimal')
+    
+    @staticmethod
+    def nat_rule_full() -> Dict[str, Any]:
+        return load_policy_example('nat_rule_full')
+    
+    # Policies - Decryption Rules
+    @staticmethod
+    def decryption_rule_minimal() -> Dict[str, Any]:
+        return load_policy_example('decryption_rule_minimal')
+    
+    @staticmethod
+    def decryption_rule_no_decrypt() -> Dict[str, Any]:
+        return load_policy_example('decryption_rule_no_decrypt')
+    
+    # Policies - Authentication Rules
+    @staticmethod
+    def authentication_rule() -> Dict[str, Any]:
+        return load_policy_example('authentication_rule_minimal')
+    
+    # Policies - QoS Rules
+    @staticmethod
+    def qos_rule() -> Dict[str, Any]:
+        return load_policy_example('qos_rule_minimal')
+    
+    # Policies - PBF Rules
+    @staticmethod
+    def pbf_rule() -> Dict[str, Any]:
+        return load_policy_example('pbf_rule_minimal')
     
     # Profiles
     @staticmethod

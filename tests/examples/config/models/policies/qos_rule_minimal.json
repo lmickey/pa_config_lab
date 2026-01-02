@@ -1,0 +1,13 @@
+{
+  "name": "prioritize-voice",
+  "folder": "Mobile Users",
+  "from": ["trust"],
+  "to": ["untrust"],
+  "source": ["any"],
+  "destination": ["any"],
+  "application": ["zoom", "ms-teams"],
+  "action": {
+    "class": "voice-priority"
+  },
+  "description": "Prioritize voice/video applications"
+}

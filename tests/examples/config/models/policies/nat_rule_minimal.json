@@ -1,0 +1,17 @@
+{
+  "name": "outbound-nat",
+  "folder": "Mobile Users",
+  "from": ["trust"],
+  "to": ["untrust"],
+  "source": ["internal-network"],
+  "destination": ["any"],
+  "service": "any",
+  "source_translation": {
+    "dynamic_ip_and_port": {
+      "interface_address": {
+        "interface": "ethernet1/1"
+      }
+    }
+  },
+  "description": "Outbound source NAT"
+}

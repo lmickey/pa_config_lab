@@ -1,0 +1,18 @@
+{
+  "id": "nat-456-789",
+  "name": "inbound-dnat",
+  "folder": "Remote Networks",
+  "from": ["untrust"],
+  "to": ["dmz"],
+  "source": ["any"],
+  "destination": ["public-ip"],
+  "service": "tcp-443",
+  "destination_translation": {
+    "translated_address": "internal-web-server",
+    "translated_port": 8443
+  },
+  "disabled": false,
+  "position": 3,
+  "tag": ["production", "web"],
+  "description": "Inbound destination NAT for web server"
+}

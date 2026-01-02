@@ -1,0 +1,10 @@
+{
+  "name": "require-saml-auth",
+  "folder": "Mobile Users",
+  "from": ["trust"],
+  "to": ["untrust"],
+  "source": ["internal-network"],
+  "destination": ["any"],
+  "authentication_enforcement": "okta-saml",
+  "description": "Require SAML authentication for outbound traffic"
+}

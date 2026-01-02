@@ -44,6 +44,15 @@ from .profiles import (
     QoSProfile,
 )
 
+from .policies import (
+    SecurityRule,
+    NATRule,
+    DecryptionRule,
+    AuthenticationRule,
+    QoSPolicyRule,
+    PBFRule,
+)
+
 __all__ = [
     # Base classes
     'ConfigItem',
@@ -78,4 +87,11 @@ __all__ = [
     'OCSPResponder',
     'SCEPProfile',
     'QoSProfile',
+    # Policy/Rule models
+    'SecurityRule',
+    'NATRule',
+    'DecryptionRule',
+    'AuthenticationRule',
+    'QoSPolicyRule',
+    'PBFRule',
 ]
