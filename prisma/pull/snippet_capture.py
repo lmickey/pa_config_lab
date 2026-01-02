@@ -218,8 +218,10 @@ class SnippetCapture:
             
             if not self.suppress_output:
                 import traceback
-                print("\n    Full traceback:")
-                traceback.print_exc()
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Full traceback for snippet {snippet_id}:")
+                logger.error(traceback.format_exc())
             
             return None
 

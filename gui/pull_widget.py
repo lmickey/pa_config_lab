@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+import logging
 
 from gui.workers import PullWorker
 from gui.toast_notification import ToastManager, DismissibleErrorNotification
@@ -36,6 +37,7 @@ class PullConfigWidget(QWidget):
         """Initialize the pull widget."""
         super().__init__(parent)
 
+        self.logger = logging.getLogger(__name__)
         self.api_client = None
         self.toast_manager = ToastManager(self)
         self.error_notification = DismissibleErrorNotification(self)
@@ -474,9 +476,9 @@ class PullConfigWidget(QWidget):
             
         except RuntimeError as e:
             # Widget might have been deleted - ignore
-            print(f"Progress update error: {e}")
+            self.logger.warning(f"Progress update error (widget deleted?): {e}")
         except Exception as e:
-            print(f"Unexpected progress update error: {e}")
+            self.logger.error(f"Unexpected progress update error: {e}")
     
     def _flush_pending_messages(self):
         """Flush all pending messages to results text widget in one batch."""
@@ -492,18 +494,18 @@ class PullConfigWidget(QWidget):
             # Qt will update the GUI naturally on the next event loop iteration
             
         except RuntimeError as e:
-            print(f"Batch update error: {e}")
+            self.logger.warning(f"Batch update error (widget deleted?): {e}")
         except Exception as e:
-            print(f"Unexpected batch update error: {e}")
+            self.logger.error(f"Unexpected batch update error: {e}")
 
     def _on_error(self, error_message: str):
         """Handle error from worker."""
         try:
             self.results_text.append(f"\n❌ ERROR: {error_message}")
         except RuntimeError as e:
-            print(f"Error display failed (widget deleted?): {e}")
+            self.logger.warning(f"Error display failed (widget deleted?): {e}")
         except Exception as e:
-            print(f"Unexpected error display error: {e}")
+            self.logger.error(f"Unexpected error display error: {e}")
 
     def _on_pull_finished(self, success: bool, message: str, config: Optional[Dict]):
         """Handle pull completion."""
@@ -557,9 +559,9 @@ class PullConfigWidget(QWidget):
                 QMessageBox.warning(self, "Pull Failed", f"Pull operation failed:\n\n{message}")
                 
         except RuntimeError as e:
-            print(f"Pull finished handler error (widget deleted?): {e}")
+            self.logger.warning(f"Pull finished handler error (widget deleted?): {e}")
         except Exception as e:
-            print(f"Unexpected pull finished error: {e}")
+            self.logger.error(f"Unexpected pull finished error: {e}")
 
     def _set_ui_enabled(self, enabled: bool):
         """Enable or disable UI controls."""

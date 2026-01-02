@@ -8,6 +8,7 @@ capture modules and providing progress tracking and error handling.
 from typing import Dict, Any, List, Optional, Callable
 from datetime import datetime
 import time
+import logging
 
 from ..api_client import PrismaAccessAPIClient
 from .folder_capture import FolderCapture
@@ -32,6 +33,7 @@ class PullOrchestrator:
             detect_defaults: Whether to detect defaults during capture (default: True)
             suppress_output: Suppress print statements (for GUI usage)
         """
+        self.logger = logging.getLogger(__name__)
         self.api_client = api_client
         self.suppress_output = suppress_output
         self.folder_capture = FolderCapture(api_client, suppress_output=suppress_output)
@@ -85,7 +87,7 @@ class PullOrchestrator:
             self.progress_callback(message, current, total)
         else:
             if not self.suppress_output:
-                print(f"[{current}/{total}] {message}")
+                self.logger.info(f"[{current}/{total}] {message}")
 
     def _handle_error(self, message: str, error: Exception):
         """Handle error if handler is set."""
@@ -95,7 +97,7 @@ class PullOrchestrator:
             self.error_handler(message, error)
         else:
             if not self.suppress_output:
-                print(f"Error: {message} - {error}")
+                self.logger.error(f"Error: {message} - {error}")
 
     def pull_folder_configuration(
         self,
@@ -372,7 +374,7 @@ class PullOrchestrator:
                 except Exception as e:
                     # HIP capture is optional - don't fail if it errors
                     if not self.suppress_output:
-                        print(f"  ⚠ Warning: Could not capture HIP for folder {folder_name}: {e}")
+                        self.logger.warning(f"Could not capture HIP for folder {folder_name}: {e}")
                     folder_config["hip"] = {"hip_objects": [], "hip_profiles": []}
                 # Decryption profiles is now a list, not a dict
                 dec_profiles = profiles.get("decryption_profiles", [])
