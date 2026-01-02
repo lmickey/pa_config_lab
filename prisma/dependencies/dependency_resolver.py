@@ -7,6 +7,7 @@ configuration objects (address groups → addresses, rules → profiles, etc.).
 
 from typing import Dict, List, Set, Optional, Any
 from collections import defaultdict
+import logging
 from .dependency_graph import DependencyGraph, DependencyNode
 
 
@@ -15,6 +16,7 @@ class DependencyResolver:
 
     def __init__(self):
         """Initialize dependency resolver."""
+        self.logger = logging.getLogger(__name__)
         self.graph = DependencyGraph()
         self.resolved_dependencies: Dict[str, Set[str]] = {}
         self.missing_dependencies: Dict[str, List[str]] = {}
@@ -329,17 +331,17 @@ class DependencyResolver:
     def _process_infrastructure_dependencies(self, infrastructure: Dict[str, Any]):
         """Process dependencies within infrastructure components."""
         
-        print(f"\nDEBUG: Processing infrastructure dependencies")
-        print(f"  Infrastructure keys: {list(infrastructure.keys())}")
+        self.logger.debug(f"DEBUG: Processing infrastructure dependencies")
+        self.logger.debug(f"  Infrastructure keys: {list(infrastructure.keys())}")
         
         # Process IKE Crypto Profiles (no dependencies)
         ike_crypto_profiles = infrastructure.get("ike_crypto_profiles", [])
-        print(f"  IKE Crypto Profiles: {len(ike_crypto_profiles)}")
+        self.logger.debug(f"  IKE Crypto Profiles: {len(ike_crypto_profiles)}")
         for profile in ike_crypto_profiles:
             profile_name = profile.get("name", "")
             if profile_name:
                 self.graph.add_node(profile_name, "ike_crypto_profile", profile)
-                print(f"    Added node: {profile_name}")
+                self.logger.debug(f"    Added node: {profile_name}")
         
         # Process IPSec Crypto Profiles (no dependencies)
         ipsec_crypto_profiles = infrastructure.get("ipsec_crypto_profiles", [])
@@ -397,17 +399,17 @@ class DependencyResolver:
         
         # Process Service Connections → IPSec Tunnel
         service_connections = infrastructure.get("service_connections", [])
-        print(f"  Service Connections: {len(service_connections)}")
+        self.logger.debug(f"  Service Connections: {len(service_connections)}")
         for sc in service_connections:
             sc_name = sc.get("name", "")
             if sc_name:
                 self.graph.add_node(sc_name, "service_connection", sc)
-                print(f"    Added node: {sc_name}")
-                print(f"    Service connection keys: {list(sc.keys())}")
+                self.logger.debug(f"    Added node: {sc_name}")
+                self.logger.debug(f"    Service connection keys: {list(sc.keys())}")
                 
                 # Service Connection depends on IPSec Tunnel (if using IPSec)
                 ipsec_tunnel = sc.get("ipsec_tunnel")
-                print(f"    Looking for ipsec_tunnel field: {ipsec_tunnel}")
+                self.logger.debug(f"    Looking for ipsec_tunnel field: {ipsec_tunnel}")
                 if ipsec_tunnel:
                     # Add dependency - pass the type so the edge gets created
                     # The tunnel node will be created as a "reference", and if it's not in the actual
@@ -415,9 +417,9 @@ class DependencyResolver:
                     self.graph.add_dependency(
                         sc_name, ipsec_tunnel, "service_connection", "ipsec_tunnel"
                     )
-                    print(f"    Added dependency: {sc_name} -> {ipsec_tunnel}")
+                    self.logger.debug(f"    Added dependency: {sc_name} -> {ipsec_tunnel}")
                 else:
-                    print(f"    No ipsec_tunnel field found")
+                    self.logger.debug(f"    No ipsec_tunnel field found")
                 
                 # Service Connection may also depend on BGP peer (if configured)
                 bgp_peer = sc.get("bgp_peer", {}).get("local_ip_address")
@@ -455,8 +457,8 @@ class DependencyResolver:
         available_nodes = set(node_id for node_id, node in self.graph.nodes.items() 
                              if not getattr(node, 'is_reference', False))
         
-        print(f"DEBUG: Available nodes (non-reference): {available_nodes}")
-        print(f"DEBUG: All nodes in graph: {set(self.graph.nodes.keys())}")
+        self.logger.debug(f"DEBUG: Available nodes (non-reference): {available_nodes}")
+        self.logger.debug(f"DEBUG: All nodes in graph: {set(self.graph.nodes.keys())}")
 
         # Find missing dependencies
         missing = self.graph.find_missing_dependencies(available_nodes)
@@ -533,17 +535,17 @@ class DependencyResolver:
         
         while iteration < max_iterations:
             iteration += 1
-            print(f"\nDEBUG: Dependency resolution iteration {iteration}")
+            self.logger.debug(f"DEBUG: Dependency resolution iteration {iteration}")
             
             # Validate working config to find missing deps
             validation = self.validate_dependencies(working_config)
             missing_deps_dict = validation.get('missing_dependencies', {})
             
-            print(f"  Total nodes in graph: {len(self.graph.nodes)}")
-            print(f"  Nodes: {list(self.graph.nodes.keys())}")
-            print(f"  Total edges in graph: {len(self.graph.edges)}")
-            print(f"  Edges: {[(f'{e[0]}->{e[1]}') for e in self.graph.edges]}")
-            print(f"  Missing dependencies dict: {missing_deps_dict}")
+            self.logger.debug(f"  Total nodes in graph: {len(self.graph.nodes)}")
+            self.logger.debug(f"  Nodes: {list(self.graph.nodes.keys())}")
+            self.logger.debug(f"  Total edges in graph: {len(self.graph.edges)}")
+            self.logger.debug(f"  Edges: {[(f'{e[0]}->{e[1]}') for e in self.graph.edges]}")
+            self.logger.debug(f"  Missing dependencies dict: {missing_deps_dict}")
             
             # Convert missing_deps dict to list
             missing_deps = []
@@ -556,13 +558,13 @@ class DependencyResolver:
                             'referenced_by': node_id
                         })
             
-            print(f"  Missing dependencies list: {len(missing_deps)}")
+            self.logger.debug(f"  Missing dependencies list: {len(missing_deps)}")
             for dep in missing_deps:
-                print(f"    - {dep.get('name')} (referenced by: {dep.get('referenced_by')})")
+                self.logger.debug(f"    - {dep.get('name')} (referenced by: {dep.get('referenced_by')})")
             
             # If no missing dependencies, we're done
             if not missing_deps:
-                print(f"  No more missing dependencies found after {iteration} iteration(s)")
+                self.logger.debug(f"  No more missing dependencies found after {iteration} iteration(s)")
                 break
             
             # Search full config for missing dependencies and add to working config
@@ -573,7 +575,7 @@ class DependencyResolver:
                 if not dep_name or dep_name in added_names:
                     continue
                 
-                print(f"\n  Searching for dependency: {dep_name}")
+                self.logger.debug(f"  Searching for dependency: {dep_name}")
                 
                 try:
                     # Try infrastructure
@@ -583,16 +585,16 @@ class DependencyResolver:
                                      'ipsec_crypto_profiles', 'service_connections', 'remote_networks']:
                         infra_items = infrastructure.get(infra_key, [])
                         if not isinstance(infra_items, list):
-                            print(f"    WARNING: {infra_key} is not a list: {type(infra_items)}")
+                            self.logger.debug(f"    WARNING: {infra_key} is not a list: {type(infra_items)}")
                             continue
                             
                         for item in infra_items:
                             if not isinstance(item, dict):
-                                print(f"    WARNING: Item in {infra_key} is not a dict: {type(item)}")
+                                self.logger.debug(f"    WARNING: Item in {infra_key} is not a dict: {type(item)}")
                                 continue
                                 
                             if item.get('name') == dep_name:
-                                print(f"    Found in {infra_key}")
+                                self.logger.debug(f"    Found in {infra_key}")
                                 
                                 # Add to all_required
                                 if infra_key not in all_required['infrastructure']:
@@ -612,7 +614,7 @@ class DependencyResolver:
                             break
                     
                     if not found:
-                        print(f"    NOT FOUND in infrastructure")
+                        self.logger.debug(f"    NOT FOUND in infrastructure")
                     
                     # Try folders (objects and profiles)
                     if not found:
@@ -625,7 +627,7 @@ class DependencyResolver:
                             # Search address objects
                             for addr_obj in objects.get('address_objects', []):
                                 if addr_obj.get('name') == dep_name:
-                                    print(f"    Found address object in folder '{folder_name}'")
+                                    self.logger.debug(f"    Found address object in folder '{folder_name}'")
                                     # Add to all_required
                                     # Find or create folder in all_required
                                     req_folder = next((f for f in all_required['folders'] if f.get('name') == folder_name), None)
@@ -653,7 +655,7 @@ class DependencyResolver:
                             if not found:
                                 for addr_group in objects.get('address_groups', []):
                                     if addr_group.get('name') == dep_name:
-                                        print(f"    Found address group in folder '{folder_name}'")
+                                        self.logger.debug(f"    Found address group in folder '{folder_name}'")
                                         req_folder = next((f for f in all_required['folders'] if f.get('name') == folder_name), None)
                                         if not req_folder:
                                             req_folder = {'name': folder_name, 'objects': {}}
@@ -676,7 +678,7 @@ class DependencyResolver:
                             if not found:
                                 for svc_obj in objects.get('service_objects', []):
                                     if svc_obj.get('name') == dep_name:
-                                        print(f"    Found service object in folder '{folder_name}'")
+                                        self.logger.debug(f"    Found service object in folder '{folder_name}'")
                                         req_folder = next((f for f in all_required['folders'] if f.get('name') == folder_name), None)
                                         if not req_folder:
                                             req_folder = {'name': folder_name, 'objects': {}}
@@ -699,7 +701,7 @@ class DependencyResolver:
                             if not found:
                                 for svc_group in objects.get('service_groups', []):
                                     if svc_group.get('name') == dep_name:
-                                        print(f"    Found service group in folder '{folder_name}'")
+                                        self.logger.debug(f"    Found service group in folder '{folder_name}'")
                                         req_folder = next((f for f in all_required['folders'] if f.get('name') == folder_name), None)
                                         if not req_folder:
                                             req_folder = {'name': folder_name, 'objects': {}}
@@ -723,7 +725,7 @@ class DependencyResolver:
                                 # Authentication profiles
                                 for auth_prof in profiles.get('authentication_profiles', []):
                                     if auth_prof.get('name') == dep_name:
-                                        print(f"    Found authentication profile in folder '{folder_name}'")
+                                        self.logger.debug(f"    Found authentication profile in folder '{folder_name}'")
                                         req_folder = next((f for f in all_required['folders'] if f.get('name') == folder_name), None)
                                         if not req_folder:
                                             req_folder = {'name': folder_name, 'profiles': {}}
@@ -748,7 +750,7 @@ class DependencyResolver:
                                     for prof_type, prof_list in sec_profiles.items():
                                         for prof in prof_list:
                                             if prof.get('name') == dep_name:
-                                                print(f"    Found {prof_type} profile in folder '{folder_name}'")
+                                                self.logger.debug(f"    Found {prof_type} profile in folder '{folder_name}'")
                                                 req_folder = next((f for f in all_required['folders'] if f.get('name') == folder_name), None)
                                                 if not req_folder:
                                                     req_folder = {'name': folder_name, 'profiles': {'security_profiles': {}}}
@@ -775,7 +777,7 @@ class DependencyResolver:
                                 # HIP objects
                                 for hip_obj in hip_data.get('hip_objects', []):
                                     if hip_obj.get('name') == dep_name:
-                                        print(f"    Found HIP object in folder '{folder_name}'")
+                                        self.logger.debug(f"    Found HIP object in folder '{folder_name}'")
                                         req_folder = next((f for f in all_required['folders'] if f.get('name') == folder_name), None)
                                         if not req_folder:
                                             req_folder = {'name': folder_name, 'hip': {}}
@@ -798,7 +800,7 @@ class DependencyResolver:
                                 if not found:
                                     for hip_prof in hip_data.get('hip_profiles', []):
                                         if hip_prof.get('name') == dep_name:
-                                            print(f"    Found HIP profile in folder '{folder_name}'")
+                                            self.logger.debug(f"    Found HIP profile in folder '{folder_name}'")
                                             req_folder = next((f for f in all_required['folders'] if f.get('name') == folder_name), None)
                                             if not req_folder:
                                                 req_folder = {'name': folder_name, 'hip': {}}
@@ -821,19 +823,19 @@ class DependencyResolver:
                                 break
                     
                     if not found:
-                        print(f"    NOT FOUND in any configuration section")
+                        self.logger.debug(f"    NOT FOUND in any configuration section")
                 
                 except Exception as e:
                     import traceback
-                    print(f"    ERROR searching for {dep_name}: {e}")
+                    self.logger.debug(f"    ERROR searching for {dep_name}: {e}")
                     traceback.print_exc()
             
             if not found_any:
-                print(f"  WARNING: Could not find some dependencies in full config")
+                self.logger.debug(f"  WARNING: Could not find some dependencies in full config")
                 break
         
         if iteration >= max_iterations:
-            print(f"  WARNING: Reached max iterations ({max_iterations}), stopping dependency resolution")
+            self.logger.debug(f"  WARNING: Reached max iterations ({max_iterations}), stopping dependency resolution")
         
         return all_required
     
