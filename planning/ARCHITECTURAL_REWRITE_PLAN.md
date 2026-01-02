@@ -883,11 +883,325 @@ not rule-based policy from Day 4). All infrastructure items REQUIRE folder, not 
 
 ---
 
-## Phase 8: Migration & Cleanup
+## Phase 8: Logging Integration
 
-### Day 14.5: Migrate Existing Code
+### Day 14: Integrate Activity Logging into Base Classes
 
-**Goal:** Update all existing code to use new object model (after production validation)
+**Goal:** Build comprehensive logging into class structure with debug mode support
+
+**Tasks:**
+
+1. **Review and standardize logging in base classes:**
+   - Review `config/models/base.py` for logging touchpoints
+   - Identify all operations that should log:
+     * Creation (`__init__`, `create()`)
+     * Modification (`update()`, `rename()`)
+     * Deletion (`delete()`, `mark_for_deletion()`)
+     * Validation (`validate()`, `_validate_specific()`)
+     * Dependency resolution (`get_dependencies()`, `_compute_dependencies()`)
+     * State changes (`deleted`, `delete_success`, `push_strategy`)
+     * API interactions (`refresh()`, `get()`)
+   - Add consistent logging to ConfigItem base class
+   - Ensure all subclasses inherit logging behavior
+
+2. **Implement debug mode:**
+   - Create `config/logging_config.py` with debug level support
+   - Add debug flag to application settings
+   - Debug mode logs:
+     * All property accesses (via `__getattribute__` or explicit)
+     * Full raw_config on creation
+     * Detailed validation results (not just errors)
+     * API request/response bodies
+     * Dependency chain resolution details
+     * Cache hits/misses
+   - Normal mode logs only:
+     * Errors and warnings
+     * Major state changes (create/update/delete)
+     * Validation failures
+
+3. **Add GUI debug mode toggle:**
+   - Create settings/preferences dialog
+   - Add "Enable Debug Logging" checkbox
+   - Add "Log Level" dropdown (ERROR, WARNING, INFO, DEBUG)
+   - Add "Clear Activity Log" button
+   - Save preferences to `QSettings`
+   - Apply log level changes immediately (no restart)
+   - Add debug indicator in status bar when enabled
+
+4. **Standardize log messages:**
+   - Define log message format standards:
+     * Use consistent prefixes: "Created", "Updated", "Deleted", "Validated", "Failed"
+     * Include item type and name in all messages
+     * Include location (folder/snippet) in messages
+     * Use structured format: `"{action} {item_type} '{name}' in {location}"`
+   - Update all logging calls to use standard format
+   - Add log level guidelines:
+     * DEBUG: Detailed internal operations
+     * INFO: Normal operations (create/update/delete)
+     * WARNING: Recoverable issues, skipped items
+     * ERROR: Failures, exceptions
+   - Document logging standards in `docs/LOGGING_STANDARDS.md`
+
+5. **Add container-level logging:**
+   - FolderConfig: Log add/remove items, bulk operations
+   - SnippetConfig: Log add/remove items, bulk operations
+   - InfrastructureConfig: Log dependency chain resolution
+   - Configuration: Log metadata changes, push history entries
+
+6. **Test logging integration:**
+   - Create `tests/config/test_logging.py`
+   - Test logging at all levels (DEBUG, INFO, WARNING, ERROR)
+   - Test debug mode toggles correctly
+   - Test log message format consistency
+   - Verify no logging in production mode impacts performance
+
+**Deliverables:**
+- Updated `config/models/base.py` with comprehensive logging
+- `config/logging_config.py` - Logging configuration with debug mode
+- Settings/preferences dialog in GUI with debug toggle
+- `docs/LOGGING_STANDARDS.md` - Logging standards documentation
+- `tests/config/test_logging.py` - Logging tests
+- All classes updated with standardized logging
+
+**Success Criteria:**
+- All ConfigItem operations log appropriately
+- Debug mode provides detailed diagnostics without impacting normal mode
+- GUI settings persist and apply immediately
+- Log messages follow consistent format
+- Tests verify logging behavior
+
+---
+
+## Phase 9: Configuration Serialization
+
+### Day 15: Implement Configuration Save/Load
+
+**Goal:** Implement file-based serialization for Configuration objects
+
+**Tasks:**
+
+1. **Design configuration file format:**
+   - Choose format: JSON (recommended) or YAML
+   - Structure:
+     ```json
+     {
+       "version": "3.1.x",
+       "metadata": {
+         "source_tsg": "...",
+         "source_file": null,
+         "load_type": "pull",
+         "saved_credentials_ref": "SCM Lab",
+         "created_at": "2025-01-02T10:00:00Z",
+         "modified_at": "2025-01-02T10:00:00Z"
+       },
+       "push_history": [...],
+       "folders": {
+         "Mobile Users": {
+           "parent": null,
+           "items": [...]
+         }
+       },
+       "snippets": {...},
+       "infrastructure": {
+         "items": [...]
+       }
+     }
+     ```
+   - Each item stored as `item.to_dict()` output
+   - Preserve all metadata and relationships
+   - Document format in `docs/CONFIG_FILE_FORMAT.md`
+
+2. **Implement Configuration.save_to_file():**
+   - Replace placeholder implementation in `config/models/containers.py`
+   - Serialize all folders, snippets, infrastructure
+   - Include metadata, version, push_history
+   - Write atomically (temp file + rename)
+   - Handle file permissions and errors
+   - Add optional compression (gzip)
+   - Log save operation with file size
+
+3. **Implement Configuration.load_from_file():**
+   - Replace placeholder implementation in `config/models/containers.py`
+   - Parse JSON/YAML file
+   - Validate version compatibility
+   - Instantiate ConfigItem objects using ConfigItemFactory
+   - Rebuild folder/snippet/infrastructure structure
+   - Restore metadata and push_history
+   - Handle missing/corrupted data gracefully
+   - Log load operation with item counts
+
+4. **Integrate with saved config menu:**
+   - Update `gui/load_config_dialog.py`:
+     * Use Configuration.load_from_file() instead of raw JSON
+     * Display metadata (source TSG, created date, modified date)
+     * Show item counts by type (objects, profiles, rules, infrastructure)
+     * Display push history summary
+   - Update `gui/config_viewer.py`:
+     * Display Configuration metadata in header
+     * Add "Save Configuration" button
+     * Add "Configuration Info" button showing full metadata
+   - Update workflow save logic:
+     * Use Configuration.save_to_file() after pull
+     * Prompt to save before workflow change
+     * Auto-save to temp location for recovery
+
+5. **Add configuration validation:**
+   - Validate file format on load
+   - Check version compatibility
+   - Verify all referenced items can be instantiated
+   - Report any missing properties or validation failures
+   - Option to load with errors (partial load) or fail completely
+
+6. **Test serialization:**
+   - Create `tests/config/models/test_serialization.py`
+   - Test save/load roundtrip for all item types
+   - Test with large configurations (100+ items)
+   - Test with missing/corrupted data
+   - Test version compatibility
+   - Test compression
+   - Test atomic write (interrupted save)
+   - Verify metadata preservation
+
+**Deliverables:**
+- Implemented `Configuration.save_to_file()`
+- Implemented `Configuration.load_from_file()`
+- `docs/CONFIG_FILE_FORMAT.md` - File format documentation
+- Updated `gui/load_config_dialog.py` using new serialization
+- Updated `gui/config_viewer.py` with save/info features
+- `tests/config/models/test_serialization.py` - Serialization tests
+- Compression support (optional)
+
+**Success Criteria:**
+- Configuration objects can be saved and loaded without data loss
+- All metadata and relationships preserved
+- File format is human-readable and documented
+- GUI integrates seamlessly with save/load
+- Tests verify all serialization scenarios
+- Large configurations (100+ items) save/load in <2 seconds
+
+---
+
+## Phase 10: GUI Integration & Standards
+
+### Day 16: Create GUI Standards & Base Classes
+
+**Goal:** Establish standardized GUI components and workflow base classes
+
+**Tasks:**
+
+1. **Create notification system:**
+   - Create `gui/notifications/notification_manager.py`:
+     * NotificationManager class
+     * Queue-based notification system
+     * Support for multiple notification types:
+       - Toast (temporary, auto-dismiss)
+       - Banner (persistent until dismissed)
+       - Status bar (lightweight)
+       - Dialog (blocking, requires action)
+     * Priority levels (info, warning, error, success)
+     * Configurable duration and position
+     * Stack notifications (show multiple)
+   - Create `gui/notifications/notification_widget.py`:
+     * Styled notification widgets
+     * Icon based on type (✓, ⚠, ✗, ℹ)
+     * Close button
+     * Fade in/out animations
+   - Deprecate ad-hoc `QMessageBox` and inline banners
+   - Update all GUI components to use NotificationManager
+
+2. **Standardize progress bars:**
+   - Create `gui/widgets/progress_calculator.py`:
+     * ProgressCalculator class
+     * Calculates accurate percentage based on:
+       - Total items to process
+       - Current item index
+       - Weighted steps (e.g., validation=20%, push=80%)
+       - Sub-operations (nested progress)
+     * Methods:
+       - `set_total(count)` - Set total item count
+       - `start_step(name, weight)` - Start a weighted step
+       - `increment(n=1)` - Increment by n items
+       - `get_percentage()` - Get current percentage
+       - `get_message()` - Get current status message
+   - Update all progress bars to use ProgressCalculator
+   - Fix issues in:
+     * Push validation progress
+     * Pull progress
+     * Push operation progress
+
+3. **Standardize status messages:**
+   - Create `gui/widgets/status_formatter.py`:
+     * StatusFormatter class
+     * Templates for common operations:
+       - "Connecting to {tenant}..."
+       - "Pulling {count} items from {location}..."
+       - "Validating {item} ({current}/{total})..."
+       - "Creating {item_type} '{name}'..."
+       - "Completed: {created} created, {updated} updated, {failed} failed"
+     * Color coding: green (success), yellow (warning), red (error)
+     * Icon prefixes: ✓, ⚠, ✗, ⟳, ...
+   - Update all status updates to use StatusFormatter
+
+4. **Create workflow base class:**
+   - Create `gui/workflows/workflow_base.py`:
+     * WorkflowBase abstract class
+     * Built-in standards:
+       - NotificationManager integration
+       - ProgressCalculator integration
+       - StatusFormatter integration
+       - Activity logging
+       - Error handling
+       - State management (has_unsaved_work)
+       - Cleanup on workflow change
+     * Abstract methods:
+       - `initialize()` - Setup workflow
+       - `validate()` - Validate workflow state
+       - `execute()` - Execute workflow
+       - `cleanup()` - Clean up resources
+     * Common methods:
+       - `show_notification(message, type)` - Show notification
+       - `update_progress(percentage, message)` - Update progress
+       - `log_activity(message, level)` - Log to activity log
+       - `confirm_workflow_change()` - Prompt before leaving
+   - Update existing workflows to extend WorkflowBase:
+     * MigrationWorkflowWidget
+     * (Future workflows inherit standards)
+
+5. **Create workflow state management:**
+   - Track active workflow
+   - Prompt before switching workflows if has_unsaved_work
+   - Auto-cleanup on workflow switch
+   - Save workflow state for recovery
+
+6. **Test GUI standards:**
+   - Create `tests/gui/test_notifications.py`
+   - Create `tests/gui/test_progress_calculator.py`
+   - Create `tests/gui/test_status_formatter.py`
+   - Create `tests/gui/test_workflow_base.py`
+   - Manual testing checklist for GUI components
+
+**Deliverables:**
+- `gui/notifications/notification_manager.py` - Notification system
+- `gui/notifications/notification_widget.py` - Notification widgets
+- `gui/widgets/progress_calculator.py` - Progress calculation
+- `gui/widgets/status_formatter.py` - Status formatting
+- `gui/workflows/workflow_base.py` - Workflow base class
+- Updated workflows using new base class
+- GUI tests for new components
+- Documentation of GUI standards
+
+**Success Criteria:**
+- All notifications use NotificationManager (no more ad-hoc QMessageBox)
+- All progress bars calculate accurately
+- All status messages use consistent formatting
+- MigrationWorkflowWidget extends WorkflowBase
+- Tests verify GUI component behavior
+
+---
+
+### Day 17: Migrate Existing Code
+
+**Goal:** Update all existing code to use new object model and GUI standards
 
 **Tasks:**
 
@@ -913,56 +1227,100 @@ not rule-based policy from Day 4). All infrastructure items REQUIRE folder, not 
    - Serialize ConfigItem objects using .to_dict()
    - Deserialize using ConfigItemFactory
 
-6. **Run integration tests:** ⭐ NEW
-   - Test complete pull workflow
-   - Test complete push workflow
-   - Test complete POV workflow
-   - Verify GUI displays correctly
-   - Test with production tenant (if available)
-
 **Deliverables:**
-- All GUI components updated
+- All GUI components migrated to new model and standards
 - All utility modules updated
+- Pull/push orchestrators using ConfigItem objects
 - Integration tests passing
-- No references to old dictionary-based model
+- No more raw dict manipulation
 
 ---
 
-### Day 15.5: Final Testing & Documentation
+### Day 18: Final Testing & Documentation
 
-**Goal:** Comprehensive testing and documentation with production validation
+**Goal:** Comprehensive testing, performance validation, and documentation
 
 **Tasks:**
 
 1. **Run full test suite:**
-   - Unit tests: All model classes
-   - Integration tests: Full workflows
-   - Performance tests: Bulk operations
-   - GUI tests: All workflows
+   - All unit tests (300+ tests expected)
+   - Integration tests
+   - Production example tests
+   - GUI tests (manual checklist)
+   - Performance tests
 
 2. **Update documentation:**
-   - Update README with new architecture
-   - Document all ConfigItem classes
-   - Document factory usage
-   - Document migration guide from v2.0
+   - Update README with new architecture overview
+   - Create `docs/ARCHITECTURE.md`:
+     * Class hierarchy diagrams
+     * Dependency flow diagrams
+     * Serialization format
+     * GUI architecture
+   - Complete API documentation for ConfigItem classes
+   - Update `docs/LOGGING_STANDARDS.md`
+   - Update `docs/CONFIG_FILE_FORMAT.md`
+   - Create migration guide: `docs/MIGRATION_GUIDE.md`
+     * How to add new config types
+     * How to extend workflows
+     * How to add new API endpoints
 
 3. **Performance validation:**
-   - Compare API call count (old vs new)
-   - Verify bulk operations are efficient
+   - Test with large configurations (500+ items)
    - Profile memory usage
+   - Profile save/load times
+   - Profile pull/push operations
+   - Optimize bottlenecks
+   - Document performance benchmarks
 
-4. **Validate with production examples:**
-   - Use examples captured in Phase 7.5
-   - Run production test suite
-   - Verify all workflows with real data
-   - Document any remaining incompatibilities
+4. **Create examples and tutorials:**
+   - Example scripts using new model:
+     * `examples/create_config_programmatically.py`
+     * `examples/analyze_config.py`
+     * `examples/compare_configs.py`
+   - Tutorial for adding new config types
+   - Tutorial for extending workflows
+
+5. **Validation report:**
+   - Create report comparing old vs new architecture
+   - List all improvements
+   - Document any limitations or known issues
+   - Performance comparison
+   - Test coverage report
 
 **Deliverables:**
-- Complete test coverage report
-- Updated documentation
-- Performance report
-- Production validation report
-- Final compatibility matrix
+- All tests passing (300+ tests)
+- Complete documentation (README, ARCHITECTURE, API docs, guides)
+- Performance benchmarks and validation report
+- Example scripts and tutorials
+- Migration guide for future development
+
+---
+
+## Timeline Summary
+
+### Revised Timeline (with new phases):
+
+| Phase | Days | Focus | Deliverables |
+|-------|------|-------|--------------|
+| **Phase 1** | Day 1 | Foundation | Base classes, versioning, tests (✅ COMPLETE) |
+| **Phase 2** | Day 2-5 | Object Models | 37 model classes (✅ COMPLETE) |
+| **Phase 3** | Day 6 | Container Classes | 4 container classes (✅ COMPLETE) |
+| **Phase 4** | Day 7 | Factory Pattern | ConfigItemFactory (✅ COMPLETE) |
+| **Phase 5** | Day 8-9 | API Integration | API client refactor, deprecate api_endpoints.py |
+| **Phase 6** | Day 10-11 | Bulk Operations | Rewrite pull orchestrator, new endpoints |
+| **Phase 7** | Day 12-13 | Push Operations | Update push orchestrator |
+| **Phase 7.5** | Day 13.5 | Production Examples | Capture, sanitize, validate, document defaults |
+| **Phase 8** | Day 14 | Logging Integration | Activity log in base classes, debug mode |
+| **Phase 9** | Day 15 | Config Serialization | save_to_file(), load_from_file(), GUI integration |
+| **Phase 10** | Day 16-18 | GUI Standards & Migration | Notifications, progress bars, workflow base, migration, docs |
+
+**Total Timeline:** ~18 days (was 15.5 days)
+
+**Key Changes:**
+- Added Phase 8 (Logging Integration) - 1 day
+- Added Phase 9 (Configuration Serialization) - 1 day
+- Expanded Phase 10 (GUI Standards & Migration) - 3 days (was 2 days)
+- Total increase: 3 days for critical integration work
 
 ---
 
@@ -1015,30 +1373,52 @@ tests/examples/
 
 ## Success Criteria
 
-- ✅ All ConfigItem classes implemented
-- ✅ All tests passing (target: 200+ tests)
-- ✅ Example coverage for all item types
-- ✅ API calls reduced (bulk operations)
-- ✅ No references to old dictionary model
-- ✅ Documentation complete
-- ✅ Version: 3.2.x or higher
-- ✅ Production validation successful
+**Core Architecture:**
+- ✅ All ConfigItem classes implemented (47 classes)
+- ✅ All tests passing (target: 300+ tests)
+- ✅ Example coverage for all item types (target: 75+ examples)
+- ✅ ConfigItemFactory with auto-detection
+- ⏳ API calls reduced (bulk operations)
+- ⏳ No references to old dictionary model
+- ⏳ Logging integrated into all classes
+- ⏳ Configuration save/load implemented
+- ⏳ GUI standards established
+- ⏳ Documentation complete
+- ⏳ Version: 3.2.x or higher
+- ⏳ Production validation successful
+
+**Phases Complete:**
+- ✅ Phase 1: Foundation (Day 1)
+- ✅ Phase 2: Object Models (Day 2-5)
+- ✅ Phase 3: Container Classes (Day 6)
+- ✅ Phase 4: Factory Pattern (Day 7)
+- ⏳ Phase 5: API Integration (Day 8-9)
+- ⏳ Phase 6: Bulk Operations (Day 10-11)
+- ⏳ Phase 7: Push Operations (Day 12-13)
+- ⏳ Phase 7.5: Production Examples (Day 13.5)
+- ⏳ Phase 8: Logging Integration (Day 14) - **NEW**
+- ⏳ Phase 9: Config Serialization (Day 15) - **NEW**
+- ⏳ Phase 10: GUI Standards & Migration (Day 16-18) - **EXPANDED**
 
 ---
 
 ## Current Status
 
-**Phase:** 1 - Foundation  
-**Day:** 1 (Complete ✅)  
-**Version:** 3.1.137  
-**Next:** Day 2 - Object Models
+**Phase:** 4 - Factory Pattern  
+**Day:** 7 (Complete ✅)  
+**Version:** 3.1.154  
+**Next:** Phase 5 - API Integration (Day 8-9)
 
-**Completed:**
-- ✅ Base ConfigItem class
-- ✅ Specialized base classes (ObjectItem, PolicyItem, ProfileItem, RuleItem)
-- ✅ Automated versioning
-- ✅ Test infrastructure
-- ✅ Example configurations (22 files)
-- ✅ Example loader utility
+**Completed (Phases 1-4):**
+- ✅ **Phase 1**: Base ConfigItem class, specialized base classes, versioning, tests (Day 1)
+- ✅ **Phase 2**: All 37 model classes - objects, profiles, policies, infrastructure (Day 2-5)
+- ✅ **Phase 3**: All 4 container classes - folders, snippets, infrastructure, configuration (Day 6)
+- ✅ **Phase 4**: ConfigItemFactory with 37 registered types and auto-detection (Day 7)
 
-**Ready for:** Day 2 - Create Specific Object Model Classes
+**Statistics:**
+- **Classes:** 47 (5 base + 37 models + 4 containers + 1 factory)
+- **Tests:** 231 (exceeded 200+ target by 16%)
+- **Examples:** 76 (exceeded 75+ target by 1%)
+- **Coverage:** 18.7% (increasing as we migrate existing code)
+
+**Ready for:** Phase 5 - API Integration (Day 8-9)
