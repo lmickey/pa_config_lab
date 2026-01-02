@@ -1,0 +1,6 @@
+{
+  "name": "trusted-networks",
+  "folder": "Mobile Users",
+  "static": ["internal-network", "vpn-subnets"],
+  "description": "All trusted network ranges"
+}

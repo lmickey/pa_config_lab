@@ -1,0 +1,11 @@
+{
+  "name": "allow-web-traffic",
+  "folder": "Mobile Users",
+  "from": ["any"],
+  "to": ["any"],
+  "source": ["any"],
+  "destination": ["any"],
+  "service": ["tcp-443", "tcp-80"],
+  "application": ["web-browsing", "ssl"],
+  "action": "allow"
+}

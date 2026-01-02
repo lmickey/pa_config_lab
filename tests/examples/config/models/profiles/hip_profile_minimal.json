@@ -1,0 +1,6 @@
+{
+  "name": "corporate-device",
+  "folder": "Mobile Users",
+  "match": "all",
+  "description": "Corporate managed device requirements"
+}

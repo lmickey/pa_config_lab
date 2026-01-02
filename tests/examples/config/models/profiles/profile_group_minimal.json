@@ -1,0 +1,10 @@
+{
+  "name": "best-practice",
+  "folder": "Shared",
+  "virus": ["default"],
+  "spyware": ["strict"],
+  "vulnerability": ["strict"],
+  "url_filtering": ["default"],
+  "file_blocking": ["strict file blocking"],
+  "is_default": true
+}

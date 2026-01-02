@@ -1,0 +1,13 @@
+{
+  "name": "block-legacy-protocols",
+  "folder": "Remote Networks",
+  "from": ["any"],
+  "to": ["any"],
+  "source": ["any"],
+  "destination": ["any"],
+  "service": ["telnet", "ftp"],
+  "application": ["telnet", "ftp"],
+  "action": "deny",
+  "disabled": true,
+  "description": "Temporarily disabled - legacy protocol block"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "tcp-8443",
+  "folder": "Mobile Users",
+  "protocol": {
+    "tcp": {
+      "port": "8443"
+    }
+  },
+  "description": "Custom HTTPS port"
+}

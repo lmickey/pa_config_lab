@@ -1,0 +1,12 @@
+{
+  "id": "abc-123-def-456",
+  "name": "datacenter-subnet",
+  "folder": "Remote Networks",
+  "ip_netmask": "10.0.0.0/16",
+  "description": "Primary datacenter subnet",
+  "tag": ["production", "datacenter"],
+  "created": "2024-01-15T10:30:00Z",
+  "updated": "2024-06-20T14:22:00Z",
+  "created_by": "admin@example.com",
+  "updated_by": "security-team@example.com"
+}

@@ -1,0 +1,15 @@
+{
+  "name": "branch-office-tunnel",
+  "auto_key": {
+    "ike_gateway": [
+      {
+        "name": "branch-office-gateway"
+      }
+    ],
+    "ipsec_crypto_profile": "default-ipsec-crypto"
+  },
+  "tunnel_monitor": {
+    "enable": true,
+    "destination_ip": "10.1.1.1"
+  }
+}

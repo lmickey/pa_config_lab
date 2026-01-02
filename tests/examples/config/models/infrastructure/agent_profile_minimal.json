@@ -1,0 +1,10 @@
+{
+  "name": "corporate-gp-agent",
+  "portal": "corporate-portal",
+  "authentication_profile": "saml-auth",
+  "split_tunneling": {
+    "enabled": true,
+    "include_domains": ["*.corp.example.com"],
+    "exclude_domains": ["*.public.example.com"]
+  }
+}

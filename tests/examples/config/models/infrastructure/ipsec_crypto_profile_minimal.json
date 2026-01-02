@@ -1,0 +1,11 @@
+{
+  "name": "default-ipsec-crypto",
+  "esp": {
+    "authentication": ["sha256"],
+    "encryption": ["aes-256-cbc"]
+  },
+  "dh_group": "group14",
+  "lifetime": {
+    "hours": 1
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "branch-dc-connection",
+  "region": "us-east",
+  "ipsec_tunnel": "branch-office-tunnel",
+  "backup_SC": "backup-connection",
+  "bgp_peer": {
+    "local_ip_address": "169.254.10.1/30",
+    "peer_ip_address": "169.254.10.2",
+    "secret": "********"
+  },
+  "subnets": ["10.100.0.0/16", "10.200.0.0/16"]
+}

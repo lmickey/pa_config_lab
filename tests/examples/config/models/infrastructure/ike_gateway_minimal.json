@@ -1,0 +1,24 @@
+{
+  "name": "branch-office-gateway",
+  "authentication": {
+    "pre_shared_key": {
+      "key": "********"
+    }
+  },
+  "peer_address": {
+    "ip": "203.0.113.10"
+  },
+  "protocol": {
+    "ikev2": {
+      "ike_crypto_profile": "default-ike-crypto"
+    }
+  },
+  "local_id": {
+    "id": "hq@example.com",
+    "type": "ufqdn"
+  },
+  "peer_id": {
+    "id": "branch@example.com",
+    "type": "ufqdn"
+  }
+}

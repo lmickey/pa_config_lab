@@ -1,0 +1,15 @@
+{
+  "name": "secure-access-rule",
+  "folder": "Mobile Users",
+  "from": ["trust"],
+  "to": ["dmz"],
+  "source": ["internal-network", "vpn-subnets"],
+  "destination": ["web-servers", "app-servers"],
+  "service": ["tcp-443", "tcp-8443"],
+  "application": ["web-browsing", "ssl"],
+  "action": "allow",
+  "profile_setting": {
+    "group": ["strict-security"]
+  },
+  "description": "Rule with multiple object dependencies"
+}

@@ -6,6 +6,7 @@ Tests the base ConfigItem class and specialized base classes.
 
 import pytest
 from config.models.base import ConfigItem, ObjectItem, PolicyItem, ProfileItem, RuleItem
+from tests.examples.loader import Examples, load_object_example, load_policy_example
 
 
 class MockAddressObject(ObjectItem):
@@ -249,6 +250,46 @@ class TestRuleItem:
         }
         rule = MockSecurityRule(rule_config)
         assert rule.is_enabled
+
+
+class TestExampleLoader:
+    """Tests using example configurations from tests/examples/"""
+    
+    def test_load_address_example(self):
+        """Test loading address object from examples"""
+        config = Examples.address_minimal()
+        
+        # Should be able to create object from example
+        item = MockAddressObject(config)
+        
+        assert item.name == 'internal-network'
+        assert item.folder == 'Mobile Users'
+        assert item.raw_config['ip_netmask'] == '192.168.1.0/24'
+    
+    def test_load_security_rule_example(self):
+        """Test loading security rule from examples"""
+        config = Examples.security_rule_full()
+        
+        # Should be able to create rule from example
+        rule = MockSecurityRule(config)
+        
+        assert rule.name == 'allow-internal-apps'
+        assert rule.folder == 'Mobile Users'
+        assert rule.position == 5
+        assert rule.is_enabled
+        assert rule.has_dependencies  # Has source, destination, service, application
+    
+    def test_load_snippet_based_example(self):
+        """Test loading snippet-based configuration"""
+        config = Examples.address_snippet()
+        
+        item = MockAddressObject(config)
+        
+        assert item.name == 'web-servers'
+        assert item.snippet == 'production-snippet'
+        assert item.folder is None
+        assert item.is_in_snippet()
+        assert not item.is_in_folder()
 
 
 if __name__ == '__main__':

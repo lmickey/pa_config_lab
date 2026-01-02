@@ -1,0 +1,22 @@
+{
+  "id": "sc-456-789-abc",
+  "name": "primary-datacenter",
+  "folder": "Remote Networks",
+  "region": "us-west",
+  "ipsec_tunnel": "dc-primary-tunnel",
+  "backup_SC": "secondary-datacenter",
+  "bgp_peer": {
+    "local_ip_address": "169.254.20.1/30",
+    "peer_ip_address": "169.254.20.2",
+    "peer_as_number": "65001",
+    "secret": "********",
+    "summarize_mobile_user_routes": true
+  },
+  "subnets": ["10.0.0.0/8", "172.16.0.0/12"],
+  "nat_pool": "nat-pool-1",
+  "no_export_community": "disabled",
+  "source_nat": true,
+  "description": "Primary datacenter connection with BGP",
+  "created": "2024-03-01T11:00:00Z",
+  "updated": "2024-08-15T09:30:00Z"
+}
