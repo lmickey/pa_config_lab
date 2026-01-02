@@ -1,0 +1,13 @@
+{
+  "name": "default-av",
+  "folder": "Shared",
+  "decoder": {
+    "http": {
+      "action": "default"
+    },
+    "smtp": {
+      "action": "default"
+    }
+  },
+  "description": "Default antivirus profile"
+}

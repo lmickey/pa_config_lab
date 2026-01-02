@@ -1,0 +1,16 @@
+{
+  "name": "voice-priority",
+  "folder": "Mobile Users",
+  "class_bandwidth_type": {
+    "mbps": {
+      "class": [
+        {
+          "name": "class1",
+          "priority": "real-time",
+          "guaranteed_bandwidth": 10
+        }
+      ]
+    }
+  },
+  "description": "Voice traffic QoS priority"
+}

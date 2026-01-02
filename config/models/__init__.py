@@ -25,6 +25,25 @@ from .objects import (
     Schedule,
 )
 
+from .profiles import (
+    AuthenticationProfile,
+    DecryptionProfile,
+    URLFilteringProfile,
+    AntivirusProfile,
+    AntiSpywareProfile,
+    VulnerabilityProfile,
+    FileBlockingProfile,
+    WildfireProfile,
+    ProfileGroup,
+    HIPProfile,
+    HIPObject,
+    HTTPHeaderProfile,
+    CertificateProfile,
+    OCSPResponder,
+    SCEPProfile,
+    QoSProfile,
+)
+
 __all__ = [
     # Base classes
     'ConfigItem',
@@ -42,4 +61,21 @@ __all__ = [
     'ApplicationGroup',
     'ApplicationFilter',
     'Schedule',
+    # Profile models
+    'AuthenticationProfile',
+    'DecryptionProfile',
+    'URLFilteringProfile',
+    'AntivirusProfile',
+    'AntiSpywareProfile',
+    'VulnerabilityProfile',
+    'FileBlockingProfile',
+    'WildfireProfile',
+    'ProfileGroup',
+    'HIPProfile',
+    'HIPObject',
+    'HTTPHeaderProfile',
+    'CertificateProfile',
+    'OCSPResponder',
+    'SCEPProfile',
+    'QoSProfile',
 ]

@@ -1,0 +1,14 @@
+{
+  "name": "windows-compliant",
+  "folder": "Mobile Users",
+  "host_info": {
+    "criteria": {
+      "os": {
+        "contains": {
+          "Microsoft": "All"
+        }
+      }
+    }
+  },
+  "description": "Windows OS requirement"
+}

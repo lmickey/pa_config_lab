@@ -1,0 +1,11 @@
+{
+  "name": "default-cert-profile",
+  "folder": "Shared",
+  "username_field": {
+    "subject": "common-name"
+  },
+  "cert_status_timeout": 5,
+  "use_crl": true,
+  "use_ocsp": true,
+  "description": "Default certificate validation profile"
+}

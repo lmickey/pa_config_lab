@@ -1,0 +1,16 @@
+{
+  "id": "url-789-abc",
+  "name": "corporate-url-policy",
+  "folder": "Mobile Users",
+  "action": {
+    "block": ["adult", "gambling", "malware", "phishing"],
+    "alert": ["hacking", "proxy-avoidance", "peer-to-peer"],
+    "allow": ["business-and-economy", "computer-and-internet-info"],
+    "continue": ["low-risk"]
+  },
+  "credential_enforcement": {
+    "mode": ["ip-user", "domain-credentials"],
+    "log_severity": "medium"
+  },
+  "description": "Corporate URL filtering policy"
+}

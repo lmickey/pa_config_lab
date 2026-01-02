@@ -1,0 +1,17 @@
+{
+  "id": "dec-123-456",
+  "name": "strict-decryption",
+  "folder": "Mobile Users",
+  "ssl_protocol_settings": {
+    "min_version": "tls1-2",
+    "max_version": "max",
+    "key_exchange_algorithms": ["RSA", "ECDHE"]
+  },
+  "ssl_forward_proxy": {
+    "auto_include_altname": true,
+    "block_client_cert": false,
+    "block_expired_certificate": true,
+    "block_untrusted_issuer": true
+  },
+  "description": "Strict TLS decryption policy"
+}

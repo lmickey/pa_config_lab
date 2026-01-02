@@ -1,0 +1,12 @@
+{
+  "name": "default-wildfire",
+  "folder": "Shared",
+  "rules": [
+    {
+      "name": "forward-all",
+      "analysis": "public-cloud",
+      "direction": "both"
+    }
+  ],
+  "description": "Forward files to Wildfire for analysis"
+}

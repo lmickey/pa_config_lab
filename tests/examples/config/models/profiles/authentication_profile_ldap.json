@@ -1,0 +1,12 @@
+{
+  "name": "ad-ldap",
+  "folder": "Mobile Users",
+  "method": {
+    "ldap": {
+      "server_profile": "active-directory",
+      "login_attribute": "sAMAccountName",
+      "password_expiry_warning": 7
+    }
+  },
+  "description": "Active Directory LDAP authentication"
+}

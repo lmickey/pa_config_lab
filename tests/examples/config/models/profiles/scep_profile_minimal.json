@@ -1,0 +1,7 @@
+{
+  "name": "scep-enrollment",
+  "folder": "Shared",
+  "ca_identity": "CN=CA,O=Example,C=US",
+  "url": "https://scep.example.com/certsrv/mscep/mscep.dll",
+  "description": "SCEP enrollment profile"
+}

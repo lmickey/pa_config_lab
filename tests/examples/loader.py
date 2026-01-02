@@ -201,6 +201,78 @@ class Examples:
     def schedule_non_recurring() -> Dict[str, Any]:
         return load_object_example('schedule_non_recurring')
     
+    # Profiles - Authentication
+    @staticmethod
+    def auth_profile_saml() -> Dict[str, Any]:
+        return load_profile_example('authentication_profile_saml')
+    
+    @staticmethod
+    def auth_profile_ldap() -> Dict[str, Any]:
+        return load_profile_example('authentication_profile_ldap')
+    
+    @staticmethod
+    def auth_profile_cie() -> Dict[str, Any]:
+        return load_profile_example('authentication_profile_cie')
+    
+    # Profiles - Security
+    @staticmethod
+    def decryption_profile_full() -> Dict[str, Any]:
+        return load_profile_example('decryption_profile_full')
+    
+    @staticmethod
+    def url_filtering_profile_full() -> Dict[str, Any]:
+        return load_profile_example('url_filtering_profile_full')
+    
+    @staticmethod
+    def antivirus_profile() -> Dict[str, Any]:
+        return load_profile_example('antivirus_profile_minimal')
+    
+    @staticmethod
+    def anti_spyware_profile() -> Dict[str, Any]:
+        return load_profile_example('anti_spyware_profile_minimal')
+    
+    @staticmethod
+    def vulnerability_profile() -> Dict[str, Any]:
+        return load_profile_example('vulnerability_profile_minimal')
+    
+    @staticmethod
+    def file_blocking_profile() -> Dict[str, Any]:
+        return load_profile_example('file_blocking_profile_minimal')
+    
+    @staticmethod
+    def wildfire_profile() -> Dict[str, Any]:
+        return load_profile_example('wildfire_profile_minimal')
+    
+    @staticmethod
+    def profile_group_custom() -> Dict[str, Any]:
+        return load_profile_example('profile_group_custom')
+    
+    # Profiles - HIP
+    @staticmethod
+    def hip_object() -> Dict[str, Any]:
+        return load_profile_example('hip_object_minimal')
+    
+    # Profiles - Other
+    @staticmethod
+    def http_header_profile() -> Dict[str, Any]:
+        return load_profile_example('http_header_profile_minimal')
+    
+    @staticmethod
+    def certificate_profile() -> Dict[str, Any]:
+        return load_profile_example('certificate_profile_minimal')
+    
+    @staticmethod
+    def ocsp_responder() -> Dict[str, Any]:
+        return load_profile_example('ocsp_responder_minimal')
+    
+    @staticmethod
+    def scep_profile() -> Dict[str, Any]:
+        return load_profile_example('scep_profile_minimal')
+    
+    @staticmethod
+    def qos_profile() -> Dict[str, Any]:
+        return load_profile_example('qos_profile_minimal')
+    
     # Policies
     @staticmethod
     def security_rule_minimal() -> Dict[str, Any]:
