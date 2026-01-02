@@ -81,8 +81,19 @@ class DefaultDetector:
         if not snippet:
             return snippet
 
+        # Check if already marked as default by snippet capture (based on type field)
+        already_marked = snippet.get("is_default", False)
+        
+        # Also check by name against known defaults
         snippet_name = snippet.get("name", "")
-        is_default_snippet = self.default_configs.is_default_snippet(snippet_name)
+        is_default_by_name = self.default_configs.is_default_snippet(snippet_name)
+        
+        # Check by type field (predefined/readonly)
+        snippet_type = snippet.get("type", "")
+        is_default_by_type = snippet_type in ["predefined", "readonly"]
+        
+        # A snippet is default if ANY of these conditions are true
+        is_default_snippet = already_marked or is_default_by_name or is_default_by_type
 
         if is_default_snippet:
             self.detection_stats["snippets"] += 1
