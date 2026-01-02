@@ -6,6 +6,7 @@ Tests all network object model classes.
 
 import pytest
 from config.models.objects import (
+    Tag,
     AddressObject,
     AddressGroup,
     ServiceObject,
@@ -16,6 +17,90 @@ from config.models.objects import (
     Schedule,
 )
 from tests.examples.loader import Examples
+
+
+class TestTag:
+    """Tests for Tag class"""
+    
+    def test_create_tag_minimal(self):
+        """Test creating minimal tag"""
+        config = Examples.tag_minimal()
+        tag = Tag(config)
+        
+        assert tag.name == 'production'
+        assert tag.folder == 'All'
+        assert tag.snippet is None
+        assert tag.color == 'Red'
+        assert tag.comments is None
+        assert not tag.has_dependencies
+    
+    def test_create_tag_full(self):
+        """Test creating full tag with all fields"""
+        config = Examples.tag_full()
+        tag = Tag(config)
+        
+        assert tag.name == 'Zoom'
+        assert tag.folder == 'Shared'
+        assert tag.color == 'Cerulean Blue'
+        assert tag.comments == 'Zoom for use in address group'
+    
+    def test_create_tag_with_both_folder_and_snippet(self):
+        """Test creating tag with both folder and snippet (valid for tags)"""
+        config = Examples.tag_with_snippet()
+        tag = Tag(config)
+        
+        assert tag.name == 'Web Security Global'
+        assert tag.folder == 'All'
+        assert tag.snippet == 'Web-Security-Default'
+        assert tag.color == 'Green'
+        
+        # Location should show both
+        location = tag.get_location()
+        assert 'All' in location
+        assert 'Web-Security-Default' in location
+    
+    def test_create_tag_no_color(self):
+        """Test creating tag without color"""
+        config = Examples.tag_no_color()
+        tag = Tag(config)
+        
+        assert tag.name == 'empty'
+        assert tag.color is None
+    
+    def test_tag_validation_no_location(self):
+        """Test validation catches tag with neither folder nor snippet"""
+        config = {
+            'name': 'invalid-tag'
+        }
+        
+        with pytest.raises(ValueError, match="at least folder or snippet"):
+            Tag(config)
+    
+    def test_tag_validation_invalid_color(self):
+        """Test validation catches invalid color"""
+        config = {
+            'name': 'invalid-tag',
+            'folder': 'All',
+            'color': 'InvalidColor'
+        }
+        
+        tag = Tag(config)
+        errors = tag.validate()
+        
+        assert len(errors) > 0
+        assert any('color' in error.lower() for error in errors)
+    
+    def test_tag_rename(self):
+        """Test renaming tag"""
+        config = Examples.tag_minimal()
+        tag = Tag(config)
+        
+        old_name = tag.name
+        tag.rename('staging')
+        
+        assert tag.name == 'staging'
+        assert tag.name != old_name
+        assert tag.raw_config['name'] == 'staging'
 
 
 class TestAddressObject:
@@ -528,6 +613,48 @@ class TestObjectDeletion:
         
         assert not service.deleted
         assert service.delete_success is None
+
+
+class TestTagSupport:
+    """Test tag support on ConfigItem objects"""
+    
+    def test_address_with_tags(self):
+        """Test address object with tags"""
+        config = Examples.address_with_tags()
+        address = AddressObject(config)
+        
+        assert address.has_tags
+        tags = address.get_tags()
+        assert len(tags) == 3
+        assert 'production' in tags
+        assert 'server' in tags
+        assert 'datacenter' in tags
+    
+    def test_address_without_tags(self):
+        """Test address object without tags"""
+        config = Examples.address_minimal()
+        address = AddressObject(config)
+        
+        assert not address.has_tags
+        tags = address.get_tags()
+        assert len(tags) == 0
+        assert tags == []
+    
+    def test_get_tags_returns_copy(self):
+        """Test that get_tags returns a copy, not reference"""
+        config = Examples.address_with_tags()
+        address = AddressObject(config)
+        
+        tags1 = address.get_tags()
+        tags2 = address.get_tags()
+        
+        # Should be equal but not the same object
+        assert tags1 == tags2
+        assert tags1 is not tags2
+        
+        # Modifying returned list shouldn't affect original
+        tags1.append('new-tag')
+        assert len(address.get_tags()) == 3  # Still 3, not 4
 
 
 if __name__ == '__main__':

@@ -2,6 +2,7 @@
 Object model classes for network objects.
 
 This module contains ConfigItem subclasses for network objects including:
+- Tags
 - Address objects (IP addresses, ranges, FQDNs)
 - Address groups (static and dynamic)
 - Service objects (TCP/UDP services)
@@ -14,9 +15,108 @@ This module contains ConfigItem subclasses for network objects including:
 
 from typing import List, Dict, Any, Optional
 import logging
-from config.models.base import ObjectItem
+from config.models.base import ConfigItem, ObjectItem
 
 logger = logging.getLogger(__name__)
+
+
+class Tag(ConfigItem):
+    """
+    Represents a tag object.
+    
+    API Endpoint: /sse/config/v1/tags
+    
+    Tags are special - they can have BOTH folder AND snippet set simultaneously,
+    unlike other configuration items where folder and snippet are mutually exclusive.
+    
+    Attributes:
+        - color: Tag color (optional)
+        - comments: Tag comments (optional)
+    """
+    
+    api_endpoint = "https://api.sase.paloaltonetworks.com/sse/config/v1/tags"
+    item_type = "tag"
+    
+    def __init__(self, raw_config: Dict[str, Any]):
+        """
+        Initialize Tag object.
+        
+        Override __init__ to allow both folder and snippet to be set,
+        as tags are the exception to the mutual exclusivity rule.
+        """
+        # Store raw config first
+        self.raw_config = raw_config.copy()
+        self.name = raw_config.get('name', '')
+        self.id = raw_config.get('id')
+        
+        # Tags can have both folder AND snippet - this is valid!
+        self.folder = raw_config.get('folder')
+        self.snippet = raw_config.get('snippet')
+        
+        # At least one must be set
+        if not self.folder and not self.snippet:
+            raise ValueError(f"Tag must have at least folder or snippet set for {self.name}")
+        
+        self.is_default = raw_config.get('is_default', False)
+        self.push_strategy = 'create'
+        self.metadata = raw_config.get('metadata', {})
+        if not self.metadata:
+            self.metadata = self._extract_metadata(raw_config)
+        
+        self.deleted = False
+        self.delete_success: Optional[bool] = None
+        self._dependencies_cache: Optional[List[tuple]] = None
+        self._parent_cache = None
+        self._children_cache = None
+    
+    @property
+    def color(self) -> Optional[str]:
+        """Get tag color"""
+        return self.raw_config.get('color')
+    
+    @property
+    def comments(self) -> Optional[str]:
+        """Get tag comments"""
+        return self.raw_config.get('comments')
+    
+    def get_location(self) -> str:
+        """
+        Get location string for tag.
+        
+        Since tags can have both folder and snippet, we return a combined string.
+        """
+        if self.folder and self.snippet:
+            return f"{self.folder} (snippet: {self.snippet})"
+        elif self.folder:
+            return self.folder
+        else:
+            return self.snippet
+    
+    def _validate_specific(self) -> List[str]:
+        """Validate tag object"""
+        errors = []
+        
+        # At least one of folder or snippet must be set
+        if not self.folder and not self.snippet:
+            errors.append("Tag must have at least folder or snippet set")
+        
+        # Color must be from valid set if specified
+        valid_colors = [
+            'Red', 'Green', 'Blue', 'Yellow', 'Copper', 'Orange', 'Purple',
+            'Gray', 'Light Green', 'Cyan', 'Light Gray', 'Blue Gray',
+            'Lime', 'Black', 'Gold', 'Brown', 'Olive', 'Maroon',
+            'Red-Orange', 'Yellow-Orange', 'Forest Green', 'Turquoise Blue',
+            'Azure Blue', 'Cerulean Blue', 'Midnight Blue', 'Medium Blue',
+            'Cobalt Blue', 'Violet Blue', 'Blue Violet', 'Medium Violet',
+            'Medium Rose', 'Lavender', 'Orchid', 'Thistle', 'Peach',
+            'Salmon', 'Magenta', 'Red Violet', 'Mahogany', 'Burnt Sienna',
+            'Chestnut'
+        ]
+        
+        if self.color and self.color not in valid_colors:
+            errors.append(f"Invalid color '{self.color}'. Must be one of the predefined colors.")
+        
+        return errors
 
 
 class AddressObject(ObjectItem):

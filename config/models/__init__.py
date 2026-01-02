@@ -14,6 +14,7 @@ from .base import (
 )
 
 from .objects import (
+    Tag,
     AddressObject,
     AddressGroup,
     ServiceObject,
@@ -32,6 +33,7 @@ __all__ = [
     'ProfileItem',
     'RuleItem',
     # Object models
+    'Tag',
     'AddressObject',
     'AddressGroup',
     'ServiceObject',

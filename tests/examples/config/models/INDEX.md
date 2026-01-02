@@ -4,6 +4,16 @@ This index provides a quick reference to all example configuration files.
 
 ## Objects (`objects/`)
 
+### Tags
+
+| File | Description | Key Features |
+|------|-------------|--------------|
+| `tag_minimal.json` | Basic tag | Folder-based, with color |
+| `tag_full.json` | Complete tag | All metadata, comments |
+| `tag_with_snippet.json` | Tag with both folder and snippet | **SPECIAL**: Tags can have both! |
+| `tag_no_color.json` | Tag without color | Minimal configuration |
+| `address_with_tags.json` | Address with tags | Demonstrates tag usage |
+
 ### Addresses
 
 | File | Description | Key Features |

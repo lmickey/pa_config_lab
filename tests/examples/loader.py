@@ -120,6 +120,23 @@ class Examples:
         >>> config = Examples.security_rule_full()
     """
     
+    # Objects - Tags
+    @staticmethod
+    def tag_minimal() -> Dict[str, Any]:
+        return load_object_example('tag_minimal')
+    
+    @staticmethod
+    def tag_full() -> Dict[str, Any]:
+        return load_object_example('tag_full')
+    
+    @staticmethod
+    def tag_with_snippet() -> Dict[str, Any]:
+        return load_object_example('tag_with_snippet')
+    
+    @staticmethod
+    def tag_no_color() -> Dict[str, Any]:
+        return load_object_example('tag_no_color')
+    
     # Objects - Addresses
     @staticmethod
     def address_minimal() -> Dict[str, Any]:
@@ -140,6 +157,10 @@ class Examples:
     @staticmethod
     def address_range() -> Dict[str, Any]:
         return load_object_example('address_range')
+    
+    @staticmethod
+    def address_with_tags() -> Dict[str, Any]:
+        return load_object_example('address_with_tags')
     
     @staticmethod
     def address_group() -> Dict[str, Any]:

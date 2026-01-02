@@ -134,6 +134,29 @@ class ConfigItem(ABC):
         
         return False
     
+    @property
+    def has_tags(self) -> bool:
+        """
+        Check if item has tags.
+        
+        Returns:
+            True if item has one or more tags
+        """
+        tags = self.raw_config.get('tag', [])
+        return isinstance(tags, list) and len(tags) > 0
+    
+    def get_tags(self) -> List[str]:
+        """
+        Get list of tag names associated with this item.
+        
+        Returns:
+            List of tag names (empty list if no tags)
+        """
+        tags = self.raw_config.get('tag', [])
+        if isinstance(tags, list):
+            return tags.copy()
+        return []
+    
     # ========== Location Methods ==========
     
     def get_location(self) -> str:
