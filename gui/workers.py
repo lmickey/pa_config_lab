@@ -163,8 +163,11 @@ class PullWorker(QThread):
                 self.progress.emit("Detecting and filtering defaults...", 85)
                 detector = DefaultDetector()
                 
-                # Detect defaults in config (modifies config in place)
+                # Detect defaults in config (marks items with is_default flag)
                 config = detector.detect_defaults_in_config(config)
+                
+                # Actually filter out the defaults (removes items marked as default)
+                config = detector.filter_defaults(config, include_defaults=False)
                 
                 # Get statistics
                 total_defaults = sum(detector.detection_stats.values())
