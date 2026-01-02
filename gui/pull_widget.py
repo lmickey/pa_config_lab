@@ -311,18 +311,28 @@ class PullConfigWidget(QWidget):
         
         dialog = FolderSelectionDialog(self.api_client, self)
         if dialog.exec():
-            self.selected_folders = dialog.get_selected_folders()
-            self.selected_components = dialog.get_selected_components()
-            self.selected_snippets = dialog.get_selected_snippets()
+            selected_folders = dialog.get_selected_folders()
+            selected_components = dialog.get_selected_components()
+            selected_snippets = dialog.get_selected_snippets()
             
-            # Update label
-            folder_count = len(self.selected_folders)
-            snippet_count = len(self.selected_snippets)
+            # If nothing was selected, treat as "pull all" by setting to None
+            # Only set if user actually selected something
+            folder_count = len(selected_folders)
+            snippet_count = len(selected_snippets)
             
             if folder_count == 0 and snippet_count == 0:
+                # User opened dialog but didn't select anything - pull all
+                self.selected_folders = []  # Will be converted to None in _start_pull
+                self.selected_components = {}
+                self.selected_snippets = []
                 self.folder_selection_label.setText("No specific folders selected (will pull all)")
                 self.folder_selection_label.setStyleSheet("color: gray; font-size: 10px; padding: 5px;")
             else:
+                # User selected specific folders/snippets
+                self.selected_folders = selected_folders
+                self.selected_components = selected_components
+                self.selected_snippets = selected_snippets
+                
                 parts = []
                 if folder_count > 0:
                     parts.append(f"{folder_count} folder(s)")
