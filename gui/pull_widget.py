@@ -169,23 +169,23 @@ class PullConfigWidget(QWidget):
         infra_group.setLayout(infra_layout)
         scroll_layout.addWidget(infra_group)
 
-        # Advanced options
+        scroll_layout.addStretch()
+        scroll.setWidget(scroll_widget)
+        layout.addWidget(scroll)
+        
+        # Advanced options (moved outside scroll area)
         advanced_group = QGroupBox("Advanced Options")
         advanced_layout = QVBoxLayout()
 
         self.filter_defaults_check = QCheckBox("Filter Default Configurations")
-        self.filter_defaults_check.setChecked(False)
+        self.filter_defaults_check.setChecked(True)  # Auto-checked by default
         self.filter_defaults_check.setToolTip(
             "Automatically detect and exclude default configurations"
         )
         advanced_layout.addWidget(self.filter_defaults_check)
 
         advanced_group.setLayout(advanced_layout)
-        scroll_layout.addWidget(advanced_group)
-
-        scroll_layout.addStretch()
-        scroll.setWidget(scroll_widget)
-        layout.addWidget(scroll)
+        layout.addWidget(advanced_group)
 
         # Action buttons
         button_layout = QHBoxLayout()
