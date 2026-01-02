@@ -257,52 +257,72 @@ class ConnectionDialog(QDialog):
         Returns:
             API client if successful, None otherwise
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         try:
             from prisma.api_client import PrismaAccessAPIClient
             from config.tenant_manager import TenantManager
             
-            # Get credentials from tenant manager
-            manager = TenantManager()
             tenant_name = tenant_data.get('name')
+            logger.info(f"Attempting to connect to saved tenant: {tenant_name}")
             
             if not tenant_name:
+                logger.error("No tenant name provided in tenant_data")
                 return None
+            
+            # Get credentials from tenant manager
+            manager = TenantManager()
+            logger.info(f"Loading tenant details from TenantManager for: {tenant_name}")
             
             # Load full tenant details (including decrypted credentials)
             tenant = manager.get_tenant(tenant_name)
             if not tenant:
+                logger.error(f"Tenant not found in TenantManager: {tenant_name}")
                 return None
+            
+            logger.info(f"Tenant loaded successfully: {tenant_name}")
             
             # Extract credentials
             tsg_id = tenant.get('tsg_id')
             api_user = tenant.get('client_id')
             api_secret = tenant.get('client_secret')
             
+            logger.info(f"Extracted credentials - TSG ID: {tsg_id}, Client ID: {api_user[:10] if api_user else 'None'}..., Secret: {'***' if api_secret else 'None'}")
+            
             if not all([tsg_id, api_user, api_secret]):
+                logger.error(f"Missing credentials - TSG ID: {bool(tsg_id)}, Client ID: {bool(api_user)}, Secret: {bool(api_secret)}")
                 return None
             
             # Create API client
+            logger.info(f"Creating PrismaAccessAPIClient for tenant: {tenant_name}")
             api_client = PrismaAccessAPIClient(
                 tsg_id=tsg_id,
                 api_user=api_user,
                 api_secret=api_secret
             )
             
+            logger.info("API client created, checking for valid token...")
+            
             # Verify connection by checking token
             if api_client.token:
+                logger.info(f"✓ Successfully connected to tenant: {tenant_name}")
                 self.api_client = api_client
                 self.connection_name = tenant_name
                 
                 # Update last used timestamp
                 manager.update_last_used(tenant_name)
+                logger.info(f"Updated last_used timestamp for: {tenant_name}")
                 
                 return api_client
             else:
+                logger.error(f"Authentication failed - no token received for tenant: {tenant_name}")
                 return None
                 
         except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(f"Error connecting to saved tenant: {e}")
+            logger.error(f"Error connecting to saved tenant '{tenant_name}': {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
     
 

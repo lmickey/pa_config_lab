@@ -330,9 +330,15 @@ class PullConfigWidget(QWidget):
     
     def _connect_to_saved_tenant(self, tenant_data: Dict[str, Any]):
         """Connect to a saved tenant."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
         from gui.connection_dialog import ConnectionDialog
         from PyQt6.QtCore import QCoreApplication
         from PyQt6.QtWidgets import QProgressDialog
+        
+        tenant_name = tenant_data.get('name', 'Unknown')
+        logger.info(f"Pull widget: Attempting to connect to saved tenant: {tenant_name}")
         
         try:
             # Show progress
@@ -344,25 +350,31 @@ class PullConfigWidget(QWidget):
                 progress.show()
                 QCoreApplication.processEvents()
                 
+                logger.info(f"Creating ConnectionDialog for tenant: {tenant_name}")
+                
                 # Attempt connection using saved credentials
                 dialog = ConnectionDialog(self)
+                logger.info(f"Calling connect_with_saved_tenant for: {tenant_name}")
                 client = dialog.connect_with_saved_tenant(tenant_data)
                 
                 if client:
-                    self.set_api_client(client, tenant_data.get('name', 'Unknown'))
+                    logger.info(f"✓ Connection successful for tenant: {tenant_name}")
+                    self.set_api_client(client, tenant_name)
                     
                     # Show success
                     self.toast_manager.show_toast(
-                        f"✓ Connected to {tenant_data.get('name', 'Unknown')}",
+                        f"✓ Connected to {tenant_name}",
                         "success",
                         duration=2000
                     )
                 else:
+                    logger.error(f"✗ Connection failed for tenant: {tenant_name} - client is None")
+                    
                     # Show error after closing progress
                     progress.close()
                     
                     self.error_notification.show_error(
-                        f"Connection Failed: Failed to connect to {tenant_data.get('name', 'Unknown')}. Please check credentials."
+                        f"Connection Failed: Failed to connect to {tenant_name}. Please check credentials."
                     )
                     
                     # Reset combo to placeholder
@@ -374,6 +386,10 @@ class PullConfigWidget(QWidget):
                     progress.deleteLater()
                     
         except Exception as e:
+            logger.error(f"Exception connecting to tenant '{tenant_name}': {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            
             self.error_notification.show_error(
                 f"Connection Error: Error connecting to tenant: {str(e)}"
             )
