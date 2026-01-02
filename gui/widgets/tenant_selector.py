@@ -209,7 +209,7 @@ class TenantSelectorWidget(QWidget):
                     self.logger.info(f"✓ Successfully connected to: {tenant_name}")
                     
                     # Update last used timestamp
-                    manager.update_last_used(tenant.get('id'))
+                    manager.mark_used(tenant.get('id'))
                     
                     # Set connection
                     self.set_connection(api_client, tenant_name)
