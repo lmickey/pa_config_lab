@@ -298,15 +298,6 @@ class Examples:
     def security_rule_deny() -> Dict[str, Any]:
         return load_policy_example('security_rule_deny')
     
-    # Policies - NAT Rules
-    @staticmethod
-    def nat_rule_minimal() -> Dict[str, Any]:
-        return load_policy_example('nat_rule_minimal')
-    
-    @staticmethod
-    def nat_rule_full() -> Dict[str, Any]:
-        return load_policy_example('nat_rule_full')
-    
     # Policies - Decryption Rules
     @staticmethod
     def decryption_rule_minimal() -> Dict[str, Any]:
@@ -325,11 +316,6 @@ class Examples:
     @staticmethod
     def qos_rule() -> Dict[str, Any]:
         return load_policy_example('qos_rule_minimal')
-    
-    # Policies - PBF Rules
-    @staticmethod
-    def pbf_rule() -> Dict[str, Any]:
-        return load_policy_example('pbf_rule_minimal')
     
     # Profiles
     @staticmethod

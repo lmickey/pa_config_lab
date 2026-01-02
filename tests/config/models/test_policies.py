@@ -7,11 +7,9 @@ Tests all policy and rule model classes.
 import pytest
 from config.models.policies import (
     SecurityRule,
-    NATRule,
     DecryptionRule,
     AuthenticationRule,
     QoSPolicyRule,
-    PBFRule,
 )
 from tests.examples.loader import Examples
 
@@ -93,62 +91,6 @@ class TestSecurityRule:
         errors = rule_invalid.validate()
         assert len(errors) > 0
         assert any('action' in error.lower() for error in errors)
-
-
-class TestNATRule:
-    """Tests for NATRule class"""
-    
-    def test_create_nat_rule_source(self):
-        """Test creating NAT rule with source translation"""
-        config = Examples.nat_rule_minimal()
-        rule = NATRule(config)
-        
-        assert rule.name == 'outbound-nat'
-        assert rule.folder == 'Mobile Users'
-        assert rule.source_translation is not None
-        assert rule.destination_translation is None
-    
-    def test_create_nat_rule_destination(self):
-        """Test creating NAT rule with destination translation"""
-        config = Examples.nat_rule_full()
-        rule = NATRule(config)
-        
-        assert rule.name == 'inbound-dnat'
-        assert rule.destination_translation is not None
-        assert rule.position == 3
-    
-    def test_nat_rule_dependencies(self):
-        """Test NAT rule dependency detection"""
-        config = Examples.nat_rule_minimal()
-        rule = NATRule(config)
-        
-        deps = rule.get_dependencies()
-        
-        # Should detect address dependencies
-        dep_types = [d[0] for d in deps]
-        assert 'address_object' in dep_types
-    
-    def test_nat_rule_validation(self):
-        """Test NAT rule validation"""
-        # Valid rule
-        config = Examples.nat_rule_minimal()
-        rule = NATRule(config)
-        errors = rule.validate()
-        assert len(errors) == 0
-        
-        # Invalid rule (no translation)
-        config_invalid = {
-            'name': 'invalid-nat',
-            'folder': 'Mobile Users',
-            'from': ['any'],
-            'to': ['any'],
-            'source': ['any'],
-            'destination': ['any']
-        }
-        rule_invalid = NATRule(config_invalid)
-        errors = rule_invalid.validate()
-        assert len(errors) > 0
-        assert any('translation' in error.lower() for error in errors)
 
 
 class TestDecryptionRule:
@@ -255,52 +197,6 @@ class TestQoSPolicyRule:
         assert 'application_object' in dep_types
 
 
-class TestPBFRule:
-    """Tests for PBFRule class"""
-    
-    def test_create_pbf_rule(self):
-        """Test creating PBF rule"""
-        config = Examples.pbf_rule()
-        rule = PBFRule(config)
-        
-        assert rule.name == 'route-branch-traffic'
-        assert rule.folder == 'Remote Networks'
-        assert rule.action is not None
-        assert 'forward' in rule.action
-    
-    def test_pbf_rule_dependencies(self):
-        """Test PBF rule dependency detection"""
-        config = Examples.pbf_rule()
-        rule = PBFRule(config)
-        
-        deps = rule.get_dependencies()
-        
-        # Should detect address dependencies
-        # Note: Service Connection dependencies are implicit/infrastructure-level
-        dep_types = [d[0] for d in deps]
-        assert 'address_object' in dep_types
-    
-    def test_pbf_rule_validation(self):
-        """Test PBF rule validation"""
-        # Valid rule
-        config = Examples.pbf_rule()
-        rule = PBFRule(config)
-        errors = rule.validate()
-        assert len(errors) == 0
-        
-        # Invalid rule (no action)
-        config_invalid = {
-            'name': 'invalid-pbf',
-            'folder': 'Remote Networks',
-            'from': ['any'],
-            'source': ['any']
-        }
-        rule_invalid = PBFRule(config_invalid)
-        errors = rule_invalid.validate()
-        assert len(errors) > 0
-        assert any('action' in error.lower() for error in errors)
-
-
 class TestRuleProperties:
     """Test common RuleItem properties"""
     
@@ -346,20 +242,20 @@ class TestPolicySerialization:
         assert rule2.name == rule.name
         assert rule2.action == rule.action
     
-    def test_nat_rule_serialization(self):
-        """Test NAT rule serialization"""
-        config = Examples.nat_rule_minimal()
-        rule = NATRule(config)
+    def test_decryption_rule_serialization(self):
+        """Test decryption rule serialization"""
+        config = Examples.decryption_rule_minimal()
+        rule = DecryptionRule(config)
         rule.push_strategy = 'rename'
         
         # Serialize
         data = rule.to_dict()
         
         assert data['push_strategy'] == 'rename'
-        assert 'source_translation' in data
+        assert 'action' in data
         
         # Deserialize
-        rule2 = NATRule.from_dict(data)
+        rule2 = DecryptionRule.from_dict(data)
         
         assert rule2.push_strategy == 'rename'
 

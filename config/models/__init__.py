@@ -46,11 +46,9 @@ from .profiles import (
 
 from .policies import (
     SecurityRule,
-    NATRule,
     DecryptionRule,
     AuthenticationRule,
     QoSPolicyRule,
-    PBFRule,
 )
 
 __all__ = [
@@ -87,11 +85,9 @@ __all__ = [
     'OCSPResponder',
     'SCEPProfile',
     'QoSProfile',
-    # Policy/Rule models
+    # Policy/Rule models (Prisma Access folder/snippet only)
     'SecurityRule',
-    'NATRule',
     'DecryptionRule',
     'AuthenticationRule',
     'QoSPolicyRule',
-    'PBFRule',
 ]
