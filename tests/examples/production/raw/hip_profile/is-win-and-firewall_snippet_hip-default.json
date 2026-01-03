@@ -1,0 +1,7 @@
+{
+  "id": "37313d64-6b65-4fe9-853b-dd424d606914",
+  "name": "is-win-and-firewall",
+  "snippet": "hip-default",
+  "match": "\"is-win\"  and \"is-firewall-enabled\" ",
+  "description": "Matches Windows endpoints that have firewall software installed and enabled"
+}

@@ -1,0 +1,214 @@
+[
+  {
+    "id": "aef143c0-7427-490e-8ccb-d6bbbdfc6d7e",
+    "name": "Alert All URLs",
+    "folder": "Shared",
+    "spyware": [
+      "best-practice"
+    ],
+    "vulnerability": [
+      "best-practice"
+    ],
+    "url_filtering": [
+      "Alert All"
+    ],
+    "file_blocking": [
+      "best-practice"
+    ],
+    "virus_and_wildfire_analysis": [
+      "best-practice"
+    ],
+    "dns_security": [
+      "Use Best Practice"
+    ],
+    "ai_security": [
+      "best-practice"
+    ]
+  },
+  {
+    "id": "aef143c0-7427-490e-8ccb-d6bbbdfc6d7e",
+    "name": "Alert All URLs",
+    "folder": "Shared",
+    "spyware": [
+      "best-practice"
+    ],
+    "vulnerability": [
+      "best-practice"
+    ],
+    "url_filtering": [
+      "Alert All"
+    ],
+    "file_blocking": [
+      "best-practice"
+    ],
+    "virus_and_wildfire_analysis": [
+      "best-practice"
+    ],
+    "dns_security": [
+      "Use Best Practice"
+    ],
+    "ai_security": [
+      "best-practice"
+    ]
+  },
+  {
+    "id": "50834ae2-6780-4b67-8a2c-5ae7af93b50f",
+    "name": "Best Practice - Block Post",
+    "folder": "Shared",
+    "virus_and_wildfire_analysis": [
+      "best-practice"
+    ],
+    "spyware": [
+      "best-practice"
+    ],
+    "dns_security": [
+      "Use Best Practice"
+    ],
+    "vulnerability": [
+      "Best Practice w-Block Post"
+    ],
+    "url_filtering": [
+      "Use Best Practice"
+    ],
+    "file_blocking": [
+      "best-practice"
+    ]
+  },
+  {
+    "id": "50834ae2-6780-4b67-8a2c-5ae7af93b50f",
+    "name": "Best Practice - Block Post",
+    "folder": "Shared",
+    "virus_and_wildfire_analysis": [
+      "best-practice"
+    ],
+    "spyware": [
+      "best-practice"
+    ],
+    "dns_security": [
+      "Use Best Practice"
+    ],
+    "vulnerability": [
+      "Best Practice w-Block Post"
+    ],
+    "url_filtering": [
+      "Use Best Practice"
+    ],
+    "file_blocking": [
+      "best-practice"
+    ]
+  },
+  {
+    "id": "015ab133-9400-48ff-8b9c-9584d07e8054",
+    "name": "Corporate Email",
+    "folder": "Shared",
+    "saas_security": [
+      "Gmail-Google"
+    ],
+    "virus_and_wildfire_analysis": [
+      "best-practice"
+    ]
+  },
+  {
+    "id": "015ab133-9400-48ff-8b9c-9584d07e8054",
+    "name": "Corporate Email",
+    "folder": "Shared",
+    "saas_security": [
+      "Gmail-Google"
+    ],
+    "virus_and_wildfire_analysis": [
+      "best-practice"
+    ]
+  },
+  {
+    "id": "259c9007-25fa-485f-b6b2-c8cdb17a8317",
+    "name": "best-practice",
+    "folder": "Shared",
+    "virus_and_wildfire_analysis": [
+      "best-practice"
+    ],
+    "spyware": [
+      "best-practice"
+    ],
+    "dns_security": [
+      "best-practice"
+    ],
+    "vulnerability": [
+      "best-practice"
+    ],
+    "url_filtering": [
+      "best-practice"
+    ],
+    "file_blocking": [
+      "best-practice"
+    ]
+  },
+  {
+    "id": "259c9007-25fa-485f-b6b2-c8cdb17a8317",
+    "name": "best-practice",
+    "folder": "Shared",
+    "virus_and_wildfire_analysis": [
+      "best-practice"
+    ],
+    "spyware": [
+      "best-practice"
+    ],
+    "dns_security": [
+      "best-practice"
+    ],
+    "vulnerability": [
+      "best-practice"
+    ],
+    "url_filtering": [
+      "best-practice"
+    ],
+    "file_blocking": [
+      "best-practice"
+    ]
+  },
+  {
+    "id": "259c9007-25fa-485f-b6b2-c8cdb17a8317",
+    "name": "best-practice",
+    "folder": "Shared",
+    "virus_and_wildfire_analysis": [
+      "best-practice"
+    ],
+    "spyware": [
+      "best-practice"
+    ],
+    "dns_security": [
+      "best-practice"
+    ],
+    "vulnerability": [
+      "best-practice"
+    ],
+    "url_filtering": [
+      "best-practice"
+    ],
+    "file_blocking": [
+      "best-practice"
+    ]
+  },
+  {
+    "id": "bb69161a-35d2-43af-985a-f579e24f1d2e",
+    "name": "globalprotect group",
+    "folder": "Mobile Users",
+    "spyware": [
+      "best-practice"
+    ],
+    "vulnerability": [
+      "best-practice"
+    ],
+    "url_filtering": [
+      "best-practice"
+    ],
+    "file_blocking": [
+      "best-practice"
+    ],
+    "virus_and_wildfire_analysis": [
+      "best-practice"
+    ],
+    "dns_security": [
+      "best-practice"
+    ]
+  }
+]

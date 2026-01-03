@@ -1,0 +1,15 @@
+{
+  "id": "a5b5268c-6b9d-42b4-bf7d-17579263749e",
+  "name": "to-azure",
+  "folder": "Remote Networks",
+  "auto_key": {
+    "ike_gateway": [
+      {
+        "name": "ike_Gateway_1767393178061"
+      }
+    ],
+    "ipsec_crypto_profile": "CloudGenix-IPSec-Crypto-Default"
+  },
+  "tunnel_interface": "tunnel",
+  "anti_replay": true
+}

@@ -1,0 +1,8 @@
+{
+  "id": "ee60b649-1a77-495c-8dcb-aeed1f8a13be",
+  "name": "zoom-static",
+  "folder": "Shared",
+  "static": [
+    "VPN-Users"
+  ]
+}

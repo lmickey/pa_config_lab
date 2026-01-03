@@ -1,0 +1,15 @@
+{
+  "id": "cc2c6bd8-38cd-4699-8fcb-e95a2854159d",
+  "name": "is-win-7",
+  "snippet": "hip-default",
+  "host_info": {
+    "criteria": {
+      "os": {
+        "contains": {
+          "Microsoft": "Windows 7"
+        }
+      }
+    }
+  },
+  "description": "Matches all Windows 7 endpoints"
+}

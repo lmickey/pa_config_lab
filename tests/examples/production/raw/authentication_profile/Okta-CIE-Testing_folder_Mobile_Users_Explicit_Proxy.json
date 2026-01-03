@@ -1,0 +1,14 @@
+{
+  "id": "9ddbdcba-e843-46c0-bfb5-2ec4fc1de974",
+  "name": "Okta-CIE-Testing",
+  "folder": "Prisma Access",
+  "lockout": {},
+  "allow_list": [
+    "all"
+  ],
+  "method": {
+    "cloud": {
+      "profile_name": "CIE-Okta"
+    }
+  }
+}

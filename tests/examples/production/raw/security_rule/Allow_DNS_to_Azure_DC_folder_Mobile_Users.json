@@ -1,0 +1,50 @@
+{
+  "id": "7d0fbe5c-5152-4a6f-9754-d005903cb218",
+  "name": "Allow DNS to Azure DC",
+  "folder": "Shared",
+  "policy_type": "Security",
+  "position": "pre",
+  "disabled": false,
+  "description": "Allow Ping to Azure DC",
+  "from": [
+    "trust"
+  ],
+  "source": [
+    "VPN-Users"
+  ],
+  "source_user": [
+    "known-user"
+  ],
+  "source_hip": [
+    "any"
+  ],
+  "to": [
+    "trust"
+  ],
+  "destination": [
+    "10.12.0.0/16"
+  ],
+  "destination_hip": [
+    "any"
+  ],
+  "application": [
+    "dns-base"
+  ],
+  "service": [
+    "application-default"
+  ],
+  "category": [
+    "any"
+  ],
+  "action": "allow",
+  "profile_setting": {
+    "group": [
+      "Best Practice - Block Post"
+    ]
+  },
+  "log_start": false,
+  "log_end": true,
+  "negate_source": false,
+  "negate_destination": false,
+  "log_setting": "Cortex Data Lake"
+}

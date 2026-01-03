@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from gui.workers import PushWorker
-from gui.widgets import TenantSelectorWidget
+from gui.widgets import TenantSelectorWidget, ResultsPanel
 from gui.toast_notification import ToastManager, DismissibleErrorNotification
 
 
@@ -178,33 +178,18 @@ class PushConfigWidget(QWidget):
         progress_group.setLayout(progress_layout)
         layout.addWidget(progress_group)
 
-        # Results section
+        # Results section (using reusable ResultsPanel)
         results_group = QGroupBox("Results")
         results_layout = QVBoxLayout()
 
-        self.results_text = QTextEdit()
-        self.results_text.setReadOnly(True)
-        self.results_text.setMaximumHeight(150)
-        self.results_text.setPlaceholderText("Push results will appear here...")
-        results_layout.addWidget(self.results_text)
-        
-        # Add buttons for results actions
-        results_buttons_layout = QHBoxLayout()
-        
-        self.copy_results_btn = QPushButton("📋 Copy Results")
-        self.copy_results_btn.setToolTip("Copy all results to clipboard")
-        self.copy_results_btn.clicked.connect(self._copy_results)
-        self.copy_results_btn.setEnabled(False)
-        results_buttons_layout.addWidget(self.copy_results_btn)
-        
-        self.view_details_btn = QPushButton("📄 View Full Details")
-        self.view_details_btn.setToolTip("Open detailed log viewer")
-        self.view_details_btn.clicked.connect(self._view_full_details)
-        self.view_details_btn.setEnabled(False)
-        results_buttons_layout.addWidget(self.view_details_btn)
-        
-        results_buttons_layout.addStretch()
-        results_layout.addLayout(results_buttons_layout)
+        self.results_panel = ResultsPanel(
+            parent=self,
+            title="Push Operation",
+            log_file="logs/activity.log",
+            placeholder="Push results will appear here..."
+        )
+        self.results_panel.results_text.setMaximumHeight(150)
+        results_layout.addWidget(self.results_panel)
 
         results_group.setLayout(results_layout)
         layout.addWidget(results_group)
@@ -439,7 +424,7 @@ class PushConfigWidget(QWidget):
         self.progress_label.setText("Preparing to push configuration...")
 
         # Clear previous results
-        self.results_text.clear()
+        self.results_panel.clear()
 
         # Create and start worker
         from gui.workers import SelectivePushWorker
@@ -450,9 +435,9 @@ class PushConfigWidget(QWidget):
             destination_config,
             resolution
         )
-        self.worker.progress.connect(self._on_push_progress)
-        self.worker.finished.connect(self._on_push_finished)
-        self.worker.error.connect(self._on_error)
+        self.worker.progress.connect(self._on_push_progress, Qt.ConnectionType.QueuedConnection)
+        self.worker.finished.connect(self._on_push_finished, Qt.ConnectionType.QueuedConnection)
+        self.worker.error.connect(self._on_error, Qt.ConnectionType.QueuedConnection)
         self.worker.start()
 
     def _on_push_progress(self, message: str, current: int, total: int):
@@ -719,11 +704,7 @@ class PushConfigWidget(QWidget):
                     details.append("See activity.log for complete details")
                     details.append("")
                     
-                    self.results_text.setPlainText("\n".join(details))
-                    
-                    # Enable results action buttons
-                    self.copy_results_btn.setEnabled(True)
-                    self.view_details_btn.setEnabled(True)
+                    self.results_panel.set_text("\n".join(details))
                 except Exception as results_err:
                     # Avoid print in case this runs in thread context
                     pass
@@ -745,7 +726,7 @@ class PushConfigWidget(QWidget):
                 
                 self.progress_label.setText("Push failed")
                 self.progress_label.setStyleSheet("color: red;")
-                self.results_text.setPlainText(f"Error: {message}")
+                self.results_panel.set_text(f"Error: {message}")
         except Exception as e:
             # Avoid print in case this runs in thread context
             import logging
@@ -774,7 +755,7 @@ class PushConfigWidget(QWidget):
         if len(conflicts) > 10:
             conflict_text += f"\n... and {len(conflicts) - 10} more"
 
-        self.results_text.setPlainText(conflict_text)
+        self.results_panel.set_text(conflict_text)
 
     def _set_ui_enabled(self, enabled: bool):
         """Enable or disable UI controls."""
@@ -794,78 +775,3 @@ class PushConfigWidget(QWidget):
         """Set the selected items from selection widget."""
         self.selected_items = selected_items
         self._update_status()
-    
-    def _copy_results(self):
-        """Copy results text to clipboard."""
-        try:
-            from PyQt6.QtWidgets import QApplication
-            clipboard = QApplication.clipboard()
-            clipboard.setText(self.results_text.toPlainText())
-            
-            # Show brief feedback
-            original_text = self.copy_results_btn.text()
-            self.copy_results_btn.setText("✓ Copied!")
-            self.copy_results_btn.setStyleSheet("background-color: #4CAF50; color: white;")
-            
-            # Reset after 2 seconds
-            from PyQt6.QtCore import QTimer
-            QTimer.singleShot(2000, lambda: (
-                self.copy_results_btn.setText(original_text),
-                self.copy_results_btn.setStyleSheet("")
-            ))
-        except Exception as e:
-            QMessageBox.warning(self, "Copy Failed", f"Failed to copy results: {e}")
-    
-    def _view_full_details(self):
-        """Open a dialog to view full activity log details."""
-        try:
-            from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout
-            
-            dialog = QDialog(self)
-            dialog.setWindowTitle("Push Operation - Full Details")
-            dialog.resize(1000, 700)
-            
-            layout = QVBoxLayout(dialog)
-            
-            # Add header
-            from PyQt6.QtWidgets import QLabel
-            header = QLabel("<h3>Complete Activity Log</h3>")
-            layout.addWidget(header)
-            
-            # Text area with full log
-            log_text = QTextEdit()
-            log_text.setReadOnly(True)
-            log_text.setStyleSheet("font-family: monospace; font-size: 10pt;")
-            
-            # Read activity.log
-            try:
-                with open('activity.log', 'r') as f:
-                    # Get last 500 lines to avoid overwhelming the viewer
-                    lines = f.readlines()
-                    log_content = ''.join(lines[-500:])
-                    log_text.setPlainText(log_content)
-                    
-                    # Scroll to bottom
-                    log_text.verticalScrollBar().setValue(log_text.verticalScrollBar().maximum())
-            except Exception as read_err:
-                log_text.setPlainText(f"Error reading activity.log: {read_err}")
-            
-            layout.addWidget(log_text)
-            
-            # Close button
-            button_layout = QHBoxLayout()
-            button_layout.addStretch()
-            
-            copy_log_btn = QPushButton("📋 Copy Full Log")
-            copy_log_btn.clicked.connect(lambda: QApplication.clipboard().setText(log_text.toPlainText()))
-            button_layout.addWidget(copy_log_btn)
-            
-            close_btn = QPushButton("Close")
-            close_btn.clicked.connect(dialog.close)
-            button_layout.addWidget(close_btn)
-            
-            layout.addLayout(button_layout)
-            
-            dialog.exec()
-        except Exception as e:
-            QMessageBox.warning(self, "View Details Failed", f"Failed to open details viewer: {e}")

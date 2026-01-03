@@ -1,0 +1,17 @@
+{
+  "id": "895e4ff7-586a-4c70-8efc-bf8ad7de381a",
+  "name": "AES-256",
+  "folder": "Remote Networks",
+  "lifetime": {
+    "hours": 8
+  },
+  "encryption": [
+    "aes-256-cbc"
+  ],
+  "dh_group": [
+    "group14"
+  ],
+  "hash": [
+    "sha1"
+  ]
+}

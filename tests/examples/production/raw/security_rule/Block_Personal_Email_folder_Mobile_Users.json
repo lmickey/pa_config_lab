@@ -1,0 +1,42 @@
+{
+  "id": "b58b6902-ae2f-48cf-98d9-0d20fd2e367c",
+  "name": "Block Personal Email",
+  "folder": "Shared",
+  "policy_type": "Internet",
+  "position": "pre",
+  "source": [
+    "any"
+  ],
+  "source_user": [
+    "any"
+  ],
+  "security_settings": {
+    "anti_spyware": "yes",
+    "virus_and_wildfire_analysis": "yes",
+    "vulnerability": "yes"
+  },
+  "allow_web_application": [
+    {
+      "name": "gmail",
+      "position": "pre",
+      "dlp": "none",
+      "type": "application",
+      "saas_enterprise_control": {
+        "consumer_access": {
+          "enable": "no"
+        },
+        "enterprise_access": {
+          "enable": "yes"
+        }
+      },
+      "file_control": {
+        "upload": "best-practice",
+        "download": "best-practice"
+      },
+      "application_function": [
+        "gmail-uploading"
+      ]
+    }
+  ],
+  "disabled": true
+}

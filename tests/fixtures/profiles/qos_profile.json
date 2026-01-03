@@ -1,0 +1,56 @@
+[
+  {
+    "id": "d2516ee2-0a7d-48ce-97e9-22cd53ef5ce4",
+    "name": "Default Profile",
+    "snippet": "default",
+    "class_bandwidth_type": {
+      "percentage": {
+        "class": [
+          {
+            "name": "class2",
+            "priority": "high",
+            "class_bandwidth": {
+              "egress_max": 0,
+              "egress_guaranteed": 50
+            }
+          },
+          {
+            "name": "class4",
+            "priority": "medium",
+            "class_bandwidth": {
+              "egress_max": 0,
+              "egress_guaranteed": 50
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "5d10526f-2a0d-4994-969b-cc07f8e3bb13",
+    "name": "regular bucket",
+    "folder": "Remote Networks",
+    "class_bandwidth_type": {
+      "mbps": {
+        "class": [
+          {
+            "name": "class3",
+            "priority": "medium",
+            "class_bandwidth": {
+              "egress_max": 200,
+              "egress_guaranteed": 15
+            }
+          },
+          {
+            "name": "class1",
+            "priority": "real-time",
+            "class_bandwidth": {
+              "egress_max": 100,
+              "egress_guaranteed": 50
+            }
+          }
+        ]
+      }
+    }
+  }
+]

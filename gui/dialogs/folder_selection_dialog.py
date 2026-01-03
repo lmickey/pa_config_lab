@@ -207,9 +207,9 @@ class FolderSelectionDialog(QDialog):
         # Create worker thread
         from gui.workers import DiscoveryWorker
         self.worker = DiscoveryWorker(self.api_client)
-        self.worker.progress.connect(lambda msg, pct: progress.setValue(pct))
-        self.worker.finished.connect(lambda folders, snippets: self._on_discovery_finished(folders, snippets, progress))
-        self.worker.error.connect(lambda error: self._on_discovery_error(error, progress))
+        self.worker.progress.connect(lambda msg, pct: progress.setValue(pct), Qt.ConnectionType.QueuedConnection)
+        self.worker.finished.connect(lambda folders, snippets: self._on_discovery_finished(folders, snippets, progress), Qt.ConnectionType.QueuedConnection)
+        self.worker.error.connect(lambda error: self._on_discovery_error(error, progress), Qt.ConnectionType.QueuedConnection)
         self.worker.start()
     
     def _on_discovery_finished(self, folders: List[Dict], snippets: List[Dict], progress):

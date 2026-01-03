@@ -5,26 +5,30 @@ This module provides the UI for pulling configurations from Prisma Access,
 including options selection, progress tracking, and results display.
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QGroupBox,
-    QCheckBox,
     QPushButton,
     QLabel,
     QProgressBar,
-    QTextEdit,
     QMessageBox,
-    QScrollArea,
+    QSplitter,
+    QStackedWidget,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSettings
 import logging
 
 from gui.workers import PullWorker
 from gui.toast_notification import ToastManager, DismissibleErrorNotification
-from gui.widgets import TenantSelectorWidget
+from gui.widgets import (
+    TenantSelectorWidget,
+    ResultsPanel,
+    SelectionTreeWidget,
+    InfrastructureTreeWidget,
+)
+from gui.dialogs import AdvancedOptionsDialog
 
 
 class PullConfigWidget(QWidget):
@@ -33,11 +37,22 @@ class PullConfigWidget(QWidget):
     # Signal emitted when pull completes successfully
     pull_completed = pyqtSignal(object)  # config
 
+    # Prisma Access folders - complete hierarchy
+    PRISMA_ACCESS_FOLDERS = [
+        ('Global', 'All'),  # Display name, API name
+        ('Prisma Access', 'Shared'),
+        ('Mobile Users Container', 'Mobile Users Container'),
+        ('Mobile Users', 'Mobile Users'),
+        ('Remote Networks', 'Remote Networks'),
+        ('Mobile Users Explicit Proxy', 'Mobile Users Explicit Proxy'),
+    ]
+
     def __init__(self, parent=None):
         """Initialize the pull widget."""
         super().__init__(parent)
 
         self.logger = logging.getLogger(__name__)
+        self.settings = QSettings("PrismaAccess", "ConfigManager")
         self.api_client = None
         self.toast_manager = ToastManager(self)
         self.error_notification = DismissibleErrorNotification(self)
@@ -45,12 +60,15 @@ class PullConfigWidget(QWidget):
         self.worker = None
         self.pulled_config = None
         
+        # Cached data
+        self._snippets_cache: List[Dict[str, Any]] = []
+        self._agent_profiles_cache: List[Dict[str, Any]] = []
+        
         # Batch GUI updates to prevent segfaults from rapid updates
         self.pending_messages = []
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self._flush_pending_messages)
-        self.update_timer.setInterval(250)  # Update GUI every 250ms
-        # Timer will be started when pull begins, not on every progress update
+        self.update_timer.setInterval(250)
 
         self._init_ui()
 
@@ -58,19 +76,33 @@ class PullConfigWidget(QWidget):
         """Initialize the user interface."""
         layout = QVBoxLayout(self)
 
-        # Title
+        # === Header Row: Title + Advanced Options Button ===
+        header_layout = QHBoxLayout()
+        
         title = QLabel("<h2>Pull Configuration</h2>")
-        layout.addWidget(title)
+        header_layout.addWidget(title)
+        
+        header_layout.addStretch()
+        
+        self.advanced_btn = QPushButton("⚙ Advanced Options")
+        self.advanced_btn.setMaximumWidth(150)
+        self.advanced_btn.clicked.connect(self._open_advanced_options)
+        header_layout.addWidget(self.advanced_btn)
+        
+        layout.addLayout(header_layout)
 
+        # Info text
         info = QLabel(
-            "Pull configuration from a Prisma Access tenant.\n"
             "Connect to a source tenant and select which components to retrieve."
         )
         info.setWordWrap(True)
         info.setStyleSheet("color: gray; margin-bottom: 10px;")
         layout.addWidget(info)
         
-        # Source tenant selection (using reusable widget)
+        # === Source Tenant + Pull Button Row ===
+        tenant_row = QHBoxLayout()
+        
+        # Tenant selector (left half)
         self.tenant_selector = TenantSelectorWidget(
             parent=self,
             title="Source Tenant",
@@ -79,186 +111,326 @@ class PullConfigWidget(QWidget):
             show_error_banner=lambda msg: self.error_notification.show_error(msg)
         )
         self.tenant_selector.connection_changed.connect(self._on_connection_changed)
-        layout.addWidget(self.tenant_selector)
-
-        # Scroll area for options
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setMaximumHeight(450)  # Increased from 300 to accommodate infrastructure options
-
-        scroll_widget = QWidget()
-        scroll_layout = QVBoxLayout(scroll_widget)
-
-        # Folder selection button (NEW)
-        folder_selection_layout = QHBoxLayout()
-        folder_selection_layout.addStretch()
+        tenant_row.addWidget(self.tenant_selector, stretch=1)
         
-        self.folder_select_btn = QPushButton("📁 Select Folders & Snippets...")
-        self.folder_select_btn.setMinimumWidth(250)
-        self.folder_select_btn.setStyleSheet(
-            "QPushButton { background-color: #FF9800; color: white; padding: 10px; font-weight: bold; }"
-            "QPushButton:hover { background-color: #F57C00; }"
-        )
-        self.folder_select_btn.clicked.connect(self._open_folder_selection)
-        self.folder_select_btn.setEnabled(False)  # Enable when connected
-        folder_selection_layout.addWidget(self.folder_select_btn)
+        # Button container for Pull and Update Selection (stacked vertically)
+        button_container = QVBoxLayout()
+        button_container.setSpacing(4)
         
-        folder_selection_layout.addStretch()
-        scroll_layout.addLayout(folder_selection_layout)
-        
-        # Folder selection status label (NEW)
-        self.folder_selection_label = QLabel("No specific folders selected (will pull all)")
-        self.folder_selection_label.setStyleSheet("color: gray; font-size: 10px; padding: 5px; text-align: center;")
-        self.folder_selection_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        scroll_layout.addWidget(self.folder_selection_label)
-        
-        # Store selected folders/components/snippets (NEW)
-        self.selected_folders = []
-        self.selected_components = {}
-        self.selected_snippets = []
-        
-        # Store selected applications
-        self.selected_applications = []
-
-        # Infrastructure Components group (NEW)
-        infra_group = QGroupBox("Infrastructure Components")
-        infra_layout = QVBoxLayout()
-
-        self.remote_networks_check = QCheckBox("Remote Networks")
-        self.remote_networks_check.setChecked(True)
-        self.remote_networks_check.setToolTip(
-            "Pull remote network configurations (branches, data centers)"
-        )
-        infra_layout.addWidget(self.remote_networks_check)
-
-        self.service_connections_check = QCheckBox("Service Connections")
-        self.service_connections_check.setChecked(True)
-        self.service_connections_check.setToolTip(
-            "Pull service connection configurations (on-prem connectivity)"
-        )
-        infra_layout.addWidget(self.service_connections_check)
-
-        self.ipsec_tunnels_check = QCheckBox("IPsec Tunnels & Crypto")
-        self.ipsec_tunnels_check.setChecked(True)
-        self.ipsec_tunnels_check.setToolTip(
-            "Pull IPsec tunnel configs, IKE gateways, and crypto profiles"
-        )
-        infra_layout.addWidget(self.ipsec_tunnels_check)
-
-        self.mobile_users_check = QCheckBox("Mobile User Infrastructure")
-        self.mobile_users_check.setChecked(True)
-        self.mobile_users_check.setToolTip(
-            "Pull GlobalProtect gateway/portal configs and mobile user settings"
-        )
-        infra_layout.addWidget(self.mobile_users_check)
-
-        self.hip_check = QCheckBox("HIP Objects & Profiles")
-        self.hip_check.setChecked(True)
-        self.hip_check.setToolTip(
-            "Pull Host Information Profile (HIP) objects and profiles"
-        )
-        infra_layout.addWidget(self.hip_check)
-
-        self.regions_check = QCheckBox("Regions & Bandwidth")
-        self.regions_check.setChecked(True)
-        self.regions_check.setToolTip(
-            "Pull enabled regions and bandwidth allocations"
-        )
-        infra_layout.addWidget(self.regions_check)
-
-        infra_group.setLayout(infra_layout)
-        scroll_layout.addWidget(infra_group)
-
-        scroll_layout.addStretch()
-        scroll.setWidget(scroll_widget)
-        layout.addWidget(scroll)
-        
-        # Advanced options (moved outside scroll area)
-        advanced_group = QGroupBox("Advanced Options")
-        advanced_layout = QVBoxLayout()
-
-        self.filter_defaults_check = QCheckBox("Filter Default Configurations")
-        self.filter_defaults_check.setChecked(True)  # Auto-checked by default
-        self.filter_defaults_check.setToolTip(
-            "Automatically detect and exclude default configurations"
-        )
-        advanced_layout.addWidget(self.filter_defaults_check)
-
-        advanced_group.setLayout(advanced_layout)
-        layout.addWidget(advanced_group)
-
-        # Action buttons
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-
-        self.select_all_btn = QPushButton("Select All")
-        self.select_all_btn.clicked.connect(self._select_all)
-        button_layout.addWidget(self.select_all_btn)
-
-        self.select_none_btn = QPushButton("Select None")
-        self.select_none_btn.clicked.connect(self._select_none)
-        button_layout.addWidget(self.select_none_btn)
-
-        button_layout.addStretch()
-
-        self.pull_btn = QPushButton("Pull Configuration")
-        self.pull_btn.setMinimumWidth(150)
+        # Pull button - fixed height
+        self.pull_btn = QPushButton("🔄 Pull Configuration")
+        self.pull_btn.setMinimumWidth(180)
+        self.pull_btn.setFixedHeight(36)
         self.pull_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; padding: 8px; }"
+            "QPushButton { background-color: #4CAF50; color: white; font-weight: bold; font-size: 13px; }"
             "QPushButton:hover { background-color: #45a049; }"
-            "QPushButton:disabled { background-color: #cccccc; }"
+            "QPushButton:disabled { background-color: #cccccc; color: #666666; }"
         )
         self.pull_btn.clicked.connect(self._start_pull)
-        button_layout.addWidget(self.pull_btn)
+        self.pull_btn.setEnabled(False)
+        button_container.addWidget(self.pull_btn)
+        
+        # Update Selection button - starts disabled, enabled during pull
+        self.update_selection_btn = QPushButton("📝 Update Selection")
+        self.update_selection_btn.setMinimumWidth(180)
+        self.update_selection_btn.setFixedHeight(36)
+        self.update_selection_btn.setToolTip("Cancel pull and return to selection")
+        self.update_selection_btn.setStyleSheet(
+            "QPushButton { background-color: #FF9800; color: white; font-weight: bold; font-size: 13px; }"
+            "QPushButton:hover { background-color: #F57C00; }"
+            "QPushButton:disabled { background-color: #cccccc; color: #666666; }"
+        )
+        self.update_selection_btn.clicked.connect(self._update_selection)
+        self.update_selection_btn.setEnabled(False)
+        button_container.addWidget(self.update_selection_btn)
+        
+        tenant_row.addLayout(button_container)
+        
+        layout.addLayout(tenant_row)
 
-        layout.addLayout(button_layout)
-
+        # === Stacked Widget: Selection vs Progress/Results ===
+        self.stacked_widget = QStackedWidget()
+        
+        # Page 0: Selection Area (three columns)
+        selection_page = QWidget()
+        selection_layout = QVBoxLayout(selection_page)
+        selection_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        
+        # Left: Folders
+        self.folders_tree = SelectionTreeWidget("Folders", show_components=True)
+        self.folders_tree.set_enabled(False)
+        self._populate_folders()
+        self.splitter.addWidget(self.folders_tree)
+        
+        # Middle: Snippets
+        self.snippets_tree = SelectionTreeWidget("Snippets", show_components=True)
+        self.snippets_tree.set_enabled(False)
+        self.splitter.addWidget(self.snippets_tree)
+        
+        # Right: Infrastructure
+        self.infrastructure_tree = InfrastructureTreeWidget()
+        self.infrastructure_tree.set_enabled(False)
+        self.splitter.addWidget(self.infrastructure_tree)
+        
+        # Set initial splitter sizes (equal thirds)
+        self.splitter.setSizes([300, 300, 300])
+        
+        selection_layout.addWidget(self.splitter)
+        self.stacked_widget.addWidget(selection_page)
+        
+        # Page 1: Progress and Results
+        results_page = QWidget()
+        results_layout = QVBoxLayout(results_page)
+        results_layout.setContentsMargins(0, 0, 0, 0)
+        
         # Progress section
-        progress_group = QGroupBox("Progress")
-        progress_layout = QVBoxLayout()
-
-        self.progress_label = QLabel("Ready to pull")
-        progress_layout.addWidget(self.progress_label)
+        self.progress_label = QLabel("Pulling configuration...")
+        self.progress_label.setStyleSheet("color: #1976D2; font-size: 14px; font-weight: bold;")
+        results_layout.addWidget(self.progress_label)
 
         self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
-        progress_layout.addWidget(self.progress_bar)
+        self.progress_bar.setMinimumHeight(25)
+        results_layout.addWidget(self.progress_bar)
+        
+        # Results panel (takes remaining space)
+        self.results_panel = ResultsPanel(parent=self, title="Pull Results")
+        results_layout.addWidget(self.results_panel, stretch=1)
+        
+        # Button row: Back (left) and Cancel (right)
+        button_layout = QHBoxLayout()
+        
+        self.back_btn = QPushButton("← Back to Selection")
+        self.back_btn.clicked.connect(self._show_selection_page)
+        self.back_btn.setVisible(False)  # Only show after pull completes
+        button_layout.addWidget(self.back_btn)
+        
+        button_layout.addStretch()
+        
+        self.cancel_btn = QPushButton("✕ Cancel Pull")
+        self.cancel_btn.setStyleSheet(
+            "QPushButton { background-color: #f44336; color: white; padding: 8px 16px; font-weight: bold; }"
+            "QPushButton:hover { background-color: #d32f2f; }"
+        )
+        self.cancel_btn.clicked.connect(self._cancel_pull)
+        self.cancel_btn.setVisible(True)  # Visible during pull, hidden after
+        button_layout.addWidget(self.cancel_btn)
+        
+        results_layout.addLayout(button_layout)
+        
+        self.stacked_widget.addWidget(results_page)
+        
+        # Start on selection page
+        self.stacked_widget.setCurrentIndex(0)
+        
+        layout.addWidget(self.stacked_widget, stretch=1)
 
-        progress_group.setLayout(progress_layout)
-        layout.addWidget(progress_group)
+    def _populate_folders(self):
+        """Populate the folders tree with Prisma Access folders."""
+        self.folders_tree.clear()
+        for display_name, api_name in self.PRISMA_ACCESS_FOLDERS:
+            self.folders_tree.add_top_level_item(
+                name=display_name,
+                item_type="folder",
+                data={'name': api_name, 'display_name': display_name, 'type': 'folder'},
+                checked=True,
+                add_components=True
+            )
 
-        # Results section
-        results_group = QGroupBox("Results")
-        results_layout = QVBoxLayout()
+    def _open_advanced_options(self):
+        """Open the advanced options dialog."""
+        dialog = AdvancedOptionsDialog(self)
+        dialog.exec()
 
-        self.results_text = QTextEdit()
-        self.results_text.setReadOnly(True)
-        self.results_text.setMaximumHeight(150)
-        self.results_text.setPlaceholderText("Pull results will appear here...")
-        results_layout.addWidget(self.results_text)
+    def _show_selection_page(self):
+        """Switch to selection page."""
+        self.stacked_widget.setCurrentIndex(0)
+        self.back_btn.setVisible(False)
+        self.cancel_btn.setVisible(False)
+        # Re-enable pull button, disable update selection
+        self.pull_btn.setEnabled(self.api_client is not None)
+        self.update_selection_btn.setEnabled(False)
 
-        results_group.setLayout(results_layout)
-        layout.addWidget(results_group)
+    def _show_results_page(self):
+        """Switch to results page."""
+        self.stacked_widget.setCurrentIndex(1)
+        self.results_panel.clear()
+        self.back_btn.setVisible(False)
+        self.cancel_btn.setVisible(True)
+        # Disable pull button, enable update selection
+        self.pull_btn.setEnabled(False)
+        self.update_selection_btn.setEnabled(True)
 
-        layout.addStretch()
+    def _update_selection(self):
+        """Cancel pull if running and return to selection page."""
+        # Cancel the pull if it's running
+        if self.worker and self.worker.isRunning():
+            self.logger.info("User requested to update selection - cancelling pull")
+            self.worker.stop()
+            self.worker = None
+        
+        # Return to selection page
+        self._show_selection_page()
+        self._set_ui_enabled(True)
+
+    def _cancel_pull(self):
+        """Cancel the current pull operation."""
+        if self.worker and self.worker.isRunning():
+            self.logger.info("User requested pull cancellation")
+            self.results_panel.append_text("\n⚠ Cancelling pull operation...")
+            self.progress_label.setText("Cancelling...")
+            self.progress_label.setStyleSheet("color: #FF9800; font-size: 14px; font-weight: bold;")
+            
+            # Signal the worker to stop
+            self.worker.stop()
+            
+            # Hide cancel button immediately
+            self.cancel_btn.setVisible(False)
+        self.progress_bar.setValue(0)
+
+    def _on_connection_changed(self, api_client, tenant_name: str):
+        """Handle connection state changes."""
+        self.api_client = api_client
+        self.connection_name = tenant_name if tenant_name else None
+        
+        connected = api_client is not None
+        
+        # Enable/disable UI elements
+        self.folders_tree.set_enabled(connected)
+        self.snippets_tree.set_enabled(connected)
+        self.infrastructure_tree.set_enabled(connected)
+        self.pull_btn.setEnabled(connected)
+        
+        if connected:
+            self.progress_label.setText(f"Connected to {tenant_name} - Ready to pull")
+            self.progress_label.setStyleSheet("color: green;")
+            # Discover snippets and agent profiles
+            self._discover_snippets()
+            self._discover_agent_profiles()
+        else:
+            self.progress_label.setText("Not connected")
+            self.progress_label.setStyleSheet("color: gray;")
+            self.snippets_tree.clear()
+            self._snippets_cache = []
+
+    def _discover_snippets(self):
+        """Discover available snippets from the API."""
+        if not self.api_client:
+            return
+        
+        try:
+            self.progress_label.setText("Discovering snippets...")
+            
+            from prisma.api_endpoints import APIEndpoints
+            response = self.api_client._make_request(
+                "GET",
+                APIEndpoints.SECURITY_POLICY_SNIPPETS,
+                item_type='snippet'
+            )
+            
+            snippets = []
+            if isinstance(response, dict) and 'data' in response:
+                for snippet in response['data']:
+                    snippet_name = snippet.get('name', '')
+                    snippet_type = snippet.get('type', '')
+                    
+                    # Filter out predefined/readonly snippets
+                    if snippet_type in ('predefined', 'readonly'):
+                        continue
+                    
+                    # Filter out known system snippet patterns
+                    if snippet_name.startswith('predefined-') or snippet_name.endswith('-default'):
+                        continue
+                    if 'Default' in snippet_name and 'Snippet' in snippet_name:
+                        continue
+                    
+                    snippets.append({
+                        'name': snippet_name,
+                        'id': snippet.get('id', ''),
+                        'type': snippet_type,
+                    })
+            
+            self._snippets_cache = snippets
+            self._populate_snippets(snippets)
+            
+            self.progress_label.setText(f"Connected to {self.connection_name} - Found {len(snippets)} custom snippets")
+            self.logger.info(f"Discovered {len(snippets)} custom snippets")
+            
+        except Exception as e:
+            self.logger.error(f"Error discovering snippets: {e}")
+            self.progress_label.setText(f"Connected - Error discovering snippets: {e}")
+
+    def _populate_snippets(self, snippets: List[Dict[str, Any]]):
+        """Populate the snippets tree."""
+        self.snippets_tree.clear()
+        
+        if not snippets:
+            # Add placeholder
+            self.snippets_tree.add_top_level_item(
+                name="(No custom snippets found)",
+                item_type="info",
+                checked=False,
+                add_components=False
+            )
+            return
+        
+        for snippet in snippets:
+            self.snippets_tree.add_top_level_item(
+                name=snippet['name'],
+                item_type="snippet",
+                data=snippet,
+                checked=True,
+                add_components=True
+            )
+
+    def _discover_agent_profiles(self):
+        """Discover agent profiles for Mobile Users infrastructure."""
+        if not self.api_client:
+            return
+        
+        try:
+            from config.models.factory import ConfigItemFactory
+            
+            model_class = ConfigItemFactory.get_model_class('agent_profile')
+            if not model_class or not hasattr(model_class, 'api_endpoint'):
+                self.logger.warning("No model class for agent_profile")
+                return
+            
+            # Fetch agent profiles
+            url = f"{model_class.api_endpoint}?folder=Mobile%20Users"
+            response = self.api_client._make_request("GET", url, item_type='agent_profile')
+            
+            profiles = []
+            if isinstance(response, dict) and 'data' in response:
+                for profile in response['data']:
+                    profiles.append({
+                        'name': profile.get('name', 'Unknown'),
+                        'id': profile.get('id', ''),
+                    })
+            
+            self._agent_profiles_cache = profiles
+            self.infrastructure_tree.set_agent_profiles(profiles)
+            
+            self.logger.info(f"Discovered {len(profiles)} agent profiles")
+            
+        except Exception as e:
+            self.logger.error(f"Error discovering agent profiles: {e}")
 
     def set_api_client(self, api_client, connection_name=None):
-        """
-        Set the API client for pull operations.
-        
-        This method is called from main_window when a connection is established,
-        or internally via the tenant selector widget.
-        """
+        """Set the API client for this widget."""
         self.api_client = api_client
         self.connection_name = connection_name or "Manual"
         
-        # Update tenant selector if called externally
+        connected = api_client is not None
+        self.folders_tree.set_enabled(connected)
+        self.snippets_tree.set_enabled(connected)
+        self.infrastructure_tree.set_enabled(connected)
+        self.pull_btn.setEnabled(connected)
+        
         if api_client and connection_name:
             self.tenant_selector.set_connection(api_client, connection_name)
-        
-        # Update UI state
-        self._update_ui_for_connection()
-    
+
     def populate_source_tenants(self, tenants: list):
         """
         Populate the source tenant dropdown with saved tenants.
@@ -267,204 +439,60 @@ class PullConfigWidget(QWidget):
             tenants: List of tenant dictionaries with 'name' key
         """
         self.tenant_selector.populate_tenants(tenants)
-    
-    def _on_connection_changed(self, api_client, tenant_name: str):
-        """
-        Handle connection changes from the tenant selector.
-        
-        Args:
-            api_client: The API client (or None if disconnected)
-            tenant_name: Name of the tenant (or empty string if disconnected)
-        """
-        self.api_client = api_client
-        self.connection_name = tenant_name if tenant_name else None
-        self._update_ui_for_connection()
-    
-    def _update_ui_for_connection(self):
-        """Update UI elements based on connection state."""
-        connected = self.api_client is not None
-        
-        # Update button states
-        self.pull_btn.setEnabled(connected)
-        self.folder_select_btn.setEnabled(connected)
-        
-        # Update progress label
-        if connected:
-            self.progress_label.setText(
-                f"Connected to {self.connection_name} - Ready to pull"
-            )
-            self.progress_label.setStyleSheet("color: green;")
-        else:
-            self.progress_label.setText("Connect to a source tenant to begin")
-            self.progress_label.setStyleSheet("color: gray;")
-
-    def _open_folder_selection(self):
-        """Open folder selection dialog."""
-        if not self.api_client:
-            # Show inline error instead of dialog
-            self.error_notification.show_error(
-                "Not Connected: Please connect to a source tenant before selecting folders."
-            )
-            return
-        
-        from gui.dialogs.folder_selection_dialog import FolderSelectionDialog
-        
-        dialog = FolderSelectionDialog(self.api_client, self)
-        if dialog.exec():
-            selected_folders = dialog.get_selected_folders()
-            selected_components = dialog.get_selected_components()
-            selected_snippets = dialog.get_selected_snippets()
-            
-            # If nothing was selected, treat as "pull all" by setting to None
-            # Only set if user actually selected something
-            folder_count = len(selected_folders)
-            snippet_count = len(selected_snippets)
-            
-            if folder_count == 0 and snippet_count == 0:
-                # User opened dialog but didn't select anything - pull all
-                self.selected_folders = []  # Will be converted to None in _start_pull
-                self.selected_components = {}
-                self.selected_snippets = []
-                self.folder_selection_label.setText("No specific folders selected (will pull all)")
-                self.folder_selection_label.setStyleSheet("color: gray; font-size: 10px; padding: 5px;")
-            else:
-                # User selected specific folders/snippets
-                self.selected_folders = selected_folders
-                self.selected_components = selected_components
-                self.selected_snippets = selected_snippets
-                
-                parts = []
-                if folder_count > 0:
-                    parts.append(f"{folder_count} folder(s)")
-                if snippet_count > 0:
-                    parts.append(f"{snippet_count} snippet(s)")
-                
-                self.folder_selection_label.setText(f"Selected: {', '.join(parts)}")
-                self.folder_selection_label.setStyleSheet("color: green; font-size: 10px; padding: 5px;")
-
-    def _on_applications_toggle(self, state):
-        """Enable/disable applications button when checkbox toggled."""
-        from PyQt6.QtCore import Qt
-        self.applications_btn.setEnabled(state == Qt.CheckState.Checked.value)
-        if state != Qt.CheckState.Checked.value:
-            self.selected_applications = []
-            self.applications_label.setText("No applications selected")
-            self.applications_label.setStyleSheet("color: gray; font-size: 10px;")
-
-    def _select_applications(self):
-        """Open application search dialog."""
-        if not self.api_client:
-            QMessageBox.warning(
-                self,
-                "Not Connected",
-                "Please connect to Prisma Access before selecting applications."
-            )
-            return
-        
-        # Use CLI application search for now (simple implementation)
-        from PyQt6.QtWidgets import QInputDialog
-        
-        # Simple input dialog for application names
-        text, ok = QInputDialog.getText(
-            self,
-            "Custom Applications",
-            "Enter application names (comma-separated):\n"
-            "Note: Only include custom/user-created applications.\n"
-            "Most applications are predefined and don't need to be specified.",
-            text=", ".join(self.selected_applications)
-        )
-        
-        if ok and text:
-            # Parse comma-separated list
-            apps = [app.strip() for app in text.split(",") if app.strip()]
-            self.selected_applications = apps
-            count = len(apps)
-            self.applications_label.setText(
-                f"{count} application{'s' if count != 1 else ''} selected"
-            )
-            self.applications_label.setStyleSheet("color: green; font-size: 10px;")
-        elif ok:
-            # Empty input - clear selection
-            self.selected_applications = []
-            self.applications_label.setText("No applications selected")
-            self.applications_label.setStyleSheet("color: gray; font-size: 10px;")
-
-    def _select_all(self):
-        """Select all infrastructure checkboxes."""
-        # Infrastructure
-        self.remote_networks_check.setChecked(True)
-        self.service_connections_check.setChecked(True)
-        self.ipsec_tunnels_check.setChecked(True)
-        self.mobile_users_check.setChecked(True)
-        self.hip_check.setChecked(True)
-        self.regions_check.setChecked(True)
-
-    def _select_none(self):
-        """Deselect all infrastructure checkboxes."""
-        # Infrastructure
-        self.remote_networks_check.setChecked(False)
-        self.service_connections_check.setChecked(False)
-        self.ipsec_tunnels_check.setChecked(False)
-        self.mobile_users_check.setChecked(False)
-        self.hip_check.setChecked(False)
-        self.regions_check.setChecked(False)
 
     def _start_pull(self):
-        """Start the pull operation."""
-        # Check if API client is set
+        """Start the configuration pull operation."""
         if not self.api_client:
-            # Show inline error instead of dialog
             self.error_notification.show_error(
                 "Not Connected: Please connect to a source tenant before pulling configuration."
             )
             return
-        
-        # Gather options (folder/snippet selection handled by dialog)
+
+        # Get filter defaults setting
+        filter_defaults = self.settings.value("pull/filter_defaults", True, type=bool)
+
+        # Gather selected folders and their components
+        selected_folders = self.folders_tree.get_selected_items()
+        selected_snippets = self.snippets_tree.get_selected_items()
+        infrastructure_config = self.infrastructure_tree.get_selected_infrastructure()
+
+        # Build options dict for the worker
         options = {
-            # Configuration components are now selected via the folder selection dialog
-            "folders": True,  # Always pull folders
-            "snippets": True,  # Always pull snippets
-            "rules": True,  # Always pull rules
-            "objects": True,  # Always pull objects
-            "profiles": True,  # Always pull profiles
-            # Custom applications (if any selected)
-            "application_names": self.selected_applications if self.selected_applications else None,
+            "folders": True,
+            "snippets": True,
+            "rules": True,
+            "objects": True,
+            "profiles": True,
+            # Folder selection
+            "selected_folders": selected_folders,
+            # Snippet selection
+            "selected_snippets": selected_snippets,
             # Infrastructure options
-            "include_remote_networks": self.remote_networks_check.isChecked(),
-            "include_service_connections": self.service_connections_check.isChecked(),
-            "include_ipsec_tunnels": self.ipsec_tunnels_check.isChecked(),
-            "include_mobile_users": self.mobile_users_check.isChecked(),
-            "include_hip": self.hip_check.isChecked(),
-            "include_regions": self.regions_check.isChecked(),
-            # Folder and snippet selection (from dialog)
-            # Convert empty lists to None so orchestrator knows to pull all
-            "selected_folders": self.selected_folders if self.selected_folders else None,
-            "selected_components": self.selected_components if self.selected_components else None,
-            "selected_snippets": self.selected_snippets if self.selected_snippets else None,
+            "include_remote_networks": infrastructure_config.get('remote_networks', False),
+            "include_service_connections": infrastructure_config.get('service_connections', False),
+            "include_mobile_users": infrastructure_config.get('mobile_users', False),
+            "infrastructure_config": infrastructure_config,
         }
 
-        filter_defaults = self.filter_defaults_check.isChecked()
+        self.logger.info(f"Starting pull with options: folders={len(selected_folders)}, "
+                        f"snippets={len(selected_snippets)}, filter_defaults={filter_defaults}")
 
         # Disable UI during pull
         self._set_ui_enabled(False)
 
-        # Show progress bar
-        self.progress_bar.setValue(0)
-        self.progress_bar.setVisible(True)
+        # Switch to results page
+        self._show_results_page()
         self.progress_label.setText("Preparing to pull configuration...")
-
-        # Clear previous results
-        self.results_text.clear()
         
-        # Start the batch update timer (runs continuously during pull)
+        # Start the batch update timer
         self.pending_messages.clear()
         self.update_timer.start()
 
         # Create and start worker
-        self.worker = PullWorker(self.api_client, options, filter_defaults)
-        self.worker.progress.connect(self._on_progress)
-        self.worker.finished.connect(self._on_pull_finished)
-        self.worker.error.connect(self._on_error)
+        self.worker = PullWorker(self.api_client, options, filter_defaults, self.connection_name)
+        self.worker.progress.connect(self._on_progress, Qt.ConnectionType.QueuedConnection)
+        self.worker.finished.connect(self._on_pull_finished, Qt.ConnectionType.QueuedConnection)
+        self.worker.error.connect(self._on_error, Qt.ConnectionType.QueuedConnection)
         self.worker.start()
 
     def _on_progress(self, message: str, percentage: int):
@@ -473,115 +501,112 @@ class PullConfigWidget(QWidget):
             # Ensure progress never goes backwards
             current_value = self.progress_bar.value()
             if percentage < current_value:
-                percentage = current_value  # Don't allow backwards progress
+                percentage = current_value
             
-            # Update progress label and bar immediately (lightweight)
+            # Update progress label and bar immediately
             self.progress_label.setText(message)
             self.progress_bar.setValue(percentage)
             
-            # Queue message for batched update (prevents rapid GUI updates that cause segfaults)
+            # Queue message for batched update
             self.pending_messages.append(f"[{percentage}%] {message}")
             
-            # Timer is already running continuously - no need to start/stop
-            
         except RuntimeError as e:
-            # Widget might have been deleted - ignore
-            self.logger.warning(f"Progress update error (widget deleted?): {e}")
+            self.logger.warning(f"Progress update error: {e}")
         except Exception as e:
             self.logger.error(f"Unexpected progress update error: {e}")
-    
+
     def _flush_pending_messages(self):
-        """Flush all pending messages to results text widget in one batch."""
+        """Flush all pending messages to results panel."""
         if not self.pending_messages:
             return
         
         try:
-            # Append all pending messages at once (more efficient than one-by-one)
-            self.results_text.append("\n".join(self.pending_messages))
+            if hasattr(self.results_panel, 'append_text'):
+                combined = "\n".join(self.pending_messages)
+                self.results_panel.append_text(combined)
             self.pending_messages.clear()
-            
-            # DO NOT call QApplication.processEvents() - causes segfaults on Linux!
-            # Qt will update the GUI naturally on the next event loop iteration
-            
-        except RuntimeError as e:
-            self.logger.warning(f"Batch update error (widget deleted?): {e}")
+        except RuntimeError:
+            self.pending_messages.clear()
         except Exception as e:
-            self.logger.error(f"Unexpected batch update error: {e}")
+            self.logger.error(f"Error flushing messages: {e}")
+            self.pending_messages.clear()
+
+    def _on_pull_finished(self, success: bool, message: str, config_unused):
+        """Handle pull completion."""
+        self.update_timer.stop()
+        self._flush_pending_messages()
+        
+        # Get config from worker before cleanup
+        pulled_config = None
+        if self.worker:
+            try:
+                pulled_config = self.worker.config
+                if pulled_config:
+                    self.logger.info(f"Retrieved configuration from worker: {len(str(pulled_config))} bytes")
+            except Exception as e:
+                self.logger.error(f"Error getting config from worker: {e}")
+            
+            self.worker = None
+
+        self._set_ui_enabled(True)
+        
+        # Show back button, hide cancel button
+        self.back_btn.setVisible(True)
+        self.cancel_btn.setVisible(False)
+        # Re-enable pull, disable update selection (pull is done)
+        self.pull_btn.setEnabled(self.api_client is not None)
+        self.update_selection_btn.setEnabled(False)
+
+        if success:
+            self.progress_label.setText("✓ Pull completed successfully!")
+            self.progress_label.setStyleSheet("color: green; font-size: 14px; font-weight: bold;")
+            
+            self.results_panel.set_success(True)
+            self.results_panel.append_text(f"\n{'='*50}\n✓ {message}")
+            
+            if pulled_config:
+                self.pulled_config = pulled_config
+                self.logger.info(f"Emitting pull_completed signal with config: {len(str(pulled_config))} bytes")
+                self.pull_completed.emit(pulled_config)
+            else:
+                self.logger.warning("No pulled_config to emit!")
+        else:
+            self.progress_label.setText(f"✗ Pull failed: {message}")
+            self.progress_label.setStyleSheet("color: red; font-size: 14px; font-weight: bold;")
+            
+            self.results_panel.set_success(False)
+            self.results_panel.append_text(f"\n{'='*50}\n✗ Pull failed: {message}")
 
     def _on_error(self, error_message: str):
-        """Handle error from worker."""
-        try:
-            self.results_text.append(f"\n❌ ERROR: {error_message}")
-        except RuntimeError as e:
-            self.logger.warning(f"Error display failed (widget deleted?): {e}")
-        except Exception as e:
-            self.logger.error(f"Unexpected error display error: {e}")
-
-    def _on_pull_finished(self, success: bool, message: str, config: Optional[Dict]):
-        """Handle pull completion."""
-        try:
-            # Stop update timer and flush any remaining messages
-            self.update_timer.stop()
-            self._flush_pending_messages()
-            
-            # Wait for worker thread to fully finish
-            if self.worker:
-                self.worker.wait(1000)  # Wait up to 1 second for thread to finish
-            
-            # Re-enable UI
-            self._set_ui_enabled(True)
-
-            if success:
-                self.progress_label.setText("Pull completed successfully!")
-                self.progress_label.setStyleSheet("color: green;")
-                
-                # Append stats to results
-                self.results_text.append(f"\n{'='*50}")
-                self.results_text.append("✓ Pull completed successfully!")
-                self.results_text.append(f"\n{message}")
-                
-                # Get config from worker (not from signal parameter to avoid threading issues)
-                if self.worker and hasattr(self.worker, 'config'):
-                    self.pulled_config = self.worker.config
-                else:
-                    self.pulled_config = config  # Fallback to parameter if worker unavailable
-                
-                # Emit signal WITHOUT the config object to avoid memory corruption
-                # Other components should call get_pulled_config() to retrieve it
-                if self.pulled_config:
-                    # Use QTimer to emit from main thread - pass None to avoid memory issues
-                    QTimer.singleShot(100, lambda: self.pull_completed.emit(None))
-                
-                # Show toast notification instead of dialog
-                self.toast_manager.show_success("✓ Configuration pulled successfully!")
-                
-                # TODO: Re-enable error notification once we solve the memory corruption issue
-                # The config object is too large and causes heap corruption when accessed immediately
-                # For now, users can check api_errors.log manually if they suspect issues
-            else:
-                self.progress_label.setText("Pull failed")
-                self.progress_label.setStyleSheet("color: red;")
-                
-                # Show error in results
-                self.results_text.append(f"\n{'='*50}")
-                self.results_text.append(f"✗ Pull failed!")
-                self.results_text.append(f"\nError: {message}")
-                
-                QMessageBox.warning(self, "Pull Failed", f"Pull operation failed:\n\n{message}")
-                
-        except RuntimeError as e:
-            self.logger.warning(f"Pull finished handler error (widget deleted?): {e}")
-        except Exception as e:
-            self.logger.error(f"Unexpected pull finished error: {e}")
+        """Handle errors during pull."""
+        self.update_timer.stop()
+        self._flush_pending_messages()
+        
+        self.worker = None
+        self._set_ui_enabled(True)
+        
+        # Show back button, hide cancel button
+        self.back_btn.setVisible(True)
+        self.cancel_btn.setVisible(False)
+        # Re-enable pull, disable update selection (pull is done)
+        self.pull_btn.setEnabled(self.api_client is not None)
+        self.update_selection_btn.setEnabled(False)
+        
+        self.progress_label.setText(f"✗ Error: {error_message}")
+        self.progress_label.setStyleSheet("color: red; font-size: 14px; font-weight: bold;")
+        
+        self.results_panel.set_success(False)
+        self.results_panel.append_text(f"\n{'='*50}\n✗ Error: {error_message}")
 
     def _set_ui_enabled(self, enabled: bool):
-        """Enable or disable UI controls."""
-        self.filter_defaults_check.setEnabled(enabled)
-        self.select_all_btn.setEnabled(enabled)
-        self.select_none_btn.setEnabled(enabled)
-        self.pull_btn.setEnabled(enabled)
-        self.folder_select_btn.setEnabled(enabled)
+        """Enable or disable UI elements."""
+        self.tenant_selector.setEnabled(enabled)
+        self.folders_tree.set_enabled(enabled and self.api_client is not None)
+        self.snippets_tree.set_enabled(enabled and self.api_client is not None)
+        self.infrastructure_tree.set_enabled(enabled and self.api_client is not None)
+        self.pull_btn.setEnabled(enabled and self.api_client is not None)
+        self.advanced_btn.setEnabled(enabled)
 
-    def get_pulled_config(self) -> Optional[Dict[str, Any]]:
-        """Get the pulled configuration."""
+    def get_pulled_config(self):
+        """Get the most recently pulled configuration."""
         return self.pulled_config

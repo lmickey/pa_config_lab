@@ -1,0 +1,15 @@
+{
+  "id": "6d0f8cb9-15c7-4b39-bbf5-b6902adf6b1a",
+  "name": "is-win-vista",
+  "snippet": "hip-default",
+  "host_info": {
+    "criteria": {
+      "os": {
+        "contains": {
+          "Microsoft": "Windows Vista"
+        }
+      }
+    }
+  },
+  "description": "Matches all Windows Vista endpoints"
+}

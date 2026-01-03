@@ -1303,8 +1303,8 @@ class POVWorkflowWidget(QWidget):
         self.progress_bar.setValue(0)
 
         self.worker = POVConfigWorker("configure_firewall", self.config_data)
-        self.worker.progress.connect(self._on_progress)
-        self.worker.finished.connect(self._on_fw_finished)
+        self.worker.progress.connect(self._on_progress, Qt.ConnectionType.QueuedConnection)
+        self.worker.finished.connect(self._on_fw_finished, Qt.ConnectionType.QueuedConnection)
         self.worker.start()
 
     def _configure_prisma_access(self):
@@ -1330,8 +1330,8 @@ class POVWorkflowWidget(QWidget):
         self.progress_bar.setValue(0)
 
         self.worker = POVConfigWorker("configure_service_connection", self.config_data)
-        self.worker.progress.connect(self._on_progress)
-        self.worker.finished.connect(self._on_pa_finished)
+        self.worker.progress.connect(self._on_progress, Qt.ConnectionType.QueuedConnection)
+        self.worker.finished.connect(self._on_pa_finished, Qt.ConnectionType.QueuedConnection)
         self.worker.start()
 
     def _complete_pov_setup(self):

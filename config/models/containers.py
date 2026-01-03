@@ -447,9 +447,13 @@ class Configuration:
     Metadata includes source information, version tracking, and push history.
     """
     
+    # Program version - update this when releasing new versions
+    PROGRAM_VERSION = "1.0.0"
+    
     def __init__(self, 
                  source_tsg: Optional[str] = None,
-                 source_file: Optional[str] = None,
+                 source_tenant: Optional[str] = None,
+                 source_config: Optional[str] = None,
                  load_type: Optional[str] = None,
                  saved_credentials_ref: Optional[str] = None):
         """
@@ -457,8 +461,9 @@ class Configuration:
         
         Args:
             source_tsg: Source Tenant Service Group ID
-            source_file: Source file path (if loaded from file)
-            load_type: How config was loaded ('file', 'pull', 'api')
+            source_tenant: Friendly name of source tenant (connection name)
+            source_config: Source config name (friendly name if loaded from file)
+            load_type: How config was loaded ('From File', 'From Pull', 'From API')
             saved_credentials_ref: Reference to saved credentials (tenant name)
         """
         self.folders: Dict[str, FolderConfig] = {}
@@ -467,12 +472,14 @@ class Configuration:
         
         # Metadata
         self.source_tsg = source_tsg
-        self.source_file = source_file
-        self.load_type = load_type  # 'file', 'pull', 'api'
+        self.source_tenant = source_tenant  # Friendly tenant name
+        self.source_config = source_config  # Friendly config name (when loaded from file)
+        self.load_type = load_type  # 'From File', 'From Pull', 'From API'
         self.saved_credentials_ref = saved_credentials_ref
         
-        # Version tracking (for future use)
-        self.version: Optional[str] = None
+        # Version tracking
+        self.program_version: str = self.PROGRAM_VERSION  # Version of program that created/modified this
+        self.config_version: int = 1  # Increments each time config is saved
         self.created_at: Optional[str] = None
         self.modified_at: Optional[str] = None
         
@@ -646,33 +653,406 @@ class Configuration:
         
         return deps
     
-    def save_to_file(self, file_path: str) -> None:
+    def save_to_file(
+        self, 
+        file_path: str, 
+        compress: bool = False, 
+        description: Optional[str] = None,
+        password: Optional[str] = None,
+        friendly_name: Optional[str] = None
+    ) -> None:
         """
-        Save configuration to file.
+        Save configuration to file, optionally with encryption.
         
-        TODO: Implement serialization to JSON/YAML format.
-        Should include metadata, version info, and all containers.
+        Serializes all folders, snippets, infrastructure, metadata, and history
+        to a JSON file. If password is provided, encrypts the file using AES-256.
         
         Args:
-            file_path: Path to save configuration file
+            file_path: Path to save configuration file (.json, .json.gz, or .pac)
+            compress: Whether to compress with gzip (default: False, ignored if encrypted)
+            description: Optional description to include in metadata
+            password: If provided, encrypt the file with this password
+            friendly_name: Optional friendly name for display (used with encryption)
+            
+        Raises:
+            IOError: If file cannot be written
+            ValueError: If configuration is invalid
         """
-        raise NotImplementedError("save_to_file() will be implemented in future phase")
+        import json
+        import gzip
+        from pathlib import Path
+        from datetime import datetime
+        
+        logger.info(f"Saving configuration to {file_path}")
+        logger.debug(f"Compress: {compress}, Description: {description}, Encrypted: {bool(password)}")
+        
+        # Update timestamps - modified_at is always updated on save
+        # created_at should already be set from pull; only set if missing
+        self.modified_at = datetime.now().isoformat()
+        if not self.created_at:
+            self.created_at = self.modified_at
+        
+        # Update program version to current version
+        self.program_version = self.PROGRAM_VERSION
+        
+        # Increment config version on each save (if not first save)
+        if not hasattr(self, 'config_version') or self.config_version is None:
+            self.config_version = 1
+        else:
+            self.config_version += 1
+        
+        # Build configuration dictionary
+        config_dict = {
+            "program_version": self.program_version,
+            "config_version": self.config_version,
+            "format_version": "1.0",
+            "metadata": {
+                "source_tsg": self.source_tsg,
+                "source_tenant": getattr(self, 'source_tenant', None),
+                "source_config": getattr(self, 'source_config', None),
+                "load_type": self.load_type,
+                "saved_credentials_ref": self.saved_credentials_ref,
+                "created_at": self.created_at,
+                "modified_at": self.modified_at,
+                "description": description
+            },
+            "push_history": self.push_history,
+            "folders": {},
+            "snippets": {},
+            "infrastructure": {
+                "items": []
+            },
+            "stats": {}
+        }
+        
+        logger.debug(f"Serializing {len(self.folders)} folders")
+        # Serialize folders
+        for folder_name, folder in self.folders.items():
+            config_dict["folders"][folder_name] = {
+                "parent": folder.parent,
+                "items": [item.to_dict(include_id=True) for item in folder.items]
+            }
+            logger.debug(f"  Folder '{folder_name}': {len(folder.items)} items")
+        
+        logger.debug(f"Serializing {len(self.snippets)} snippets")
+        # Serialize snippets
+        for snippet_name, snippet in self.snippets.items():
+            config_dict["snippets"][snippet_name] = {
+                "items": [item.to_dict(include_id=True) for item in snippet.items]
+            }
+            logger.debug(f"  Snippet '{snippet_name}': {len(snippet.items)} items")
+        
+        logger.debug(f"Serializing infrastructure")
+        # Serialize infrastructure
+        config_dict["infrastructure"]["items"] = [
+            item.to_dict(include_id=True) for item in self.infrastructure.items
+        ]
+        logger.debug(f"  Infrastructure: {len(self.infrastructure.items)} items")
+        
+        # Generate stats
+        all_items = self.get_all_items()
+        items_by_type = {}
+        for item in all_items:
+            items_by_type[item.item_type] = items_by_type.get(item.item_type, 0) + 1
+        
+        config_dict["stats"] = {
+            "total_items": len(all_items),
+            "items_by_type": items_by_type,
+            "folders_count": len(self.folders),
+            "snippets_count": len(self.snippets),
+            "infrastructure_count": len(self.infrastructure.items)
+        }
+        
+        logger.info(f"Configuration prepared: {config_dict['stats']['total_items']} total items")
+        
+        # Write to file
+        file_path_obj = Path(file_path)
+        file_path_obj.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Write to temporary file first (atomic write)
+        temp_path = file_path_obj.with_suffix(file_path_obj.suffix + '.tmp')
+        
+        try:
+            logger.debug(f"Writing to temporary file: {temp_path}")
+            
+            if password:
+                # Encrypted save
+                from config.utils.encryption import encrypt_config
+                
+                # Prepare metadata for encryption wrapper
+                enc_metadata = {
+                    "name": friendly_name or "Configuration",
+                    "description": description or "",
+                    "created_at": self.created_at,
+                    "source_tenant": getattr(self, 'source_tenant', None),
+                    "source_tsg": self.source_tsg,
+                    "pull_date": self.created_at,
+                    "item_count": config_dict["stats"]["total_items"],
+                    "folders_count": config_dict["stats"]["folders_count"],
+                    "snippets_count": config_dict["stats"]["snippets_count"],
+                }
+                
+                encrypted = encrypt_config(config_dict, password, enc_metadata)
+                
+                with open(temp_path, 'w', encoding='utf-8') as f:
+                    json.dump(encrypted, f, indent=2)
+                logger.debug("Wrote encrypted file")
+                
+            elif compress or file_path.endswith('.gz'):
+                with gzip.open(temp_path, 'wt', encoding='utf-8') as f:
+                    json.dump(config_dict, f, indent=2, sort_keys=False)
+                logger.debug("Wrote compressed file")
+            else:
+                with open(temp_path, 'w', encoding='utf-8') as f:
+                    json.dump(config_dict, f, indent=2, sort_keys=False)
+                logger.debug("Wrote uncompressed file")
+            
+            # Move temp file to final location (atomic)
+            temp_path.rename(file_path_obj)
+            logger.info(f"Configuration saved successfully to {file_path}")
+            logger.info(f"File size: {file_path_obj.stat().st_size} bytes")
+            
+        except Exception as e:
+            # Clean up temp file on error
+            if temp_path.exists():
+                temp_path.unlink()
+            logger.error(f"Failed to save configuration: {e}", exc_info=True)
+            raise IOError(f"Failed to save configuration to {file_path}: {e}") from e
     
     @classmethod
-    def load_from_file(cls, file_path: str) -> 'Configuration':
+    def load_from_file(
+        cls, 
+        file_path: str, 
+        strict: bool = True, 
+        on_error: str = "fail",
+        password: Optional[str] = None
+    ) -> 'Configuration':
         """
-        Load configuration from file.
+        Load configuration from file, with optional decryption.
         
-        TODO: Implement deserialization from JSON/YAML format.
-        Should recreate all folders, snippets, infrastructure, and metadata.
+        Deserializes a JSON file created by save_to_file() and recreates the complete
+        Configuration object with all folders, snippets, infrastructure, and metadata.
+        If the file is encrypted, a password must be provided.
         
         Args:
-            file_path: Path to configuration file
+            file_path: Path to configuration file (.json, .json.gz, or .pac)
+            strict: If True, fail on any validation error. If False, allow partial load (default: True)
+            on_error: How to handle errors: "fail" (raise), "warn" (log warning), "skip" (silent) (default: "fail")
+            password: Password for encrypted files (required if file is encrypted)
             
         Returns:
             Configuration instance
+            
+        Raises:
+            FileNotFoundError: If file doesn't exist
+            ValueError: If file format is invalid, incompatible, or password is wrong/missing
+            IOError: If file cannot be read
         """
-        raise NotImplementedError("load_from_file() will be implemented in future phase")
+        import json
+        import gzip
+        from pathlib import Path
+        from datetime import datetime
+        from config.models.factory import ConfigItemFactory
+        
+        logger.info(f"Loading configuration from {file_path}")
+        logger.debug(f"Strict: {strict}, On error: {on_error}")
+        
+        file_path_obj = Path(file_path)
+        if not file_path_obj.exists():
+            raise FileNotFoundError(f"Configuration file not found: {file_path}")
+        
+        # Read file (handle compressed, uncompressed, and encrypted)
+        try:
+            logger.debug("Reading file")
+            if file_path.endswith('.gz'):
+                with gzip.open(file_path_obj, 'rt', encoding='utf-8') as f:
+                    config_dict = json.load(f)
+                logger.debug("Loaded compressed file")
+            else:
+                with open(file_path_obj, 'r', encoding='utf-8') as f:
+                    config_dict = json.load(f)
+                logger.debug("Loaded uncompressed file")
+        except Exception as e:
+            logger.error(f"Failed to read configuration file: {e}")
+            raise IOError(f"Failed to read configuration file {file_path}: {e}") from e
+        
+        # Check if file is encrypted
+        if config_dict.get('format') == 'pac_encrypted_v1':
+            logger.info("File is encrypted, decrypting...")
+            if not password:
+                raise ValueError("File is encrypted but no password provided")
+            
+            from config.utils.encryption import decrypt_config
+            try:
+                config_dict = decrypt_config(config_dict, password)
+                logger.debug("Decrypted successfully")
+            except ValueError as e:
+                logger.error(f"Decryption failed: {e}")
+                raise
+        
+        # Validate format version
+        format_version = config_dict.get('format_version', '1.0')
+        if not format_version.startswith('1.'):
+            raise ValueError(f"Unsupported format version: {format_version}. This version supports 1.x only.")
+        
+        logger.info(f"Configuration format version: {format_version}")
+        
+        # Extract metadata
+        metadata = config_dict.get('metadata', {})
+        
+        # Get friendly name from encrypted wrapper metadata or description
+        # Try: encrypted metadata 'name' -> metadata description -> filename
+        friendly_name = None
+        if isinstance(config_dict.get('metadata'), dict):
+            # Check if this was from encrypted file (has outer metadata with 'name')
+            friendly_name = metadata.get('name') or metadata.get('description')
+        if not friendly_name:
+            # Use filename without extension as fallback
+            friendly_name = file_path_obj.stem
+        
+        # Create Configuration instance
+        config = cls(
+            source_tsg=metadata.get('source_tsg'),
+            source_tenant=metadata.get('source_tenant'),
+            source_config=friendly_name,  # Friendly name of the loaded config
+            load_type='From File',
+            saved_credentials_ref=metadata.get('saved_credentials_ref')
+        )
+        
+        # Restore version info
+        config.program_version = config_dict.get('program_version', cls.PROGRAM_VERSION)
+        config.config_version = config_dict.get('config_version', 1)
+        config.created_at = metadata.get('created_at')
+        config.modified_at = metadata.get('modified_at')
+        config.push_history = config_dict.get('push_history', [])
+        
+        logger.debug(f"Metadata loaded: TSG={config.source_tsg}, Created={config.created_at}")
+        
+        # Track errors
+        errors = []
+        items_loaded = 0
+        items_skipped = 0
+        
+        # Load folders
+        folders_dict = config_dict.get('folders', {})
+        logger.info(f"Loading {len(folders_dict)} folders")
+        
+        for folder_name, folder_data in folders_dict.items():
+            logger.debug(f"Loading folder '{folder_name}'")
+            folder = FolderConfig(
+                name=folder_name,
+                parent=folder_data.get('parent')
+            )
+            
+            items_data = folder_data.get('items', [])
+            logger.debug(f"  {len(items_data)} items in folder")
+            
+            for item_idx, item_data in enumerate(items_data):
+                try:
+                    item_type = item_data.get('item_type')
+                    item_name = item_data.get('name', f'item_{item_idx}')
+                    
+                    if not item_type:
+                        raise ValueError(f"Item missing 'item_type': {item_name}")
+                    
+                    logger.debug(f"    Creating {item_type} '{item_name}'")
+                    item = ConfigItemFactory.create_from_dict(item_type, item_data)
+                    folder.add_item(item)
+                    items_loaded += 1
+                    
+                except Exception as e:
+                    error_msg = f"Failed to load item in folder '{folder_name}': {item_data.get('name', 'unknown')}: {e}"
+                    errors.append(error_msg)
+                    items_skipped += 1
+                    
+                    if on_error == "fail" or (strict and on_error != "skip"):
+                        logger.error(error_msg)
+                        raise ValueError(error_msg) from e
+                    elif on_error == "warn":
+                        logger.warning(error_msg)
+                    # on_error == "skip": silent
+            
+            config.add_folder(folder)
+            logger.info(f"Loaded folder '{folder_name}': {len(folder.items)} items")
+        
+        # Load snippets
+        snippets_dict = config_dict.get('snippets', {})
+        logger.info(f"Loading {len(snippets_dict)} snippets")
+        
+        for snippet_name, snippet_data in snippets_dict.items():
+            logger.debug(f"Loading snippet '{snippet_name}'")
+            snippet = SnippetConfig(name=snippet_name)
+            
+            items_data = snippet_data.get('items', [])
+            logger.debug(f"  {len(items_data)} items in snippet")
+            
+            for item_idx, item_data in enumerate(items_data):
+                try:
+                    item_type = item_data.get('item_type')
+                    item_name = item_data.get('name', f'item_{item_idx}')
+                    
+                    if not item_type:
+                        raise ValueError(f"Item missing 'item_type': {item_name}")
+                    
+                    logger.debug(f"    Creating {item_type} '{item_name}'")
+                    item = ConfigItemFactory.create_from_dict(item_type, item_data)
+                    snippet.add_item(item)
+                    items_loaded += 1
+                    
+                except Exception as e:
+                    error_msg = f"Failed to load item in snippet '{snippet_name}': {item_data.get('name', 'unknown')}: {e}"
+                    errors.append(error_msg)
+                    items_skipped += 1
+                    
+                    if on_error == "fail" or (strict and on_error != "skip"):
+                        logger.error(error_msg)
+                        raise ValueError(error_msg) from e
+                    elif on_error == "warn":
+                        logger.warning(error_msg)
+            
+            config.add_snippet(snippet)
+            logger.info(f"Loaded snippet '{snippet_name}': {len(snippet.items)} items")
+        
+        # Load infrastructure
+        infrastructure_dict = config_dict.get('infrastructure', {})
+        items_data = infrastructure_dict.get('items', [])
+        logger.info(f"Loading {len(items_data)} infrastructure items")
+        
+        for item_idx, item_data in enumerate(items_data):
+            try:
+                item_type = item_data.get('item_type')
+                item_name = item_data.get('name', f'item_{item_idx}')
+                
+                if not item_type:
+                    raise ValueError(f"Item missing 'item_type': {item_name}")
+                
+                logger.debug(f"  Creating {item_type} '{item_name}'")
+                item = ConfigItemFactory.create_from_dict(item_type, item_data)
+                config.infrastructure.add_item(item)
+                items_loaded += 1
+                
+            except Exception as e:
+                error_msg = f"Failed to load infrastructure item: {item_data.get('name', 'unknown')}: {e}"
+                errors.append(error_msg)
+                items_skipped += 1
+                
+                if on_error == "fail" or (strict and on_error != "skip"):
+                    logger.error(error_msg)
+                    raise ValueError(error_msg) from e
+                elif on_error == "warn":
+                    logger.warning(error_msg)
+        
+        # Log summary
+        logger.normal("=" * 80)
+        logger.normal(f"CONFIGURATION LOADED: {items_loaded} items")
+        logger.normal("=" * 80)
+        logger.info(f"Load summary: {items_loaded} items loaded, {items_skipped} skipped")
+        logger.info(f"Folders: {len(config.folders)}, Snippets: {len(config.snippets)}, Infrastructure: {len(config.infrastructure.items)}")
+        
+        if errors and on_error == "warn":
+            logger.warning(f"Load completed with {len(errors)} errors (items skipped)")
+        
+        return config
     
     def push_to_destination(self, api_client) -> Dict[str, Any]:
         """

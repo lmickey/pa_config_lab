@@ -1,0 +1,26 @@
+{
+  "id": "3340c2af-b314-42ba-9063-d610d640fe61",
+  "name": "Protected system access",
+  "folder": "Shared",
+  "schedule_type": {
+    "recurring": {
+      "weekly": {
+        "monday": [
+          "07:30-18:00"
+        ],
+        "tuesday": [
+          "07:30-18:00"
+        ],
+        "wednesday": [
+          "07:30-18:00"
+        ],
+        "thursday": [
+          "07:30-18:00"
+        ],
+        "friday": [
+          "07:30-16:00"
+        ]
+      }
+    }
+  }
+}

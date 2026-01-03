@@ -1,0 +1,15 @@
+{
+  "id": "d1bb9b40-3dc4-4578-90d2-c7ca839cfe2e",
+  "name": "is-win-xp",
+  "snippet": "hip-default",
+  "host_info": {
+    "criteria": {
+      "os": {
+        "contains": {
+          "Microsoft": "Windows XP"
+        }
+      }
+    }
+  },
+  "description": "Matches all Windows XP endpoints"
+}

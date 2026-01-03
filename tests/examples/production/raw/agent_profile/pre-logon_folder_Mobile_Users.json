@@ -1,0 +1,570 @@
+{
+  "name": "pre-logon",
+  "folder": "Mobile Users",
+  "gateways": {
+    "internal": {
+      "list": [
+        {
+          "name": "Prisma Access Internal Gateway",
+          "fqdn": "gpcloudservice.com"
+        }
+      ]
+    },
+    "external": {
+      "list": [
+        {
+          "name": "Prisma Access",
+          "fqdn": "gpcloudservice.com",
+          "manual": true,
+          "priority_rule": [
+            {
+              "name": "Any",
+              "priority": "1"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "hip_collection": {
+    "collect_hip_data": true
+  },
+  "save_user_credentials": "1",
+  "certificate": {
+    "criteria": {
+      "certificate_profile": "Lab-CA"
+    }
+  },
+  "authentication_override": {
+    "generate_cookie": true,
+    "cookie_encrypt_decrypt_cert": "Authentication Cookie CA",
+    "accept_cookie": {
+      "cookie_lifetime": {
+        "lifetime_in_hours": 24
+      }
+    }
+  },
+  "client_certificate": {
+    "local": "GP_Log_Certificate"
+  },
+  "gp_app_config": {
+    "config": [
+      {
+        "name": "agent-proxy-mode",
+        "value": [
+          "1"
+        ]
+      },
+      {
+        "name": "forwarding-option-choice",
+        "value": [
+          "auto-proxy-pac"
+        ]
+      },
+      {
+        "name": "agent-proxy-port",
+        "value": [
+          "9999"
+        ]
+      },
+      {
+        "name": "proxy-multiple-autodetect",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "use-proxy",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "dem-agent",
+        "value": [
+          "install-with-admin-control"
+        ]
+      },
+      {
+        "name": "user-accept-terms-before-creating-tunnel",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "enable-signout",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "allow-extend-session",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "enable-advanced-view",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "enable-do-not-display-this-welcome-page-again",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "rediscover-network",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "wifi-to-wired-transition",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "resubmit-host-info",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "intelligent-portal",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "can-continue-if-portal-cert-invalid",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "access-gateway-from-agent-only",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "dem-agent-action",
+        "value": [
+          "install"
+        ]
+      },
+      {
+        "name": "allow-disable-cbl",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "dem-notification",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "refresh-config-interval",
+        "value": [
+          "24"
+        ]
+      },
+      {
+        "name": "show-agent-icon",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "wsc-autodetect",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "init-panel",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "user-input-on-top",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "pre-logon-tunnel-rename-timeout",
+        "value": [
+          "-1"
+        ]
+      },
+      {
+        "name": "retry-tunnel",
+        "value": [
+          "30"
+        ]
+      },
+      {
+        "name": "retry-timeout",
+        "value": [
+          "5"
+        ]
+      },
+      {
+        "name": "user-switch-tunnel-rename-timeout",
+        "value": [
+          "0"
+        ]
+      },
+      {
+        "name": "enable-cache-portal-config-absence-prelogon-tunnel",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "preserve-tunnel-upon-user-logoff-timeout",
+        "value": [
+          "0"
+        ]
+      },
+      {
+        "name": "ipsec-failover-ssl",
+        "value": [
+          "0"
+        ]
+      },
+      {
+        "name": "display-tunnel-fallback-notification",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "ssl-only-selection",
+        "value": [
+          "0"
+        ]
+      },
+      {
+        "name": "split-tunnel-option",
+        "value": [
+          "network-traffic"
+        ]
+      },
+      {
+        "name": "advanced-st-public-key",
+        "value": [
+          "Empty"
+        ]
+      },
+      {
+        "name": "ipv6-preferred",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "use-sso",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "use-sso-pin",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "use-sso-macos",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "logout-remove-sso",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "krb-auth-fail-fallback",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "default-browser",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "certificate-store-lookup",
+        "value": [
+          "machine"
+        ]
+      },
+      {
+        "name": "scep-certificate-renewal-period",
+        "value": [
+          "7"
+        ]
+      },
+      {
+        "name": "full-chain-cert-verify",
+        "value": [
+          "pre-deploy"
+        ]
+      },
+      {
+        "name": "retain-connection-smartcard-removal",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "traffic-enforcement",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "enforce-globalprotect",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "captive-portal-exception-timeout",
+        "value": [
+          "0"
+        ]
+      },
+      {
+        "name": "captive-portal-using-default-browser",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "traffic-blocking-notification-delay",
+        "value": [
+          "15"
+        ]
+      },
+      {
+        "name": "display-traffic-blocking-notification-msg",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "traffic-blocking-notification-msg",
+        "value": [
+          "<div style=\"font-family:'Helvetica Neue';\"><h1 style=\"color:red;text-align:center; margin: 0; font-size: 30px;\">Notice</h1><p style=\"margin: 0;font-size: 15px; line-height: 1.2em;\">To access the network, you must first connect to GlobalProtect.</p></div>"
+        ]
+      },
+      {
+        "name": "allow-traffic-blocking-notification-dismissal",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "display-captive-portal-detection-msg",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "captive-portal-detection-msg",
+        "value": [
+          "<div style=\"font-family:'Helvetica Neue';\"><h1 style=\"color:red;text-align:center; margin: 0; font-size: 30px;\">Captive Portal Detected</h1><p style=\"margin: 0; font-size: 15px; line-height: 1.2em;\">GlobalProtect has temporarily permitted network access for you to connect to the Internet. Follow instructions from your internet provider.</p><p style=\"margin: 0; font-size: 15px; line-height: 1.2em;\">If you let the connection time out, open GlobalProtect and click Connect to try again.</p></div>"
+        ]
+      },
+      {
+        "name": "captive-portal-notification-delay",
+        "value": [
+          "5"
+        ]
+      },
+      {
+        "name": "adv-internal-host-detection",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "delays-internal-host-detection",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "unified-user-id-hybrid-deployment",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "enable-hip-remediation",
+        "value": [
+          "0"
+        ]
+      },
+      {
+        "name": "hip-remediation-retry",
+        "value": [
+          "0"
+        ]
+      },
+      {
+        "name": "tunnel-mtu",
+        "value": [
+          "1400"
+        ]
+      },
+      {
+        "name": "max-internal-gateway-connection-attempts",
+        "value": [
+          "0"
+        ]
+      },
+      {
+        "name": "portal-timeout",
+        "value": [
+          "5"
+        ]
+      },
+      {
+        "name": "connect-timeout",
+        "value": [
+          "5"
+        ]
+      },
+      {
+        "name": "receive-timeout",
+        "value": [
+          "30"
+        ]
+      },
+      {
+        "name": "split-tunnel-option-mobile",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "enforce-dns",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "append-local-search-domain",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "flush-dns",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "mfa-enabled",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "mfa-listening-port",
+        "value": [
+          "4501"
+        ]
+      },
+      {
+        "name": "mfa-notification-msg",
+        "value": [
+          "You have attempted to access a protected resource that requires additional authentication. Proceed to authenticate at"
+        ]
+      },
+      {
+        "name": "mfa-prompt-suppress-time",
+        "value": [
+          "0"
+        ]
+      },
+      {
+        "name": "measuring-egw-tcp-connection",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "log-gateway",
+        "value": [
+          "no"
+        ]
+      },
+      {
+        "name": "quarantine-add-message",
+        "value": [
+          "Your security policy has restricted access to the network from this device. If the issue persists, contact your administrator."
+        ]
+      },
+      {
+        "name": "quarantine-remove-message",
+        "value": [
+          "Your security policy has restored access to the network from this device. If you still cannot access the network, contact your administrator."
+        ]
+      },
+      {
+        "name": "can-change-portal",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "uninstall",
+        "value": [
+          "allowed"
+        ]
+      },
+      {
+        "name": "cdl-log",
+        "value": [
+          "yes"
+        ]
+      },
+      {
+        "name": "connect-method",
+        "value": [
+          "pre-logon"
+        ]
+      },
+      {
+        "name": "agent-user-override",
+        "value": [
+          "allowed"
+        ]
+      },
+      {
+        "name": "client-upgrade",
+        "value": [
+          "prompt"
+        ]
+      }
+    ]
+  }
+}

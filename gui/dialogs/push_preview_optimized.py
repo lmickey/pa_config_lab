@@ -105,17 +105,19 @@ def optimized_fetch_logic(self):
                 items_to_check['infrastructure'][infra_type][folder_name].add(item_name)
     
     # Step 2: Fetch only what we need
-    print(f"\n=== Checking Specific Items ===")
-    print(f"Objects: {sum(len(names) for type_dict in items_to_check['objects'].values() for names in type_dict.values())}")
-    print(f"Rules: {sum(len(names) for names in items_to_check['rules'].values())}")
-    print(f"Profiles: {sum(len(names) for type_dict in items_to_check['profiles'].values() for names in type_dict.values())}")
-    print(f"Infrastructure: {sum(len(names) for type_dict in items_to_check['infrastructure'].values() for names in type_dict.values())}")
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.debug(f"=== Checking Specific Items ===")
+    logger.debug(f"Objects: {sum(len(names) for type_dict in items_to_check['objects'].values() for names in type_dict.values())}")
+    logger.debug(f"Rules: {sum(len(names) for names in items_to_check['rules'].values())}")
+    logger.debug(f"Profiles: {sum(len(names) for type_dict in items_to_check['profiles'].values() for names in type_dict.values())}")
+    logger.debug(f"Infrastructure: {sum(len(names) for type_dict in items_to_check['infrastructure'].values() for names in type_dict.values())}")
     
     # Check objects
     for obj_type, folders_dict in items_to_check['objects'].items():
         for folder_name, obj_names in folders_dict.items():
-            print(f"\nChecking {len(obj_names)} {obj_type} in '{folder_name}':")
-            print(f"  Names: {list(obj_names)[:5]}{'...' if len(obj_names) > 5 else ''}")
+            logger.debug(f"Checking {len(obj_names)} {obj_type} in '{folder_name}':")
+            logger.debug(f"  Names: {list(obj_names)[:5]}{'...' if len(obj_names) > 5 else ''}")
             
             # Fetch all from folder (API limitation - can't filter by name)
             # But we only store the ones we care about
@@ -135,16 +137,16 @@ def optimized_fetch_logic(self):
                     obj_name = obj.get('name')
                     if obj_name in obj_names:
                         dest_config['objects'][obj_type][obj_name] = obj
-                        print(f"  ✓ Found: {obj_name}")
+                        logger.debug(f"  ✓ Found: {obj_name}")
                 
                 # Report not found
                 found_names = set(dest_config['objects'][obj_type].keys())
                 not_found = obj_names - found_names
                 for name in not_found:
-                    print(f"  ✗ Not found: {name}")
+                    logger.debug(f"  ✗ Not found: {name}")
                     
             except Exception as e:
-                print(f"  ERROR: {e}")
+                logger.error(f"  ERROR: {e}")
     
     # Similar for profiles, infrastructure, etc.
     # ... (implement same pattern)

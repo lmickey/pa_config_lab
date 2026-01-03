@@ -1,0 +1,23 @@
+{
+  "id": "259c9007-25fa-485f-b6b2-c8cdb17a8317",
+  "name": "best-practice",
+  "folder": "Shared",
+  "virus_and_wildfire_analysis": [
+    "best-practice"
+  ],
+  "spyware": [
+    "best-practice"
+  ],
+  "dns_security": [
+    "best-practice"
+  ],
+  "vulnerability": [
+    "best-practice"
+  ],
+  "url_filtering": [
+    "best-practice"
+  ],
+  "file_blocking": [
+    "best-practice"
+  ]
+}

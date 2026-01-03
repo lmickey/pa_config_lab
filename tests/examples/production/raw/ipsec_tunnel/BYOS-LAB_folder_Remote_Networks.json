@@ -1,0 +1,15 @@
+{
+  "id": "bdd2ad2f-9889-47ec-acdb-642c0ee01e74",
+  "name": "BYOS-LAB",
+  "folder": "Remote Networks",
+  "tunnel_interface": "tunnel",
+  "auto_key": {
+    "ike_gateway": [
+      {
+        "name": "ike_Gateway_1726855411253"
+      }
+    ],
+    "ipsec_crypto_profile": "AES256"
+  },
+  "anti_replay": true
+}

@@ -1,0 +1,9 @@
+{
+  "id": "3e64b77b-e24b-4911-8992-24baf0baba14",
+  "name": "Mgmt Ports",
+  "folder": "Shared",
+  "members": [
+    "Service-SSH",
+    "service-RDP"
+  ]
+}

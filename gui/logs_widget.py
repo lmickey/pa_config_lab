@@ -100,24 +100,31 @@ class LogsWidget(QWidget):
             message: Log message
             level: Log level (info, success, warning, error)
         """
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        entry = {
-            "timestamp": timestamp,
-            "level": level.lower(),
-            "message": message,
-        }
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            entry = {
+                "timestamp": timestamp,
+                "level": level.lower(),
+                "message": message,
+            }
 
-        self.log_entries.append(entry)
+            self.log_entries.append(entry)
 
-        # Limit log entries
-        if len(self.log_entries) > self.max_log_entries:
-            self.log_entries.pop(0)
+            # Limit log entries
+            if len(self.log_entries) > self.max_log_entries:
+                self.log_entries.pop(0)
 
-        # Format and display
-        self._display_entry(entry)
+            # Format and display
+            self._display_entry(entry)
 
-        # Update stats
-        self._update_stats()
+            # Update stats
+            self._update_stats()
+        except RuntimeError:
+            # Widget was deleted or not accessible - silently ignore
+            pass
+        except Exception:
+            # Any other error - silently ignore to prevent crashes
+            pass
 
     def _display_entry(self, entry: dict):
         """Display a log entry with appropriate formatting."""
@@ -150,32 +157,45 @@ class LogsWidget(QWidget):
             f"<span>{message}</span>"
         )
 
-        # Append to display
-        self.log_text.append(formatted)
+        # Append to display (with error handling for shutdown/threading issues)
+        try:
+            if not self.log_text:
+                return
+            self.log_text.append(formatted)
 
-        # Auto-scroll to bottom
-        cursor = self.log_text.textCursor()
-        cursor.movePosition(QTextCursor.MoveOperation.End)
-        self.log_text.setTextCursor(cursor)
+            # Auto-scroll to bottom
+            cursor = self.log_text.textCursor()
+            cursor.movePosition(QTextCursor.MoveOperation.End)
+            self.log_text.setTextCursor(cursor)
+        except RuntimeError:
+            # Widget was deleted or not accessible - silently ignore
+            pass
 
     def _update_stats(self):
         """Update statistics label."""
-        total = len(self.log_entries)
+        try:
+            if not self.stats_label:
+                return
+                
+            total = len(self.log_entries)
 
-        # Count by level
-        counts = {"info": 0, "success": 0, "warning": 0, "error": 0}
-        for entry in self.log_entries:
-            level = entry["level"]
-            if level in counts:
-                counts[level] += 1
+            # Count by level
+            counts = {"info": 0, "success": 0, "warning": 0, "error": 0}
+            for entry in self.log_entries:
+                level = entry["level"]
+                if level in counts:
+                    counts[level] += 1
 
-        self.stats_label.setText(
-            f"Total: {total} | "
-            f"Info: {counts['info']} | "
-            f"Success: {counts['success']} | "
-            f"Warnings: {counts['warning']} | "
-            f"Errors: {counts['error']}"
-        )
+            self.stats_label.setText(
+                f"Total: {total} | "
+                f"Info: {counts['info']} | "
+                f"Success: {counts['success']} | "
+                f"Warnings: {counts['warning']} | "
+                f"Errors: {counts['error']}"
+            )
+        except RuntimeError:
+            # Widget was deleted or not accessible - silently ignore
+            pass
 
     def _apply_filter(self, filter_type: str):
         """Apply log filter."""

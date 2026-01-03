@@ -1,0 +1,17 @@
+{
+  "id": "dc8d879a-a5bf-4ec5-bcd5-5838ce0effac",
+  "name": "AES256",
+  "folder": "Remote Networks",
+  "esp": {
+    "encryption": [
+      "aes-256-cbc"
+    ],
+    "authentication": [
+      "sha512"
+    ]
+  },
+  "lifetime": {
+    "hours": 1
+  },
+  "dh_group": "group14"
+}

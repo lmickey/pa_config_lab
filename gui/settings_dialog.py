@@ -5,6 +5,7 @@ This module provides a dialog for configuring application settings
 and preferences.
 """
 
+import logging
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -19,8 +20,11 @@ from PyQt6.QtWidgets import (
     QLabel,
     QGroupBox,
     QMessageBox,
+    QComboBox,
 )
 from PyQt6.QtCore import QSettings
+
+from config.logging_config import NORMAL, set_log_level, enable_debug_mode, disable_debug_mode
 
 
 class SettingsDialog(QDialog):
@@ -55,6 +59,9 @@ class SettingsDialog(QDialog):
 
         # API tab
         tabs.addTab(self._create_api_tab(), "API")
+
+        # Encryption tab
+        tabs.addTab(self._create_encryption_tab(), "Encryption")
 
         # Advanced tab
         tabs.addTab(self._create_advanced_tab(), "Advanced")
@@ -160,6 +167,71 @@ class SettingsDialog(QDialog):
         layout.addStretch()
         return widget
 
+    def _create_encryption_tab(self) -> QWidget:
+        """Create encryption settings tab."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+
+        # Password Policy
+        policy_group = QGroupBox("Password Policy")
+        policy_layout = QFormLayout()
+
+        self.min_length_spin = QSpinBox()
+        self.min_length_spin.setRange(4, 32)
+        self.min_length_spin.setValue(8)
+        self.min_length_spin.setSuffix(" characters")
+        policy_layout.addRow("Minimum Length:", self.min_length_spin)
+
+        self.require_uppercase_check = QCheckBox("Require uppercase letter (A-Z)")
+        self.require_uppercase_check.setChecked(True)
+        policy_layout.addRow("", self.require_uppercase_check)
+
+        self.require_lowercase_check = QCheckBox("Require lowercase letter (a-z)")
+        self.require_lowercase_check.setChecked(True)
+        policy_layout.addRow("", self.require_lowercase_check)
+
+        self.require_digit_check = QCheckBox("Require digit (0-9)")
+        self.require_digit_check.setChecked(True)
+        policy_layout.addRow("", self.require_digit_check)
+
+        self.require_special_check = QCheckBox("Require special character (!@#$%^&*...)")
+        self.require_special_check.setChecked(True)
+        policy_layout.addRow("", self.require_special_check)
+
+        self.disallow_common_check = QCheckBox("Disallow common passwords")
+        self.disallow_common_check.setChecked(True)
+        policy_layout.addRow("", self.disallow_common_check)
+
+        policy_group.setLayout(policy_layout)
+        layout.addWidget(policy_group)
+
+        # Encryption Options
+        encrypt_group = QGroupBox("Encryption Options")
+        encrypt_layout = QFormLayout()
+
+        self.default_encrypt_check = QCheckBox("Encrypt saved configurations by default")
+        self.default_encrypt_check.setChecked(True)
+        encrypt_layout.addRow("", self.default_encrypt_check)
+
+        self.show_strength_check = QCheckBox("Show password strength indicator")
+        self.show_strength_check.setChecked(True)
+        encrypt_layout.addRow("", self.show_strength_check)
+
+        encrypt_group.setLayout(encrypt_layout)
+        layout.addWidget(encrypt_group)
+
+        # Info
+        info_label = QLabel(
+            "<i>Note: Configurations are encrypted using AES-256 with PBKDF2 key derivation. "
+            "Lost passwords cannot be recovered.</i>"
+        )
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: #666; margin-top: 10px;")
+        layout.addWidget(info_label)
+
+        layout.addStretch()
+        return widget
+
     def _create_advanced_tab(self) -> QWidget:
         """Create advanced settings tab."""
         widget = QWidget()
@@ -169,15 +241,37 @@ class SettingsDialog(QDialog):
         log_group = QGroupBox("Logging")
         log_layout = QFormLayout()
 
+        # Log level dropdown
+        self.log_level_combo = QComboBox()
+        self.log_level_combo.addItem("Error - Fewest entries", logging.ERROR)
+        self.log_level_combo.addItem("Warning - Recoverable issues", logging.WARNING)
+        self.log_level_combo.addItem("Normal - Summary operations", NORMAL)
+        self.log_level_combo.addItem("Info - Detailed steps", logging.INFO)
+        self.log_level_combo.addItem("Debug - Everything (troubleshooting)", logging.DEBUG)
+        self.log_level_combo.setCurrentIndex(2)  # Default to NORMAL
+        log_layout.addRow("Log Level:", self.log_level_combo)
+
         self.max_logs_spin = QSpinBox()
         self.max_logs_spin.setRange(100, 10000)
         self.max_logs_spin.setValue(1000)
         self.max_logs_spin.setSuffix(" entries")
         log_layout.addRow("Max Log Entries:", self.max_logs_spin)
 
-        self.log_level_check = QCheckBox("Enable debug logging")
-        self.log_level_check.setChecked(False)
-        log_layout.addRow("Debug Mode:", self.log_level_check)
+        # Log retention
+        log_retention_label = QLabel("<b>Log Retention:</b>")
+        log_layout.addRow(log_retention_label)
+
+        self.log_rotation_spin = QSpinBox()
+        self.log_rotation_spin.setRange(1, 30)
+        self.log_rotation_spin.setValue(7)
+        self.log_rotation_spin.setSuffix(" files")
+        log_layout.addRow("  Keep Rotations:", self.log_rotation_spin)
+
+        self.log_age_spin = QSpinBox()
+        self.log_age_spin.setRange(1, 90)
+        self.log_age_spin.setValue(30)
+        self.log_age_spin.setSuffix(" days")
+        log_layout.addRow("  Keep Age:", self.log_age_spin)
 
         log_group.setLayout(log_layout)
         layout.addWidget(log_group)
@@ -232,12 +326,48 @@ class SettingsDialog(QDialog):
             self.settings.value("api/cache_ttl", 300, type=int)
         )
 
-        # Advanced
+        # Encryption
+        self.min_length_spin.setValue(
+            self.settings.value("encryption/min_length", 8, type=int)
+        )
+        self.require_uppercase_check.setChecked(
+            self.settings.value("encryption/require_uppercase", True, type=bool)
+        )
+        self.require_lowercase_check.setChecked(
+            self.settings.value("encryption/require_lowercase", True, type=bool)
+        )
+        self.require_digit_check.setChecked(
+            self.settings.value("encryption/require_digit", True, type=bool)
+        )
+        self.require_special_check.setChecked(
+            self.settings.value("encryption/require_special", True, type=bool)
+        )
+        self.disallow_common_check.setChecked(
+            self.settings.value("encryption/disallow_common", True, type=bool)
+        )
+        self.default_encrypt_check.setChecked(
+            self.settings.value("encryption/default_encrypt", True, type=bool)
+        )
+        self.show_strength_check.setChecked(
+            self.settings.value("encryption/show_strength", True, type=bool)
+        )
+
+        # Advanced - Logging
+        log_level = self.settings.value("advanced/log_level", NORMAL, type=int)
+        # Find index of matching log level
+        for i in range(self.log_level_combo.count()):
+            if self.log_level_combo.itemData(i) == log_level:
+                self.log_level_combo.setCurrentIndex(i)
+                break
+        
         self.max_logs_spin.setValue(
             self.settings.value("advanced/max_logs", 1000, type=int)
         )
-        self.log_level_check.setChecked(
-            self.settings.value("advanced/debug", False, type=bool)
+        self.log_rotation_spin.setValue(
+            self.settings.value("advanced/log_rotation", 7, type=int)
+        )
+        self.log_age_spin.setValue(
+            self.settings.value("advanced/log_age", 30, type=int)
         )
         self.max_tree_items_spin.setValue(
             self.settings.value("advanced/max_tree_items", 1000, type=int)
@@ -262,12 +392,46 @@ class SettingsDialog(QDialog):
         self.settings.setValue("api/rate_limit", self.rate_limit_spin.value())
         self.settings.setValue("api/cache_ttl", self.cache_ttl_spin.value())
 
-        # Advanced
+        # Encryption
+        self.settings.setValue("encryption/min_length", self.min_length_spin.value())
+        self.settings.setValue(
+            "encryption/require_uppercase", self.require_uppercase_check.isChecked()
+        )
+        self.settings.setValue(
+            "encryption/require_lowercase", self.require_lowercase_check.isChecked()
+        )
+        self.settings.setValue(
+            "encryption/require_digit", self.require_digit_check.isChecked()
+        )
+        self.settings.setValue(
+            "encryption/require_special", self.require_special_check.isChecked()
+        )
+        self.settings.setValue(
+            "encryption/disallow_common", self.disallow_common_check.isChecked()
+        )
+        self.settings.setValue(
+            "encryption/default_encrypt", self.default_encrypt_check.isChecked()
+        )
+        self.settings.setValue(
+            "encryption/show_strength", self.show_strength_check.isChecked()
+        )
+
+        # Advanced - Logging
+        log_level = self.log_level_combo.currentData()
+        self.settings.setValue("advanced/log_level", log_level)
         self.settings.setValue("advanced/max_logs", self.max_logs_spin.value())
-        self.settings.setValue("advanced/debug", self.log_level_check.isChecked())
+        self.settings.setValue("advanced/log_rotation", self.log_rotation_spin.value())
+        self.settings.setValue("advanced/log_age", self.log_age_spin.value())
         self.settings.setValue(
             "advanced/max_tree_items", self.max_tree_items_spin.value()
         )
+        
+        # Apply log level immediately
+        set_log_level(log_level)
+        if log_level == logging.DEBUG:
+            enable_debug_mode()
+        else:
+            disable_debug_mode()
 
     def _save_and_close(self):
         """Save settings and close dialog."""

@@ -1,0 +1,7462 @@
+{
+  "objects": {
+    "tag": [
+      {
+        "id": "56391305-7042-46b5-b2fd-09677bcf6fe2",
+        "name": "Block-brute-force",
+        "folder": "All",
+        "snippet": "default",
+        "color": "Red"
+      },
+      {
+        "id": "aeb0ee0d-3c1e-4104-882f-a41366499252",
+        "name": "PA_predefined_embargo_rule",
+        "folder": "All",
+        "snippet": "Web-Security-Default",
+        "color": "Green"
+      },
+      {
+        "id": "aeb0ee0d-3c1e-4104-882f-a41366499252",
+        "name": "PA_predefined_embargo_rule",
+        "folder": "All",
+        "snippet": "Web-Security-Default",
+        "color": "Green"
+      },
+      {
+        "id": "852dadab-6e82-4872-8793-2ec7f3a3755d",
+        "name": "Sanctioned",
+        "folder": "All",
+        "color": "Olive"
+      },
+      {
+        "id": "20faa7e3-5ac7-4ada-ac22-0c07498676d7",
+        "name": "Tolerated",
+        "folder": "All",
+        "color": "Maroon"
+      },
+      {
+        "id": "e19f776e-b2f7-40c6-920c-91e46ffd5d9c",
+        "name": "Web Security Global",
+        "folder": "All",
+        "snippet": "Web-Security-Default",
+        "color": "Green"
+      },
+      {
+        "id": "e19f776e-b2f7-40c6-920c-91e46ffd5d9c",
+        "name": "Web Security Global",
+        "folder": "All",
+        "snippet": "Web-Security-Default",
+        "color": "Green"
+      },
+      {
+        "id": "5cb59450-4a32-4cc6-a1a0-cdf9350d1d27",
+        "name": "best-practice",
+        "folder": "All",
+        "snippet": "default",
+        "color": "Green"
+      },
+      {
+        "id": "cdc30f04-1086-4bba-9b1c-7c1c6ff1df99",
+        "name": "decrypt-bypass",
+        "folder": "All",
+        "snippet": "default",
+        "color": "Red"
+      },
+      {
+        "id": "1fcedfa3-9196-4f0d-9c75-75d36e230c33",
+        "name": "empty",
+        "folder": "All"
+      }
+    ],
+    "address_object": [
+      {
+        "id": "8e451aac-0032-4996-9b5b-814c3713a23d",
+        "name": "VPN-Users",
+        "folder": "Mobile Users",
+        "override_loc": "Prisma Access",
+        "override_type": "container",
+        "override_id": "d92abb4e-b6fc-47e5-91a0-cf82dc870c72",
+        "ip_netmask": "172.16.0.0/20"
+      },
+      {
+        "id": "d92abb4e-b6fc-47e5-91a0-cf82dc870c72",
+        "name": "VPN-Users",
+        "folder": "Shared",
+        "ip_netmask": "172.16.0.0/20"
+      },
+      {
+        "id": "d92abb4e-b6fc-47e5-91a0-cf82dc870c72",
+        "name": "VPN-Users",
+        "folder": "Shared",
+        "ip_netmask": "172.16.0.0/20"
+      },
+      {
+        "id": "5f4464f0-ae95-4b12-8847-af999fd1bc32",
+        "name": "trust-network",
+        "folder": "Mobile Users",
+        "ip_netmask": "10.12.2.0/24"
+      },
+      {
+        "id": "a9a74af7-03b9-439f-9c8b-f1c3c025ad14",
+        "name": "zoom-1",
+        "folder": "All",
+        "ip_netmask": "3.7.35.0/25"
+      },
+      {
+        "id": "a9a74af7-03b9-439f-9c8b-f1c3c025ad14",
+        "name": "zoom-1",
+        "folder": "All",
+        "ip_netmask": "3.7.35.0/25"
+      },
+      {
+        "id": "a9a74af7-03b9-439f-9c8b-f1c3c025ad14",
+        "name": "zoom-1",
+        "folder": "All",
+        "ip_netmask": "3.7.35.0/25"
+      },
+      {
+        "id": "a9a74af7-03b9-439f-9c8b-f1c3c025ad14",
+        "name": "zoom-1",
+        "folder": "All",
+        "ip_netmask": "3.7.35.0/25"
+      },
+      {
+        "id": "a9a74af7-03b9-439f-9c8b-f1c3c025ad14",
+        "name": "zoom-1",
+        "folder": "All",
+        "ip_netmask": "3.7.35.0/25"
+      },
+      {
+        "id": "780ca193-3a1e-4361-a9bb-9d1ee6bb1493",
+        "name": "zoom-8",
+        "folder": "Mobile Users",
+        "ip_netmask": "3.21.137.128/25"
+      }
+    ],
+    "address_group": [
+      {
+        "id": "ee60b649-1a77-495c-8dcb-aeed1f8a13be",
+        "name": "zoom-static",
+        "folder": "Shared",
+        "static": [
+          "VPN-Users"
+        ]
+      },
+      {
+        "id": "ee60b649-1a77-495c-8dcb-aeed1f8a13be",
+        "name": "zoom-static",
+        "folder": "Shared",
+        "static": [
+          "VPN-Users"
+        ]
+      },
+      {
+        "id": "ee60b649-1a77-495c-8dcb-aeed1f8a13be",
+        "name": "zoom-static",
+        "folder": "Shared",
+        "static": [
+          "VPN-Users"
+        ]
+      },
+      {
+        "id": "ee60b649-1a77-495c-8dcb-aeed1f8a13be",
+        "name": "zoom-static",
+        "folder": "Shared",
+        "static": [
+          "VPN-Users"
+        ]
+      },
+      {
+        "id": "ee60b649-1a77-495c-8dcb-aeed1f8a13be",
+        "name": "zoom-static",
+        "folder": "Shared",
+        "static": [
+          "VPN-Users"
+        ]
+      },
+      {
+        "id": "ee60b649-1a77-495c-8dcb-aeed1f8a13be",
+        "name": "zoom-static",
+        "folder": "Shared",
+        "static": [
+          "VPN-Users"
+        ]
+      }
+    ],
+    "service_object": [
+      {
+        "id": "86f44faf-771f-4dc6-a58b-1aea6f09dc5d",
+        "name": "Quic-HTTPS",
+        "folder": "Shared",
+        "protocol": {
+          "udp": {
+            "port": "443"
+          }
+        }
+      },
+      {
+        "id": "86f44faf-771f-4dc6-a58b-1aea6f09dc5d",
+        "name": "Quic-HTTPS",
+        "folder": "Shared",
+        "protocol": {
+          "udp": {
+            "port": "443"
+          }
+        }
+      },
+      {
+        "id": "86f44faf-771f-4dc6-a58b-1aea6f09dc5d",
+        "name": "Quic-HTTPS",
+        "folder": "Shared",
+        "protocol": {
+          "udp": {
+            "port": "443"
+          }
+        }
+      },
+      {
+        "id": "86f44faf-771f-4dc6-a58b-1aea6f09dc5d",
+        "name": "Quic-HTTPS",
+        "folder": "Shared",
+        "protocol": {
+          "udp": {
+            "port": "443"
+          }
+        }
+      },
+      {
+        "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+        "name": "Quic-HTTP",
+        "folder": "Shared",
+        "protocol": {
+          "udp": {
+            "port": "80"
+          }
+        }
+      },
+      {
+        "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+        "name": "Quic-HTTP",
+        "folder": "Shared",
+        "protocol": {
+          "udp": {
+            "port": "80"
+          }
+        }
+      },
+      {
+        "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+        "name": "Quic-HTTP",
+        "folder": "Shared",
+        "protocol": {
+          "udp": {
+            "port": "80"
+          }
+        }
+      },
+      {
+        "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+        "name": "Quic-HTTP",
+        "folder": "Shared",
+        "protocol": {
+          "udp": {
+            "port": "80"
+          }
+        }
+      },
+      {
+        "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+        "name": "Quic-HTTP",
+        "folder": "Shared",
+        "protocol": {
+          "udp": {
+            "port": "80"
+          }
+        }
+      },
+      {
+        "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+        "name": "Quic-HTTP",
+        "folder": "Shared",
+        "protocol": {
+          "udp": {
+            "port": "80"
+          }
+        }
+      },
+      {
+        "id": "0619326e-4d01-41da-8f89-520ee5922fa3",
+        "name": "service-SSH",
+        "folder": "Mobile Users",
+        "protocol": {
+          "tcp": {
+            "port": "22"
+          }
+        }
+      }
+    ],
+    "service_group": [
+      {
+        "id": "3e64b77b-e24b-4911-8992-24baf0baba14",
+        "name": "Mgmt Ports",
+        "folder": "Shared",
+        "members": [
+          "Service-SSH",
+          "service-RDP"
+        ]
+      },
+      {
+        "id": "3e64b77b-e24b-4911-8992-24baf0baba14",
+        "name": "Mgmt Ports",
+        "folder": "Shared",
+        "members": [
+          "Service-SSH",
+          "service-RDP"
+        ]
+      },
+      {
+        "id": "3e64b77b-e24b-4911-8992-24baf0baba14",
+        "name": "Mgmt Ports",
+        "folder": "Shared",
+        "members": [
+          "Service-SSH",
+          "service-RDP"
+        ]
+      },
+      {
+        "id": "70b79819-a564-4342-aa80-5d628abe8d78",
+        "name": "Panorama Ports",
+        "folder": "Shared",
+        "members": [
+          "Mgmt Ports",
+          "Web Ports"
+        ]
+      },
+      {
+        "id": "70b79819-a564-4342-aa80-5d628abe8d78",
+        "name": "Panorama Ports",
+        "folder": "Shared",
+        "members": [
+          "Mgmt Ports",
+          "Web Ports"
+        ]
+      },
+      {
+        "id": "3c752e9b-4202-41bc-9394-8b4f391476e0",
+        "name": "Quic",
+        "folder": "Shared",
+        "members": [
+          "Quic-HTTP",
+          "Quic-HTTPS"
+        ]
+      },
+      {
+        "id": "3c752e9b-4202-41bc-9394-8b4f391476e0",
+        "name": "Quic",
+        "folder": "Shared",
+        "members": [
+          "Quic-HTTP",
+          "Quic-HTTPS"
+        ]
+      },
+      {
+        "id": "e5bc86ac-af30-4115-a4a5-307af09a8e82",
+        "name": "Web Ports",
+        "folder": "Shared",
+        "members": [
+          "service-http",
+          "service-https"
+        ]
+      },
+      {
+        "id": "e5bc86ac-af30-4115-a4a5-307af09a8e82",
+        "name": "Web Ports",
+        "folder": "Shared",
+        "members": [
+          "service-http",
+          "service-https"
+        ]
+      },
+      {
+        "id": "e5bc86ac-af30-4115-a4a5-307af09a8e82",
+        "name": "Web Ports",
+        "folder": "Shared",
+        "members": [
+          "service-http",
+          "service-https"
+        ]
+      }
+    ],
+    "application_group": [
+      {
+        "id": "04222009-7ece-4061-bd17-f665b5fd42b4",
+        "name": "Facebook",
+        "folder": "Shared",
+        "members": [
+          "facebook"
+        ]
+      },
+      {
+        "id": "04222009-7ece-4061-bd17-f665b5fd42b4",
+        "name": "Facebook",
+        "folder": "Shared",
+        "members": [
+          "facebook"
+        ]
+      },
+      {
+        "id": "04222009-7ece-4061-bd17-f665b5fd42b4",
+        "name": "Facebook",
+        "folder": "Shared",
+        "members": [
+          "facebook"
+        ]
+      },
+      {
+        "id": "04222009-7ece-4061-bd17-f665b5fd42b4",
+        "name": "Facebook",
+        "folder": "Shared",
+        "members": [
+          "facebook"
+        ]
+      },
+      {
+        "id": "59ac5c98-179f-4c73-98e6-52fda381a7fe",
+        "name": "Google-Gmail",
+        "folder": "Shared",
+        "members": [
+          "google-analytics",
+          "google-app-engine",
+          "google-app-engine-uploading",
+          "google-base",
+          "google-cache",
+          "google-chat",
+          "google-classroom",
+          "google-cloud-console",
+          "google-cloud-print",
+          "google-drive-web",
+          "google-duo",
+          "google-earth",
+          "google-expeditions",
+          "google-finance-posting",
+          "google-keep",
+          "google-location-service",
+          "google-maps",
+          "google-meet",
+          "google-messages",
+          "google-play",
+          "google-safebrowsing",
+          "google-toolbar",
+          "google-voice-actions",
+          "google-workspace-duet-ai",
+          "google-bard",
+          "google-calendar",
+          "google-cloud-storage",
+          "google-docs",
+          "google-hangouts",
+          "google-photos",
+          "google-plus",
+          "google-surveys",
+          "google-translate",
+          "google-vertex-ai",
+          "google-video",
+          "gmail-drive",
+          "gmail"
+        ]
+      },
+      {
+        "id": "59ac5c98-179f-4c73-98e6-52fda381a7fe",
+        "name": "Google-Gmail",
+        "folder": "Shared",
+        "members": [
+          "google-analytics",
+          "google-app-engine",
+          "google-app-engine-uploading",
+          "google-base",
+          "google-cache",
+          "google-chat",
+          "google-classroom",
+          "google-cloud-console",
+          "google-cloud-print",
+          "google-drive-web",
+          "google-duo",
+          "google-earth",
+          "google-expeditions",
+          "google-finance-posting",
+          "google-keep",
+          "google-location-service",
+          "google-maps",
+          "google-meet",
+          "google-messages",
+          "google-play",
+          "google-safebrowsing",
+          "google-toolbar",
+          "google-voice-actions",
+          "google-workspace-duet-ai",
+          "google-bard",
+          "google-calendar",
+          "google-cloud-storage",
+          "google-docs",
+          "google-hangouts",
+          "google-photos",
+          "google-plus",
+          "google-surveys",
+          "google-translate",
+          "google-vertex-ai",
+          "google-video",
+          "gmail-drive",
+          "gmail"
+        ]
+      },
+      {
+        "id": "59ac5c98-179f-4c73-98e6-52fda381a7fe",
+        "name": "Google-Gmail",
+        "folder": "Shared",
+        "members": [
+          "google-analytics",
+          "google-app-engine",
+          "google-app-engine-uploading",
+          "google-base",
+          "google-cache",
+          "google-chat",
+          "google-classroom",
+          "google-cloud-console",
+          "google-cloud-print",
+          "google-drive-web",
+          "google-duo",
+          "google-earth",
+          "google-expeditions",
+          "google-finance-posting",
+          "google-keep",
+          "google-location-service",
+          "google-maps",
+          "google-meet",
+          "google-messages",
+          "google-play",
+          "google-safebrowsing",
+          "google-toolbar",
+          "google-voice-actions",
+          "google-workspace-duet-ai",
+          "google-bard",
+          "google-calendar",
+          "google-cloud-storage",
+          "google-docs",
+          "google-hangouts",
+          "google-photos",
+          "google-plus",
+          "google-surveys",
+          "google-translate",
+          "google-vertex-ai",
+          "google-video",
+          "gmail-drive",
+          "gmail"
+        ]
+      },
+      {
+        "id": "935ee92c-465e-46ed-9441-9b1ac50c3b25",
+        "name": "Social Networking Allowed",
+        "folder": "Shared",
+        "members": [
+          "facebook-base",
+          "instagram-base",
+          "twitter-base",
+          "linkedin-base"
+        ]
+      },
+      {
+        "id": "935ee92c-465e-46ed-9441-9b1ac50c3b25",
+        "name": "Social Networking Allowed",
+        "folder": "Shared",
+        "members": [
+          "facebook-base",
+          "instagram-base",
+          "twitter-base",
+          "linkedin-base"
+        ]
+      },
+      {
+        "id": "935ee92c-465e-46ed-9441-9b1ac50c3b25",
+        "name": "Social Networking Allowed",
+        "folder": "Shared",
+        "members": [
+          "facebook-base",
+          "instagram-base",
+          "twitter-base",
+          "linkedin-base"
+        ]
+      }
+    ],
+    "application_filter": [
+      {
+        "id": "12ba63f2-cfd5-4e8b-8780-ffbaed27ca10",
+        "name": "Collaboration Apps",
+        "folder": "All",
+        "category": [
+          "collaboration"
+        ]
+      },
+      {
+        "id": "12ba63f2-cfd5-4e8b-8780-ffbaed27ca10",
+        "name": "Collaboration Apps",
+        "folder": "All",
+        "category": [
+          "collaboration"
+        ]
+      },
+      {
+        "id": "12ba63f2-cfd5-4e8b-8780-ffbaed27ca10",
+        "name": "Collaboration Apps",
+        "folder": "All",
+        "category": [
+          "collaboration"
+        ]
+      },
+      {
+        "id": "12ba63f2-cfd5-4e8b-8780-ffbaed27ca10",
+        "name": "Collaboration Apps",
+        "folder": "All",
+        "category": [
+          "collaboration"
+        ]
+      },
+      {
+        "id": "12ba63f2-cfd5-4e8b-8780-ffbaed27ca10",
+        "name": "Collaboration Apps",
+        "folder": "All",
+        "category": [
+          "collaboration"
+        ]
+      },
+      {
+        "id": "12ba63f2-cfd5-4e8b-8780-ffbaed27ca10",
+        "name": "Collaboration Apps",
+        "folder": "All",
+        "category": [
+          "collaboration"
+        ]
+      },
+      {
+        "id": "e94d3cfe-3636-4206-a6f9-f123d6285989",
+        "name": "Gen-AI Sanctioned",
+        "folder": "Shared",
+        "tagging": {
+          "tag": [
+            "[Generative AI]"
+          ]
+        },
+        "risk": [
+          1,
+          2,
+          3
+        ]
+      },
+      {
+        "id": "e94d3cfe-3636-4206-a6f9-f123d6285989",
+        "name": "Gen-AI Sanctioned",
+        "folder": "Shared",
+        "tagging": {
+          "tag": [
+            "[Generative AI]"
+          ]
+        },
+        "risk": [
+          1,
+          2,
+          3
+        ]
+      },
+      {
+        "id": "e94d3cfe-3636-4206-a6f9-f123d6285989",
+        "name": "Gen-AI Sanctioned",
+        "folder": "Shared",
+        "tagging": {
+          "tag": [
+            "[Generative AI]"
+          ]
+        },
+        "risk": [
+          1,
+          2,
+          3
+        ]
+      },
+      {
+        "id": "e94d3cfe-3636-4206-a6f9-f123d6285989",
+        "name": "Gen-AI Sanctioned",
+        "folder": "Shared",
+        "tagging": {
+          "tag": [
+            "[Generative AI]"
+          ]
+        },
+        "risk": [
+          1,
+          2,
+          3
+        ]
+      }
+    ],
+    "schedule": [
+      {
+        "id": "c5f3d0a6-fdf9-4b49-b487-936c2ac015b6",
+        "name": "Contractor Term",
+        "folder": "Shared",
+        "schedule_type": {
+          "non_recurring": [
+            "2026/01/02@18:15-2026/06/11@19:15"
+          ]
+        }
+      },
+      {
+        "id": "c5f3d0a6-fdf9-4b49-b487-936c2ac015b6",
+        "name": "Contractor Term",
+        "folder": "Shared",
+        "schedule_type": {
+          "non_recurring": [
+            "2026/01/02@18:15-2026/06/11@19:15"
+          ]
+        }
+      },
+      {
+        "id": "c5f3d0a6-fdf9-4b49-b487-936c2ac015b6",
+        "name": "Contractor Term",
+        "folder": "Shared",
+        "schedule_type": {
+          "non_recurring": [
+            "2026/01/02@18:15-2026/06/11@19:15"
+          ]
+        }
+      },
+      {
+        "id": "0f35f0ea-5c6c-4a0b-8702-64b4966b4fe8",
+        "name": "Cutover Window",
+        "folder": "Shared",
+        "schedule_type": {
+          "recurring": {
+            "daily": [
+              "23:00-23:45",
+              "00:00-01:30"
+            ]
+          }
+        }
+      },
+      {
+        "id": "0f35f0ea-5c6c-4a0b-8702-64b4966b4fe8",
+        "name": "Cutover Window",
+        "folder": "Shared",
+        "schedule_type": {
+          "recurring": {
+            "daily": [
+              "23:00-23:45",
+              "00:00-01:30"
+            ]
+          }
+        }
+      },
+      {
+        "id": "0f35f0ea-5c6c-4a0b-8702-64b4966b4fe8",
+        "name": "Cutover Window",
+        "folder": "Shared",
+        "schedule_type": {
+          "recurring": {
+            "daily": [
+              "23:00-23:45",
+              "00:00-01:30"
+            ]
+          }
+        }
+      },
+      {
+        "id": "0f35f0ea-5c6c-4a0b-8702-64b4966b4fe8",
+        "name": "Cutover Window",
+        "folder": "Shared",
+        "schedule_type": {
+          "recurring": {
+            "daily": [
+              "23:00-23:45",
+              "00:00-01:30"
+            ]
+          }
+        }
+      },
+      {
+        "id": "3340c2af-b314-42ba-9063-d610d640fe61",
+        "name": "Protected system access",
+        "folder": "Shared",
+        "schedule_type": {
+          "recurring": {
+            "weekly": {
+              "monday": [
+                "07:30-18:00"
+              ],
+              "tuesday": [
+                "07:30-18:00"
+              ],
+              "wednesday": [
+                "07:30-18:00"
+              ],
+              "thursday": [
+                "07:30-18:00"
+              ],
+              "friday": [
+                "07:30-16:00"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": "3340c2af-b314-42ba-9063-d610d640fe61",
+        "name": "Protected system access",
+        "folder": "Shared",
+        "schedule_type": {
+          "recurring": {
+            "weekly": {
+              "monday": [
+                "07:30-18:00"
+              ],
+              "tuesday": [
+                "07:30-18:00"
+              ],
+              "wednesday": [
+                "07:30-18:00"
+              ],
+              "thursday": [
+                "07:30-18:00"
+              ],
+              "friday": [
+                "07:30-16:00"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": "3340c2af-b314-42ba-9063-d610d640fe61",
+        "name": "Protected system access",
+        "folder": "Shared",
+        "schedule_type": {
+          "recurring": {
+            "weekly": {
+              "monday": [
+                "07:30-18:00"
+              ],
+              "tuesday": [
+                "07:30-18:00"
+              ],
+              "wednesday": [
+                "07:30-18:00"
+              ],
+              "thursday": [
+                "07:30-18:00"
+              ],
+              "friday": [
+                "07:30-16:00"
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  "profiles": {
+    "authentication_profile": [
+      {
+        "id": "5d28095b-5c74-4ea7-a1a8-29662108412a",
+        "name": "CIE-Okta",
+        "folder": "All",
+        "lockout": {},
+        "method": {
+          "cloud": {
+            "profile_name": "CIE-Okta"
+          }
+        },
+        "allow_list": [
+          "all"
+        ]
+      },
+      {
+        "id": "5d28095b-5c74-4ea7-a1a8-29662108412a",
+        "name": "CIE-Okta",
+        "folder": "All",
+        "lockout": {},
+        "method": {
+          "cloud": {
+            "profile_name": "CIE-Okta"
+          }
+        },
+        "allow_list": [
+          "all"
+        ]
+      },
+      {
+        "id": "5d28095b-5c74-4ea7-a1a8-29662108412a",
+        "name": "CIE-Okta",
+        "folder": "All",
+        "lockout": {},
+        "method": {
+          "cloud": {
+            "profile_name": "CIE-Okta"
+          }
+        },
+        "allow_list": [
+          "all"
+        ]
+      },
+      {
+        "id": "5d28095b-5c74-4ea7-a1a8-29662108412a",
+        "name": "CIE-Okta",
+        "folder": "All",
+        "lockout": {},
+        "method": {
+          "cloud": {
+            "profile_name": "CIE-Okta"
+          }
+        },
+        "allow_list": [
+          "all"
+        ]
+      },
+      {
+        "id": "f751c42d-89fa-4861-bd9f-392fd419ee09",
+        "name": "Local Users",
+        "folder": "Mobile Users",
+        "multi_factor_auth": {
+          "mfa_enable": false
+        },
+        "method": {
+          "local_database": {}
+        },
+        "allow_list": [
+          "all"
+        ],
+        "lockout": {
+          "failed_attempts": 3,
+          "lockout_time": 5
+        }
+      },
+      {
+        "id": "3b9a3cfb-146b-4537-8eb1-f7276d744b41",
+        "name": "OKTA Direct SAML",
+        "folder": "Mobile Users",
+        "allow_list": [
+          "all"
+        ],
+        "method": {
+          "saml_idp": {
+            "attribute_name_username": "username",
+            "request_signing_certificate": "SAML-Signing-Cert",
+            "server_profile": "SAML_IDP_2025-05-01 14-52"
+          }
+        }
+      },
+      {
+        "id": "9ddbdcba-e843-46c0-bfb5-2ec4fc1de974",
+        "name": "Okta-CIE-Testing",
+        "folder": "Prisma Access",
+        "lockout": {},
+        "allow_list": [
+          "all"
+        ],
+        "method": {
+          "cloud": {
+            "profile_name": "CIE-Okta"
+          }
+        }
+      },
+      {
+        "id": "9ddbdcba-e843-46c0-bfb5-2ec4fc1de974",
+        "name": "Okta-CIE-Testing",
+        "folder": "Prisma Access",
+        "lockout": {},
+        "allow_list": [
+          "all"
+        ],
+        "method": {
+          "cloud": {
+            "profile_name": "CIE-Okta"
+          }
+        }
+      },
+      {
+        "id": "9ddbdcba-e843-46c0-bfb5-2ec4fc1de974",
+        "name": "Okta-CIE-Testing",
+        "folder": "Prisma Access",
+        "lockout": {},
+        "allow_list": [
+          "all"
+        ],
+        "method": {
+          "cloud": {
+            "profile_name": "CIE-Okta"
+          }
+        }
+      },
+      {
+        "id": "b4be58ef-2297-4ca9-9c8b-ca8e2e8cf929",
+        "name": "Okta Auth",
+        "folder": "Mobile Users",
+        "allow_list": [
+          "all"
+        ],
+        "method": {
+          "cloud": {
+            "profile_name": "CIE-Okta"
+          }
+        }
+      }
+    ],
+    "decryption_profile": [
+      {
+        "id": "4c4f8b63-4c2e-493b-9402-9f98be7154b3",
+        "name": "Gmail Test",
+        "folder": "Shared",
+        "ssl_no_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true
+        },
+        "ssl_forward_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true,
+          "block_unknown_cert": true,
+          "restrict_cert_exts": true,
+          "auto_include_altname": true,
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true,
+          "block_client_cert": true,
+          "strip_alpn": true
+        },
+        "ssl_inbound_proxy": {
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true
+        },
+        "ssl_protocol_settings": {
+          "min_version": "tls1-2",
+          "enc_algo_3des": false,
+          "enc_algo_rc4": false,
+          "auth_algo_sha1": false,
+          "max_version": "max"
+        }
+      },
+      {
+        "id": "4c4f8b63-4c2e-493b-9402-9f98be7154b3",
+        "name": "Gmail Test",
+        "folder": "Shared",
+        "ssl_no_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true
+        },
+        "ssl_forward_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true,
+          "block_unknown_cert": true,
+          "restrict_cert_exts": true,
+          "auto_include_altname": true,
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true,
+          "block_client_cert": true,
+          "strip_alpn": true
+        },
+        "ssl_inbound_proxy": {
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true
+        },
+        "ssl_protocol_settings": {
+          "min_version": "tls1-2",
+          "enc_algo_3des": false,
+          "enc_algo_rc4": false,
+          "auth_algo_sha1": false,
+          "max_version": "max"
+        }
+      },
+      {
+        "id": "4c4f8b63-4c2e-493b-9402-9f98be7154b3",
+        "name": "Gmail Test",
+        "folder": "Shared",
+        "ssl_no_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true
+        },
+        "ssl_forward_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true,
+          "block_unknown_cert": true,
+          "restrict_cert_exts": true,
+          "auto_include_altname": true,
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true,
+          "block_client_cert": true,
+          "strip_alpn": true
+        },
+        "ssl_inbound_proxy": {
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true
+        },
+        "ssl_protocol_settings": {
+          "min_version": "tls1-2",
+          "enc_algo_3des": false,
+          "enc_algo_rc4": false,
+          "auth_algo_sha1": false,
+          "max_version": "max"
+        }
+      },
+      {
+        "id": "4c4f8b63-4c2e-493b-9402-9f98be7154b3",
+        "name": "Gmail Test",
+        "folder": "Shared",
+        "ssl_no_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true
+        },
+        "ssl_forward_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true,
+          "block_unknown_cert": true,
+          "restrict_cert_exts": true,
+          "auto_include_altname": true,
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true,
+          "block_client_cert": true,
+          "strip_alpn": true
+        },
+        "ssl_inbound_proxy": {
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true
+        },
+        "ssl_protocol_settings": {
+          "min_version": "tls1-2",
+          "enc_algo_3des": false,
+          "enc_algo_rc4": false,
+          "auth_algo_sha1": false,
+          "max_version": "max"
+        }
+      },
+      {
+        "id": "4c4f8b63-4c2e-493b-9402-9f98be7154b3",
+        "name": "Gmail Test",
+        "folder": "Shared",
+        "ssl_no_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true
+        },
+        "ssl_forward_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true,
+          "block_unknown_cert": true,
+          "restrict_cert_exts": true,
+          "auto_include_altname": true,
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true,
+          "block_client_cert": true,
+          "strip_alpn": true
+        },
+        "ssl_inbound_proxy": {
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true
+        },
+        "ssl_protocol_settings": {
+          "min_version": "tls1-2",
+          "enc_algo_3des": false,
+          "enc_algo_rc4": false,
+          "auth_algo_sha1": false,
+          "max_version": "max"
+        }
+      },
+      {
+        "id": "13b8ea0f-20cd-44c0-a748-ab1118e39278",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "ssl_no_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true
+        },
+        "ssl_forward_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true,
+          "block_unknown_cert": true,
+          "restrict_cert_exts": true,
+          "auto_include_altname": true,
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true,
+          "block_client_cert": true
+        },
+        "ssl_inbound_proxy": {
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true
+        },
+        "ssl_protocol_settings": {
+          "min_version": "tls1-2",
+          "max_version": "max",
+          "enc_algo_3des": false,
+          "enc_algo_rc4": false,
+          "auth_algo_sha1": false
+        }
+      },
+      {
+        "id": "13b8ea0f-20cd-44c0-a748-ab1118e39278",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "ssl_no_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true
+        },
+        "ssl_forward_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true,
+          "block_unknown_cert": true,
+          "restrict_cert_exts": true,
+          "auto_include_altname": true,
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true,
+          "block_client_cert": true
+        },
+        "ssl_inbound_proxy": {
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true
+        },
+        "ssl_protocol_settings": {
+          "min_version": "tls1-2",
+          "max_version": "max",
+          "enc_algo_3des": false,
+          "enc_algo_rc4": false,
+          "auth_algo_sha1": false
+        }
+      },
+      {
+        "id": "13b8ea0f-20cd-44c0-a748-ab1118e39278",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "ssl_no_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true
+        },
+        "ssl_forward_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true,
+          "block_unknown_cert": true,
+          "restrict_cert_exts": true,
+          "auto_include_altname": true,
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true,
+          "block_client_cert": true
+        },
+        "ssl_inbound_proxy": {
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true
+        },
+        "ssl_protocol_settings": {
+          "min_version": "tls1-2",
+          "max_version": "max",
+          "enc_algo_3des": false,
+          "enc_algo_rc4": false,
+          "auth_algo_sha1": false
+        }
+      },
+      {
+        "id": "13b8ea0f-20cd-44c0-a748-ab1118e39278",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "ssl_no_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true
+        },
+        "ssl_forward_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true,
+          "block_unknown_cert": true,
+          "restrict_cert_exts": true,
+          "auto_include_altname": true,
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true,
+          "block_client_cert": true
+        },
+        "ssl_inbound_proxy": {
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true
+        },
+        "ssl_protocol_settings": {
+          "min_version": "tls1-2",
+          "max_version": "max",
+          "enc_algo_3des": false,
+          "enc_algo_rc4": false,
+          "auth_algo_sha1": false
+        }
+      },
+      {
+        "id": "13b8ea0f-20cd-44c0-a748-ab1118e39278",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "ssl_no_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true
+        },
+        "ssl_forward_proxy": {
+          "block_expired_certificate": true,
+          "block_untrusted_issuer": true,
+          "block_unknown_cert": true,
+          "restrict_cert_exts": true,
+          "auto_include_altname": true,
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true,
+          "block_client_cert": true
+        },
+        "ssl_inbound_proxy": {
+          "block_unsupported_version": true,
+          "block_unsupported_cipher": true
+        },
+        "ssl_protocol_settings": {
+          "min_version": "tls1-2",
+          "max_version": "max",
+          "enc_algo_3des": false,
+          "enc_algo_rc4": false,
+          "auth_algo_sha1": false
+        }
+      }
+    ],
+    "anti_spyware_profile": [
+      {
+        "id": "b10269e8-f2d0-4771-86b4-5597e29155d0",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "description": "Best practice anti-spyware security profile",
+        "cloud_inline_analysis": true,
+        "mica_engine_spyware_enabled": [
+          {
+            "name": "HTTP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "HTTP2 Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "SSL Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-TCP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-UDP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          }
+        ],
+        "rules": [
+          {
+            "name": "simple-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "critical"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-high",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "high"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "medium"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-informational",
+            "action": {},
+            "severity": [
+              "informational"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-low",
+            "action": {},
+            "severity": [
+              "low"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "disable"
+          }
+        ]
+      },
+      {
+        "id": "b10269e8-f2d0-4771-86b4-5597e29155d0",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "description": "Best practice anti-spyware security profile",
+        "cloud_inline_analysis": true,
+        "mica_engine_spyware_enabled": [
+          {
+            "name": "HTTP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "HTTP2 Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "SSL Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-TCP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-UDP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          }
+        ],
+        "rules": [
+          {
+            "name": "simple-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "critical"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-high",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "high"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "medium"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-informational",
+            "action": {},
+            "severity": [
+              "informational"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-low",
+            "action": {},
+            "severity": [
+              "low"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "disable"
+          }
+        ]
+      },
+      {
+        "id": "b10269e8-f2d0-4771-86b4-5597e29155d0",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "description": "Best practice anti-spyware security profile",
+        "cloud_inline_analysis": true,
+        "mica_engine_spyware_enabled": [
+          {
+            "name": "HTTP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "HTTP2 Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "SSL Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-TCP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-UDP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          }
+        ],
+        "rules": [
+          {
+            "name": "simple-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "critical"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-high",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "high"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "medium"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-informational",
+            "action": {},
+            "severity": [
+              "informational"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-low",
+            "action": {},
+            "severity": [
+              "low"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "disable"
+          }
+        ]
+      },
+      {
+        "id": "b10269e8-f2d0-4771-86b4-5597e29155d0",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "description": "Best practice anti-spyware security profile",
+        "cloud_inline_analysis": true,
+        "mica_engine_spyware_enabled": [
+          {
+            "name": "HTTP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "HTTP2 Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "SSL Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-TCP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-UDP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          }
+        ],
+        "rules": [
+          {
+            "name": "simple-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "critical"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-high",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "high"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "medium"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-informational",
+            "action": {},
+            "severity": [
+              "informational"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-low",
+            "action": {},
+            "severity": [
+              "low"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "disable"
+          }
+        ]
+      },
+      {
+        "id": "b10269e8-f2d0-4771-86b4-5597e29155d0",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "description": "Best practice anti-spyware security profile",
+        "cloud_inline_analysis": true,
+        "mica_engine_spyware_enabled": [
+          {
+            "name": "HTTP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "HTTP2 Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "SSL Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-TCP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-UDP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          }
+        ],
+        "rules": [
+          {
+            "name": "simple-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "critical"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-high",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "high"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "medium"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-informational",
+            "action": {},
+            "severity": [
+              "informational"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-low",
+            "action": {},
+            "severity": [
+              "low"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "disable"
+          }
+        ]
+      },
+      {
+        "id": "b10269e8-f2d0-4771-86b4-5597e29155d0",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "description": "Best practice anti-spyware security profile",
+        "cloud_inline_analysis": true,
+        "mica_engine_spyware_enabled": [
+          {
+            "name": "HTTP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "HTTP2 Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "SSL Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-TCP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-UDP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          }
+        ],
+        "rules": [
+          {
+            "name": "simple-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "critical"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-high",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "high"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "medium"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-informational",
+            "action": {},
+            "severity": [
+              "informational"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-low",
+            "action": {},
+            "severity": [
+              "low"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "disable"
+          }
+        ]
+      },
+      {
+        "id": "b10269e8-f2d0-4771-86b4-5597e29155d0",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "description": "Best practice anti-spyware security profile",
+        "cloud_inline_analysis": true,
+        "mica_engine_spyware_enabled": [
+          {
+            "name": "HTTP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "HTTP2 Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "SSL Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-TCP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-UDP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          }
+        ],
+        "rules": [
+          {
+            "name": "simple-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "critical"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-high",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "high"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "medium"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-informational",
+            "action": {},
+            "severity": [
+              "informational"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-low",
+            "action": {},
+            "severity": [
+              "low"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "disable"
+          }
+        ]
+      },
+      {
+        "id": "b10269e8-f2d0-4771-86b4-5597e29155d0",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "description": "Best practice anti-spyware security profile",
+        "cloud_inline_analysis": true,
+        "mica_engine_spyware_enabled": [
+          {
+            "name": "HTTP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "HTTP2 Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "SSL Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-TCP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-UDP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          }
+        ],
+        "rules": [
+          {
+            "name": "simple-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "critical"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-high",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "high"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "medium"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-informational",
+            "action": {},
+            "severity": [
+              "informational"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-low",
+            "action": {},
+            "severity": [
+              "low"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "disable"
+          }
+        ]
+      },
+      {
+        "id": "b10269e8-f2d0-4771-86b4-5597e29155d0",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "description": "Best practice anti-spyware security profile",
+        "cloud_inline_analysis": true,
+        "mica_engine_spyware_enabled": [
+          {
+            "name": "HTTP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "HTTP2 Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "SSL Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-TCP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-UDP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          }
+        ],
+        "rules": [
+          {
+            "name": "simple-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "critical"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-high",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "high"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "severity": [
+              "medium"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-informational",
+            "action": {},
+            "severity": [
+              "informational"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-low",
+            "action": {},
+            "severity": [
+              "low"
+            ],
+            "threat_name": "any",
+            "category": "any",
+            "packet_capture": "disable"
+          }
+        ]
+      },
+      {
+        "id": "c311cbd7-4607-4584-bfb2-9c9ff1b5b30b",
+        "name": "web-security-default",
+        "snippet": "Web-Security-Default",
+        "rules": [
+          {
+            "name": "adware",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          },
+          {
+            "name": "autogen",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          },
+          {
+            "name": "backdoor",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          },
+          {
+            "name": "botnet",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          },
+          {
+            "name": "browser-hijack",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          },
+          {
+            "name": "command-and-control",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          },
+          {
+            "name": "cryptominer",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          },
+          {
+            "name": "data-theft",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          },
+          {
+            "name": "downloader",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          },
+          {
+            "name": "fraud",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          },
+          {
+            "name": "hacktool",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          },
+          {
+            "name": "keylogger",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          },
+          {
+            "name": "net-worm",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          },
+          {
+            "name": "p2p-communication",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          },
+          {
+            "name": "phishing-kit",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          },
+          {
+            "name": "post-exploitation",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          },
+          {
+            "name": "spyware",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          },
+          {
+            "name": "tls-fingerprint",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          },
+          {
+            "name": "webshell",
+            "severity": [
+              "medium"
+            ],
+            "category": "any"
+          }
+        ],
+        "mica_engine_spyware_enabled": [
+          {
+            "name": "HTTP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "HTTP2 Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "SSL Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-TCP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          },
+          {
+            "name": "Unknown-UDP Command and Control detector",
+            "inline_policy_action": "reset-both"
+          }
+        ],
+        "cloud_inline_analysis": true
+      }
+    ],
+    "vulnerability_profile": [
+      {
+        "id": "c6c3de7b-179c-4167-9394-cf5e24013ad6",
+        "name": "Auto-block portal dos",
+        "folder": "Shared",
+        "rules": [
+          {
+            "name": "Block portal user brute-force",
+            "packet_capture": "disable",
+            "cve": [
+              "any"
+            ],
+            "vendor_id": [
+              "any"
+            ],
+            "category": "brute-force",
+            "host": "any",
+            "severity": [
+              "any"
+            ],
+            "action": {
+              "block_ip": {
+                "track_by": "source",
+                "duration": 3600
+              }
+            },
+            "threat_name": "any"
+          }
+        ]
+      },
+      {
+        "id": "c6c3de7b-179c-4167-9394-cf5e24013ad6",
+        "name": "Auto-block portal dos",
+        "folder": "Shared",
+        "rules": [
+          {
+            "name": "Block portal user brute-force",
+            "packet_capture": "disable",
+            "cve": [
+              "any"
+            ],
+            "vendor_id": [
+              "any"
+            ],
+            "category": "brute-force",
+            "host": "any",
+            "severity": [
+              "any"
+            ],
+            "action": {
+              "block_ip": {
+                "track_by": "source",
+                "duration": 3600
+              }
+            },
+            "threat_name": "any"
+          }
+        ]
+      },
+      {
+        "id": "c6c3de7b-179c-4167-9394-cf5e24013ad6",
+        "name": "Auto-block portal dos",
+        "folder": "Shared",
+        "rules": [
+          {
+            "name": "Block portal user brute-force",
+            "packet_capture": "disable",
+            "cve": [
+              "any"
+            ],
+            "vendor_id": [
+              "any"
+            ],
+            "category": "brute-force",
+            "host": "any",
+            "severity": [
+              "any"
+            ],
+            "action": {
+              "block_ip": {
+                "track_by": "source",
+                "duration": 3600
+              }
+            },
+            "threat_name": "any"
+          }
+        ]
+      },
+      {
+        "id": "21701d3e-d69d-463b-b574-100f3fdd0c81",
+        "name": "Best Practice w-Block Post",
+        "folder": "Shared",
+        "description": "Best practice vulnerability protection security profile",
+        "rules": [
+          {
+            "name": "simple-client-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "critical"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-high",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "high"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "medium"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-informational",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "informational"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-client-low",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "low"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "critical"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-high",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "high"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "medium"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-informational",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "informational"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-server-low",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "low"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "Block POST",
+            "packet_capture": "disable",
+            "cve": [
+              "any"
+            ],
+            "vendor_id": [
+              "any"
+            ],
+            "category": "any",
+            "host": "any",
+            "severity": [
+              "any"
+            ],
+            "threat_name": "block Post"
+          }
+        ]
+      },
+      {
+        "id": "21701d3e-d69d-463b-b574-100f3fdd0c81",
+        "name": "Best Practice w-Block Post",
+        "folder": "Shared",
+        "description": "Best practice vulnerability protection security profile",
+        "rules": [
+          {
+            "name": "simple-client-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "critical"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-high",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "high"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "medium"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-informational",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "informational"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-client-low",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "low"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "critical"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-high",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "high"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "medium"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-informational",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "informational"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-server-low",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "low"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "Block POST",
+            "packet_capture": "disable",
+            "cve": [
+              "any"
+            ],
+            "vendor_id": [
+              "any"
+            ],
+            "category": "any",
+            "host": "any",
+            "severity": [
+              "any"
+            ],
+            "threat_name": "block Post"
+          }
+        ]
+      },
+      {
+        "id": "21701d3e-d69d-463b-b574-100f3fdd0c81",
+        "name": "Best Practice w-Block Post",
+        "folder": "Shared",
+        "description": "Best practice vulnerability protection security profile",
+        "rules": [
+          {
+            "name": "simple-client-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "critical"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-high",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "high"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "medium"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-informational",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "informational"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-client-low",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "low"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "critical"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-high",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "high"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "medium"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-informational",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "informational"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-server-low",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "low"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "Block POST",
+            "packet_capture": "disable",
+            "cve": [
+              "any"
+            ],
+            "vendor_id": [
+              "any"
+            ],
+            "category": "any",
+            "host": "any",
+            "severity": [
+              "any"
+            ],
+            "threat_name": "block Post"
+          }
+        ]
+      },
+      {
+        "id": "48e2a66b-5a2a-433c-803b-3452b44279ce",
+        "name": "best-practice",
+        "folder": "Shared",
+        "description": "Best practice vulnerability protection security profile",
+        "rules": [
+          {
+            "name": "simple-client-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "critical"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-high",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "high"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "medium"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-informational",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "informational"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-client-low",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "low"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "critical"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-high",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "high"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "medium"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-informational",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "informational"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-server-low",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "low"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          }
+        ]
+      },
+      {
+        "id": "48e2a66b-5a2a-433c-803b-3452b44279ce",
+        "name": "best-practice",
+        "folder": "Shared",
+        "description": "Best practice vulnerability protection security profile",
+        "rules": [
+          {
+            "name": "simple-client-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "critical"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-high",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "high"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "medium"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-informational",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "informational"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-client-low",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "low"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "critical"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-high",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "high"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "medium"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-informational",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "informational"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-server-low",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "low"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          }
+        ]
+      },
+      {
+        "id": "48e2a66b-5a2a-433c-803b-3452b44279ce",
+        "name": "best-practice",
+        "folder": "Shared",
+        "description": "Best practice vulnerability protection security profile",
+        "rules": [
+          {
+            "name": "simple-client-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "critical"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-high",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "high"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "medium"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-informational",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "informational"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-client-low",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "low"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "critical"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-high",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "high"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "medium"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-informational",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "informational"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-server-low",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "low"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          }
+        ]
+      },
+      {
+        "id": "48e2a66b-5a2a-433c-803b-3452b44279ce",
+        "name": "best-practice",
+        "folder": "Shared",
+        "description": "Best practice vulnerability protection security profile",
+        "rules": [
+          {
+            "name": "simple-client-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "critical"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-high",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "high"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "medium"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-client-informational",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "informational"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-client-low",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "low"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "client",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-critical",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "critical"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-high",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "high"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-medium",
+            "action": {
+              "reset_both": {}
+            },
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "medium"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          },
+          {
+            "name": "simple-server-informational",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "informational"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "disable"
+          },
+          {
+            "name": "simple-server-low",
+            "action": {},
+            "vendor_id": [
+              "any"
+            ],
+            "severity": [
+              "low"
+            ],
+            "cve": [
+              "any"
+            ],
+            "threat_name": "any",
+            "host": "server",
+            "category": "any",
+            "packet_capture": "single-packet"
+          }
+        ]
+      }
+    ],
+    "file_blocking_profile": [
+      {
+        "id": "6570f01f-cf86-47a3-9f46-686decfbcf9c",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "rules": [
+          {
+            "name": "Block all risky file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "7z",
+              "bat",
+              "chm",
+              "class",
+              "cpl",
+              "dll",
+              "hlp",
+              "hta",
+              "jar",
+              "ocx",
+              "pif",
+              "scr",
+              "torrent",
+              "vbe",
+              "wsf"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Continue prompt encrypted files",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "encrypted-rar",
+              "encrypted-zip"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Log all other file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "any"
+            ],
+            "direction": "both",
+            "action": "alert"
+          }
+        ],
+        "description": "Best practice file blocking security profile"
+      },
+      {
+        "id": "6570f01f-cf86-47a3-9f46-686decfbcf9c",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "rules": [
+          {
+            "name": "Block all risky file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "7z",
+              "bat",
+              "chm",
+              "class",
+              "cpl",
+              "dll",
+              "hlp",
+              "hta",
+              "jar",
+              "ocx",
+              "pif",
+              "scr",
+              "torrent",
+              "vbe",
+              "wsf"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Continue prompt encrypted files",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "encrypted-rar",
+              "encrypted-zip"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Log all other file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "any"
+            ],
+            "direction": "both",
+            "action": "alert"
+          }
+        ],
+        "description": "Best practice file blocking security profile"
+      },
+      {
+        "id": "6570f01f-cf86-47a3-9f46-686decfbcf9c",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "rules": [
+          {
+            "name": "Block all risky file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "7z",
+              "bat",
+              "chm",
+              "class",
+              "cpl",
+              "dll",
+              "hlp",
+              "hta",
+              "jar",
+              "ocx",
+              "pif",
+              "scr",
+              "torrent",
+              "vbe",
+              "wsf"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Continue prompt encrypted files",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "encrypted-rar",
+              "encrypted-zip"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Log all other file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "any"
+            ],
+            "direction": "both",
+            "action": "alert"
+          }
+        ],
+        "description": "Best practice file blocking security profile"
+      },
+      {
+        "id": "6570f01f-cf86-47a3-9f46-686decfbcf9c",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "rules": [
+          {
+            "name": "Block all risky file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "7z",
+              "bat",
+              "chm",
+              "class",
+              "cpl",
+              "dll",
+              "hlp",
+              "hta",
+              "jar",
+              "ocx",
+              "pif",
+              "scr",
+              "torrent",
+              "vbe",
+              "wsf"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Continue prompt encrypted files",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "encrypted-rar",
+              "encrypted-zip"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Log all other file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "any"
+            ],
+            "direction": "both",
+            "action": "alert"
+          }
+        ],
+        "description": "Best practice file blocking security profile"
+      },
+      {
+        "id": "6570f01f-cf86-47a3-9f46-686decfbcf9c",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "rules": [
+          {
+            "name": "Block all risky file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "7z",
+              "bat",
+              "chm",
+              "class",
+              "cpl",
+              "dll",
+              "hlp",
+              "hta",
+              "jar",
+              "ocx",
+              "pif",
+              "scr",
+              "torrent",
+              "vbe",
+              "wsf"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Continue prompt encrypted files",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "encrypted-rar",
+              "encrypted-zip"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Log all other file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "any"
+            ],
+            "direction": "both",
+            "action": "alert"
+          }
+        ],
+        "description": "Best practice file blocking security profile"
+      },
+      {
+        "id": "6570f01f-cf86-47a3-9f46-686decfbcf9c",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "rules": [
+          {
+            "name": "Block all risky file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "7z",
+              "bat",
+              "chm",
+              "class",
+              "cpl",
+              "dll",
+              "hlp",
+              "hta",
+              "jar",
+              "ocx",
+              "pif",
+              "scr",
+              "torrent",
+              "vbe",
+              "wsf"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Continue prompt encrypted files",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "encrypted-rar",
+              "encrypted-zip"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Log all other file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "any"
+            ],
+            "direction": "both",
+            "action": "alert"
+          }
+        ],
+        "description": "Best practice file blocking security profile"
+      },
+      {
+        "id": "6570f01f-cf86-47a3-9f46-686decfbcf9c",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "rules": [
+          {
+            "name": "Block all risky file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "7z",
+              "bat",
+              "chm",
+              "class",
+              "cpl",
+              "dll",
+              "hlp",
+              "hta",
+              "jar",
+              "ocx",
+              "pif",
+              "scr",
+              "torrent",
+              "vbe",
+              "wsf"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Continue prompt encrypted files",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "encrypted-rar",
+              "encrypted-zip"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Log all other file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "any"
+            ],
+            "direction": "both",
+            "action": "alert"
+          }
+        ],
+        "description": "Best practice file blocking security profile"
+      },
+      {
+        "id": "6570f01f-cf86-47a3-9f46-686decfbcf9c",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "rules": [
+          {
+            "name": "Block all risky file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "7z",
+              "bat",
+              "chm",
+              "class",
+              "cpl",
+              "dll",
+              "hlp",
+              "hta",
+              "jar",
+              "ocx",
+              "pif",
+              "scr",
+              "torrent",
+              "vbe",
+              "wsf"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Continue prompt encrypted files",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "encrypted-rar",
+              "encrypted-zip"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Log all other file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "any"
+            ],
+            "direction": "both",
+            "action": "alert"
+          }
+        ],
+        "description": "Best practice file blocking security profile"
+      },
+      {
+        "id": "6570f01f-cf86-47a3-9f46-686decfbcf9c",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "rules": [
+          {
+            "name": "Block all risky file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "7z",
+              "bat",
+              "chm",
+              "class",
+              "cpl",
+              "dll",
+              "hlp",
+              "hta",
+              "jar",
+              "ocx",
+              "pif",
+              "scr",
+              "torrent",
+              "vbe",
+              "wsf"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Continue prompt encrypted files",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "encrypted-rar",
+              "encrypted-zip"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Log all other file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "any"
+            ],
+            "direction": "both",
+            "action": "alert"
+          }
+        ],
+        "description": "Best practice file blocking security profile"
+      },
+      {
+        "id": "6570f01f-cf86-47a3-9f46-686decfbcf9c",
+        "name": "best-practice",
+        "snippet": "predefined",
+        "rules": [
+          {
+            "name": "Block all risky file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "7z",
+              "bat",
+              "chm",
+              "class",
+              "cpl",
+              "dll",
+              "hlp",
+              "hta",
+              "jar",
+              "ocx",
+              "pif",
+              "scr",
+              "torrent",
+              "vbe",
+              "wsf"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Continue prompt encrypted files",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "encrypted-rar",
+              "encrypted-zip"
+            ],
+            "direction": "both",
+            "action": "block"
+          },
+          {
+            "name": "Log all other file types",
+            "application": [
+              "any"
+            ],
+            "file_type": [
+              "any"
+            ],
+            "direction": "both",
+            "action": "alert"
+          }
+        ],
+        "description": "Best practice file blocking security profile"
+      }
+    ],
+    "profile_group": [
+      {
+        "id": "aef143c0-7427-490e-8ccb-d6bbbdfc6d7e",
+        "name": "Alert All URLs",
+        "folder": "Shared",
+        "spyware": [
+          "best-practice"
+        ],
+        "vulnerability": [
+          "best-practice"
+        ],
+        "url_filtering": [
+          "Alert All"
+        ],
+        "file_blocking": [
+          "best-practice"
+        ],
+        "virus_and_wildfire_analysis": [
+          "best-practice"
+        ],
+        "dns_security": [
+          "Use Best Practice"
+        ],
+        "ai_security": [
+          "best-practice"
+        ]
+      },
+      {
+        "id": "aef143c0-7427-490e-8ccb-d6bbbdfc6d7e",
+        "name": "Alert All URLs",
+        "folder": "Shared",
+        "spyware": [
+          "best-practice"
+        ],
+        "vulnerability": [
+          "best-practice"
+        ],
+        "url_filtering": [
+          "Alert All"
+        ],
+        "file_blocking": [
+          "best-practice"
+        ],
+        "virus_and_wildfire_analysis": [
+          "best-practice"
+        ],
+        "dns_security": [
+          "Use Best Practice"
+        ],
+        "ai_security": [
+          "best-practice"
+        ]
+      },
+      {
+        "id": "50834ae2-6780-4b67-8a2c-5ae7af93b50f",
+        "name": "Best Practice - Block Post",
+        "folder": "Shared",
+        "virus_and_wildfire_analysis": [
+          "best-practice"
+        ],
+        "spyware": [
+          "best-practice"
+        ],
+        "dns_security": [
+          "Use Best Practice"
+        ],
+        "vulnerability": [
+          "Best Practice w-Block Post"
+        ],
+        "url_filtering": [
+          "Use Best Practice"
+        ],
+        "file_blocking": [
+          "best-practice"
+        ]
+      },
+      {
+        "id": "50834ae2-6780-4b67-8a2c-5ae7af93b50f",
+        "name": "Best Practice - Block Post",
+        "folder": "Shared",
+        "virus_and_wildfire_analysis": [
+          "best-practice"
+        ],
+        "spyware": [
+          "best-practice"
+        ],
+        "dns_security": [
+          "Use Best Practice"
+        ],
+        "vulnerability": [
+          "Best Practice w-Block Post"
+        ],
+        "url_filtering": [
+          "Use Best Practice"
+        ],
+        "file_blocking": [
+          "best-practice"
+        ]
+      },
+      {
+        "id": "015ab133-9400-48ff-8b9c-9584d07e8054",
+        "name": "Corporate Email",
+        "folder": "Shared",
+        "saas_security": [
+          "Gmail-Google"
+        ],
+        "virus_and_wildfire_analysis": [
+          "best-practice"
+        ]
+      },
+      {
+        "id": "015ab133-9400-48ff-8b9c-9584d07e8054",
+        "name": "Corporate Email",
+        "folder": "Shared",
+        "saas_security": [
+          "Gmail-Google"
+        ],
+        "virus_and_wildfire_analysis": [
+          "best-practice"
+        ]
+      },
+      {
+        "id": "259c9007-25fa-485f-b6b2-c8cdb17a8317",
+        "name": "best-practice",
+        "folder": "Shared",
+        "virus_and_wildfire_analysis": [
+          "best-practice"
+        ],
+        "spyware": [
+          "best-practice"
+        ],
+        "dns_security": [
+          "best-practice"
+        ],
+        "vulnerability": [
+          "best-practice"
+        ],
+        "url_filtering": [
+          "best-practice"
+        ],
+        "file_blocking": [
+          "best-practice"
+        ]
+      },
+      {
+        "id": "259c9007-25fa-485f-b6b2-c8cdb17a8317",
+        "name": "best-practice",
+        "folder": "Shared",
+        "virus_and_wildfire_analysis": [
+          "best-practice"
+        ],
+        "spyware": [
+          "best-practice"
+        ],
+        "dns_security": [
+          "best-practice"
+        ],
+        "vulnerability": [
+          "best-practice"
+        ],
+        "url_filtering": [
+          "best-practice"
+        ],
+        "file_blocking": [
+          "best-practice"
+        ]
+      },
+      {
+        "id": "259c9007-25fa-485f-b6b2-c8cdb17a8317",
+        "name": "best-practice",
+        "folder": "Shared",
+        "virus_and_wildfire_analysis": [
+          "best-practice"
+        ],
+        "spyware": [
+          "best-practice"
+        ],
+        "dns_security": [
+          "best-practice"
+        ],
+        "vulnerability": [
+          "best-practice"
+        ],
+        "url_filtering": [
+          "best-practice"
+        ],
+        "file_blocking": [
+          "best-practice"
+        ]
+      },
+      {
+        "id": "bb69161a-35d2-43af-985a-f579e24f1d2e",
+        "name": "globalprotect group",
+        "folder": "Mobile Users",
+        "spyware": [
+          "best-practice"
+        ],
+        "vulnerability": [
+          "best-practice"
+        ],
+        "url_filtering": [
+          "best-practice"
+        ],
+        "file_blocking": [
+          "best-practice"
+        ],
+        "virus_and_wildfire_analysis": [
+          "best-practice"
+        ],
+        "dns_security": [
+          "best-practice"
+        ]
+      }
+    ],
+    "hip_profile": [
+      {
+        "id": "f6ebde53-c344-41ce-b8b0-622474903d1d",
+        "name": "is-mac-and-anti-malware",
+        "folder": "Mobile Users",
+        "description": "Matches Mac endpoints that have anti-malware software installed",
+        "match": "\"is-mac\"  and \"is-anti-malware-and-rtp-enabled\" "
+      },
+      {
+        "id": "9d76a68f-7a2f-4d43-9f2f-4ef162cf2db2",
+        "name": "is-win-and-anti-malware-1day",
+        "snippet": "hip-default",
+        "match": "\"is-win\"  and \"is-anti-malware-installed-1day\" ",
+        "description": "Matches Windows endpoints that have anti-malware software installed and a Last Scan Time and Virus Definition within 1 day"
+      },
+      {
+        "id": "5ac1bb96-d885-4455-9e2f-83004c87f722",
+        "name": "is-win-and-anti-malware-7days",
+        "snippet": "hip-default",
+        "match": "\"is-win\"  and \"is-anti-malware-installed-7days\" ",
+        "description": "Matches Windows endpoints that have anti-malware software installed and a Last Scan Time and Virus Definition within 7 days"
+      },
+      {
+        "id": "7b65885b-d220-4589-acc0-7c4ad5e053f9",
+        "name": "is-win-and-anti-malware",
+        "snippet": "hip-default",
+        "match": "\"is-win\"  and \"is-anti-malware-and-rtp-enabled\" ",
+        "description": "Matches Windows endpoints that have anti-malware software installed"
+      },
+      {
+        "id": "225632cb-79dc-47cf-bddd-fc0dffa69a37",
+        "name": "is-win-and-disk-backup-1day",
+        "snippet": "hip-default",
+        "match": "\"is-win\"  and \"is-disk-backup-installed-1day\" ",
+        "description": "Matches Windows endpoints that have disk backup software installed and a Last Backup Time within 1 day"
+      },
+      {
+        "id": "ae3ab7a4-f312-4444-9ed0-81dfc88c06bf",
+        "name": "is-win-and-disk-backup-7days",
+        "snippet": "hip-default",
+        "match": "\"is-win\"  and \"is-disk-backup-installed-7days\" ",
+        "description": "Matches Windows endpoints that have disk backup software installed and a Last Backup Time within 7 days"
+      },
+      {
+        "id": "be7fbc94-7fcc-4c6b-917e-50655db932fb",
+        "name": "is-win-and-disk-backup",
+        "snippet": "hip-default",
+        "match": "\"is-win\"  and \"is-disk-backup-installed\" ",
+        "description": "Matches Windows endpoints that have disk backup software installed"
+      },
+      {
+        "id": "232f7156-ddd6-4da8-bb7b-70f15383cf21",
+        "name": "is-win-and-disk-encryption",
+        "snippet": "hip-default",
+        "match": "\"is-win\"  and \"is-disk-encryption-installed\" ",
+        "description": "Matches Windows endpoints that have disk encryption software installed"
+      },
+      {
+        "id": "37313d64-6b65-4fe9-853b-dd424d606914",
+        "name": "is-win-and-firewall",
+        "snippet": "hip-default",
+        "match": "\"is-win\"  and \"is-firewall-enabled\" ",
+        "description": "Matches Windows endpoints that have firewall software installed and enabled"
+      },
+      {
+        "id": "cf0e866d-4b1f-4d09-aee4-ef056b6a3fbe",
+        "name": "is-win-and-patch-management",
+        "snippet": "hip-default",
+        "match": "\"is-win\"  and \"is-patch-management-enabled\" ",
+        "description": "Matches Windows endpoints that have patch management software installed and enabled"
+      }
+    ],
+    "hip_object": [
+      {
+        "id": "be1d428c-38f9-4c1a-942a-21fa72ecd581",
+        "name": "Macintosh-hd-drive-encrypted",
+        "snippet": "default",
+        "disk_encryption": {
+          "criteria": {
+            "encrypted_locations": [
+              {
+                "name": "Macintosh HD",
+                "encryption_state": {
+                  "is": "encrypted"
+                }
+              }
+            ],
+            "is_installed": true
+          },
+          "exclude_vendor": false
+        }
+      },
+      {
+        "id": "03c5491b-5443-4fc3-9542-4f9cc6196ac2",
+        "name": "is-mac",
+        "snippet": "hip-default",
+        "host_info": {
+          "criteria": {
+            "os": {
+              "contains": {
+                "Apple": "Mac OS X"
+              }
+            }
+          }
+        },
+        "description": "Matches all Mac endpoints"
+      },
+      {
+        "id": "d340e1a5-4740-4d94-a44d-36108bbfe33b",
+        "name": "is-win-10",
+        "snippet": "hip-default",
+        "host_info": {
+          "criteria": {
+            "os": {
+              "contains": {
+                "Microsoft": "Windows 10"
+              }
+            }
+          }
+        },
+        "description": "Matches all Windows 10 endpoints"
+      },
+      {
+        "id": "cc2c6bd8-38cd-4699-8fcb-e95a2854159d",
+        "name": "is-win-7",
+        "snippet": "hip-default",
+        "host_info": {
+          "criteria": {
+            "os": {
+              "contains": {
+                "Microsoft": "Windows 7"
+              }
+            }
+          }
+        },
+        "description": "Matches all Windows 7 endpoints"
+      },
+      {
+        "id": "56d71eb7-4f70-4aca-b317-9d07c73ba611",
+        "name": "is-win-8",
+        "snippet": "hip-default",
+        "host_info": {
+          "criteria": {
+            "os": {
+              "contains": {
+                "Microsoft": "Windows 8"
+              }
+            }
+          }
+        },
+        "description": "Matches all Windows 8 endpoints"
+      },
+      {
+        "id": "90384203-e575-42d8-9f45-b2721ba018ce",
+        "name": "is-win-uwp-desktop",
+        "snippet": "hip-default",
+        "host_info": {
+          "criteria": {
+            "os": {
+              "contains": {
+                "Microsoft": "Windows UWP Desktop"
+              }
+            }
+          }
+        },
+        "description": "Matches all Windows UWP desktops"
+      },
+      {
+        "id": "8048c752-4ef3-42e9-9850-ae08e05e63ef",
+        "name": "is-win-uwp-mobile",
+        "snippet": "hip-default",
+        "host_info": {
+          "criteria": {
+            "os": {
+              "contains": {
+                "Microsoft": "Windows UWP Mobile"
+              }
+            }
+          }
+        },
+        "description": "Matches all Windows UWP mobile endpoints"
+      },
+      {
+        "id": "6d0f8cb9-15c7-4b39-bbf5-b6902adf6b1a",
+        "name": "is-win-vista",
+        "snippet": "hip-default",
+        "host_info": {
+          "criteria": {
+            "os": {
+              "contains": {
+                "Microsoft": "Windows Vista"
+              }
+            }
+          }
+        },
+        "description": "Matches all Windows Vista endpoints"
+      },
+      {
+        "id": "d1bb9b40-3dc4-4578-90d2-c7ca839cfe2e",
+        "name": "is-win-xp",
+        "snippet": "hip-default",
+        "host_info": {
+          "criteria": {
+            "os": {
+              "contains": {
+                "Microsoft": "Windows XP"
+              }
+            }
+          }
+        },
+        "description": "Matches all Windows XP endpoints"
+      },
+      {
+        "id": "4aa88d8a-1b13-45be-b2e9-f3736efff7f1",
+        "name": "is-win",
+        "snippet": "hip-default",
+        "host_info": {
+          "criteria": {
+            "os": {
+              "contains": {
+                "Microsoft": "All"
+              }
+            }
+          }
+        },
+        "description": "Matches all Windows endpoints"
+      }
+    ],
+    "http_header_profile": [
+      {
+        "id": "50c4f902-201a-4e0c-914c-6ff285eb9ab1",
+        "name": "Gmail-Google",
+        "folder": "Shared",
+        "description": "Insert domain for email tracking",
+        "http_header_insertion": [
+          {
+            "name": "Gmail-Google",
+            "type": [
+              {
+                "name": "Google Apps Access Control",
+                "headers": [
+                  {
+                    "name": "auto_bjbb8fw6",
+                    "header": "X-GooGApps-Allowed-Domains",
+                    "value": "paloaltonetworks.com"
+                  }
+                ],
+                "domains": [
+                  "*.google.com",
+                  "gmail.com",
+                  "*.googleusercontent.com",
+                  "*.drive.google.com",
+                  "*.gstatic.com"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "50c4f902-201a-4e0c-914c-6ff285eb9ab1",
+        "name": "Gmail-Google",
+        "folder": "Shared",
+        "description": "Insert domain for email tracking",
+        "http_header_insertion": [
+          {
+            "name": "Gmail-Google",
+            "type": [
+              {
+                "name": "Google Apps Access Control",
+                "headers": [
+                  {
+                    "name": "auto_bjbb8fw6",
+                    "header": "X-GooGApps-Allowed-Domains",
+                    "value": "paloaltonetworks.com"
+                  }
+                ],
+                "domains": [
+                  "*.google.com",
+                  "gmail.com",
+                  "*.googleusercontent.com",
+                  "*.drive.google.com",
+                  "*.gstatic.com"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "50c4f902-201a-4e0c-914c-6ff285eb9ab1",
+        "name": "Gmail-Google",
+        "folder": "Shared",
+        "description": "Insert domain for email tracking",
+        "http_header_insertion": [
+          {
+            "name": "Gmail-Google",
+            "type": [
+              {
+                "name": "Google Apps Access Control",
+                "headers": [
+                  {
+                    "name": "auto_bjbb8fw6",
+                    "header": "X-GooGApps-Allowed-Domains",
+                    "value": "paloaltonetworks.com"
+                  }
+                ],
+                "domains": [
+                  "*.google.com",
+                  "gmail.com",
+                  "*.googleusercontent.com",
+                  "*.drive.google.com",
+                  "*.gstatic.com"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "50c4f902-201a-4e0c-914c-6ff285eb9ab1",
+        "name": "Gmail-Google",
+        "folder": "Shared",
+        "description": "Insert domain for email tracking",
+        "http_header_insertion": [
+          {
+            "name": "Gmail-Google",
+            "type": [
+              {
+                "name": "Google Apps Access Control",
+                "headers": [
+                  {
+                    "name": "auto_bjbb8fw6",
+                    "header": "X-GooGApps-Allowed-Domains",
+                    "value": "paloaltonetworks.com"
+                  }
+                ],
+                "domains": [
+                  "*.google.com",
+                  "gmail.com",
+                  "*.googleusercontent.com",
+                  "*.drive.google.com",
+                  "*.gstatic.com"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "50c4f902-201a-4e0c-914c-6ff285eb9ab1",
+        "name": "Gmail-Google",
+        "folder": "Shared",
+        "description": "Insert domain for email tracking",
+        "http_header_insertion": [
+          {
+            "name": "Gmail-Google",
+            "type": [
+              {
+                "name": "Google Apps Access Control",
+                "headers": [
+                  {
+                    "name": "auto_bjbb8fw6",
+                    "header": "X-GooGApps-Allowed-Domains",
+                    "value": "paloaltonetworks.com"
+                  }
+                ],
+                "domains": [
+                  "*.google.com",
+                  "gmail.com",
+                  "*.googleusercontent.com",
+                  "*.drive.google.com",
+                  "*.gstatic.com"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "certificate_profile": [
+      {
+        "id": "6210736e-20b9-4509-8d8f-f27e228b9ad4",
+        "name": "EDL-Hosting-Service-Profile",
+        "snippet": "default",
+        "ca_certificates": [
+          {
+            "name": "GlobalSign-Root-CA"
+          }
+        ]
+      },
+      {
+        "id": "2918b6be-df93-4305-8e27-1509731f14f0",
+        "name": "Lab-CA",
+        "folder": "Shared",
+        "ca_certificates": [
+          {
+            "name": "Forward-Trust-CA"
+          }
+        ],
+        "username_field": {
+          "subject": "common-name"
+        }
+      },
+      {
+        "id": "2918b6be-df93-4305-8e27-1509731f14f0",
+        "name": "Lab-CA",
+        "folder": "Shared",
+        "ca_certificates": [
+          {
+            "name": "Forward-Trust-CA"
+          }
+        ],
+        "username_field": {
+          "subject": "common-name"
+        }
+      },
+      {
+        "id": "2918b6be-df93-4305-8e27-1509731f14f0",
+        "name": "Lab-CA",
+        "folder": "Shared",
+        "ca_certificates": [
+          {
+            "name": "Forward-Trust-CA"
+          }
+        ],
+        "username_field": {
+          "subject": "common-name"
+        }
+      },
+      {
+        "id": "2918b6be-df93-4305-8e27-1509731f14f0",
+        "name": "Lab-CA",
+        "folder": "Shared",
+        "ca_certificates": [
+          {
+            "name": "Forward-Trust-CA"
+          }
+        ],
+        "username_field": {
+          "subject": "common-name"
+        }
+      },
+      {
+        "id": "2918b6be-df93-4305-8e27-1509731f14f0",
+        "name": "Lab-CA",
+        "folder": "Shared",
+        "ca_certificates": [
+          {
+            "name": "Forward-Trust-CA"
+          }
+        ],
+        "username_field": {
+          "subject": "common-name"
+        }
+      }
+    ],
+    "qos_profile": [
+      {
+        "id": "d2516ee2-0a7d-48ce-97e9-22cd53ef5ce4",
+        "name": "Default Profile",
+        "snippet": "default",
+        "class_bandwidth_type": {
+          "percentage": {
+            "class": [
+              {
+                "name": "class2",
+                "priority": "high",
+                "class_bandwidth": {
+                  "egress_max": 0,
+                  "egress_guaranteed": 50
+                }
+              },
+              {
+                "name": "class4",
+                "priority": "medium",
+                "class_bandwidth": {
+                  "egress_max": 0,
+                  "egress_guaranteed": 50
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "5d10526f-2a0d-4994-969b-cc07f8e3bb13",
+        "name": "regular bucket",
+        "folder": "Remote Networks",
+        "class_bandwidth_type": {
+          "mbps": {
+            "class": [
+              {
+                "name": "class3",
+                "priority": "medium",
+                "class_bandwidth": {
+                  "egress_max": 200,
+                  "egress_guaranteed": 15
+                }
+              },
+              {
+                "name": "class1",
+                "priority": "real-time",
+                "class_bandwidth": {
+                  "egress_max": 100,
+                  "egress_guaranteed": 50
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "policies": {
+    "security_rule": [
+      {
+        "id": "bd31f511-2354-4ae5-bccf-ac199d1342c4",
+        "name": "Allow DNS",
+        "folder": "Shared",
+        "policy_type": "Security",
+        "position": "pre",
+        "description": "Allow DNS to Prisma Access Infrastructure",
+        "from": [
+          "trust"
+        ],
+        "source": [
+          "VPN-Users"
+        ],
+        "source_user": [
+          "any"
+        ],
+        "source_hip": [
+          "any"
+        ],
+        "to": [
+          "untrust"
+        ],
+        "destination": [
+          "169.254.169.254"
+        ],
+        "destination_hip": [
+          "any"
+        ],
+        "application": [
+          "dns-base"
+        ],
+        "service": [
+          "application-default"
+        ],
+        "category": [
+          "any"
+        ],
+        "action": "allow",
+        "profile_setting": {
+          "group": [
+            "Best Practice - Block Post"
+          ]
+        },
+        "log_setting": "Cortex Data Lake",
+        "log_end": true,
+        "log_start": false,
+        "disabled": false,
+        "negate_source": false,
+        "negate_destination": false
+      },
+      {
+        "id": "7d0fbe5c-5152-4a6f-9754-d005903cb218",
+        "name": "Allow DNS to Azure DC",
+        "folder": "Shared",
+        "policy_type": "Security",
+        "position": "pre",
+        "disabled": false,
+        "description": "Allow Ping to Azure DC",
+        "from": [
+          "trust"
+        ],
+        "source": [
+          "VPN-Users"
+        ],
+        "source_user": [
+          "known-user"
+        ],
+        "source_hip": [
+          "any"
+        ],
+        "to": [
+          "trust"
+        ],
+        "destination": [
+          "10.12.0.0/16"
+        ],
+        "destination_hip": [
+          "any"
+        ],
+        "application": [
+          "dns-base"
+        ],
+        "service": [
+          "application-default"
+        ],
+        "category": [
+          "any"
+        ],
+        "action": "allow",
+        "profile_setting": {
+          "group": [
+            "Best Practice - Block Post"
+          ]
+        },
+        "log_start": false,
+        "log_end": true,
+        "negate_source": false,
+        "negate_destination": false,
+        "log_setting": "Cortex Data Lake"
+      },
+      {
+        "id": "6cdb3e72-5bfd-4318-9674-09983dc6a0d8",
+        "name": "Auto-VPN-Default-Snippet",
+        "folder": "ngfw-shared",
+        "policy_type": "Security",
+        "log_setting": "Cortex Data Lake",
+        "log_end": true
+      },
+      {
+        "id": "b58b6902-ae2f-48cf-98d9-0d20fd2e367c",
+        "name": "Block Personal Email",
+        "folder": "Shared",
+        "policy_type": "Internet",
+        "position": "pre",
+        "source": [
+          "any"
+        ],
+        "source_user": [
+          "any"
+        ],
+        "security_settings": {
+          "anti_spyware": "yes",
+          "virus_and_wildfire_analysis": "yes",
+          "vulnerability": "yes"
+        },
+        "allow_web_application": [
+          {
+            "name": "gmail",
+            "position": "pre",
+            "dlp": "none",
+            "type": "application",
+            "saas_enterprise_control": {
+              "consumer_access": {
+                "enable": "no"
+              },
+              "enterprise_access": {
+                "enable": "yes"
+              }
+            },
+            "file_control": {
+              "upload": "best-practice",
+              "download": "best-practice"
+            },
+            "application_function": [
+              "gmail-uploading"
+            ]
+          }
+        ],
+        "disabled": true
+      },
+      {
+        "id": "984421d8-a716-4170-8956-906b5940e747",
+        "name": "Default Category Block",
+        "folder": "Shared",
+        "policy_type": "Internet",
+        "position": "pre",
+        "source": [
+          "any"
+        ],
+        "source_user": [
+          "any"
+        ],
+        "security_settings": {
+          "anti_spyware": "yes",
+          "virus_and_wildfire_analysis": "yes",
+          "vulnerability": "yes"
+        },
+        "description": "block these categories for all users regardless of rules",
+        "block_url_category": [
+          "social-networking"
+        ],
+        "disabled": true
+      },
+      {
+        "id": "2a514310-d44e-401f-af58-699759f44d0e",
+        "name": "Web-Security-Default",
+        "folder": "All",
+        "policy_type": "Security",
+        "log_setting": "Cortex Data Lake",
+        "log_end": true
+      },
+      {
+        "id": "7f31ba8c-ec33-4a2f-9921-e23196b04b9d",
+        "name": "default",
+        "folder": "All",
+        "policy_type": "Security",
+        "log_setting": "Cortex Data Lake",
+        "log_end": true
+      },
+      {
+        "id": "c6396267-347f-4e54-92b4-ac410590e046",
+        "name": "hip-default",
+        "folder": "All",
+        "policy_type": "Security"
+      },
+      {
+        "id": "25441ad9-d2bf-4dcc-916f-a18c7f26c68b",
+        "name": "office365",
+        "folder": "Shared",
+        "policy_type": "Security",
+        "position": "pre",
+        "log_setting": "Cortex Data Lake",
+        "log_end": true
+      },
+      {
+        "id": "d19cdffa-c3eb-47fd-b98a-25b89c1ccf3f",
+        "name": "optional-default",
+        "folder": "Shared",
+        "policy_type": "Security",
+        "position": "pre",
+        "log_setting": "Cortex Data Lake",
+        "log_end": true
+      }
+    ],
+    "decryption_rule": [
+      {
+        "id": "805113f0-0cd9-4fad-831a-e9136f9cf0e5",
+        "name": "Auto-VPN-Default-Snippet",
+        "folder": "ngfw-shared",
+        "log_setting": "Cortex Data Lake",
+        "log_fail": true
+      },
+      {
+        "id": "559a282c-af13-4657-bc50-98ccb04a36fc",
+        "name": "Decryption",
+        "folder": "Shared",
+        "position": "pre",
+        "source_hip": [
+          "any"
+        ],
+        "destination_hip": [
+          "any"
+        ],
+        "action": "decrypt",
+        "profile": "Gmail Test",
+        "from": [
+          "trust"
+        ],
+        "to": [
+          "untrust"
+        ],
+        "source": [
+          "VPN-Users"
+        ],
+        "destination": [
+          "any"
+        ],
+        "service": [
+          "service-http",
+          "service-https"
+        ],
+        "type": {
+          "ssl_forward_proxy": {}
+        },
+        "description": "Decryption",
+        "source_user": [
+          "known-user"
+        ],
+        "category": [
+          "real-estate",
+          "social-networking",
+          "Corporate Webmail"
+        ],
+        "log_setting": "Cortex Data Lake"
+      },
+      {
+        "id": "559a282c-af13-4657-bc50-98ccb04a36fc",
+        "name": "Decryption",
+        "folder": "Shared",
+        "position": "pre",
+        "source_hip": [
+          "any"
+        ],
+        "destination_hip": [
+          "any"
+        ],
+        "action": "decrypt",
+        "profile": "Gmail Test",
+        "from": [
+          "trust"
+        ],
+        "to": [
+          "untrust"
+        ],
+        "source": [
+          "VPN-Users"
+        ],
+        "destination": [
+          "any"
+        ],
+        "service": [
+          "service-http",
+          "service-https"
+        ],
+        "type": {
+          "ssl_forward_proxy": {}
+        },
+        "description": "Decryption",
+        "source_user": [
+          "known-user"
+        ],
+        "category": [
+          "real-estate",
+          "social-networking",
+          "Corporate Webmail"
+        ],
+        "log_setting": "Cortex Data Lake"
+      },
+      {
+        "id": "dcf6102b-4c6c-4b90-956e-ecce819461ad",
+        "name": "Web-Security-Default",
+        "folder": "All",
+        "log_setting": "Cortex Data Lake",
+        "log_fail": true
+      },
+      {
+        "id": "c6b2b69c-c5b0-4291-8a01-d947ac375e6a",
+        "name": "default",
+        "folder": "All",
+        "log_setting": "Cortex Data Lake",
+        "log_fail": true
+      },
+      {
+        "id": "86432ba8-0b4d-4b0f-b9b1-0cf0997371fe",
+        "name": "hip-default",
+        "folder": "All"
+      },
+      {
+        "id": "1680b489-95e0-482d-9129-c32b9e70650d",
+        "name": "office365",
+        "folder": "Shared",
+        "position": "pre",
+        "log_setting": "Cortex Data Lake",
+        "log_fail": true
+      },
+      {
+        "id": "1680b489-95e0-482d-9129-c32b9e70650d",
+        "name": "office365",
+        "folder": "Shared",
+        "position": "pre",
+        "log_setting": "Cortex Data Lake",
+        "log_fail": true
+      },
+      {
+        "id": "4d7f77d9-88ae-40ee-9255-294f8a152569",
+        "name": "optional-default",
+        "folder": "Shared",
+        "position": "pre",
+        "log_setting": "Cortex Data Lake",
+        "log_fail": true
+      },
+      {
+        "id": "4d7f77d9-88ae-40ee-9255-294f8a152569",
+        "name": "optional-default",
+        "folder": "Shared",
+        "position": "pre",
+        "log_setting": "Cortex Data Lake",
+        "log_fail": true
+      }
+    ],
+    "authentication_rule": [
+      {
+        "id": "83dc11c3-ced0-4717-bfd3-a3338135179f",
+        "name": "Authenticate Real-Estate Users",
+        "folder": "Mobile Users",
+        "from": [
+          "trust"
+        ],
+        "to": [
+          "untrust"
+        ],
+        "source": [
+          "any"
+        ],
+        "destination": [
+          "any"
+        ],
+        "source_user": [
+          "any"
+        ],
+        "category": [
+          "real-estate"
+        ],
+        "service": [
+          "service-http",
+          "service-https"
+        ],
+        "source_hip": [
+          "any"
+        ],
+        "log_setting": "Cortex Data Lake",
+        "destination_hip": [
+          "any"
+        ],
+        "authentication_enforcement": "enforcement13749"
+      },
+      {
+        "id": "09eb0191-efd0-4771-ad5f-6b9ff1999a2a",
+        "name": "Authenticate SSH Users",
+        "folder": "Mobile Users",
+        "from": [
+          "trust"
+        ],
+        "to": [
+          "untrust"
+        ],
+        "source": [
+          "any"
+        ],
+        "destination": [
+          "any"
+        ],
+        "source_user": [
+          "any"
+        ],
+        "category": [
+          "any"
+        ],
+        "source_hip": [
+          "any"
+        ],
+        "log_setting": "Cortex Data Lake",
+        "destination_hip": [
+          "any"
+        ],
+        "service": [
+          "service-SSH"
+        ],
+        "authentication_enforcement": "enforcement67006"
+      },
+      {
+        "id": "a86c1069-aa99-4d63-a5e8-ac5d8b1394ce",
+        "name": "Auto-VPN-Default-Snippet",
+        "folder": "ngfw-shared"
+      },
+      {
+        "id": "eed66ea4-f391-426c-a196-b9aacc85a9b7",
+        "name": "Web-Security-Default",
+        "folder": "All"
+      },
+      {
+        "id": "eed66ea4-f391-426c-a196-b9aacc85a9b7",
+        "name": "Web-Security-Default",
+        "folder": "All"
+      },
+      {
+        "id": "256d378f-419b-492c-bcf2-4e4d7e84443c",
+        "name": "default",
+        "folder": "All"
+      },
+      {
+        "id": "256d378f-419b-492c-bcf2-4e4d7e84443c",
+        "name": "default",
+        "folder": "All"
+      },
+      {
+        "id": "ae50213c-d3d7-4719-be3f-072818ee189d",
+        "name": "hip-default",
+        "folder": "All"
+      },
+      {
+        "id": "ae50213c-d3d7-4719-be3f-072818ee189d",
+        "name": "hip-default",
+        "folder": "All"
+      },
+      {
+        "id": "0806ada5-8d5f-4f6c-a4e4-afdb8459a31f",
+        "name": "optional-default",
+        "folder": "Prisma Access"
+      }
+    ],
+    "qos_policy_rule": [
+      {
+        "id": "8a70c596-a3d0-46d6-b02b-de439190042f",
+        "name": "Auto-VPN-Default-Snippet",
+        "folder": "ngfw-shared"
+      },
+      {
+        "id": "c80841f3-ded1-4bcf-964a-2795b3c2e40f",
+        "name": "Web-Security-Default",
+        "folder": "All"
+      },
+      {
+        "id": "c80841f3-ded1-4bcf-964a-2795b3c2e40f",
+        "name": "Web-Security-Default",
+        "folder": "All"
+      },
+      {
+        "id": "5ca1c722-b229-4135-b486-239fafd42368",
+        "name": "default",
+        "folder": "All"
+      },
+      {
+        "id": "5ca1c722-b229-4135-b486-239fafd42368",
+        "name": "default",
+        "folder": "All"
+      },
+      {
+        "id": "bca2433a-07a6-4b20-8fbe-4811b5b315bd",
+        "name": "hip-default",
+        "folder": "All"
+      },
+      {
+        "id": "bca2433a-07a6-4b20-8fbe-4811b5b315bd",
+        "name": "hip-default",
+        "folder": "All"
+      },
+      {
+        "id": "6e7c28d8-0060-4040-9623-567ae01d8ed9",
+        "name": "office365",
+        "folder": "Shared"
+      },
+      {
+        "id": "3e2dcc66-2a37-4e64-923e-91b861eef7d8",
+        "name": "optional-default",
+        "folder": "Shared"
+      },
+      {
+        "id": "c05c7860-0580-4b74-96e7-49c2dbbfa94f",
+        "name": "rbi",
+        "folder": "Shared"
+      }
+    ]
+  },
+  "infrastructure": {
+    "ike_crypto_profile": [
+      {
+        "id": "895e4ff7-586a-4c70-8efc-bf8ad7de381a",
+        "name": "AES-256",
+        "folder": "Remote Networks",
+        "lifetime": {
+          "hours": 8
+        },
+        "encryption": [
+          "aes-256-cbc"
+        ],
+        "dh_group": [
+          "group14"
+        ],
+        "hash": [
+          "sha1"
+        ]
+      },
+      {
+        "id": "98ebfee3-2d15-4526-9539-72b35e3325ab",
+        "name": "Auto_Prisma_SDWAN_IKECrypto",
+        "folder": "Remote Networks",
+        "dh_group": [
+          "group20"
+        ],
+        "encryption": [
+          "aes-256-cbc"
+        ],
+        "hash": [
+          "sha512"
+        ],
+        "lifetime": {
+          "hours": 8
+        }
+      }
+    ],
+    "ipsec_crypto_profile": [
+      {
+        "id": "dc8d879a-a5bf-4ec5-bcd5-5838ce0effac",
+        "name": "AES256",
+        "folder": "Remote Networks",
+        "esp": {
+          "encryption": [
+            "aes-256-cbc"
+          ],
+          "authentication": [
+            "sha512"
+          ]
+        },
+        "lifetime": {
+          "hours": 1
+        },
+        "dh_group": "group14"
+      },
+      {
+        "id": "ffe1f4c3-fbde-4260-8087-4666e3db86a9",
+        "name": "Auto_Prisma_SDWAN_IPSecCrypto",
+        "folder": "Remote Networks",
+        "dh_group": "group20",
+        "lifetime": {
+          "hours": 1
+        },
+        "esp": {
+          "authentication": [
+            "sha512"
+          ],
+          "encryption": [
+            "aes-256-cbc"
+          ]
+        }
+      }
+    ],
+    "ike_gateway": [
+      {
+        "id": "690b99b4-3622-4a57-8692-231ecffe74c5",
+        "name": "ike_Gateway_1726855411253",
+        "folder": "Remote Networks",
+        "local_address": {
+          "interface": "vlan"
+        },
+        "authentication": {
+          "pre_shared_key": {
+            "key": "-AQ==2esxUDK55jx9dp0pXiOazCX+6aQ=wGJSL1t6kcBbUyYFi3kpEQ=="
+          }
+        },
+        "peer_address": {
+          "ip": "64.124.201.47"
+        },
+        "local_id": {
+          "type": "fqdn",
+          "id": "prisma"
+        },
+        "peer_id": {
+          "type": "fqdn",
+          "id": "byos"
+        },
+        "protocol": {
+          "version": "ikev2",
+          "ikev2": {
+            "ike_crypto_profile": "AES-256",
+            "dpd": {
+              "enable": true
+            }
+          },
+          "ikev1": {
+            "dpd": {
+              "enable": true
+            }
+          }
+        },
+        "protocol_common": {
+          "nat_traversal": {
+            "enable": true
+          },
+          "fragmentation": {
+            "enable": false
+          }
+        }
+      },
+      {
+        "id": "e839a419-1312-459a-a448-a808ffb912b5",
+        "name": "ike_Gateway_1755793091156",
+        "folder": "Remote Networks",
+        "local_address": {
+          "interface": "vlan"
+        },
+        "authentication": {
+          "pre_shared_key": {
+            "key": "-AQ==qUqP5cyxm6YcTAhz05Hph5gvu9M=jU5PlkeG8sZo9hECK2yK/Q=="
+          }
+        },
+        "peer_address": {
+          "ip": "1.2.4.5"
+        },
+        "protocol": {
+          "ikev2": {
+            "ike_crypto_profile": "CloudGenix-IKE-Crypto-Default",
+            "dpd": {
+              "enable": true
+            }
+          },
+          "ikev1": {
+            "dpd": {
+              "enable": true
+            }
+          }
+        },
+        "protocol_common": {
+          "nat_traversal": {
+            "enable": true
+          },
+          "fragmentation": {
+            "enable": false
+          }
+        }
+      },
+      {
+        "id": "16feb3cf-b1d8-4179-b3e6-e7f983137c89",
+        "name": "ike_Gateway_1767393178061",
+        "folder": "Remote Networks",
+        "local_address": {
+          "interface": "vlan"
+        },
+        "peer_address": {
+          "ip": "11.32.5.4"
+        },
+        "authentication": {
+          "pre_shared_key": {
+            "key": "-AQ==3HJK8Y+91OWRifX+dopfgxFScFA=/vdDID53ClNFpz2Rs3SIlQ=="
+          }
+        },
+        "local_id": {
+          "type": "ipaddr",
+          "id": "192.168.54.78"
+        },
+        "peer_id": {
+          "type": "fqdn",
+          "id": "Azure"
+        },
+        "protocol": {
+          "ikev1": {
+            "ike_crypto_profile": "CiscoASA-IKE-Crypto-Default",
+            "dpd": {
+              "enable": true
+            }
+          },
+          "ikev2": {
+            "ike_crypto_profile": "Velocloud-IKE-default",
+            "dpd": {
+              "enable": true
+            }
+          },
+          "version": "ikev2-preferred"
+        },
+        "protocol_common": {
+          "nat_traversal": {
+            "enable": true
+          },
+          "fragmentation": {
+            "enable": false
+          }
+        }
+      }
+    ],
+    "ipsec_tunnel": [
+      {
+        "id": "bdd2ad2f-9889-47ec-acdb-642c0ee01e74",
+        "name": "BYOS-LAB",
+        "folder": "Remote Networks",
+        "tunnel_interface": "tunnel",
+        "auto_key": {
+          "ike_gateway": [
+            {
+              "name": "ike_Gateway_1726855411253"
+            }
+          ],
+          "ipsec_crypto_profile": "AES256"
+        },
+        "anti_replay": true
+      },
+      {
+        "id": "d5fd2a4f-f216-438b-8d3d-0a38e67a0ee5",
+        "name": "test_tunnel",
+        "folder": "Remote Networks",
+        "tunnel_interface": "tunnel",
+        "auto_key": {
+          "ike_gateway": [
+            {
+              "name": "ike_Gateway_1755793091156"
+            }
+          ],
+          "ipsec_crypto_profile": "CloudGenix-IPSec-Crypto-Default"
+        },
+        "anti_replay": true
+      },
+      {
+        "id": "a5b5268c-6b9d-42b4-bf7d-17579263749e",
+        "name": "to-azure",
+        "folder": "Remote Networks",
+        "auto_key": {
+          "ike_gateway": [
+            {
+              "name": "ike_Gateway_1767393178061"
+            }
+          ],
+          "ipsec_crypto_profile": "CloudGenix-IPSec-Crypto-Default"
+        },
+        "tunnel_interface": "tunnel",
+        "anti_replay": true
+      }
+    ],
+    "agent_profile": [
+      {
+        "name": "Employee-BYOD",
+        "folder": "Mobile Users",
+        "hip_collection": {
+          "collect_hip_data": true
+        },
+        "save_user_credentials": "1",
+        "gateways": {
+          "external": {
+            "list": [
+              {
+                "name": "Prisma Access",
+                "fqdn": "gpcloudservice.com",
+                "manual": true,
+                "priority_rule": [
+                  {
+                    "name": "US",
+                    "priority": "1"
+                  }
+                ]
+              }
+            ]
+          },
+          "internal": {
+            "list": [
+              {
+                "name": "Prisma Access Internal Gateway",
+                "fqdn": "gpcloudservice.com"
+              }
+            ]
+          }
+        },
+        "authentication_override": {
+          "generate_cookie": true,
+          "cookie_encrypt_decrypt_cert": "Authentication Cookie CA",
+          "accept_cookie": {
+            "cookie_lifetime": {
+              "lifetime_in_hours": 24
+            }
+          }
+        },
+        "gp_app_config": {
+          "config": [
+            {
+              "name": "agent-proxy-mode",
+              "value": [
+                "1"
+              ]
+            },
+            {
+              "name": "agent-proxy-port",
+              "value": [
+                "9999"
+              ]
+            },
+            {
+              "name": "proxy-multiple-autodetect",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "use-proxy",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "dem-agent",
+              "value": [
+                "not-install"
+              ]
+            },
+            {
+              "name": "user-accept-terms-before-creating-tunnel",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "enable-signout",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "allow-extend-session",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "enable-advanced-view",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "enable-do-not-display-this-welcome-page-again",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "rediscover-network",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "resubmit-host-info",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "intelligent-portal",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "can-continue-if-portal-cert-invalid",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "dem-agent-action",
+              "value": [
+                "no-action"
+              ]
+            },
+            {
+              "name": "dem-notification",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "refresh-config-interval",
+              "value": [
+                "24"
+              ]
+            },
+            {
+              "name": "show-agent-icon",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "wsc-autodetect",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "init-panel",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "user-input-on-top",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "pre-logon-tunnel-rename-timeout",
+              "value": [
+                "-1"
+              ]
+            },
+            {
+              "name": "retry-tunnel",
+              "value": [
+                "30"
+              ]
+            },
+            {
+              "name": "retry-timeout",
+              "value": [
+                "5"
+              ]
+            },
+            {
+              "name": "user-switch-tunnel-rename-timeout",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "preserve-tunnel-upon-user-logoff-timeout",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "ipsec-failover-ssl",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "display-tunnel-fallback-notification",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "ssl-only-selection",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "split-tunnel-option",
+              "value": [
+                "network-traffic"
+              ]
+            },
+            {
+              "name": "advanced-st-public-key",
+              "value": [
+                "Empty"
+              ]
+            },
+            {
+              "name": "ipv6-preferred",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "use-sso",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "use-sso-pin",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "use-sso-macos",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "logout-remove-sso",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "krb-auth-fail-fallback",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "default-browser",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "certificate-store-lookup",
+              "value": [
+                "user-and-machine"
+              ]
+            },
+            {
+              "name": "scep-certificate-renewal-period",
+              "value": [
+                "7"
+              ]
+            },
+            {
+              "name": "retain-connection-smartcard-removal",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "traffic-enforcement",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "enforce-globalprotect",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "captive-portal-exception-timeout",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "traffic-blocking-notification-delay",
+              "value": [
+                "15"
+              ]
+            },
+            {
+              "name": "display-traffic-blocking-notification-msg",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "traffic-blocking-notification-msg",
+              "value": [
+                "<div style=\"font-family:'Helvetica Neue';\"><h1 style=\"color:red;text-align:center; margin: 0; font-size: 30px;\">Notice</h1><p style=\"margin: 0;font-size: 15px; line-height: 1.2em;\">To access the network, you must first connect to GlobalProtect.</p></div>"
+              ]
+            },
+            {
+              "name": "allow-traffic-blocking-notification-dismissal",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "display-captive-portal-detection-msg",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "captive-portal-detection-msg",
+              "value": [
+                "<div style=\"font-family:'Helvetica Neue';\"><h1 style=\"color:red;text-align:center; margin: 0; font-size: 30px;\">Captive Portal Detected</h1><p style=\"margin: 0; font-size: 15px; line-height: 1.2em;\">GlobalProtect has temporarily permitted network access for you to connect to the Internet. Follow instructions from your internet provider.</p><p style=\"margin: 0; font-size: 15px; line-height: 1.2em;\">If you let the connection time out, open GlobalProtect and click Connect to try again.</p></div>"
+              ]
+            },
+            {
+              "name": "captive-portal-notification-delay",
+              "value": [
+                "5"
+              ]
+            },
+            {
+              "name": "adv-internal-host-detection",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "delays-internal-host-detection",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "enable-hip-remediation",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "hip-remediation-retry",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "tunnel-mtu",
+              "value": [
+                "1400"
+              ]
+            },
+            {
+              "name": "max-internal-gateway-connection-attempts",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "portal-timeout",
+              "value": [
+                "5"
+              ]
+            },
+            {
+              "name": "connect-timeout",
+              "value": [
+                "5"
+              ]
+            },
+            {
+              "name": "receive-timeout",
+              "value": [
+                "30"
+              ]
+            },
+            {
+              "name": "split-tunnel-option-mobile",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "enforce-dns",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "append-local-search-domain",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "flush-dns",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "mfa-enabled",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "mfa-listening-port",
+              "value": [
+                "4501"
+              ]
+            },
+            {
+              "name": "mfa-notification-msg",
+              "value": [
+                "You have attempted to access a protected resource that requires additional authentication. Proceed to authenticate at"
+              ]
+            },
+            {
+              "name": "mfa-prompt-suppress-time",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "measuring-egw-tcp-connection",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "log-gateway",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "quarantine-add-message",
+              "value": [
+                "Your security policy has restricted access to the network from this device. If the issue persists, contact your administrator."
+              ]
+            },
+            {
+              "name": "quarantine-remove-message",
+              "value": [
+                "Your security policy has restored access to the network from this device. If you still cannot access the network, contact your administrator."
+              ]
+            },
+            {
+              "name": "can-change-portal",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "uninstall",
+              "value": [
+                "allowed"
+              ]
+            },
+            {
+              "name": "cdl-log",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "connect-method",
+              "value": [
+                "on-demand"
+              ]
+            },
+            {
+              "name": "agent-user-override",
+              "value": [
+                "allowed"
+              ]
+            },
+            {
+              "name": "client-upgrade",
+              "value": [
+                "prompt"
+              ]
+            }
+          ]
+        },
+        "source_user": [
+          "any"
+        ]
+      },
+      {
+        "name": "Employee-Issued",
+        "folder": "Mobile Users",
+        "gateways": {
+          "internal": {
+            "list": [
+              {
+                "name": "Prisma Access Internal Gateway",
+                "fqdn": "gpcloudservice.com"
+              }
+            ]
+          },
+          "external": {
+            "list": [
+              {
+                "name": "Prisma Access",
+                "fqdn": "gpcloudservice.com",
+                "manual": true,
+                "priority_rule": [
+                  {
+                    "name": "Any",
+                    "priority": "1"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "hip_collection": {
+          "collect_hip_data": true
+        },
+        "save_user_credentials": "1",
+        "certificate": {
+          "criteria": {
+            "certificate_profile": "Lab-CA"
+          }
+        },
+        "source_user": [
+          "CN=Remote Users,DC=integrator-6969699okta"
+        ],
+        "authentication_override": {
+          "generate_cookie": true,
+          "cookie_encrypt_decrypt_cert": "Authentication Cookie CA",
+          "accept_cookie": {
+            "cookie_lifetime": {
+              "lifetime_in_hours": 72
+            }
+          }
+        },
+        "client_certificate": {
+          "local": "GP_Log_Certificate"
+        },
+        "gp_app_config": {
+          "config": [
+            {
+              "name": "agent-proxy-mode",
+              "value": [
+                "1"
+              ]
+            },
+            {
+              "name": "forwarding-option-choice",
+              "value": [
+                "auto-proxy-pac"
+              ]
+            },
+            {
+              "name": "agent-proxy-port",
+              "value": [
+                "9999"
+              ]
+            },
+            {
+              "name": "proxy-multiple-autodetect",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "use-proxy",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "dem-agent",
+              "value": [
+                "install-with-admin-control"
+              ]
+            },
+            {
+              "name": "user-accept-terms-before-creating-tunnel",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "enable-signout",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "allow-extend-session",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "enable-advanced-view",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "enable-do-not-display-this-welcome-page-again",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "rediscover-network",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "wifi-to-wired-transition",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "resubmit-host-info",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "intelligent-portal",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "can-continue-if-portal-cert-invalid",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "access-gateway-from-agent-only",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "dem-agent-action",
+              "value": [
+                "install"
+              ]
+            },
+            {
+              "name": "allow-disable-cbl",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "dem-notification",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "refresh-config-interval",
+              "value": [
+                "24"
+              ]
+            },
+            {
+              "name": "show-agent-icon",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "wsc-autodetect",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "init-panel",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "user-input-on-top",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "pre-logon-tunnel-rename-timeout",
+              "value": [
+                "-1"
+              ]
+            },
+            {
+              "name": "retry-tunnel",
+              "value": [
+                "30"
+              ]
+            },
+            {
+              "name": "retry-timeout",
+              "value": [
+                "5"
+              ]
+            },
+            {
+              "name": "user-switch-tunnel-rename-timeout",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "enable-cache-portal-config-absence-prelogon-tunnel",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "preserve-tunnel-upon-user-logoff-timeout",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "ipsec-failover-ssl",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "display-tunnel-fallback-notification",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "ssl-only-selection",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "split-tunnel-option",
+              "value": [
+                "network-traffic"
+              ]
+            },
+            {
+              "name": "advanced-st-public-key",
+              "value": [
+                "Empty"
+              ]
+            },
+            {
+              "name": "ipv6-preferred",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "use-sso",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "use-sso-pin",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "use-sso-macos",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "logout-remove-sso",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "krb-auth-fail-fallback",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "default-browser",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "certificate-store-lookup",
+              "value": [
+                "user-and-machine"
+              ]
+            },
+            {
+              "name": "scep-certificate-renewal-period",
+              "value": [
+                "7"
+              ]
+            },
+            {
+              "name": "full-chain-cert-verify",
+              "value": [
+                "pre-deploy"
+              ]
+            },
+            {
+              "name": "retain-connection-smartcard-removal",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "traffic-enforcement",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "enforce-globalprotect",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "captive-portal-exception-timeout",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "captive-portal-using-default-browser",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "traffic-blocking-notification-delay",
+              "value": [
+                "15"
+              ]
+            },
+            {
+              "name": "display-traffic-blocking-notification-msg",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "traffic-blocking-notification-msg",
+              "value": [
+                "<div style=\"font-family:'Helvetica Neue';\"><h1 style=\"color:red;text-align:center; margin: 0; font-size: 30px;\">Notice</h1><p style=\"margin: 0;font-size: 15px; line-height: 1.2em;\">To access the network, you must first connect to GlobalProtect.</p></div>"
+              ]
+            },
+            {
+              "name": "allow-traffic-blocking-notification-dismissal",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "display-captive-portal-detection-msg",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "captive-portal-detection-msg",
+              "value": [
+                "<div style=\"font-family:'Helvetica Neue';\"><h1 style=\"color:red;text-align:center; margin: 0; font-size: 30px;\">Captive Portal Detected</h1><p style=\"margin: 0; font-size: 15px; line-height: 1.2em;\">GlobalProtect has temporarily permitted network access for you to connect to the Internet. Follow instructions from your internet provider.</p><p style=\"margin: 0; font-size: 15px; line-height: 1.2em;\">If you let the connection time out, open GlobalProtect and click Connect to try again.</p></div>"
+              ]
+            },
+            {
+              "name": "captive-portal-notification-delay",
+              "value": [
+                "5"
+              ]
+            },
+            {
+              "name": "adv-internal-host-detection",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "delays-internal-host-detection",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "unified-user-id-hybrid-deployment",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "enable-hip-remediation",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "hip-remediation-retry",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "tunnel-mtu",
+              "value": [
+                "1400"
+              ]
+            },
+            {
+              "name": "max-internal-gateway-connection-attempts",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "portal-timeout",
+              "value": [
+                "5"
+              ]
+            },
+            {
+              "name": "connect-timeout",
+              "value": [
+                "5"
+              ]
+            },
+            {
+              "name": "receive-timeout",
+              "value": [
+                "30"
+              ]
+            },
+            {
+              "name": "split-tunnel-option-mobile",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "enforce-dns",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "append-local-search-domain",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "flush-dns",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "mfa-enabled",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "mfa-listening-port",
+              "value": [
+                "4501"
+              ]
+            },
+            {
+              "name": "mfa-notification-msg",
+              "value": [
+                "You have attempted to access a protected resource that requires additional authentication. Proceed to authenticate at"
+              ]
+            },
+            {
+              "name": "mfa-prompt-suppress-time",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "measuring-egw-tcp-connection",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "log-gateway",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "quarantine-add-message",
+              "value": [
+                "Your security policy has restricted access to the network from this device. If the issue persists, contact your administrator."
+              ]
+            },
+            {
+              "name": "quarantine-remove-message",
+              "value": [
+                "Your security policy has restored access to the network from this device. If you still cannot access the network, contact your administrator."
+              ]
+            },
+            {
+              "name": "can-change-portal",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "uninstall",
+              "value": [
+                "allowed"
+              ]
+            },
+            {
+              "name": "cdl-log",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "connect-method",
+              "value": [
+                "user-logon"
+              ]
+            },
+            {
+              "name": "agent-user-override",
+              "value": [
+                "allowed"
+              ]
+            },
+            {
+              "name": "client-upgrade",
+              "value": [
+                "prompt"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "pre-logon",
+        "folder": "Mobile Users",
+        "gateways": {
+          "internal": {
+            "list": [
+              {
+                "name": "Prisma Access Internal Gateway",
+                "fqdn": "gpcloudservice.com"
+              }
+            ]
+          },
+          "external": {
+            "list": [
+              {
+                "name": "Prisma Access",
+                "fqdn": "gpcloudservice.com",
+                "manual": true,
+                "priority_rule": [
+                  {
+                    "name": "Any",
+                    "priority": "1"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "hip_collection": {
+          "collect_hip_data": true
+        },
+        "save_user_credentials": "1",
+        "certificate": {
+          "criteria": {
+            "certificate_profile": "Lab-CA"
+          }
+        },
+        "authentication_override": {
+          "generate_cookie": true,
+          "cookie_encrypt_decrypt_cert": "Authentication Cookie CA",
+          "accept_cookie": {
+            "cookie_lifetime": {
+              "lifetime_in_hours": 24
+            }
+          }
+        },
+        "client_certificate": {
+          "local": "GP_Log_Certificate"
+        },
+        "gp_app_config": {
+          "config": [
+            {
+              "name": "agent-proxy-mode",
+              "value": [
+                "1"
+              ]
+            },
+            {
+              "name": "forwarding-option-choice",
+              "value": [
+                "auto-proxy-pac"
+              ]
+            },
+            {
+              "name": "agent-proxy-port",
+              "value": [
+                "9999"
+              ]
+            },
+            {
+              "name": "proxy-multiple-autodetect",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "use-proxy",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "dem-agent",
+              "value": [
+                "install-with-admin-control"
+              ]
+            },
+            {
+              "name": "user-accept-terms-before-creating-tunnel",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "enable-signout",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "allow-extend-session",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "enable-advanced-view",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "enable-do-not-display-this-welcome-page-again",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "rediscover-network",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "wifi-to-wired-transition",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "resubmit-host-info",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "intelligent-portal",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "can-continue-if-portal-cert-invalid",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "access-gateway-from-agent-only",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "dem-agent-action",
+              "value": [
+                "install"
+              ]
+            },
+            {
+              "name": "allow-disable-cbl",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "dem-notification",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "refresh-config-interval",
+              "value": [
+                "24"
+              ]
+            },
+            {
+              "name": "show-agent-icon",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "wsc-autodetect",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "init-panel",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "user-input-on-top",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "pre-logon-tunnel-rename-timeout",
+              "value": [
+                "-1"
+              ]
+            },
+            {
+              "name": "retry-tunnel",
+              "value": [
+                "30"
+              ]
+            },
+            {
+              "name": "retry-timeout",
+              "value": [
+                "5"
+              ]
+            },
+            {
+              "name": "user-switch-tunnel-rename-timeout",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "enable-cache-portal-config-absence-prelogon-tunnel",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "preserve-tunnel-upon-user-logoff-timeout",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "ipsec-failover-ssl",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "display-tunnel-fallback-notification",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "ssl-only-selection",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "split-tunnel-option",
+              "value": [
+                "network-traffic"
+              ]
+            },
+            {
+              "name": "advanced-st-public-key",
+              "value": [
+                "Empty"
+              ]
+            },
+            {
+              "name": "ipv6-preferred",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "use-sso",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "use-sso-pin",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "use-sso-macos",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "logout-remove-sso",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "krb-auth-fail-fallback",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "default-browser",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "certificate-store-lookup",
+              "value": [
+                "machine"
+              ]
+            },
+            {
+              "name": "scep-certificate-renewal-period",
+              "value": [
+                "7"
+              ]
+            },
+            {
+              "name": "full-chain-cert-verify",
+              "value": [
+                "pre-deploy"
+              ]
+            },
+            {
+              "name": "retain-connection-smartcard-removal",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "traffic-enforcement",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "enforce-globalprotect",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "captive-portal-exception-timeout",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "captive-portal-using-default-browser",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "traffic-blocking-notification-delay",
+              "value": [
+                "15"
+              ]
+            },
+            {
+              "name": "display-traffic-blocking-notification-msg",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "traffic-blocking-notification-msg",
+              "value": [
+                "<div style=\"font-family:'Helvetica Neue';\"><h1 style=\"color:red;text-align:center; margin: 0; font-size: 30px;\">Notice</h1><p style=\"margin: 0;font-size: 15px; line-height: 1.2em;\">To access the network, you must first connect to GlobalProtect.</p></div>"
+              ]
+            },
+            {
+              "name": "allow-traffic-blocking-notification-dismissal",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "display-captive-portal-detection-msg",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "captive-portal-detection-msg",
+              "value": [
+                "<div style=\"font-family:'Helvetica Neue';\"><h1 style=\"color:red;text-align:center; margin: 0; font-size: 30px;\">Captive Portal Detected</h1><p style=\"margin: 0; font-size: 15px; line-height: 1.2em;\">GlobalProtect has temporarily permitted network access for you to connect to the Internet. Follow instructions from your internet provider.</p><p style=\"margin: 0; font-size: 15px; line-height: 1.2em;\">If you let the connection time out, open GlobalProtect and click Connect to try again.</p></div>"
+              ]
+            },
+            {
+              "name": "captive-portal-notification-delay",
+              "value": [
+                "5"
+              ]
+            },
+            {
+              "name": "adv-internal-host-detection",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "delays-internal-host-detection",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "unified-user-id-hybrid-deployment",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "enable-hip-remediation",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "hip-remediation-retry",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "tunnel-mtu",
+              "value": [
+                "1400"
+              ]
+            },
+            {
+              "name": "max-internal-gateway-connection-attempts",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "portal-timeout",
+              "value": [
+                "5"
+              ]
+            },
+            {
+              "name": "connect-timeout",
+              "value": [
+                "5"
+              ]
+            },
+            {
+              "name": "receive-timeout",
+              "value": [
+                "30"
+              ]
+            },
+            {
+              "name": "split-tunnel-option-mobile",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "enforce-dns",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "append-local-search-domain",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "flush-dns",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "mfa-enabled",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "mfa-listening-port",
+              "value": [
+                "4501"
+              ]
+            },
+            {
+              "name": "mfa-notification-msg",
+              "value": [
+                "You have attempted to access a protected resource that requires additional authentication. Proceed to authenticate at"
+              ]
+            },
+            {
+              "name": "mfa-prompt-suppress-time",
+              "value": [
+                "0"
+              ]
+            },
+            {
+              "name": "measuring-egw-tcp-connection",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "log-gateway",
+              "value": [
+                "no"
+              ]
+            },
+            {
+              "name": "quarantine-add-message",
+              "value": [
+                "Your security policy has restricted access to the network from this device. If the issue persists, contact your administrator."
+              ]
+            },
+            {
+              "name": "quarantine-remove-message",
+              "value": [
+                "Your security policy has restored access to the network from this device. If you still cannot access the network, contact your administrator."
+              ]
+            },
+            {
+              "name": "can-change-portal",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "uninstall",
+              "value": [
+                "allowed"
+              ]
+            },
+            {
+              "name": "cdl-log",
+              "value": [
+                "yes"
+              ]
+            },
+            {
+              "name": "connect-method",
+              "value": [
+                "pre-logon"
+              ]
+            },
+            {
+              "name": "agent-user-override",
+              "value": [
+                "allowed"
+              ]
+            },
+            {
+              "name": "client-upgrade",
+              "value": [
+                "prompt"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

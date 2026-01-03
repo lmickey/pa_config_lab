@@ -1,0 +1,56 @@
+{
+  "id": "6570f01f-cf86-47a3-9f46-686decfbcf9c",
+  "name": "best-practice",
+  "snippet": "predefined",
+  "rules": [
+    {
+      "name": "Block all risky file types",
+      "application": [
+        "any"
+      ],
+      "file_type": [
+        "7z",
+        "bat",
+        "chm",
+        "class",
+        "cpl",
+        "dll",
+        "hlp",
+        "hta",
+        "jar",
+        "ocx",
+        "pif",
+        "scr",
+        "torrent",
+        "vbe",
+        "wsf"
+      ],
+      "direction": "both",
+      "action": "block"
+    },
+    {
+      "name": "Continue prompt encrypted files",
+      "application": [
+        "any"
+      ],
+      "file_type": [
+        "encrypted-rar",
+        "encrypted-zip"
+      ],
+      "direction": "both",
+      "action": "block"
+    },
+    {
+      "name": "Log all other file types",
+      "application": [
+        "any"
+      ],
+      "file_type": [
+        "any"
+      ],
+      "direction": "both",
+      "action": "alert"
+    }
+  ],
+  "description": "Best practice file blocking security profile"
+}

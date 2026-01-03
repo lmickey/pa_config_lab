@@ -1,0 +1,13 @@
+{
+  "id": "0f35f0ea-5c6c-4a0b-8702-64b4966b4fe8",
+  "name": "Cutover Window",
+  "folder": "Shared",
+  "schedule_type": {
+    "recurring": {
+      "daily": [
+        "23:00-23:45",
+        "00:00-01:30"
+      ]
+    }
+  }
+}

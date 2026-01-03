@@ -1,0 +1,87 @@
+{
+  "id": "b10269e8-f2d0-4771-86b4-5597e29155d0",
+  "name": "best-practice",
+  "snippet": "predefined",
+  "description": "Best practice anti-spyware security profile",
+  "cloud_inline_analysis": true,
+  "mica_engine_spyware_enabled": [
+    {
+      "name": "HTTP Command and Control detector",
+      "inline_policy_action": "reset-both"
+    },
+    {
+      "name": "HTTP2 Command and Control detector",
+      "inline_policy_action": "reset-both"
+    },
+    {
+      "name": "SSL Command and Control detector",
+      "inline_policy_action": "reset-both"
+    },
+    {
+      "name": "Unknown-TCP Command and Control detector",
+      "inline_policy_action": "reset-both"
+    },
+    {
+      "name": "Unknown-UDP Command and Control detector",
+      "inline_policy_action": "reset-both"
+    }
+  ],
+  "rules": [
+    {
+      "name": "simple-critical",
+      "action": {
+        "reset_both": {}
+      },
+      "severity": [
+        "critical"
+      ],
+      "threat_name": "any",
+      "category": "any",
+      "packet_capture": "single-packet"
+    },
+    {
+      "name": "simple-high",
+      "action": {
+        "reset_both": {}
+      },
+      "severity": [
+        "high"
+      ],
+      "threat_name": "any",
+      "category": "any",
+      "packet_capture": "single-packet"
+    },
+    {
+      "name": "simple-medium",
+      "action": {
+        "reset_both": {}
+      },
+      "severity": [
+        "medium"
+      ],
+      "threat_name": "any",
+      "category": "any",
+      "packet_capture": "single-packet"
+    },
+    {
+      "name": "simple-informational",
+      "action": {},
+      "severity": [
+        "informational"
+      ],
+      "threat_name": "any",
+      "category": "any",
+      "packet_capture": "disable"
+    },
+    {
+      "name": "simple-low",
+      "action": {},
+      "severity": [
+        "low"
+      ],
+      "threat_name": "any",
+      "category": "any",
+      "packet_capture": "disable"
+    }
+  ]
+}

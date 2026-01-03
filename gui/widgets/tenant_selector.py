@@ -197,11 +197,21 @@ class TenantSelectorWidget(QWidget):
                 
                 self.logger.info(f"Creating API client for: {tenant_name}")
                 
-                # Create API client
+                # Load API settings from application preferences
+                from PyQt6.QtCore import QSettings
+                settings = QSettings("PrismaAccess", "ConfigManager")
+                timeout = settings.value("api/timeout", 60, type=int)
+                rate_limit = settings.value("api/rate_limit", 100, type=int)
+                cache_ttl = settings.value("api/cache_ttl", 300, type=int)
+                
+                # Create API client with settings
                 api_client = PrismaAccessAPIClient(
                     tsg_id=tsg_id,
                     api_user=api_user,
-                    api_secret=api_secret
+                    api_secret=api_secret,
+                    rate_limit=rate_limit,
+                    cache_ttl=cache_ttl,
+                    timeout=timeout
                 )
                 
                 # Verify connection

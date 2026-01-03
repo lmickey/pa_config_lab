@@ -22,8 +22,6 @@ from config.models.objects import (
 from config.models.profiles import (
     AuthenticationProfile,
     DecryptionProfile,
-    URLFilteringProfile,
-    AntivirusProfile,
     AntiSpywareProfile,
     VulnerabilityProfile,
     FileBlockingProfile,
@@ -84,8 +82,6 @@ class ConfigItemFactory:
         # Profiles
         'authentication_profile': AuthenticationProfile,
         'decryption_profile': DecryptionProfile,
-        'url_filtering_profile': URLFilteringProfile,
-        'antivirus_profile': AntivirusProfile,
         'anti_spyware_profile': AntiSpywareProfile,
         'vulnerability_profile': VulnerabilityProfile,
         'file_blocking_profile': FileBlockingProfile,
@@ -130,12 +126,10 @@ class ConfigItemFactory:
         
         '/sse/config/v1/authentication-profiles': 'authentication_profile',
         '/sse/config/v1/decryption-profiles': 'decryption_profile',
-        '/sse/config/v1/url-filtering-profiles': 'url_filtering_profile',
         '/sse/config/v1/anti-spyware-profiles': 'anti_spyware_profile',
         '/sse/config/v1/vulnerability-protection-profiles': 'vulnerability_profile',
-        '/sse/config/v1/wildfire-anti-virus-profiles': 'antivirus_profile',
+        '/config/security/v1/wildfire-anti-virus-profiles': 'wildfire_profile',
         '/sse/config/v1/file-blocking-profiles': 'file_blocking_profile',
-        '/sse/config/v1/wildfire-profiles': 'wildfire_profile',
         '/sse/config/v1/profile-groups': 'profile_group',
         '/sse/config/v1/hip-profiles': 'hip_profile',
         '/sse/config/v1/hip-objects': 'hip_object',
@@ -183,6 +177,19 @@ class ConfigItemFactory:
         """
         cls._endpoint_mapping[endpoint] = item_type
         logger.debug(f"Registered endpoint '{endpoint}' -> '{item_type}'")
+    
+    @classmethod
+    def get_model_class(cls, item_type: str) -> Optional[Type[ConfigItem]]:
+        """
+        Get the model class for a given item type.
+        
+        Args:
+            item_type: Type of item (e.g., 'address', 'security_rule')
+            
+        Returns:
+            ConfigItem subclass or None if not found
+        """
+        return cls._type_registry.get(item_type)
     
     @classmethod
     def create_from_dict(cls, item_type: str, raw_config: Dict[str, Any]) -> ConfigItem:

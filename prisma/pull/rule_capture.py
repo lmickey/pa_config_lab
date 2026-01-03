@@ -80,16 +80,16 @@ class RuleCapture:
             error_str = str(e).lower()
             if "doesn't exist" in error_str or "folder" in error_str and ("400" in error_str or "not exist" in error_str or "invalid" in error_str):
                 if not self.suppress_output:
-                    print(f"⚠ Folder '{folder_name}' does not exist or is invalid - skipping")
+                    logger.warning(f"⚠ Folder '{folder_name}' does not exist or is invalid - skipping")
                 return []
             elif "500" in error_str or "503" in error_str or "502" in error_str:
                 # Server errors - API is having issues, skip gracefully
                 if not self.suppress_output:
-                    print(f"⚠ API server error for rules in folder '{folder_name}' - skipping")
+                    logger.warning(f"⚠ API server error for rules in folder '{folder_name}' - skipping")
                 return []
             
             if not self.suppress_output:
-                print(f"Error capturing rules from folder {folder_name}: {e}")
+                logger.error(f"Error capturing rules from folder {folder_name}: {e}")
             return []
 
     def capture_parent_level_rules(self, folder_name: str) -> List[Dict[str, Any]]:
@@ -146,7 +146,7 @@ class RuleCapture:
 
         except Exception as e:
             if not self.suppress_output:
-                print(f"Error capturing parent-level rules from folder {folder_name}: {e}")
+                logger.error(f"Error capturing parent-level rules from folder {folder_name}: {e}")
             return []
 
     def capture_rules_from_snippet(self, snippet_name: str) -> List[Dict[str, Any]]:
@@ -199,7 +199,7 @@ class RuleCapture:
 
         except Exception as e:
             if not self.suppress_output:
-                print(f"Error capturing rules from snippet {snippet_name}: {e}")
+                logger.error(f"Error capturing rules from snippet {snippet_name}: {e}")
             return []
 
     def capture_all_rules(
@@ -233,7 +233,7 @@ class RuleCapture:
         # Print brief summary only
         total_rules = sum(len(rules) for rules in all_rules.values())
         if total_rules > 0 and not self.suppress_output:
-            print(f"  ✓ Captured {total_rules} rules")
+            logger.info(f"  ✓ Captured {total_rules} rules")
 
         return all_rules
 

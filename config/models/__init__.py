@@ -28,8 +28,6 @@ from .objects import (
 from .profiles import (
     AuthenticationProfile,
     DecryptionProfile,
-    URLFilteringProfile,
-    AntivirusProfile,
     AntiSpywareProfile,
     VulnerabilityProfile,
     FileBlockingProfile,
@@ -91,8 +89,6 @@ __all__ = [
     # Profile models
     'AuthenticationProfile',
     'DecryptionProfile',
-    'URLFilteringProfile',
-    'AntivirusProfile',
     'AntiSpywareProfile',
     'VulnerabilityProfile',
     'FileBlockingProfile',

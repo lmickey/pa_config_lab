@@ -1,0 +1,15 @@
+{
+  "id": "d5fd2a4f-f216-438b-8d3d-0a38e67a0ee5",
+  "name": "test_tunnel",
+  "folder": "Remote Networks",
+  "tunnel_interface": "tunnel",
+  "auto_key": {
+    "ike_gateway": [
+      {
+        "name": "ike_Gateway_1755793091156"
+      }
+    ],
+    "ipsec_crypto_profile": "CloudGenix-IPSec-Crypto-Default"
+  },
+  "anti_replay": true
+}

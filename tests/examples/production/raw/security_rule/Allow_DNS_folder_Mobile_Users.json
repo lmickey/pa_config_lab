@@ -1,0 +1,50 @@
+{
+  "id": "bd31f511-2354-4ae5-bccf-ac199d1342c4",
+  "name": "Allow DNS",
+  "folder": "Shared",
+  "policy_type": "Security",
+  "position": "pre",
+  "description": "Allow DNS to Prisma Access Infrastructure",
+  "from": [
+    "trust"
+  ],
+  "source": [
+    "VPN-Users"
+  ],
+  "source_user": [
+    "any"
+  ],
+  "source_hip": [
+    "any"
+  ],
+  "to": [
+    "untrust"
+  ],
+  "destination": [
+    "169.254.169.254"
+  ],
+  "destination_hip": [
+    "any"
+  ],
+  "application": [
+    "dns-base"
+  ],
+  "service": [
+    "application-default"
+  ],
+  "category": [
+    "any"
+  ],
+  "action": "allow",
+  "profile_setting": {
+    "group": [
+      "Best Practice - Block Post"
+    ]
+  },
+  "log_setting": "Cortex Data Lake",
+  "log_end": true,
+  "log_start": false,
+  "disabled": false,
+  "negate_source": false,
+  "negate_destination": false
+}

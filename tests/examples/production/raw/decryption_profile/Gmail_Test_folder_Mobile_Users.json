@@ -1,0 +1,31 @@
+{
+  "id": "4c4f8b63-4c2e-493b-9402-9f98be7154b3",
+  "name": "Gmail Test",
+  "folder": "Shared",
+  "ssl_no_proxy": {
+    "block_expired_certificate": true,
+    "block_untrusted_issuer": true
+  },
+  "ssl_forward_proxy": {
+    "block_expired_certificate": true,
+    "block_untrusted_issuer": true,
+    "block_unknown_cert": true,
+    "restrict_cert_exts": true,
+    "auto_include_altname": true,
+    "block_unsupported_version": true,
+    "block_unsupported_cipher": true,
+    "block_client_cert": true,
+    "strip_alpn": true
+  },
+  "ssl_inbound_proxy": {
+    "block_unsupported_version": true,
+    "block_unsupported_cipher": true
+  },
+  "ssl_protocol_settings": {
+    "min_version": "tls1-2",
+    "enc_algo_3des": false,
+    "enc_algo_rc4": false,
+    "auth_algo_sha1": false,
+    "max_version": "max"
+  }
+}

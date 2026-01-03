@@ -1,0 +1,10 @@
+{
+  "id": "c5f3d0a6-fdf9-4b49-b487-936c2ac015b6",
+  "name": "Contractor Term",
+  "folder": "Shared",
+  "schedule_type": {
+    "non_recurring": [
+      "2026/01/02@18:15-2026/06/11@19:15"
+    ]
+  }
+}

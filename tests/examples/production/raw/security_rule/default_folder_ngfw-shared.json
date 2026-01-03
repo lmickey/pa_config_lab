@@ -1,0 +1,8 @@
+{
+  "id": "7f31ba8c-ec33-4a2f-9921-e23196b04b9d",
+  "name": "default",
+  "folder": "All",
+  "policy_type": "Security",
+  "log_setting": "Cortex Data Lake",
+  "log_end": true
+}

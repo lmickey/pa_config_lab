@@ -139,59 +139,8 @@ class DecryptionProfile(ProfileItem):
         return errors
 
 
-class URLFilteringProfile(ProfileItem):
-    """
-    Represents a URL filtering profile.
-    
-    API Endpoint: /sse/config/v1/url-filtering-profiles
-    
-    Defines URL category actions (block, alert, allow, continue).
-    """
-    
-    api_endpoint = "https://api.sase.paloaltonetworks.com/sse/config/v1/url-filtering-profiles"
-    item_type = "url_filtering_profile"
-    
-    @property
-    def action(self) -> Optional[Dict[str, List[str]]]:
-        """Get action configuration (block, alert, allow, continue)"""
-        return self.raw_config.get('action')
-    
-    @property
-    def blocked_categories(self) -> List[str]:
-        """Get list of blocked URL categories"""
-        action = self.action
-        if action and isinstance(action, dict):
-            return action.get('block', [])
-        return []
-    
-    @property
-    def alerted_categories(self) -> List[str]:
-        """Get list of alerted URL categories"""
-        action = self.action
-        if action and isinstance(action, dict):
-            return action.get('alert', [])
-        return []
-    
-    def _validate_specific(self) -> List[str]:
-        """Validate URL filtering profile"""
-        errors = []
-        
-        # Should have action configuration
-        if not self.action:
-            errors.append("URL filtering profile should have action configuration")
-        
-        return errors
-
-
-class AntivirusProfile(ProfileItem):
-    """
-    Represents an antivirus profile.
-    
-    API Endpoint: /sse/config/v1/antivirus-profiles
-    """
-    
-    api_endpoint = "https://api.sase.paloaltonetworks.com/sse/config/v1/antivirus-profiles"
-    item_type = "antivirus_profile"
+# URLFilteringProfile removed - deprecated/non-functional endpoint
+# AntivirusProfile removed - endpoint doesn't exist (use AntiSpywareProfile instead)
 
 
 class AntiSpywareProfile(ProfileItem):
@@ -229,12 +178,12 @@ class FileBlockingProfile(ProfileItem):
 
 class WildfireProfile(ProfileItem):
     """
-    Represents a Wildfire analysis profile.
+    Represents a Wildfire anti-virus profile.
     
-    API Endpoint: /sse/config/v1/wildfire-antivirus-profiles
+    API Endpoint: /config/security/v1/wildfire-anti-virus-profiles
     """
     
-    api_endpoint = "https://api.sase.paloaltonetworks.com/sse/config/v1/wildfire-antivirus-profiles"
+    api_endpoint = "https://api.sase.paloaltonetworks.com/config/security/v1/wildfire-anti-virus-profiles"
     item_type = "wildfire_profile"
 
 
@@ -297,8 +246,10 @@ class ProfileGroup(ProfileItem):
         """Profile groups depend on their member profiles"""
         deps = []
         
+        # Note: virus_profiles field exists in API but we don't have a model class
+        # (antivirus endpoint doesn't exist - these are likely WildFire AV profiles)
         for profile in self.virus_profiles:
-            deps.append(('antivirus_profile', profile))
+            deps.append(('wildfire_profile', profile))
         
         for profile in self.spyware_profiles:
             deps.append(('anti_spyware_profile', profile))
@@ -306,8 +257,10 @@ class ProfileGroup(ProfileItem):
         for profile in self.vulnerability_profiles:
             deps.append(('vulnerability_profile', profile))
         
-        for profile in self.url_filtering_profiles:
-            deps.append(('url_filtering_profile', profile))
+        # Note: url_filtering_profiles field exists in API but endpoint is deprecated
+        # Keeping reference for data integrity but won't create dependency
+        # for profile in self.url_filtering_profiles:
+        #     deps.append(('url_filtering_profile', profile))
         
         for profile in self.file_blocking_profiles:
             deps.append(('file_blocking_profile', profile))

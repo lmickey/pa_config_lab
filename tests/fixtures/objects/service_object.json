@@ -1,0 +1,112 @@
+[
+  {
+    "id": "86f44faf-771f-4dc6-a58b-1aea6f09dc5d",
+    "name": "Quic-HTTPS",
+    "folder": "Shared",
+    "protocol": {
+      "udp": {
+        "port": "443"
+      }
+    }
+  },
+  {
+    "id": "86f44faf-771f-4dc6-a58b-1aea6f09dc5d",
+    "name": "Quic-HTTPS",
+    "folder": "Shared",
+    "protocol": {
+      "udp": {
+        "port": "443"
+      }
+    }
+  },
+  {
+    "id": "86f44faf-771f-4dc6-a58b-1aea6f09dc5d",
+    "name": "Quic-HTTPS",
+    "folder": "Shared",
+    "protocol": {
+      "udp": {
+        "port": "443"
+      }
+    }
+  },
+  {
+    "id": "86f44faf-771f-4dc6-a58b-1aea6f09dc5d",
+    "name": "Quic-HTTPS",
+    "folder": "Shared",
+    "protocol": {
+      "udp": {
+        "port": "443"
+      }
+    }
+  },
+  {
+    "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+    "name": "Quic-HTTP",
+    "folder": "Shared",
+    "protocol": {
+      "udp": {
+        "port": "80"
+      }
+    }
+  },
+  {
+    "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+    "name": "Quic-HTTP",
+    "folder": "Shared",
+    "protocol": {
+      "udp": {
+        "port": "80"
+      }
+    }
+  },
+  {
+    "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+    "name": "Quic-HTTP",
+    "folder": "Shared",
+    "protocol": {
+      "udp": {
+        "port": "80"
+      }
+    }
+  },
+  {
+    "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+    "name": "Quic-HTTP",
+    "folder": "Shared",
+    "protocol": {
+      "udp": {
+        "port": "80"
+      }
+    }
+  },
+  {
+    "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+    "name": "Quic-HTTP",
+    "folder": "Shared",
+    "protocol": {
+      "udp": {
+        "port": "80"
+      }
+    }
+  },
+  {
+    "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+    "name": "Quic-HTTP",
+    "folder": "Shared",
+    "protocol": {
+      "udp": {
+        "port": "80"
+      }
+    }
+  },
+  {
+    "id": "0619326e-4d01-41da-8f89-520ee5922fa3",
+    "name": "service-SSH",
+    "folder": "Mobile Users",
+    "protocol": {
+      "tcp": {
+        "port": "22"
+      }
+    }
+  }
+]

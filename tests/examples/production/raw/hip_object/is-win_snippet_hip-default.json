@@ -1,0 +1,15 @@
+{
+  "id": "4aa88d8a-1b13-45be-b2e9-f3736efff7f1",
+  "name": "is-win",
+  "snippet": "hip-default",
+  "host_info": {
+    "criteria": {
+      "os": {
+        "contains": {
+          "Microsoft": "All"
+        }
+      }
+    }
+  },
+  "description": "Matches all Windows endpoints"
+}

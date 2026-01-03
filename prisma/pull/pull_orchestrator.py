@@ -1,880 +1,1269 @@
 """
 Pull orchestration for Prisma Access configuration capture.
 
-This module orchestrates the complete pull process, coordinating all
-capture modules and providing progress tracking and error handling.
+This module orchestrates the complete pull process using:
+- Smart folder selection (bottom-level folders capture inherited configs)
+- Bulk queries per folder (3 folders instead of looping through all)
+- ConfigItem objects
+- Workflow infrastructure
+- Efficient distribution to folders/snippets
+
+For Prisma Access, querying bottom-level folders (Mobile Users, Remote Networks, 
+Explicit Proxy) automatically includes inherited configs from parent folders.
 """
 
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List, Optional, Set
 from datetime import datetime
-import time
 import logging
 
 from ..api_client import PrismaAccessAPIClient
-from .folder_capture import FolderCapture
-from .rule_capture import RuleCapture
-from .object_capture import ObjectCapture
-from .profile_capture import ProfileCapture
-from .snippet_capture import SnippetCapture
-from .infrastructure_capture import InfrastructureCapture
-from config.defaults.default_detector import DefaultDetector
-from ..dependencies.dependency_resolver import DependencyResolver
+from config.workflows import WorkflowConfig, WorkflowResult, WorkflowState, DefaultManager
+from config.workflows.workflow_utils import (
+    validate_configuration,
+    filter_by_location,
+    group_by_location,
+    handle_workflow_error,
+)
+from config.models.factory import ConfigItemFactory
+from config.models.base import ConfigItem
+
+logger = logging.getLogger(__name__)
 
 
 class PullOrchestrator:
-    """Orchestrate the complete configuration pull process."""
-
-    def __init__(self, api_client: PrismaAccessAPIClient, detect_defaults: bool = True, suppress_output: bool = False):
+    """
+    Orchestrate the complete configuration pull process.
+    
+    For Prisma Access, this uses an optimized approach:
+    - Query 3 bottom-level folders (Mobile Users, Remote Networks, Explicit Proxy)
+    - These folders inherit configs from parent folders
+    - Loop through all snippets (can't be bulk queried)
+    - Bulk fetch infrastructure items (no folder parameter needed)
+    """
+    
+    # Bottom-level folders for Prisma Access (no children)
+    # Querying these captures inherited configs from parents
+    PRISMA_ACCESS_BOTTOM_FOLDERS = [
+        'Mobile Users',
+        'Remote Networks',
+        'Mobile Users Explicit Proxy',
+    ]
+    
+    # Configuration item types to capture (folder-based)
+    FOLDER_TYPES = [
+        'address_object',
+        'address_group',
+        'service_object',
+        'service_group',
+        'tag',
+        # 'application_object',  # Excluded: 7000+ predefined apps, only pull if specifically requested
+        'application_group',
+        'application_filter',
+        'schedule',
+        'hip_object',
+        'hip_profile',
+        'external_dynamic_list',
+        'custom_url_category',
+        'anti_spyware_profile',
+        'vulnerability_profile',
+        'file_blocking_profile',
+        'wildfire_profile',
+        'dns_security_profile',
+        'decryption_profile',
+        'http_header_profile',
+        'certificate_profile',
+        # Note: qos_profile has folder restrictions - handled separately
+        'security_rule',
+        'decryption_rule',
+        'authentication_rule',
+        'qos_policy_rule',
+    ]
+    
+    # Types that only work in specific folders
+    FOLDER_RESTRICTED_TYPES = {
+        'qos_profile': ['Remote Networks', 'Service Connections'],
+    }
+    
+    # Snippet-based types (must loop through all snippets)
+    SNIPPET_TYPES = [
+        'address_object',
+        'address_group',
+        'service_object',
+        'service_group',
+        'tag',
+        # 'application_object',  # Excluded: 7000+ predefined apps, only pull if specifically requested
+        'application_group',
+        'application_filter',
+        'schedule',
+        'http_header_profile',
+    ]
+    
+    # Infrastructure types (no folder parameter needed)
+    # Note: Some types may fail if no infrastructure is configured
+    # The pull will continue even if individual types fail
+    # 
+    # Note: IKE/IPsec items exist in BOTH Remote Networks and Service Connections
+    # We need to pull them from both folders
+    #
+    # Note: 'portal' and 'gateway' (GlobalProtect) are NOT supported via SCM API
+    # They return 404 errors - these are managed differently in Prisma Access
+    INFRASTRUCTURE_TYPES = [
+        'remote_network',
+        'ike_gateway',
+        'ipsec_tunnel',
+        'ike_crypto_profile',
+        'ipsec_crypto_profile',
+        'service_connection',
+        'agent_profile',
+        # 'portal',   # Not available via SCM API (404)
+        # 'gateway',  # Not available via SCM API (404)
+    ]
+    
+    # Infrastructure items that exist in multiple folders
+    # These need to be pulled separately for each folder
+    MULTI_FOLDER_INFRA_TYPES = {
+        'ike_gateway': ['Remote Networks', 'Service Connections'],
+        'ipsec_tunnel': ['Remote Networks', 'Service Connections'],
+        'ike_crypto_profile': ['Remote Networks', 'Service Connections'],
+        'ipsec_crypto_profile': ['Remote Networks', 'Service Connections'],
+        'agent_profile': ['Mobile Users'],  # Mobile agent items need folder parameter
+        # 'portal' and 'gateway' removed - not available via SCM API
+    }
+    
+    # Infrastructure type to folder mapping (for single-folder types)
+    # Multi-folder types are handled separately
+    INFRASTRUCTURE_FOLDER_MAP = {
+        'remote_network': 'Remote Networks',
+        'service_connection': 'Service Connections',
+    }
+    
+    # Default snippet values that indicate system/predefined items
+    # These should be filtered when include_defaults=False
+    DEFAULT_SNIPPETS = {
+        'default',           # General system defaults (crypto profiles, tags, addresses)
+        'hip-default',       # HIP-specific defaults (HIP objects and profiles)
+        'optional-default',  # Optional pre-built defaults
+    }
+    
+    def __init__(
+        self,
+        api_client: PrismaAccessAPIClient,
+        config: Optional[WorkflowConfig] = None
+    ):
         """
         Initialize pull orchestrator.
-
+        
         Args:
             api_client: PrismaAccessAPIClient instance
-            detect_defaults: Whether to detect defaults during capture (default: True)
-            suppress_output: Suppress print statements (for GUI usage)
+            config: WorkflowConfig (uses defaults if not provided)
         """
-        self.logger = logging.getLogger(__name__)
+        logger.info("Initializing Pull Orchestrator")
+        logger.debug(f"API Client: {type(api_client).__name__}")
+        
         self.api_client = api_client
-        self.suppress_output = suppress_output
-        self.folder_capture = FolderCapture(api_client, suppress_output=suppress_output)
-        self.rule_capture = RuleCapture(api_client, suppress_output=suppress_output)
-        self.object_capture = ObjectCapture(api_client, suppress_output=suppress_output)
-        self.profile_capture = ProfileCapture(api_client, suppress_output=suppress_output)
-        self.snippet_capture = SnippetCapture(api_client, suppress_output=suppress_output)
-        self.infrastructure_capture = InfrastructureCapture(api_client, suppress_output=suppress_output)
-
-        # Initialize default detector
-        self.default_detector = DefaultDetector() if detect_defaults else None
-
-        # Initialize dependency resolver
-        self.dependency_resolver = DependencyResolver()
-
-        self.progress_callback: Optional[Callable[[str, int, int], None]] = None
-        self.error_handler: Optional[Callable[[str, Exception], None]] = None
-
-        self.stats = {
-            "folders_captured": 0,
-            "rules_captured": 0,
-            "objects_captured": 0,
-            "profiles_captured": 0,
-            "snippets_captured": 0,
-            "infrastructure_captured": 0,
-            "defaults_detected": 0,
-            "errors": [],
-        }
-
-    def set_progress_callback(self, callback: Callable[[str, int, int], None]):
+        self.config = config or WorkflowConfig()
+        self.default_manager = DefaultManager()
+        self.progress_callback = None  # For GUI progress updates
+        
+        logger.debug(f"Workflow config: include_defaults={self.config.include_defaults}, "
+                     f"validate_items={self.config.validate_before_pull}")
+        
+        # Initialize folder filter (set in pull_all for each pull)
+        # Only folders use filtering - snippets/infrastructure query all items
+        self._folder_filter: Optional[Dict[str, List[str]]] = None
+        
+        # Validate configuration
+        is_valid, errors = validate_configuration(self.config)
+        if not is_valid:
+            logger.warning(f"Configuration validation errors: {errors}")
+        else:
+            logger.debug("Configuration validation passed")
+    
+    def set_progress_callback(self, callback):
         """
-        Set progress callback function.
-
+        Set callback for progress updates.
+        
         Args:
-            callback: Function(message, current, total)
+            callback: Function(message: str, percentage: int)
         """
         self.progress_callback = callback
-
-    def set_error_handler(self, handler: Callable[[str, Exception], None]):
-        """
-        Set error handler function.
-
-        Args:
-            handler: Function(message, exception)
-        """
-        self.error_handler = handler
-
-    def _report_progress(self, message: str, current: int = 0, total: int = 0):
-        """Report progress if callback is set."""
-        if self.progress_callback:
-            self.progress_callback(message, current, total)
-        else:
-            if not self.suppress_output:
-                self.logger.info(f"[{current}/{total}] {message}")
-
-    def _handle_error(self, message: str, error: Exception):
-        """Handle error if handler is set."""
-        self.stats["errors"].append({"message": message, "error": str(error)})
-
-        if self.error_handler:
-            self.error_handler(message, error)
-        else:
-            if not self.suppress_output:
-                self.logger.error(f"Error: {message} - {error}")
-
-    def pull_folder_configuration(
-        self,
-        folder_name: str,
-        include_objects: bool = True,
-        include_profiles: bool = True,
-        include_rules: bool = True,
-        application_names: Optional[List[str]] = None,
-        folder_index: int = 0,
-        total_folders: int = 0,
-    ) -> Dict[str, Any]:
-        """
-        Pull complete configuration for a single folder.
-
-        Args:
-            folder_name: Name of the folder
-            include_objects: Whether to capture objects
-            include_profiles: Whether to capture profiles
-            include_rules: Whether to capture security rules
-            application_names: Optional list of custom application names to capture
-            folder_index: Current folder index (for progress reporting)
-            total_folders: Total number of folders (for progress reporting)
-
-        Returns:
-            Complete folder configuration dictionary
-        """
-        # Get parent folder info if available
-        # Try to get from folder list to check parent
-        parent_folder = None
-        try:
-            folders = self.folder_capture.list_folders_for_capture(
-                include_defaults=True
-            )
-            # Try to find this folder in the list to get parent info
-            for folder_info in folders:
-                if (
-                    isinstance(folder_info, dict)
-                    and folder_info.get("name") == folder_name
-                ):
-                    parent_folder = folder_info.get("parent")
-                    break
-        except Exception:
-            pass
-
-        folder_config = {
-            "name": folder_name,
-            "path": f"/config/security-policy/folders/{folder_name}",
-            "is_default": self.folder_capture._is_default_folder(
-                folder_name, parent_folder=parent_folder
-            ),
-            "parent": parent_folder,
-            "security_rules": [],
-            "objects": {},
-            "profiles": {},
-            "hip": {},  # HIP objects and profiles (folder-level)
-        }
-
-        try:
-            # Calculate sub-tasks for this folder
-            total_tasks = 0
-            if include_rules:
-                total_tasks += 1
-            if include_objects:
-                total_tasks += 1
-            if include_profiles:
-                total_tasks += 1
-            
-            current_task = 0
-            
-            # Capture security rules (reduced verbosity - progress callback handles output)
-            if include_rules:
-                current_task += 1
-                if total_folders > 0:
-                    self._report_progress(
-                        f"Folder {folder_index}/{total_folders}: {folder_name} - Capturing rules ({current_task}/{total_tasks})",
-                        folder_index - 1 + (current_task / total_tasks),
-                        total_folders
-                    )
-                else:
-                    self._report_progress(f"Capturing rules from {folder_name}", current_task, total_tasks)
-                
-                # Capture rules created in this folder (filtered by folder property)
-                rules = self.rule_capture.capture_rules_from_folder(folder_name)
-
-                # Capture parent-level rules that are visible but not created in this folder
-                # These are dependencies that need to exist in parent folders
-                parent_level_rules = self.rule_capture.capture_parent_level_rules(
-                    folder_name=folder_name
-                )
-
-                # Detect defaults in rules
-                if self.default_detector:
-                    rules = self.default_detector.detect_defaults_in_rules(rules)
-
-                folder_config["security_rules"] = rules
-                self.stats["rules_captured"] += len(rules)
-
-                # Track parent-level dependencies
-                # Initialize parent_dependencies if not already initialized
-                if "parent_dependencies" not in folder_config:
-                    folder_config["parent_dependencies"] = {}
-
-                # Track parent-level rules as dependencies
-                if parent_level_rules:
-                    folder_config["parent_dependencies"]["security_rules"] = [
-                        {
-                            "name": rule.get("name", ""),
-                            "folder": rule.get("folder", ""),
-                            "type": "security_rule",
-                        }
-                        for rule in parent_level_rules
-                    ]
-
-            # Capture objects (reduced verbosity)
-            if include_objects:
-                current_task += 1
-                if total_folders > 0:
-                    self._report_progress(
-                        f"Folder {folder_index}/{total_folders}: {folder_name} - Capturing objects ({current_task}/{total_tasks})",
-                        folder_index - 1 + (current_task / total_tasks),
-                        total_folders
-                    )
-                else:
-                    self._report_progress(f"Capturing objects from {folder_name}", current_task, total_tasks)
-                
-                # Capture objects created in this folder (filtered by folder property)
-                objects = self.object_capture.capture_all_objects(
-                    folder=folder_name, application_names=application_names
-                )
-
-                # Capture parent-level objects that are visible but not created in this folder
-                # These are dependencies that need to exist in parent folders
-                parent_level_objects = self.object_capture.capture_parent_level_objects(
-                    folder=folder_name
-                )
-
-                # Detect defaults in objects (but not applications - user specifies custom apps)
-                if self.default_detector:
-                    # Don't detect defaults in applications - user has specified custom ones
-                    # Still detect defaults in other object types
-                    objects_without_apps = {
-                        k: v for k, v in objects.items() if k != "applications"
-                    }
-                    if objects_without_apps:
-                        objects_without_apps = (
-                            self.default_detector.detect_defaults_in_objects(
-                                objects_without_apps
-                            )
-                        )
-                        # Merge back (applications are already custom)
-                        for k, v in objects_without_apps.items():
-                            objects[k] = v
-
-                folder_config["objects"] = objects
-
-                # Track parent-level dependencies
-                # Initialize parent_dependencies if not already initialized
-                if "parent_dependencies" not in folder_config:
-                    folder_config["parent_dependencies"] = {}
-
-                # These objects are referenced by this folder but created in parent folders
-                if parent_level_objects:
-                    for obj_type, obj_list in parent_level_objects.items():
-                        if obj_list:
-                            # Store a summary of parent dependencies (folder and name)
-                            folder_config["parent_dependencies"][obj_type] = [
-                                {
-                                    "name": obj.get("name", ""),
-                                    "folder": obj.get("folder", ""),
-                                    "type": obj_type,
-                                }
-                                for obj in obj_list
-                            ]
-
-                self.stats["objects_captured"] += sum(
-                    len(objs) for objs in objects.values()
-                )
-
-            # Capture profiles (reduced verbosity)
-            if include_profiles:
-                current_task += 1
-                if total_folders > 0:
-                    self._report_progress(
-                        f"Folder {folder_index}/{total_folders}: {folder_name} - Capturing profiles ({current_task}/{total_tasks})",
-                        folder_index - 1 + (current_task / total_tasks),
-                        total_folders
-                    )
-                else:
-                    self._report_progress(f"Capturing profiles from {folder_name}", current_task, total_tasks)
-                # Capture profiles created in this folder (filtered by folder property)
-                profiles = self.profile_capture.capture_all_profiles(folder=folder_name)
-
-                # Capture parent-level profiles that are visible but not created in this folder
-                # These are dependencies that need to exist in parent folders
-                parent_level_profiles = (
-                    self.profile_capture.capture_parent_level_profiles(
-                        folder=folder_name
-                    )
-                )
-
-                # Detect defaults in profiles
-                if self.default_detector:
-                    profiles = self.default_detector.detect_defaults_in_profiles(
-                        profiles
-                    )
-
-                folder_config["profiles"] = profiles
-
-                # Track parent-level dependencies
-                # Initialize parent_dependencies if not already initialized
-                if "parent_dependencies" not in folder_config:
-                    folder_config["parent_dependencies"] = {}
-
-                # Track parent-level profiles as dependencies
-                if parent_level_profiles:
-                    # Handle authentication profiles
-                    if "authentication_profiles" in parent_level_profiles:
-                        folder_config["parent_dependencies"][
-                            "authentication_profiles"
-                        ] = [
-                            {
-                                "name": prof.get("name", ""),
-                                "folder": prof.get("folder", ""),
-                                "type": "authentication_profile",
-                            }
-                            for prof in parent_level_profiles["authentication_profiles"]
-                        ]
-
-                    # Handle security profiles (nested dict)
-                    if "security_profiles" in parent_level_profiles:
-                        sec_profiles_list = []
-                        for profile_type, prof_list in parent_level_profiles[
-                            "security_profiles"
-                        ].items():
-                            for prof in prof_list:
-                                sec_profiles_list.append(
-                                    {
-                                        "name": prof.get("name", ""),
-                                        "folder": prof.get("folder", ""),
-                                        "type": f"security_profile_{profile_type}",
-                                    }
-                                )
-                        if sec_profiles_list:
-                            folder_config["parent_dependencies"][
-                                "security_profiles"
-                            ] = sec_profiles_list
-
-                    # Handle decryption profiles
-                    if "decryption_profiles" in parent_level_profiles:
-                        folder_config["parent_dependencies"]["decryption_profiles"] = [
-                            {
-                                "name": prof.get("name", ""),
-                                "folder": prof.get("folder", ""),
-                                "type": "decryption_profile",
-                            }
-                            for prof in parent_level_profiles["decryption_profiles"]
-                        ]
-
-                # Count profiles
-                auth_count = len(profiles.get("authentication_profiles", []))
-                sec_count = sum(
-                    len(profs)
-                    for profs in profiles.get("security_profiles", {}).values()
-                )
-            
-            # Capture HIP (Host Information Profile) objects and profiles
-            # Skip for "Remote Networks" folder - HIP doesn't apply there
-            if folder_name != "Remote Networks":
-                try:
-                    from .infrastructure_capture import InfrastructureCapture
-                    infra_capture = InfrastructureCapture(self.api_client, suppress_output=self.suppress_output)
-                    hip_data = infra_capture.capture_hip_objects_and_profiles(folder=folder_name)
-                    folder_config["hip"] = hip_data
-                except Exception as e:
-                    # HIP capture is optional - don't fail if it errors
-                    if not self.suppress_output:
-                        self.logger.warning(f"Could not capture HIP for folder {folder_name}: {e}")
-                    folder_config["hip"] = {"hip_objects": [], "hip_profiles": []}
-                # Decryption profiles is now a list, not a dict
-                dec_profiles = profiles.get("decryption_profiles", [])
-                dec_count = (
-                    len(dec_profiles)
-                    if isinstance(dec_profiles, list)
-                    else sum(len(profs) for profs in dec_profiles.values())
-                )
-                self.stats["profiles_captured"] += auth_count + sec_count + dec_count
-
-            # Detect defaults in folder configuration
-            if self.default_detector:
-                folder_config = self.default_detector.detect_defaults_in_folder(
-                    folder_config
-                )
-                # Count defaults detected
-                defaults_count = self._count_defaults_in_folder(folder_config)
-                self.stats["defaults_detected"] += defaults_count
-
-            self.stats["folders_captured"] += 1
-
-        except Exception as e:
-            self._handle_error(f"Error pulling folder {folder_name}", e)
-
-        return folder_config
-
-    def _count_defaults_in_folder(self, folder: Dict[str, Any]) -> int:
-        """Count defaults detected in a folder configuration."""
-        count = 0
-
-        if folder.get("is_default", False):
-            count += 1
-
-        # Count default rules
-        rules = folder.get("security_rules", [])
-        if isinstance(rules, list):
-            count += sum(1 for r in rules if r.get("is_default", False))
-
-        # Count default objects
-        objects = folder.get("objects", {})
-        if isinstance(objects, dict):
-            for obj_list in objects.values():
-                if isinstance(obj_list, list):
-                    count += sum(1 for o in obj_list if o.get("is_default", False))
-
-        # Count default profiles
-        profiles = folder.get("profiles", {})
-        if isinstance(profiles, dict):
-            # Auth profiles
-            auth_profiles = profiles.get("authentication_profiles", [])
-            if isinstance(auth_profiles, list):
-                count += sum(1 for p in auth_profiles if p.get("is_default", False))
-
-            # Security profiles
-            sec_profiles = profiles.get("security_profiles", {})
-            if isinstance(sec_profiles, dict):
-                for profile_list in sec_profiles.values():
-                    if isinstance(profile_list, list):
-                        count += sum(
-                            1 for p in profile_list if p.get("is_default", False)
-                        )
-
-            # Decryption profiles
-            dec_profiles = profiles.get("decryption_profiles", [])
-            if isinstance(dec_profiles, list):
-                count += sum(1 for p in dec_profiles if p.get("is_default", False))
-
-        return count
-
-    def pull_all_folders(
-        self,
-        folder_names: Optional[List[str]] = None,
-        selected_components: Optional[Dict[str, List[str]]] = None,
-        include_defaults: bool = False,
-        include_objects: bool = True,
-        include_profiles: bool = True,
-        application_names: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
-        """
-        Pull configuration for all folders.
-
-        Args:
-            folder_names: List of folder names (None = all folders)
-            selected_components: Dict mapping folder names to component types to pull
-                                e.g., {"Mobile Users": ["objects", "rules"]}
-                                If None, pulls all components for selected folders
-            include_defaults: Whether to include default folders
-            include_objects: Whether to capture objects
-            include_profiles: Whether to capture profiles
-            application_names: Optional list of custom application names to capture
-
-        Returns:
-            List of complete folder configurations
-        """
-        if folder_names is None:
-            folder_names = self.folder_capture.list_folders_for_capture(
-                include_defaults=include_defaults
-            )
-
-        total_folders = len(folder_names)
-        folder_configs = []
-
-        for idx, folder_name in enumerate(folder_names, 1):
-            # Determine which components to pull for this folder
-            if selected_components and folder_name in selected_components:
-                components = selected_components[folder_name]
-                include_objs = "objects" in components
-                include_profs = "profiles" in components
-                include_ruls = "rules" in components
-            else:
-                # Pull all components by default
-                include_objs = include_objects
-                include_profs = include_profiles
-                include_ruls = True  # Always pull rules unless explicitly excluded
-            
-            folder_config = self.pull_folder_configuration(
-                folder_name,
-                include_objects=include_objs,
-                include_profiles=include_profs,
-                include_rules=include_ruls,
-                application_names=application_names,
-                folder_index=idx,
-                total_folders=total_folders,
-            )
-            folder_configs.append(folder_config)
-
-        return folder_configs
-
-    def pull_snippets(
-        self,
-        snippet_names: Optional[List[str]] = None,
-        include_objects: bool = True,
-        include_profiles: bool = True,
-        include_rules: bool = True,
-        include_hip: bool = True
-    ) -> List[Dict[str, Any]]:
-        """
-        Pull snippet configurations with their complete contents.
         
-        Note: Snippets use the folder parameter in API calls - snippet names are passed
-        as folder parameters to existing API methods.
-
+    def _emit_progress(self, message: str, percentage: int):
+        """Emit progress update if callback is set."""
+        if self.progress_callback:
+            try:
+                self.progress_callback(message, percentage)
+            except Exception as e:
+                logger.debug(f"Error emitting progress: {e}")
+    
+    def _calculate_progress(self, base_pct: int, current: int, total: int, range_pct: int) -> int:
+        """
+        Calculate progress percentage within a range.
+        
         Args:
-            snippet_names: Optional list of snippet names/IDs to pull (None = all)
-                          Can be list of strings (names) or list of dicts with 'id' and 'name'
-            include_objects: Whether to capture objects
-            include_profiles: Whether to capture profiles
-            include_rules: Whether to capture security rules
-            include_hip: Whether to capture HIP objects and profiles
-
+            base_pct: Starting percentage for this phase
+            current: Current item number
+            total: Total items in this phase
+            range_pct: Percentage range for this phase
+            
         Returns:
-            List of snippet configurations with defaults detected
+            Calculated percentage
+        """
+        if total == 0:
+            return base_pct
+        return base_pct + int((current / total) * range_pct)
+    
+    def _is_default_item(self, item_data: dict) -> bool:
+        """
+        Determine if an item is a system default based on its snippet field.
+        
+        The snippet field in the API response is the authoritative source for
+        determining if an item is a system default vs user-created.
+        
+        Default snippets include:
+        - 'default': General system defaults (crypto profiles, tags, etc.)
+        - 'hip-default': HIP-specific defaults (HIP objects/profiles)
+        - 'optional-default': Optional pre-built defaults
+        - Any snippet ending in '-default'
+        
+        Args:
+            item_data: Raw item data dictionary from API response
+            
+        Returns:
+            True if item is a system default, False if custom/user-created
+        """
+        snippet = item_data.get('snippet', '')
+        
+        # No snippet means user-created item
+        if not snippet:
+            return False
+        
+        # Check known default snippet values
+        if snippet in self.DEFAULT_SNIPPETS:
+            return True
+        
+        # Check for any snippet ending in -default (catch future patterns)
+        if snippet.endswith('-default'):
+            return True
+        
+        return False
+    
+    def _calculate_progress_ranges(
+        self, 
+        include_folders: bool,
+        include_snippets: bool, 
+        include_infrastructure: bool,
+        num_folders: int,
+        num_snippets: int
+    ) -> dict:
+        """
+        Calculate dynamic progress ranges based on what's being pulled.
+        
+        This prevents progress bar from jumping when items are filtered out.
+        Progress is allocated proportionally based on estimated work.
+        
+        Args:
+            include_folders: Whether folders are included
+            include_snippets: Whether snippets are included
+            include_infrastructure: Whether infrastructure is included
+            num_folders: Number of folders to pull
+            num_snippets: Number of snippets to pull (after filtering)
+            
+        Returns:
+            Dictionary with start/end percentages for each phase
+        """
+        # Reserve 10% for initialization/finalization
+        start_pct = 10
+        end_pct = 90
+        available_range = end_pct - start_pct
+        
+        # Calculate weights based on estimated API calls
+        folder_weight = len(self.FOLDER_TYPES) * num_folders if include_folders else 0
+        snippet_weight = len(self.SNIPPET_TYPES) * num_snippets if include_snippets else 0
+        infra_weight = len(self.INFRASTRUCTURE_TYPES) if include_infrastructure else 0
+        
+        total_weight = folder_weight + snippet_weight + infra_weight
+        
+        if total_weight == 0:
+            # No work to do - just return even split
+            return {
+                'folders_start': start_pct,
+                'folders_end': start_pct,
+                'snippets_start': start_pct,
+                'snippets_end': start_pct,
+                'infrastructure_start': start_pct,
+                'infrastructure_end': end_pct,
+            }
+        
+        # Calculate proportional ranges
+        folder_range = int((folder_weight / total_weight) * available_range) if folder_weight > 0 else 0
+        snippet_range = int((snippet_weight / total_weight) * available_range) if snippet_weight > 0 else 0
+        infra_range = available_range - folder_range - snippet_range  # Remainder goes to infrastructure
+        
+        # Calculate start/end points
+        folders_start = start_pct
+        folders_end = folders_start + folder_range
+        
+        snippets_start = folders_end
+        snippets_end = snippets_start + snippet_range
+        
+        infrastructure_start = snippets_end
+        infrastructure_end = end_pct
+        
+        logger.debug(f"Progress ranges: folders={folders_start}-{folders_end}%, "
+                    f"snippets={snippets_start}-{snippets_end}%, "
+                    f"infra={infrastructure_start}-{infrastructure_end}%")
+        
+        return {
+            'folders_start': folders_start,
+            'folders_end': folders_end,
+            'folders_range': folder_range,
+            'snippets_start': snippets_start,
+            'snippets_end': snippets_end,
+            'snippets_range': snippet_range,
+            'infrastructure_start': infrastructure_start,
+            'infrastructure_end': infrastructure_end,
+            'infrastructure_range': infra_range,
+        }
+        
+        logger.info("Pull Orchestrator initialized")
+    
+    def pull_all(
+        self,
+        include_folders: bool = True,
+        include_snippets: bool = True,
+        include_infrastructure: bool = True,
+        use_bottom_folders: bool = True,
+        folder_list: Optional[List[str]] = None,
+        snippet_list: Optional[List[str]] = None,
+        folder_filter: Optional[Dict[str, List[str]]] = None,
+    ) -> WorkflowResult:
+        """
+        Pull all configurations.
+        
+        Args:
+            include_folders: Whether to pull folder-based items
+            include_snippets: Whether to pull snippet-based items
+            include_infrastructure: Whether to pull infrastructure items
+            use_bottom_folders: Use optimized bottom folder approach (Prisma Access only)
+            folder_list: Optional list of specific folder names to query (None = use bottom folders)
+            snippet_list: Optional list of specific snippet names to pull (None = all)
+            folder_filter: Optional dict of {folder_name: [component_types]} to control storage
+                          Empty list means all components. Missing folder means exclude.
+                          Only applies to folders - snippets/infrastructure query all items.
+            
+        Returns:
+            WorkflowResult with complete pull results
+        """
+        # Store folder filter for use during configuration building
+        self._folder_filter = folder_filter
+        logger.normal("=" * 80)
+        logger.normal("STARTING PULL OPERATION")
+        logger.normal("=" * 80)
+        logger.info(f"Pull config: folders={include_folders}, snippets={include_snippets}, "
+                   f"infrastructure={include_infrastructure}")
+        logger.debug(f"Use bottom folders: {use_bottom_folders}")
+        logger.debug(f"Include defaults: {self.config.include_defaults}")
+        
+        self._emit_progress("Starting pull operation...", 5)
+        
+        # Initialize result and state
+        result = WorkflowResult(operation='pull')
+        state = WorkflowState(
+            workflow_id=f'pull_{int(datetime.now().timestamp())}',
+            operation='pull'
+        )
+        state.start()
+        logger.debug(f"Workflow ID: {state.workflow_id}")
+        
+        try:
+            # Determine folders to query
+            if include_folders:
+                self._emit_progress("Identifying folders...", 10)
+                if folder_list:
+                    # Use specific folders provided by user
+                    folders = folder_list
+                    logger.info(f"Using user-selected folders: {folders}")
+                elif use_bottom_folders:
+                    # Prisma Access optimization: query bottom folders only
+                    folders = self.PRISMA_ACCESS_BOTTOM_FOLDERS
+                    logger.info(f"Using bottom-level folders (Prisma Access optimized): {folders}")
+                    logger.debug(f"Bottom folders capture inherited configs from parents")
+                else:
+                    # Get all folders from API
+                    logger.info("Fetching all folders from API...")
+                    state.start_operation('fetch_folders')
+                    folders = self._get_folders()
+                    logger.info(f"Found {len(folders)} folders")
+                    logger.debug(f"Folders: {folders}")
+                    state.complete_operation()
+                
+                state.store_result('folders', folders)
+            else:
+                logger.info("Skipping folder-based items")
+                folders = []
+            
+            # Get snippets
+            snippets = []
+            if include_snippets:
+                self._emit_progress("Fetching snippets...", 12)
+                logger.info("Fetching snippets from API...")
+                state.start_operation('fetch_snippets')
+                snippets = self._get_snippets(snippet_list)
+                logger.info(f"Found {len(snippets)} snippets")
+                logger.debug(f"Snippets: {snippets}")
+                state.store_result('snippets', snippets)
+                state.complete_operation()
+            else:
+                logger.info("Skipping snippet-based items")
+            
+            # Calculate total work for progress tracking
+            # Note: This is an estimate - actual work may be less if defaults are filtered
+            total_work = 0
+            if include_folders:
+                total_work += len(folders) * len(self.FOLDER_TYPES)
+            if include_snippets:
+                total_work += len(snippets) * len(self.SNIPPET_TYPES)
+            if include_infrastructure:
+                total_work += len(self.INFRASTRUCTURE_TYPES)
+            
+            self.total_work = total_work
+            self.completed_work = 0
+            logger.debug(f"Total API calls estimated: {total_work}")
+            
+            # Calculate dynamic progress ranges based on what's actually being pulled
+            # This prevents progress bar from jumping when snippets/folders are filtered
+            progress_ranges = self._calculate_progress_ranges(
+                include_folders, include_snippets, include_infrastructure,
+                len(folders), len(snippets)
+            )
+            
+            # Pull folder-based items
+            if include_folders and folders:
+                self._emit_progress(f"Pulling folder configs from {len(folders)} folders...", progress_ranges['folders_start'])
+                logger.info(f"Pulling folder-based items from {len(folders)} folders...")
+                folder_items = self._pull_folder_items(folders, state, result, progress_ranges)
+                state.store_result('folder_items', folder_items)
+                logger.info(f"Pulled {len(folder_items)} folder-based items")
+            
+            # Pull snippet-based items
+            if include_snippets and snippets:
+                self._emit_progress(f"Pulling snippet configs from {len(snippets)} snippets...", progress_ranges['snippets_start'])
+                logger.info(f"Pulling snippet-based items from {len(snippets)} snippets...")
+                snippet_items = self._pull_snippet_items(snippets, state, result, progress_ranges)
+                state.store_result('snippet_items', snippet_items)
+                logger.info(f"Pulled {len(snippet_items)} snippet-based items")
+            
+            # Pull infrastructure items
+            if include_infrastructure:
+                self._emit_progress("Pulling infrastructure configs...", progress_ranges['infrastructure_start'])
+                logger.info("Pulling infrastructure items...")
+                infra_items = self._pull_infrastructure_items(state, result, progress_ranges)
+                state.store_result('infrastructure_items', infra_items)
+                logger.info(f"Pulled {len(infra_items)} infrastructure items")
+            
+            # Build Configuration object from pulled items
+            self._emit_progress("Building configuration object...", 90)
+            logger.info("Building Configuration object...")
+            from config.models.containers import Configuration, FolderConfig, SnippetConfig, InfrastructureConfig
+            
+            configuration = Configuration(
+                source_tsg=self.api_client.tsg_id,
+                load_type='From Pull',
+                saved_credentials_ref=None  # Will be set by PullWorker with connection_name
+            )
+            # source_tenant will be set by PullWorker after pull_all returns
+            
+            # Set timestamps at pull time
+            pull_timestamp = datetime.now().isoformat()
+            configuration.created_at = pull_timestamp
+            configuration.modified_at = pull_timestamp
+            configuration.config_version = 1  # First version
+            
+            # Add folder items
+            folder_items_dict = state.get_result('folder_items') or {}
+            
+            # Initialize core folder hierarchy (even if empty)
+            core_folders = ['All', 'Shared', 'Mobile Users Container']
+            for core_folder in core_folders:
+                if core_folder not in configuration.folders:
+                    configuration.folders[core_folder] = FolderConfig(name=core_folder)
+            
+            for folder_name, item_types_dict in folder_items_dict.items():
+                for item_type, items_list in item_types_dict.items():
+                    for item in items_list:
+                        # Use the item's actual folder from the API response
+                        # Items can be in parent folders (All, Prisma Access, Mobile Users Container)
+                        # when querying child folders (Mobile Users, Remote Networks, etc.)
+                        item_folder = getattr(item, 'folder', folder_name)
+                        
+                        # Apply folder filter if provided
+                        # Filter controls which folders/components get STORED (not queried)
+                        if self._folder_filter is not None:
+                            # Check if this folder is in the filter
+                            if item_folder not in self._folder_filter:
+                                # Folder not selected - skip this item
+                                continue
+                            
+                            # Check if this component type is selected for this folder
+                            allowed_components = self._folder_filter.get(item_folder, [])
+                            if allowed_components and item_type not in allowed_components:
+                                # Component type not selected for this folder - skip
+                                continue
+                        
+                        # Create folder config if it doesn't exist
+                        if item_folder not in configuration.folders:
+                            configuration.folders[item_folder] = FolderConfig(name=item_folder)
+                        
+                        # Check if we already have this item (by id/name) to avoid duplicates
+                        existing_items = configuration.folders[item_folder].get_items_by_type(item_type)
+                        item_id = getattr(item, 'id', None) or getattr(item, 'name', None)
+                        
+                        # Skip if we already have this item
+                        if item_id and any(
+                            (getattr(existing, 'id', None) == item_id or 
+                             getattr(existing, 'name', None) == item_id)
+                            for existing in existing_items
+                        ):
+                            continue
+                        
+                        configuration.folders[item_folder].add_item(item)
+            
+            # Add snippet items
+            snippet_items_dict = state.get_result('snippet_items') or {}
+            
+            # Default/system snippet names to skip when filtering defaults
+            DEFAULT_SNIPPET_NAMES = {
+                'predefined', 'default', 'hip-default', 'optional-default',
+                'predefined-snippet', 'dlp-predefined-snippet'
+            }
+            
+            for snippet_name, item_types_dict in snippet_items_dict.items():
+                for item_type, items_list in item_types_dict.items():
+                    for item in items_list:
+                        # Use the item's actual snippet from the API response
+                        # Items can be in parent snippets when querying child snippets
+                        item_snippet = getattr(item, 'snippet', snippet_name)
+                        
+                        # Skip items from default/system snippets when filtering defaults
+                        if not self.config.include_defaults:
+                            if item_snippet in DEFAULT_SNIPPET_NAMES or item_snippet.endswith('-default'):
+                                logger.debug(f"Skipping item from default snippet: {item_snippet}")
+                                continue
+                        
+                        # Create snippet config if it doesn't exist
+                        if item_snippet not in configuration.snippets:
+                            configuration.snippets[item_snippet] = SnippetConfig(name=item_snippet)
+                        
+                        # Check if we already have this item (by id/name) to avoid duplicates
+                        existing_items = configuration.snippets[item_snippet].get_items_by_type(item_type)
+                        item_id = getattr(item, 'id', None) or getattr(item, 'name', None)
+                        
+                        # Skip if we already have this item
+                        if item_id and any(
+                            (getattr(existing, 'id', None) == item_id or 
+                             getattr(existing, 'name', None) == item_id)
+                            for existing in existing_items
+                        ):
+                            continue
+                        
+                        configuration.snippets[item_snippet].add_item(item)
+            
+            # Add infrastructure items
+            infra_items_dict = state.get_result('infrastructure_items') or {}
+            # Flatten dictionary of lists into single list
+            for item_type, items_list in infra_items_dict.items():
+                for item in items_list:
+                    configuration.infrastructure.add_item(item)
+            
+            # Attach configuration to result
+            result.configuration = configuration
+            logger.info(f"Configuration object created with {len(configuration.get_all_items())} total items")
+            
+            # Mark complete
+            state.complete()
+            result.mark_complete()
+            result.success = True
+            
+            logger.normal("=" * 80)
+            logger.normal(f"PULL COMPLETE: {result.items_processed} items processed")
+            logger.normal("=" * 80)
+            logger.info(f"Pull summary: {result.items_processed} processed, "
+                       f"{result.items_created} created, {result.items_skipped} skipped")
+            logger.debug(f"Duration: {(datetime.now() - state.start_time).total_seconds():.2f}s")
+            
+        except Exception as e:
+            state.fail(str(e))
+            result.success = False
+            logger.error(f"Pull failed: {e}", exc_info=True)
+            result.add_error(
+                item_type='workflow',
+                item_name='pull',
+                operation='pull',
+                error_type=type(e).__name__,
+                message=str(e)
+            )
+        
+        return result
+    
+    def _get_folders(self, folder_list: Optional[List[str]] = None) -> List[str]:
+        """
+        Get list of folders to process.
+        
+        Args:
+            folder_list: Optional specific folders (None = all)
+            
+        Returns:
+            List of folder names
         """
         try:
-            # Check if snippet_names contains dicts with IDs (new format)
-            if snippet_names and isinstance(snippet_names[0], dict):
-                # Pull only selected snippets by ID (efficient)
-                snippets = []
-                for snippet_info in snippet_names:
-                    snippet_id = snippet_info.get('id')
-                    snippet_name = snippet_info.get('name')
-                    if snippet_id:
-                        snippet_config = self.snippet_capture.capture_snippet_configuration(
-                            snippet_id=snippet_id,
-                            snippet_name=snippet_name,
-                            include_objects=include_objects,
-                            include_profiles=include_profiles,
-                            include_rules=include_rules,
-                            include_hip=include_hip,
-                            object_capture=self.object_capture,
-                            profile_capture=self.profile_capture,
-                            rule_capture=self.rule_capture,
-                            hip_capture=self.infrastructure_capture,
-                            default_detector=self.default_detector
-                        )
-                        if snippet_config:
-                            snippets.append(snippet_config)
+            # Get all folders from API (uses Strata API, not SASE API)
+            from ..api_endpoints import APIEndpoints
+            response = self.api_client._make_request(
+                "GET",
+                APIEndpoints.SECURITY_POLICY_FOLDERS,
+                item_type='folder'
+            )
+            
+            all_folders = []
+            if isinstance(response, dict) and 'data' in response:
+                all_folders = [f['name'] for f in response['data'] if 'name' in f]
+            
+            # Filter by provided list
+            if folder_list:
+                all_folders = [f for f in all_folders if f in folder_list]
+            
+            # Apply configuration filters
+            all_folders = self.config.get_allowed_folders(all_folders)
+            
+            return all_folders
+            
+        except Exception as e:
+            logger.error(f"Error fetching folders: {e}")
+            return []
+    
+    def _get_snippets(self, snippet_list: Optional[List[str]] = None) -> List[str]:
+        """
+        Get list of snippets to process.
+        
+        Args:
+            snippet_list: Optional specific snippets (None = all)
+            
+        Returns:
+            List of snippet names (filtered for custom snippets if include_defaults=False)
+        """
+        try:
+            # Get all snippets from API (uses Strata API, not SASE API)
+            from ..api_endpoints import APIEndpoints
+            response = self.api_client._make_request(
+                "GET",
+                APIEndpoints.SECURITY_POLICY_SNIPPETS,
+                item_type='snippet'
+            )
+            
+            # Extract snippet objects with name and type
+            all_snippet_objs = []
+            if isinstance(response, dict) and 'data' in response:
+                all_snippet_objs = response['data']
+            
+            logger.debug(f"Fetched {len(all_snippet_objs)} snippet objects from API")
+            
+            # Filter by type if include_defaults=False
+            # Snippets with type='predefined' or 'readonly' are system defaults
+            # type='custom' or unknown/missing type could be user-created
+            # Known predefined types to exclude
+            PREDEFINED_SNIPPET_TYPES = {'predefined', 'readonly'}
+            
+            if not self.config.include_defaults:
+                logger.info(f"Filtering snippets by type (include_defaults=False)")
+                logger.info(f"  Total snippets before filtering: {len(all_snippet_objs)}")
+                
+                custom_snippets = []
+                for snippet_obj in all_snippet_objs:
+                    snippet_name = snippet_obj.get('name', 'unnamed')
+                    snippet_type = snippet_obj.get('type', '')
+                    
+                    # Skip known predefined types
+                    if snippet_type in PREDEFINED_SNIPPET_TYPES:
+                        logger.info(f"  ✗ SKIPPING predefined snippet: '{snippet_name}' (type={snippet_type})")
+                        continue
+                    
+                    # Keep custom type explicitly
+                    if snippet_type == 'custom':
+                        logger.info(f"  ✓ KEEPING custom snippet: '{snippet_name}' (type={snippet_type})")
+                        custom_snippets.append(snippet_obj)
+                        continue
+                    
+                    # For unknown/missing type, check if it looks like a system snippet
+                    # System snippets often have specific naming patterns
+                    is_likely_system = any([
+                        snippet_name.startswith('predefined-'),
+                        snippet_name.endswith('-default'),
+                        snippet_name.endswith('-Default'),
+                        'Default' in snippet_name and 'Snippet' in snippet_name,
+                    ])
+                    
+                    if is_likely_system:
+                        logger.info(f"  ✗ SKIPPING likely system snippet: '{snippet_name}' (type={snippet_type or 'none'})")
+                    else:
+                        logger.info(f"  ✓ KEEPING snippet (unknown type, not system pattern): '{snippet_name}' (type={snippet_type or 'none'})")
+                        custom_snippets.append(snippet_obj)
+                
+                logger.info(f"  Total snippets after filtering: {len(custom_snippets)}")
+                logger.info(f"Filtered snippets: {len(all_snippet_objs)} → {len(custom_snippets)} "
+                           f"(removed {len(all_snippet_objs) - len(custom_snippets)} predefined)")
+                all_snippet_objs = custom_snippets
             else:
-                # Legacy: Pull all and filter by name (slow)
-                snippets = self.snippet_capture.capture_all_snippets(
-                    include_objects=include_objects,
-                    include_profiles=include_profiles,
-                    include_rules=include_rules,
-                    include_hip=include_hip,
-                    object_capture=self.object_capture,
-                    profile_capture=self.profile_capture,
-                    rule_capture=self.rule_capture,
-                    hip_capture=self.infrastructure_capture,
-                    default_detector=self.default_detector
+                logger.info(f"Including all snippets (include_defaults=True)")
+            
+            # Extract just the names
+            all_snippets = [s.get('name') for s in all_snippet_objs if 'name' in s]
+            
+            # If user explicitly selected specific snippets, use those (from the full list, not filtered)
+            # This allows user to pull system snippets if they explicitly select them
+            if snippet_list:
+                # Get all snippet names before filtering
+                all_snippet_names = [s.get('name') for s in (response.get('data', []) if isinstance(response, dict) else []) if 'name' in s]
+                # Only include snippets that exist and were requested
+                all_snippets = [s for s in snippet_list if s in all_snippet_names]
+                logger.info(f"User selected specific snippets: {all_snippets}")
+            
+            # Apply configuration filters
+            all_snippets = self.config.get_allowed_snippets(all_snippets)
+            
+            return all_snippets
+            
+        except Exception as e:
+            logger.error(f"Error fetching snippets: {e}")
+            return []
+    
+    def _pull_folder_items(
+        self,
+        folders: List[str],
+        state: WorkflowState,
+        result: WorkflowResult,
+        progress_ranges: dict
+    ) -> Dict[str, Dict[str, List[ConfigItem]]]:
+        """
+        Pull all folder-based items from specified folders.
+        
+        For Prisma Access with bottom folders, this is optimized:
+        - Only 3 folders to query (Mobile Users, Remote Networks, Explicit Proxy)
+        - Each folder query includes inherited configs from parents
+        - Result: 3 folders × M types instead of N folders × M types
+        
+        Args:
+            folders: List of folder names (bottom folders for Prisma Access)
+            state: WorkflowState for tracking
+            result: WorkflowResult for error tracking
+            progress_ranges: Dict with start/end/range percentages
+            
+        Returns:
+            Dict mapping folder -> item_type -> List[ConfigItem]
+        """
+        state.start_operation('pull_folder_items')
+        logger.info(f"Pulling folder-based items from {len(folders)} folders...")
+        logger.info(f"Folders: {folders}")
+        logger.debug(f"Item types to pull: {len(self.FOLDER_TYPES)} types")
+        
+        # Initialize structure: folder -> type -> items
+        folder_items: Dict[str, Dict[str, List[ConfigItem]]] = {
+            folder: {} for folder in folders
+        }
+        
+        total_items_fetched = 0
+        
+        # Process each folder
+        for folder_idx, folder in enumerate(folders, 1):
+            # Calculate progress for this folder using dynamic range
+            folder_progress = self._calculate_progress(
+                progress_ranges['folders_start'],
+                folder_idx - 1,
+                len(folders),
+                progress_ranges['folders_range']
+            )
+            self._emit_progress(f"[{folder_idx}/{len(folders)}] Pulling from folder: {folder}...", folder_progress)
+            
+            logger.normal(f"[{folder_idx}/{len(folders)}] Processing folder: {folder}")
+            logger.debug(f"Folder item types: {self.FOLDER_TYPES}")
+            
+            folder_item_count = 0
+            
+            # Process each item type for this folder
+            for type_idx, item_type in enumerate(self.FOLDER_TYPES, 1):
+                # Update progress for each type
+                type_progress = self._calculate_progress(
+                    folder_progress,
+                    type_idx - 1,
+                    len(self.FOLDER_TYPES),
+                    int(progress_ranges['folders_range'] / len(folders))  # Use dynamic range
+                )
+                type_display = item_type.replace('_', ' ').title()
+                self._emit_progress(
+                    f"[{folder_idx}/{len(folders)}] {folder}: {type_display} ({type_idx}/{len(self.FOLDER_TYPES)})...",
+                    type_progress
                 )
                 
-                # Filter to specific snippets if requested
-                if snippet_names:
-                    snippets = [s for s in snippets if s.get("name", "") in snippet_names]
-
-            # Detect defaults in snippets (already done in capture, but ensure it's set)
-            if self.default_detector:
-                detected_snippets = []
-                for snippet in snippets:
-                    detected_snippet = self.default_detector.detect_defaults_in_snippet(
-                        snippet
-                    )
-                    detected_snippets.append(detected_snippet)
-                snippets = detected_snippets
-
-            self.stats["snippets_captured"] = len(snippets)
-            
-            # Count snippet contents in stats
-            for snippet in snippets:
-                self.stats["rules_captured"] += len(snippet.get("security_rules", []))
-                objects = snippet.get("objects", {})
-                self.stats["objects_captured"] += sum(len(objs) for objs in objects.values())
-                profiles = snippet.get("profiles", {})
-                # Count all profile types
-                self.stats["profiles_captured"] += len(profiles.get("authentication_profiles", []))
-                self.stats["profiles_captured"] += len(profiles.get("decryption_profiles", []))
-                sec_profiles = profiles.get("security_profiles", {})
-                self.stats["profiles_captured"] += sum(len(profs) for profs in sec_profiles.values())
-            
-            return snippets
-        except Exception as e:
-            self._handle_error("Error pulling snippets", e)
-            return []
-
-    def pull_complete_configuration(
-        self,
-        folder_names: Optional[List[str]] = None,
-        snippet_names: Optional[List[str]] = None,
-        selected_components: Optional[Dict[str, List[str]]] = None,
-        include_defaults: bool = False,
-        include_snippets: bool = True,
-        include_objects: bool = True,
-        include_profiles: bool = True,
-        application_names: Optional[List[str]] = None,
-        include_remote_networks: bool = True,
-        include_service_connections: bool = True,
-        include_ipsec_tunnels: bool = True,
-        include_mobile_users: bool = True,
-        include_hip: bool = True,
-        include_regions: bool = True,
-    ) -> Dict[str, Any]:
-        """
-        Pull complete Prisma Access configuration.
-
-        Args:
-            folder_names: List of folder names (None = all folders)
-            snippet_names: Optional list of snippet names to pull (None = all)
-            selected_components: Dict mapping folder names to component types to pull
-                                e.g., {"Mobile Users": ["objects", "rules"], "Shared": ["profiles"]}
-                                If None, pulls all components for selected folders
-            include_defaults: Whether to include default folders
-            include_snippets: Whether to capture snippets
-            include_objects: Whether to capture objects
-            include_profiles: Whether to capture profiles
-            application_names: Optional list of custom application names to capture (None = no applications)
-            include_remote_networks: Whether to capture remote networks (default: True)
-            include_service_connections: Whether to capture service connections (default: True)
-            include_ipsec_tunnels: Whether to capture IPsec tunnels and crypto profiles (default: True)
-            include_mobile_users: Whether to capture mobile user infrastructure (default: True)
-            include_hip: Whether to capture HIP objects and profiles (default: True)
-            include_regions: Whether to capture regions and bandwidth allocations (default: True)
-
-        Returns:
-            Complete configuration dictionary in v2 format
-        """
-        from config.schema.config_schema_v2 import create_empty_config_v2
-
-        # Initialize configuration
-        config = create_empty_config_v2(
-            source_tenant=self.api_client.tsg_id,
-            source_type="scm",
-            description="Complete configuration pull",
-        )
-
-        # Reset stats
-        self.stats = {
-            "folders_captured": 0,
-            "rules_captured": 0,
-            "objects_captured": 0,
-            "profiles_captured": 0,
-            "snippets_captured": 0,
-            "defaults_detected": 0,
-            "errors": [],
-        }
-
-        start_time = time.time()
-
-        try:
-            # Pull folders (10-55% in worker)
-            self._report_progress("Pulling folder configurations", 10, 100)
-            folder_configs = self.pull_all_folders(
-                folder_names=folder_names,
-                selected_components=selected_components,
-                include_defaults=include_defaults,
-                include_objects=include_objects,
-                include_profiles=include_profiles,
-                application_names=application_names,
-            )
-            config["security_policies"]["folders"] = folder_configs
-
-            # Pull snippets (skip if snippet_names is explicitly empty list)
-            if include_snippets and (snippet_names is None or len(snippet_names) > 0):
-                self._report_progress("Pulling snippet configurations", 60, 100)
-                snippet_configs = self.pull_snippets(
-                    snippet_names=snippet_names,
-                    include_objects=include_objects,
-                    include_profiles=include_profiles,
-                    include_rules=True,  # Always include rules for snippets
-                    include_hip=include_hip
-                )
-                config["security_policies"]["snippets"] = snippet_configs
-
-                # Count defaults in snippets
-                if self.default_detector:
-                    defaults_in_snippets = sum(
-                        1 for s in snippet_configs if s.get("is_default", False)
-                    )
-                    self.stats["defaults_detected"] += defaults_in_snippets
-
-            # Pull shared infrastructure settings (if needed)
-            self._report_progress("Pulling shared infrastructure settings", 65, 100)
-            try:
-                infra_settings = self.api_client.get_shared_infrastructure_settings()
-                config["infrastructure"][
-                    "shared_infrastructure_settings"
-                ] = infra_settings
-            except Exception as e:
-                self._handle_error("Error pulling shared infrastructure settings", e)
-
-            # Pull infrastructure components (65-80% in worker)
-            # Check if any infrastructure components are requested
-            any_infra = (
-                include_remote_networks or
-                include_service_connections or
-                include_ipsec_tunnels or
-                include_mobile_users or
-                include_hip or
-                include_regions
-            )
-            
-            if any_infra:
-                self._report_progress("Pulling infrastructure components", 68, 100)
+                logger.debug(f"  [{type_idx}/{len(self.FOLDER_TYPES)}] Processing {item_type}")
+                
                 try:
-                    # Capture infrastructure with progress callback
-                    def infra_progress(message: str, current: int, total: int):
-                        # Map infrastructure progress to 68-78% range
-                        progress = 68 + int((current / total) * 10) if total > 0 else 68
-                        self._report_progress(message, progress, 100)
+                    # Check if this type is restricted to specific folders
+                    if item_type in self.FOLDER_RESTRICTED_TYPES:
+                        allowed_folders = self.FOLDER_RESTRICTED_TYPES[item_type]
+                        if folder not in allowed_folders:
+                            logger.debug(f"  Skipping {item_type} (restricted to: {allowed_folders})")
+                            continue
+                        logger.debug(f"  {item_type} allowed in folder '{folder}'")
                     
-                    infrastructure = self.infrastructure_capture.capture_all_infrastructure(
-                        folder=None,  # Capture from all folders
-                        include_remote_networks=include_remote_networks,
-                        include_service_connections=include_service_connections,
-                        include_ipsec_tunnels=include_ipsec_tunnels,
-                        include_mobile_users=include_mobile_users,
-                        include_hip=include_hip,
-                        include_regions=include_regions,
-                        progress_callback=infra_progress,
-                    )
+                    # Get model class for this type
+                    logger.debug(f"  Getting model class for {item_type}")
+                    model_class = ConfigItemFactory.get_model_class(item_type)
+                    if not model_class or not hasattr(model_class, 'api_endpoint'):
+                        logger.debug(f"  Skipping {item_type} (no model/endpoint)")
+                        continue
                     
-                    # Merge infrastructure into config
-                    # Remote networks and service connections go into infrastructure section
-                    if "remote_networks" in infrastructure:
-                        config["infrastructure"]["remote_networks"] = infrastructure["remote_networks"]
-                    if "service_connections" in infrastructure:
-                        config["infrastructure"]["service_connections"] = infrastructure["service_connections"]
+                    logger.debug(f"  Model class: {model_class.__name__}")
+                    logger.debug(f"  API endpoint: {model_class.api_endpoint}")
                     
-                    # IPsec components go into infrastructure section
-                    if "ipsec_tunnels" in infrastructure:
-                        config["infrastructure"]["ipsec_tunnels"] = infrastructure["ipsec_tunnels"]
-                    if "ike_gateways" in infrastructure:
-                        config["infrastructure"]["ike_gateways"] = infrastructure["ike_gateways"]
-                    if "ike_crypto_profiles" in infrastructure:
-                        config["infrastructure"]["ike_crypto_profiles"] = infrastructure["ike_crypto_profiles"]
-                    if "ipsec_crypto_profiles" in infrastructure:
-                        config["infrastructure"]["ipsec_crypto_profiles"] = infrastructure["ipsec_crypto_profiles"]
+                    # Fetch items for this type in this folder
+                    from urllib.parse import quote
+                    encoded_folder = quote(folder, safe='')
+                    url = f"{model_class.api_endpoint}?folder={encoded_folder}"
+                    logger.debug(f"  Fetching from: {url}")
                     
-                    # Mobile users go into their own top-level section
-                    if "mobile_users" in infrastructure:
-                        config["mobile_users"] = infrastructure["mobile_users"]
+                    response = self.api_client._make_request("GET", url, item_type=item_type)
                     
-                    # HIP goes into its own top-level section
-                    if "hip" in infrastructure:
-                        config["hip"] = infrastructure["hip"]
+                    # Extract items
+                    raw_items = []
+                    if isinstance(response, dict) and 'data' in response:
+                        raw_items = response['data']
+                        logger.debug(f"  Response contains 'data' with {len(raw_items)} items")
+                    elif isinstance(response, list):
+                        raw_items = response
+                        logger.debug(f"  Response is list with {len(raw_items)} items")
+                    else:
+                        logger.debug(f"  Response format unexpected: {type(response)}")
                     
-                    # Regions go into their own top-level section
-                    if "regions" in infrastructure:
-                        config["regions"] = infrastructure["regions"]
+                    if raw_items:
+                        logger.info(f"  {item_type}: {len(raw_items)} items retrieved")
+                        logger.debug(f"  First item keys: {list(raw_items[0].keys()) if raw_items else 'none'}")
                     
-                    # Count infrastructure items for stats
-                    infra_count = 0
-                    infra_count += len(infrastructure.get("remote_networks", []))
-                    infra_count += len(infrastructure.get("service_connections", []))
-                    infra_count += len(infrastructure.get("ipsec_tunnels", []))
-                    infra_count += len(infrastructure.get("ike_gateways", []))
-                    infra_count += len(infrastructure.get("ike_crypto_profiles", []))
-                    infra_count += len(infrastructure.get("ipsec_crypto_profiles", []))
+                    # Instantiate items
+                    items = []
+                    skipped_count = 0
+                    default_count = 0
                     
-                    # Count mobile users components
-                    mobile_users = infrastructure.get("mobile_users", {})
-                    infra_count += len(mobile_users.get("gp_gateways", []))
-                    infra_count += len(mobile_users.get("gp_portals", []))
+                    for item_idx, raw_item in enumerate(raw_items):
+                        item_name = raw_item.get('name', f'item_{item_idx}')
+                        logger.debug(f"    [{item_idx+1}/{len(raw_items)}] Creating {item_type} '{item_name}'")
+                        
+                        try:
+                            # Check defaults BEFORE creating ConfigItem (more efficient)
+                            # Use snippet field from raw API response
+                            if not self.config.include_defaults and self._is_default_item(raw_item):
+                                snippet_val = raw_item.get('snippet', '')
+                                logger.debug(f"    Skipping '{item_name}' (default item, snippet='{snippet_val}')")
+                                result.items_skipped += 1
+                                default_count += 1
+                                continue
+                            
+                            item = ConfigItemFactory.create_from_dict(item_type, raw_item)
+                            logger.debug(f"    Created {item_type} '{item.name}'")
+                            
+                            # Apply additional filters
+                            if not self.config.should_process_item(item):
+                                logger.debug(f"    Skipping '{item.name}' (filtered by config)")
+                                result.items_skipped += 1
+                                skipped_count += 1
+                                continue
+                            
+                            items.append(item)
+                            result.items_processed += 1
+                            logger.debug(f"    Added {item_type} '{item.name}' to results")
+                            
+                        except Exception as e:
+                            handle_workflow_error(e, None, f'parse_{item_type}', result, self.config)
                     
-                    # Count HIP components
-                    hip = infrastructure.get("hip", {})
-                    infra_count += len(hip.get("hip_objects", []))
-                    infra_count += len(hip.get("hip_profiles", []))
-                    
-                    # Count regions components
-                    regions = infrastructure.get("regions", {})
-                    infra_count += len(regions.get("bandwidth_allocations", []))
-                    
-                    self.stats["infrastructure_captured"] = infra_count
-                    
+                    # Store items for this type
+                    if items:
+                        if item_type not in folder_items[folder]:
+                            folder_items[folder][item_type] = []
+                        folder_items[folder][item_type].extend(items)
+                
                 except Exception as e:
-                    self._handle_error("Error pulling infrastructure components", e)
-
-            elapsed_time = time.time() - start_time
-
-            # Add pull metadata
-            config["metadata"]["pull_stats"] = {
-                "folders": self.stats["folders_captured"],
-                "rules": self.stats["rules_captured"],
-                "objects": self.stats["objects_captured"],
-                "profiles": self.stats["profiles_captured"],
-                "snippets": self.stats["snippets_captured"],
-                "infrastructure": self.stats["infrastructure_captured"],
-                "defaults_detected": self.stats.get("defaults_detected", 0),
-                "errors": len(self.stats["errors"]),
-                "elapsed_seconds": elapsed_time,
-            }
-
-            # Add default detection report if detector was used
-            if self.default_detector:
-                detection_report = self.default_detector.get_detection_report()
-                config["metadata"]["default_detection"] = detection_report
-
-            # Build dependency graph and add dependency report
-            dependency_report = self.dependency_resolver.get_dependency_report(config)
-            config["metadata"]["dependency_report"] = dependency_report
-
-            # Add dependency validation to stats
-            if not dependency_report["validation"]["valid"]:
-                missing_count = len(
-                    dependency_report["validation"]["missing_dependencies"]
-                )
-                if missing_count > 0:
-                    self.stats["errors"].append(
-                        {
-                            "message": f"Missing dependencies detected: {missing_count} objects have missing dependencies",
-                            "type": "dependency_validation",
-                        }
-                    )
-
-            # Don't report "Pull complete" here - worker will report final status at 80%
-
-        except Exception as e:
-            self._handle_error("Error during complete pull", e)
-
-        return config
-
-    def get_pull_report(self) -> Dict[str, Any]:
+                    handle_workflow_error(e, None, f'fetch_{item_type}_from_{folder}', result, self.config)
+        
+        state.complete_operation()
+        return folder_items
+    
+    def _pull_snippet_items(
+        self,
+        snippets: List[str],
+        state: WorkflowState,
+        result: WorkflowResult,
+        progress_ranges: dict
+    ) -> Dict[str, Dict[str, List[ConfigItem]]]:
         """
-        Get pull statistics and report.
-
+        Pull all snippet-based items by looping through each snippet.
+        
+        Note: Unlike folders, we must query each snippet individually.
+        Snippet items don't reliably show up in folder queries.
+        
+        Args:
+            snippets: List of snippet names
+            state: WorkflowState for tracking
+            result: WorkflowResult for error tracking
+            progress_ranges: Dict with start/end/range percentages
+            
         Returns:
-            Pull report dictionary
+            Dict mapping snippet -> item_type -> List[ConfigItem]
         """
-        report = {
-            "stats": self.stats.copy(),
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+        state.start_operation('pull_snippet_items')
+        logger.info(f"Pulling snippet-based items from {len(snippets)} snippets...")
+        logger.debug(f"Snippet types: {self.SNIPPET_TYPES}")
+        
+        # Initialize structure: snippet -> type -> items
+        snippet_items: Dict[str, Dict[str, List[ConfigItem]]] = {
+            snippet: {} for snippet in snippets
         }
-
-        # Add default detection report if detector was used
-        if self.default_detector:
-            detection_report = self.default_detector.get_detection_report()
-            report["default_detection"] = detection_report
-
-        return report
-
-    def validate_dependencies(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        
+        total_items_fetched = 0
+        
+        # Process each snippet
+        for snippet_idx, snippet in enumerate(snippets, 1):
+            # Calculate progress using dynamic range
+            snippet_progress = self._calculate_progress(
+                progress_ranges['snippets_start'],
+                snippet_idx - 1,
+                len(snippets),
+                progress_ranges['snippets_range']
+            )
+            self._emit_progress(f"[{snippet_idx}/{len(snippets)}] Pulling from snippet: {snippet}...", snippet_progress)
+            
+            logger.normal(f"[{snippet_idx}/{len(snippets)}] Processing snippet: {snippet}")
+            snippet_item_count = 0
+            
+            # Process each item type for this snippet
+            for type_idx, item_type in enumerate(self.SNIPPET_TYPES, 1):
+                # Update progress for each type within snippet
+                type_progress = self._calculate_progress(
+                    snippet_progress,
+                    type_idx - 1,
+                    len(self.SNIPPET_TYPES),
+                    int(progress_ranges['snippets_range'] / len(snippets)) if len(snippets) > 0 else 0
+                )
+                type_display = item_type.replace('_', ' ').title()
+                self._emit_progress(
+                    f"[{snippet_idx}/{len(snippets)}] {snippet}: {type_display} ({type_idx}/{len(self.SNIPPET_TYPES)})...",
+                    type_progress
+                )
+                
+                logger.debug(f"  Processing {item_type} for snippet '{snippet}'")
+                try:
+                    # Get model class for this type
+                    model_class = ConfigItemFactory.get_model_class(item_type)
+                    if not model_class or not hasattr(model_class, 'api_endpoint'):
+                        logger.debug(f"  Skipping {item_type} (no model/endpoint)")
+                        continue
+                    
+                    # Fetch items for this type in this snippet
+                    from urllib.parse import quote
+                    encoded_snippet = quote(snippet, safe='')
+                    url = f"{model_class.api_endpoint}?snippet={encoded_snippet}"
+                    response = self.api_client._make_request("GET", url, item_type=item_type)
+                    
+                    # Extract items
+                    raw_items = []
+                    if isinstance(response, dict) and 'data' in response:
+                        raw_items = response['data']
+                    elif isinstance(response, list):
+                        raw_items = response
+                    
+                    if raw_items:
+                        logger.info(f"  {item_type}: {len(raw_items)} items")
+                    
+                    # Instantiate items
+                    items = []
+                    default_count = 0
+                    for raw_item in raw_items:
+                        item_name = raw_item.get('name', 'unknown')
+                        try:
+                            # Check defaults BEFORE creating ConfigItem (more efficient)
+                            # Use snippet field from raw API response
+                            if not self.config.include_defaults and self._is_default_item(raw_item):
+                                snippet_val = raw_item.get('snippet', '')
+                                logger.debug(f"    Skipping '{item_name}' (default item, snippet='{snippet_val}')")
+                                result.items_skipped += 1
+                                default_count += 1
+                                continue
+                            
+                            item = ConfigItemFactory.create_from_dict(item_type, raw_item)
+                            
+                            # Apply additional filters
+                            if not self.config.should_process_item(item):
+                                result.items_skipped += 1
+                                continue
+                            
+                            items.append(item)
+                            result.items_processed += 1
+                            
+                        except Exception as e:
+                            handle_workflow_error(e, None, f'parse_{item_type}', result, self.config)
+                    
+                    if default_count > 0:
+                        logger.debug(f"  Filtered {default_count} default {item_type} items from snippet '{snippet}'")
+                    
+                    # Store items for this type
+                    if items:
+                        if item_type not in snippet_items[snippet]:
+                            snippet_items[snippet][item_type] = []
+                        snippet_items[snippet][item_type].extend(items)
+                
+                except Exception as e:
+                    handle_workflow_error(e, None, f'fetch_{item_type}_from_{snippet}', result, self.config)
+        
+        state.complete_operation()
+        return snippet_items
+    
+    def _pull_infrastructure_items(
+        self,
+        state: WorkflowState,
+        result: WorkflowResult,
+        progress_ranges: dict
+    ) -> Dict[str, List[ConfigItem]]:
         """
-        Validate dependencies in configuration.
-
+        Pull infrastructure items (no location, already optimized).
+        
+        Note: Some infrastructure types (IKE/IPsec) exist in multiple folders
+        and need to be pulled from each folder separately.
+        
         Args:
-            config: Configuration dictionary
-
+            state: WorkflowState for tracking
+            result: WorkflowResult for error tracking
+            progress_ranges: Dict with start/end/range percentages
+            
         Returns:
-            Validation results dictionary
+            Dict mapping item_type -> List[ConfigItem]
         """
-        return self.dependency_resolver.validate_dependencies(config)
-
-    def get_dependency_report(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        state.start_operation('pull_infrastructure_items')
+        logger.info("Pulling infrastructure items...")
+        
+        infra_items: Dict[str, List[ConfigItem]] = {}
+        
+        # Process each infrastructure type
+        for type_idx, item_type in enumerate(self.INFRASTRUCTURE_TYPES, 1):
+            try:
+                # Calculate progress for this infrastructure type
+                type_progress = self._calculate_progress(
+                    progress_ranges['infrastructure_start'],
+                    type_idx - 1,
+                    len(self.INFRASTRUCTURE_TYPES),
+                    progress_ranges['infrastructure_range']
+                )
+                
+                # Check if this type exists in multiple folders
+                if item_type in self.MULTI_FOLDER_INFRA_TYPES:
+                    # Pull from each folder
+                    folders = self.MULTI_FOLDER_INFRA_TYPES[item_type]
+                    
+                    type_display = item_type.replace('_', ' ').title()
+                    self._emit_progress(
+                        f"[{type_idx}/{len(self.INFRASTRUCTURE_TYPES)}] Infrastructure: {type_display} ({len(folders)} folders)...",
+                        type_progress
+                    )
+                    
+                    logger.info(f"Fetching {item_type} items from {len(folders)} folders...")
+                    
+                    all_items_for_type = []
+                    for folder in folders:
+                        folder_items = self._pull_infra_from_folder(item_type, folder, result)
+                        all_items_for_type.extend(folder_items)
+                        logger.info(f"  Fetched {len(folder_items)} {item_type} items from '{folder}'")
+                    
+                    infra_items[item_type] = all_items_for_type
+                    logger.info(f"  Total {item_type}: {len(all_items_for_type)} items")
+                else:
+                    # Single folder type - use global endpoint
+                    type_display = item_type.replace('_', ' ').title()
+                    self._emit_progress(
+                        f"[{type_idx}/{len(self.INFRASTRUCTURE_TYPES)}] Infrastructure: {type_display}...",
+                        type_progress
+                    )
+                    
+                    logger.info(f"Fetching {item_type} items...")
+                    items = self._pull_infra_global(item_type, result)
+                    infra_items[item_type] = items
+                    logger.info(f"  Fetched {len(items)} {item_type} items")
+                
+            except Exception as e:
+                # Log error but continue with other infrastructure types
+                logger.error(f"Error fetching {item_type}: {e}")
+                handle_workflow_error(e, None, f'fetch_{item_type}', result, self.config)
+                # Continue with next type instead of failing
+                continue
+        
+        state.complete_operation()
+        return infra_items
+    
+    def _pull_infra_from_folder(
+        self,
+        item_type: str,
+        folder: str,
+        result: WorkflowResult
+    ) -> List[ConfigItem]:
         """
-        Get dependency report for configuration.
-
+        Pull infrastructure items from a specific folder.
+        
         Args:
-            config: Configuration dictionary
-
+            item_type: Type of infrastructure item
+            folder: Folder name
+            result: WorkflowResult for error tracking
+            
         Returns:
-            Dependency report dictionary
+            List of ConfigItem instances
         """
-        return self.dependency_resolver.get_dependency_report(config)
+        items = []
+        
+        try:
+            # Get model class
+            model_class = ConfigItemFactory.get_model_class(item_type)
+            if not model_class or not hasattr(model_class, 'api_endpoint'):
+                logger.warning(f"No model class or endpoint for {item_type}")
+                return items
+            
+            # Fetch items with folder parameter
+            from urllib.parse import quote
+            encoded_folder = quote(folder, safe='')
+            url = f"{model_class.api_endpoint}?folder={encoded_folder}"
+            
+            response = self.api_client._make_request("GET", url, item_type=item_type)
+            
+            # Extract items
+            raw_items = []
+            if isinstance(response, dict) and 'data' in response:
+                raw_items = response['data']
+            elif isinstance(response, list):
+                raw_items = response
+            
+            # Instantiate items
+            default_count = 0
+            for raw_item in raw_items:
+                item_name = raw_item.get('name', 'unknown')
+                try:
+                    # Add folder if missing
+                    if 'folder' not in raw_item:
+                        raw_item['folder'] = folder
+                        logger.debug(f"  Added folder='{folder}' to {item_type} '{item_name}'")
+                    
+                    # Check defaults BEFORE creating ConfigItem (more efficient)
+                    # Use snippet field from raw API response
+                    if not self.config.include_defaults and self._is_default_item(raw_item):
+                        snippet_val = raw_item.get('snippet', '')
+                        logger.debug(f"  Skipping '{item_name}' (default item, snippet='{snippet_val}')")
+                        result.items_skipped += 1
+                        default_count += 1
+                        continue
+                    
+                    item = ConfigItemFactory.create_from_dict(item_type, raw_item)
+                    items.append(item)
+                    result.items_processed += 1
+                except Exception as e:
+                    handle_workflow_error(e, None, f'parse_{item_type}_from_{folder}', result, self.config)
+            
+            if default_count > 0:
+                logger.info(f"  Filtered {default_count} default {item_type} items from '{folder}'")
+        
+        except Exception as e:
+            logger.error(f"Error fetching {item_type} from '{folder}': {e}")
+            handle_workflow_error(e, None, f'fetch_{item_type}_from_{folder}', result, self.config)
+        
+        return items
+    
+    def _pull_infra_global(
+        self,
+        item_type: str,
+        result: WorkflowResult
+    ) -> List[ConfigItem]:
+        """
+        Pull infrastructure items from global endpoint (no folder parameter).
+        
+        Args:
+            item_type: Type of infrastructure item
+            result: WorkflowResult for error tracking
+            
+        Returns:
+            List of ConfigItem instances
+        """
+        items = []
+        
+        try:
+            # Get model class
+            model_class = ConfigItemFactory.get_model_class(item_type)
+            if not model_class or not hasattr(model_class, 'api_endpoint'):
+                logger.warning(f"No model class or endpoint for {item_type}")
+                return items
+            
+            # Fetch all items (no folder parameter)
+            url = model_class.api_endpoint
+            response = self.api_client._make_request("GET", url, item_type=item_type)
+            
+            # Extract items
+            raw_items = []
+            if isinstance(response, dict) and 'data' in response:
+                raw_items = response['data']
+            elif isinstance(response, list):
+                raw_items = response
+            
+            # Instantiate items
+            default_count = 0
+            for raw_item in raw_items:
+                item_name = raw_item.get('name', 'unknown')
+                try:
+                    # Infrastructure items need a folder but API doesn't provide one
+                    # Set the correct folder based on infrastructure type
+                    if 'folder' not in raw_item and 'snippet' not in raw_item:
+                        # Get the correct folder for this infrastructure type
+                        folder = self.INFRASTRUCTURE_FOLDER_MAP.get(item_type)
+                        if folder:
+                            raw_item['folder'] = folder
+                            logger.debug(f"  Added folder='{folder}' to {item_type} '{item_name}'")
+                        else:
+                            logger.warning(f"  No folder mapping for {item_type}, skipping")
+                            continue
+                    
+                    # Check defaults BEFORE creating ConfigItem (more efficient)
+                    # Use snippet field from raw API response
+                    if not self.config.include_defaults and self._is_default_item(raw_item):
+                        snippet_val = raw_item.get('snippet', '')
+                        logger.debug(f"  Skipping '{item_name}' (default item, snippet='{snippet_val}')")
+                        result.items_skipped += 1
+                        default_count += 1
+                        continue
+                    
+                    item = ConfigItemFactory.create_from_dict(item_type, raw_item)
+                    items.append(item)
+                    result.items_processed += 1
+                except Exception as e:
+                    handle_workflow_error(e, None, f'parse_{item_type}', result, self.config)
+            
+            if default_count > 0:
+                logger.info(f"  Filtered {default_count} default {item_type} items")
+        
+        except Exception as e:
+            logger.error(f"Error fetching {item_type}: {e}")
+            handle_workflow_error(e, None, f'fetch_{item_type}', result, self.config)
+        
+        return items
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """
+        Get pull statistics.
+        
+        Returns:
+            Dictionary with pull statistics
+        """
+        return {
+            'folder_types': len(self.FOLDER_TYPES),
+            'snippet_types': len(self.SNIPPET_TYPES),
+            'infrastructure_types': len(self.INFRASTRUCTURE_TYPES),
+        }

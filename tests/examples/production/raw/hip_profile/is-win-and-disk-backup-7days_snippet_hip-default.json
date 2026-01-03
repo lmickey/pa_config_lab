@@ -1,0 +1,7 @@
+{
+  "id": "ae3ab7a4-f312-4444-9ed0-81dfc88c06bf",
+  "name": "is-win-and-disk-backup-7days",
+  "snippet": "hip-default",
+  "match": "\"is-win\"  and \"is-disk-backup-installed-7days\" ",
+  "description": "Matches Windows endpoints that have disk backup software installed and a Last Backup Time within 7 days"
+}

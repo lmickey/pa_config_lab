@@ -1,0 +1,15 @@
+{
+  "id": "e94d3cfe-3636-4206-a6f9-f123d6285989",
+  "name": "Gen-AI Sanctioned",
+  "folder": "Shared",
+  "tagging": {
+    "tag": [
+      "[Generative AI]"
+    ]
+  },
+  "risk": [
+    1,
+    2,
+    3
+  ]
+}

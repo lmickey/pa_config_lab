@@ -1,0 +1,68 @@
+[
+  {
+    "id": "56391305-7042-46b5-b2fd-09677bcf6fe2",
+    "name": "Block-brute-force",
+    "folder": "All",
+    "snippet": "default",
+    "color": "Red"
+  },
+  {
+    "id": "aeb0ee0d-3c1e-4104-882f-a41366499252",
+    "name": "PA_predefined_embargo_rule",
+    "folder": "All",
+    "snippet": "Web-Security-Default",
+    "color": "Green"
+  },
+  {
+    "id": "aeb0ee0d-3c1e-4104-882f-a41366499252",
+    "name": "PA_predefined_embargo_rule",
+    "folder": "All",
+    "snippet": "Web-Security-Default",
+    "color": "Green"
+  },
+  {
+    "id": "852dadab-6e82-4872-8793-2ec7f3a3755d",
+    "name": "Sanctioned",
+    "folder": "All",
+    "color": "Olive"
+  },
+  {
+    "id": "20faa7e3-5ac7-4ada-ac22-0c07498676d7",
+    "name": "Tolerated",
+    "folder": "All",
+    "color": "Maroon"
+  },
+  {
+    "id": "e19f776e-b2f7-40c6-920c-91e46ffd5d9c",
+    "name": "Web Security Global",
+    "folder": "All",
+    "snippet": "Web-Security-Default",
+    "color": "Green"
+  },
+  {
+    "id": "e19f776e-b2f7-40c6-920c-91e46ffd5d9c",
+    "name": "Web Security Global",
+    "folder": "All",
+    "snippet": "Web-Security-Default",
+    "color": "Green"
+  },
+  {
+    "id": "5cb59450-4a32-4cc6-a1a0-cdf9350d1d27",
+    "name": "best-practice",
+    "folder": "All",
+    "snippet": "default",
+    "color": "Green"
+  },
+  {
+    "id": "cdc30f04-1086-4bba-9b1c-7c1c6ff1df99",
+    "name": "decrypt-bypass",
+    "folder": "All",
+    "snippet": "default",
+    "color": "Red"
+  },
+  {
+    "id": "1fcedfa3-9196-4f0d-9c75-75d36e230c33",
+    "name": "empty",
+    "folder": "All"
+  }
+]

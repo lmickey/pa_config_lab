@@ -1,0 +1,17 @@
+{
+  "id": "ffe1f4c3-fbde-4260-8087-4666e3db86a9",
+  "name": "Auto_Prisma_SDWAN_IPSecCrypto",
+  "folder": "Remote Networks",
+  "dh_group": "group20",
+  "lifetime": {
+    "hours": 1
+  },
+  "esp": {
+    "authentication": [
+      "sha512"
+    ],
+    "encryption": [
+      "aes-256-cbc"
+    ]
+  }
+}

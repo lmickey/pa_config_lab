@@ -1,0 +1,15 @@
+{
+  "id": "90384203-e575-42d8-9f45-b2721ba018ce",
+  "name": "is-win-uwp-desktop",
+  "snippet": "hip-default",
+  "host_info": {
+    "criteria": {
+      "os": {
+        "contains": {
+          "Microsoft": "Windows UWP Desktop"
+        }
+      }
+    }
+  },
+  "description": "Matches all Windows UWP desktops"
+}

@@ -45,12 +45,24 @@ class AuthenticationWorker(QThread):
             self.progress.emit("Initializing API client...")
 
             from prisma.api_client import PrismaAccessAPIClient
+            from PyQt6.QtCore import QSettings
+
+            # Load API settings from application preferences
+            settings = QSettings("PrismaAccess", "ConfigManager")
+            timeout = settings.value("api/timeout", 60, type=int)
+            rate_limit = settings.value("api/rate_limit", 100, type=int)
+            cache_ttl = settings.value("api/cache_ttl", 300, type=int)
 
             self.progress.emit("Connecting to Prisma Access...")
 
-            # Create API client
+            # Create API client with settings
             self.api_client = PrismaAccessAPIClient(
-                tsg_id=self.tsg_id, api_user=self.api_user, api_secret=self.api_secret
+                tsg_id=self.tsg_id, 
+                api_user=self.api_user, 
+                api_secret=self.api_secret,
+                rate_limit=rate_limit,
+                cache_ttl=cache_ttl,
+                timeout=timeout
             )
 
             self.progress.emit("Authenticating...")
@@ -461,8 +473,8 @@ class ConnectionDialog(QDialog):
 
             # Start authentication in background
             self.worker = AuthenticationWorker(tsg_id, api_user, api_secret)
-            self.worker.progress.connect(self._on_progress)
-            self.worker.finished.connect(self._on_authentication_finished)
+            self.worker.progress.connect(self._on_progress, Qt.ConnectionType.QueuedConnection)
+            self.worker.finished.connect(self._on_authentication_finished, Qt.ConnectionType.QueuedConnection)
             self.worker.start()
             
         except Exception as e:

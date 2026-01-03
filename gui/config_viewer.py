@@ -172,6 +172,51 @@ class ConfigViewerWidget(QWidget):
         version = metadata.get("version", "Unknown")
         
         # Determine action and source
+        source = metadata.get("source_tenant", "Unknown")
+        load_type = metadata.get("load_type", "unknown")
+        
+        if load_type == "pull":
+            action = "Pulled from"
+        elif load_type == "file":
+            action = "Loaded from file"
+        else:
+            action = "Source"
+        
+        self.info_label.setText(f"<b>{action}:</b> {source}")
+        self.info_label.setStyleSheet("color: #2196F3;")
+
+        # Calculate and display stats
+        stats = self.current_config.get("stats", {})
+        total = stats.get("total_items", 0)
+        
+        # Count by container type
+        folders_count = stats.get("total_folders", 0)
+        snippets_count = stats.get("total_snippets", 0)
+        infra_count = stats.get("total_infrastructure", 0)
+        
+        self.stats_label.setText(
+            f"Total: {total} items | "
+            f"Folders: {folders_count} | "
+            f"Snippets: {snippets_count} | "
+            f"Infrastructure: {infra_count}"
+        )
+
+        # Build tree using ConfigTreeBuilder
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info("="*80)
+        logger.info("ConfigViewer._refresh_view - Building tree")
+        logger.info(f"self.current_config type: {type(self.current_config)}")
+        logger.info(f"self.current_config keys: {list(self.current_config.keys()) if isinstance(self.current_config, dict) else 'not a dict'}")
+        if isinstance(self.current_config, dict):
+            logger.info(f"  folders keys: {list(self.current_config.get('folders', {}).keys())}")
+            logger.info(f"  snippets keys: {list(self.current_config.get('snippets', {}).keys())}")
+            logger.info(f"  infrastructure keys: {list(self.current_config.get('infrastructure', {}).keys())}")
+        logger.info("="*80)
+        
+        builder = ConfigTreeBuilder(enable_checkboxes=False)
+        builder.build_tree(self.tree, self.current_config)
+        
         saved_name = metadata.get("saved_name")
         source_tenant = metadata.get("source_tenant", "Unknown")
         
@@ -184,10 +229,6 @@ class ConfigViewerWidget(QWidget):
         
         self.info_label.setText(f"Version: {version} | Source: {action_source}")
         self.info_label.setStyleSheet("color: green;")
-        
-        # Use shared tree builder
-        builder = ConfigTreeBuilder(enable_checkboxes=False)
-        builder.build_tree(self.tree, self.current_config)
         
         # Update stats
         total_items = self._count_items(self.current_config)

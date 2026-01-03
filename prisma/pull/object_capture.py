@@ -51,15 +51,15 @@ class ObjectCapture:
             error_str = str(e).lower()
             if "doesn't exist" in error_str or "400" in error_str or "pattern" in error_str:
                 if not self.suppress_output:
-                    print(f"  ⚠ Folder '{folder}' cannot be used for addresses - skipping")
+                    logger.warning(f"  ⚠ Folder '{folder}' cannot be used for addresses - skipping")
                 return []
             elif "500" in error_str or "503" in error_str or "502" in error_str:
                 # Server errors - API is having issues, skip gracefully
                 if not self.suppress_output:
-                    print(f"  ⚠ API server error for addresses in folder '{folder}' - skipping")
+                    logger.warning(f"  ⚠ API server error for addresses in folder '{folder}' - skipping")
                 return []
             if not self.suppress_output:
-                print(f"Error capturing addresses: {e}")
+                logger.error(f"Error capturing addresses: {e}")
             # Log to centralized error logger
             try:
                 from ...error_logger import error_logger
@@ -96,7 +96,7 @@ class ObjectCapture:
             return [self._normalize_address_group(grp) for grp in groups]
         except Exception as e:
             if not self.suppress_output:
-                print(f"Error capturing address groups: {e}")
+                logger.error(f"Error capturing address groups: {e}")
             try:
                 from ...error_logger import error_logger
 
@@ -133,15 +133,15 @@ class ObjectCapture:
             error_str = str(e).lower()
             if "doesn't exist" in error_str or "400" in error_str or "pattern" in error_str:
                 if not self.suppress_output:
-                    print(f"  ⚠ Folder '{folder}' cannot be used for services - skipping")
+                    logger.warning(f"  ⚠ Folder '{folder}' cannot be used for services - skipping")
                 return []
             elif "500" in error_str or "503" in error_str or "502" in error_str:
                 # Server errors - API is having issues, skip gracefully
                 if not self.suppress_output:
-                    print(f"  ⚠ API server error for services in folder '{folder}' - skipping")
+                    logger.warning(f"  ⚠ API server error for services in folder '{folder}' - skipping")
                 return []
             if not self.suppress_output:
-                print(f"Error capturing services: {e}")
+                logger.error(f"Error capturing services: {e}")
             try:
                 from ...error_logger import error_logger
 
@@ -179,7 +179,7 @@ class ObjectCapture:
             return [self._normalize_service_group(grp) for grp in groups]
         except Exception as e:
             if not self.suppress_output:
-                print(f"Error capturing service groups: {e}")
+                logger.error(f"Error capturing service groups: {e}")
             try:
                 from ...error_logger import error_logger
 
@@ -230,7 +230,7 @@ class ObjectCapture:
                 return []
         except Exception as e:
             if not self.suppress_output:
-                print(f"Error capturing applications: {e}")
+                logger.error(f"Error capturing applications: {e}")
             try:
                 from ...error_logger import error_logger
 
@@ -275,7 +275,7 @@ class ObjectCapture:
         # Return empty objects if this is a reserved folder
         if folder and folder in RESERVED_FOLDERS:
             if not self.suppress_output:
-                print(f"  ℹ Skipping reserved infrastructure folder: {folder} (cannot have security objects)")
+                logger.info(f"  ℹ Skipping reserved infrastructure folder: {folder} (cannot have security objects)")
             return {
                 "address_objects": [],
                 "address_groups": [],
@@ -325,7 +325,7 @@ class ObjectCapture:
         # Print brief summary only
         total = sum(len(objs) for objs in all_objects.values())
         if total > 0 and not self.suppress_output:
-            print(f"  ✓ Captured {total} objects")
+            logger.info(f"  ✓ Captured {total} objects")
 
         return all_objects
 

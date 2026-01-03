@@ -5,6 +5,7 @@ This dialog allows users to select specific folders, snippets, objects,
 and infrastructure components from a loaded configuration.
 """
 
+import logging
 from typing import Dict, Any, Optional, List
 from PyQt6.QtWidgets import (
     QDialog,
@@ -23,6 +24,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 
 from gui.config_tree_builder import ConfigTreeBuilder
+
+logger = logging.getLogger(__name__)
 
 
 class ComponentSelectionDialog(QDialog):
@@ -558,34 +561,34 @@ class ComponentSelectionDialog(QDialog):
                     folders.append(folder)
                     
                     # Debug logging after collection is complete
-                    print(f"\nDEBUG: Collected folder '{folder.get('name')}':")
+                    logger.debug(f" Collected folder '{folder.get('name')}':")
                     if selected_rules:
-                        print(f"  Rules: {len(selected_rules)} items")
+                        logger.debug(f"  Rules: {len(selected_rules)} items")
                         for rule in selected_rules[:3]:
-                            print(f"    - {rule.get('name', 'Unknown')}")
+                            logger.debug(f"    - {rule.get('name', 'Unknown')}")
                         if len(selected_rules) > 3:
-                            print(f"    ... and {len(selected_rules) - 3} more")
+                            logger.debug(f"    ... and {len(selected_rules) - 3} more")
                     if selected_objects:
                         for obj_type, obj_list in selected_objects.items():
-                            print(f"  {obj_type}: {len(obj_list)} items")
+                            logger.debug(f"  {obj_type}: {len(obj_list)} items")
                             for obj in obj_list[:3]:
-                                print(f"    - {obj.get('name', 'Unknown')}")
+                                logger.debug(f"    - {obj.get('name', 'Unknown')}")
                             if len(obj_list) > 3:
-                                print(f"    ... and {len(obj_list) - 3} more")
+                                logger.debug(f"    ... and {len(obj_list) - 3} more")
                     if selected_profiles:
                         for prof_type, prof_list in selected_profiles.items():
-                            print(f"  {prof_type}: {len(prof_list)} items")
+                            logger.debug(f"  {prof_type}: {len(prof_list)} items")
                             for prof in prof_list[:3]:
-                                print(f"    - {prof.get('name', 'Unknown')}")
+                                logger.debug(f"    - {prof.get('name', 'Unknown')}")
                             if len(prof_list) > 3:
-                                print(f"    ... and {len(prof_list) - 3} more")
+                                logger.debug(f"    ... and {len(prof_list) - 3} more")
                     if selected_hip:
                         for hip_type, hip_list in selected_hip.items():
-                            print(f"  {hip_type}: {len(hip_list)} items")
+                            logger.debug(f"  {hip_type}: {len(hip_list)} items")
                             for hip_item in hip_list[:3]:
-                                print(f"    - {hip_item.get('name', 'Unknown')}")
+                                logger.debug(f"    - {hip_item.get('name', 'Unknown')}")
                             if len(hip_list) > 3:
-                                print(f"    ... and {len(hip_list) - 3} more")
+                                logger.debug(f"    ... and {len(hip_list) - 3} more")
         
         return folders
     
@@ -637,19 +640,19 @@ class ComponentSelectionDialog(QDialog):
             # Debug: Print item info
             item_text = item.text(0)
             check_state = item.checkState(0)
-            print(f"{indent}Checking item: '{item_text}', CheckState: {check_state}")
+            logger.debug(f"{indent}Checking item: '{item_text}', CheckState: {check_state}")
             
             if item_data and item_data.get('type') == 'infrastructure':
                 # This is an infrastructure item
-                print(f"{indent}  -> Is infrastructure item")
+                logger.debug(f"{indent}  -> Is infrastructure item")
                 # Only collect if checked AND enabled
                 if (item.checkState(0) == Qt.CheckState.Checked and
                     item.flags() & Qt.ItemFlag.ItemIsEnabled):
-                    print(f"{indent}  -> Is CHECKED and ENABLED")
+                    logger.debug(f"{indent}  -> Is CHECKED and ENABLED")
                     infra_type = item_data.get('infra_type')
                     data = item_data.get('data')
                     
-                    print(f"{indent}  -> infra_type={infra_type}, has_data={data is not None}")
+                    logger.debug(f"{indent}  -> infra_type={infra_type}, has_data={data is not None}")
                     
                     if infra_type and data:
                         # Initialize list if needed
@@ -659,42 +662,42 @@ class ComponentSelectionDialog(QDialog):
                         # For lists, extend the list
                         if isinstance(data, list):
                             infrastructure[infra_type].extend(data)
-                            print(f"{indent}  -> Extended list with {len(data)} items")
+                            logger.debug(f"{indent}  -> Extended list with {len(data)} items")
                         # For single items (dict), append to list
                         elif isinstance(data, dict):
                             infrastructure[infra_type].append(data)
-                            print(f"{indent}  -> Appended dict item")
+                            logger.debug(f"{indent}  -> Appended dict item")
                         # For other types, store directly (e.g., Mobile Users settings)
                         else:
                             infrastructure[infra_type] = data
-                            print(f"{indent}  -> Stored directly")
+                            logger.debug(f"{indent}  -> Stored directly")
                 else:
-                    print(f"{indent}  -> NOT checked")
+                    logger.debug(f"{indent}  -> NOT checked")
             
             # Check children
             for i in range(item.childCount()):
                 collect_recursive(item.child(i), depth + 1)
         
-        print(f"\nDEBUG: Starting _collect_infrastructure")
+        logger.debug(f" Starting _collect_infrastructure")
         # Start recursive collection from parent's children
         for i in range(parent.childCount()):
             collect_recursive(parent.child(i))
         
-        print(f"DEBUG: _collect_infrastructure found {len(infrastructure)} types: {list(infrastructure.keys())}")
+        logger.debug(f"DEBUG: _collect_infrastructure found {len(infrastructure)} types: {list(infrastructure.keys())}")
         return infrastructure
     
     def accept(self):
         """Override accept to add dependency analysis."""
-        print("\n=== DEPENDENCY VALIDATION STARTING ===")
+        logger.debug("\n=== DEPENDENCY VALIDATION STARTING ===")
         
         # Get initially selected items
         selected = self.get_selected_items()
         
-        print(f"Selected items summary:")
-        print(f"  Folders: {len(selected.get('folders', []))}")
-        print(f"  Snippets: {len(selected.get('snippets', []))}")
-        print(f"  Objects: {sum(len(v) for v in selected.get('objects', {}).values() if isinstance(v, list))}")
-        print(f"  Infrastructure: {sum(len(v) if isinstance(v, list) else 1 for v in selected.get('infrastructure', {}).values())}")
+        logger.debug(f"Selected items summary:")
+        logger.debug(f"  Folders: {len(selected.get('folders', []))}")
+        logger.debug(f"  Snippets: {len(selected.get('snippets', []))}")
+        logger.debug(f"  Objects: {sum(len(v) for v in selected.get('objects', {}).values() if isinstance(v, list))}")
+        logger.debug(f"  Infrastructure: {sum(len(v) if isinstance(v, list) else 1 for v in selected.get('infrastructure', {}).values())}")
         
         # Check if anything is selected
         total = (len(selected.get('folders', [])) + 
@@ -725,29 +728,29 @@ class ComponentSelectionDialog(QDialog):
             }
             
             # Debug: Show what we're analyzing
-            print(f"\nDEBUG: Selected config structure:")
-            print(f"  Infrastructure types: {list(selected_config.get('infrastructure', {}).keys())}")
+            logger.debug(f" Selected config structure:")
+            logger.debug(f"  Infrastructure types: {list(selected_config.get('infrastructure', {}).keys())}")
             for infra_type, items in selected_config.get('infrastructure', {}).items():
                 if isinstance(items, list):
-                    print(f"    {infra_type}: {len(items)} items")
+                    logger.debug(f"    {infra_type}: {len(items)} items")
                     for item in items:
-                        print(f"      - {item.get('name', 'Unknown')}")
+                        logger.debug(f"      - {item.get('name', 'Unknown')}")
                 else:
-                    print(f"    {infra_type}: 1 item (dict)")
+                    logger.debug(f"    {infra_type}: 1 item (dict)")
             
             # Find required dependencies
             required_deps = resolver.find_required_dependencies(selected_config, self.full_config)
             
             # Debug output
-            print(f"\nDEBUG: Required dependencies found: {list(required_deps.keys())}")
+            logger.debug(f" Required dependencies found: {list(required_deps.keys())}")
             for key, value in required_deps.items():
                 if isinstance(value, dict):
-                    print(f"  {key}: {sum(len(v) for v in value.values() if isinstance(v, list))} items")
+                    logger.debug(f"  {key}: {sum(len(v) for v in value.values() if isinstance(v, list))} items")
                     for subkey, subvalue in value.items():
                         if isinstance(subvalue, list):
-                            print(f"    {subkey}: {len(subvalue)} items")
+                            logger.debug(f"    {subkey}: {len(subvalue)} items")
                 elif isinstance(value, list):
-                    print(f"  {key}: {len(value)} items")
+                    logger.debug(f"  {key}: {len(value)} items")
             
             # Check if there are actually any dependencies (not just empty collections)
             has_deps = False
@@ -771,54 +774,54 @@ class ComponentSelectionDialog(QDialog):
                 selected = self._merge_dependencies(selected, required_deps)
                 
                 # Debug: Show what we're about to check
-                print(f"\nDEBUG: About to check merged dependencies in tree")
-                print(f"  required_deps keys: {list(required_deps.keys())}")
+                logger.debug(f" About to check merged dependencies in tree")
+                logger.debug(f"  required_deps keys: {list(required_deps.keys())}")
                 if 'objects' in required_deps:
-                    print(f"  Top-level objects to check:")
+                    logger.debug(f"  Top-level objects to check:")
                     for obj_type, obj_list in required_deps['objects'].items():
-                        print(f"    {obj_type}: {len(obj_list)} items")
+                        logger.debug(f"    {obj_type}: {len(obj_list)} items")
                         for obj in obj_list[:3]:
-                            print(f"      - {obj.get('name')} (folder: {obj.get('folder')})")
+                            logger.debug(f"      - {obj.get('name')} (folder: {obj.get('folder')})")
                 if 'folders' in required_deps:
-                    print(f"  Folders with contents:")
+                    logger.debug(f"  Folders with contents:")
                     for folder in required_deps['folders']:
                         folder_name = folder.get('name')
-                        print(f"    Folder: {folder_name}")
+                        logger.debug(f"    Folder: {folder_name}")
                         if 'objects' in folder:
                             for obj_type, obj_list in folder.get('objects', {}).items():
-                                print(f"      {obj_type}: {len(obj_list)} items")
+                                logger.debug(f"      {obj_type}: {len(obj_list)} items")
                                 for obj in obj_list[:3]:
-                                    print(f"        - {obj.get('name')}")
+                                    logger.debug(f"        - {obj.get('name')}")
                         if 'security_rules' in folder:
                             rules = folder.get('security_rules', [])
-                            print(f"      security_rules: {len(rules)} items")
+                            logger.debug(f"      security_rules: {len(rules)} items")
                             for rule in rules[:3]:
-                                print(f"        - {rule.get('name')}")
+                                logger.debug(f"        - {rule.get('name')}")
                 
                 # Check the newly added dependencies in the tree
                 self._check_merged_dependencies(required_deps)
                 
                 # Re-collect from tree to ensure checked items are included
                 # (This ensures the GUI state matches the internal state)
-                print("\nDEBUG: Re-collecting items from tree after checking dependencies")
+                logger.debug("\nDEBUG: Re-collecting items from tree after checking dependencies")
                 tree_selected = self.get_selected_items()
-                print(f"  Tree has {len(tree_selected.get('infrastructure', {}))} infrastructure types after checking")
+                logger.debug(f"  Tree has {len(tree_selected.get('infrastructure', {}))} infrastructure types after checking")
                 if 'folders' in tree_selected:
-                    print(f"  Tree has {len(tree_selected['folders'])} folders")
+                    logger.debug(f"  Tree has {len(tree_selected['folders'])} folders")
                     for folder in tree_selected['folders']:
                         folder_name = folder.get('name')
                         if 'objects' in folder:
-                            print(f"    Folder '{folder_name}' has objects:")
+                            logger.debug(f"    Folder '{folder_name}' has objects:")
                             for obj_type, obj_list in folder.get('objects', {}).items():
-                                print(f"      {obj_type}: {len(obj_list)} items")
+                                logger.debug(f"      {obj_type}: {len(obj_list)} items")
                                 for obj in obj_list[:3]:
-                                    print(f"        - {obj.get('name')}")
+                                    logger.debug(f"        - {obj.get('name')}")
                 
                 # Merge tree selection with our already-merged selection
                 # (This ensures we don't lose anything)
                 selected = self._merge_dependencies(selected, tree_selected)
             else:
-                print("\nDEBUG: No dependencies found - proceeding with original selection")
+                logger.debug("\nDEBUG: No dependencies found - proceeding with original selection")
             
             # Store final selection
             self.selected_items = selected
@@ -904,12 +907,12 @@ class ComponentSelectionDialog(QDialog):
                         
                         # Debug: Print what we're comparing
                         if check_type == 'infrastructure':
-                            print(f"    Comparing: '{name}' with item_name='{item_name}', infra_type='{infra_type}', item_type='{item_type}'")
+                            logger.debug(f"    Comparing: '{name}' with item_name='{item_name}', infra_type='{infra_type}', item_type='{item_type}'")
                         
                         # Check if this is the item we're looking for
                         if check_type == 'infrastructure' and item_type == 'infrastructure':
                             if data.get('name') == name:
-                                print(f"    MATCH! Checking item: {name}")
+                                logger.debug(f"    MATCH! Checking item: {name}")
                                 item.setCheckState(0, Qt.CheckState.Checked)
                                 # DON'T call _update_parent_check_state - it will uncheck the item!
                                 # Parent state updates will happen naturally when user interacts
@@ -927,21 +930,21 @@ class ComponentSelectionDialog(QDialog):
             
             # Check infrastructure dependencies
             if 'infrastructure' in required_deps:
-                print(f"\nDEBUG: Checking infrastructure dependencies")
+                logger.debug(f" Checking infrastructure dependencies")
                 for infra_type, items in required_deps['infrastructure'].items():
-                    print(f"  Type: {infra_type}, Items type: {type(items)}, Count: {len(items) if isinstance(items, list) else 'N/A'}")
+                    logger.debug(f"  Type: {infra_type}, Items type: {type(items)}, Count: {len(items) if isinstance(items, list) else 'N/A'}")
                     
                     if not isinstance(items, list):
-                        print(f"  WARNING: {infra_type} is not a list, skipping")
+                        logger.debug(f"  WARNING: {infra_type} is not a list, skipping")
                         continue
                     
                     for idx, item in enumerate(items):
                         if not isinstance(item, dict):
-                            print(f"  WARNING: Item {idx} is not a dict: {type(item)} = {item}")
+                            logger.debug(f"  WARNING: Item {idx} is not a dict: {type(item)} = {item}")
                             continue
                             
                         item_name = item.get('name', item.get('id'))
-                        print(f"  Checking item: {item_name}")
+                        logger.debug(f"  Checking item: {item_name}")
                         if item_name:
                             # Find Infrastructure section
                             root = self.tree.invisibleRootItem()
@@ -965,10 +968,10 @@ class ComponentSelectionDialog(QDialog):
             
             # Check folder dependencies
             if 'folders' in required_deps:
-                print(f"\nDEBUG: Checking folder dependencies")
+                logger.debug(f" Checking folder dependencies")
                 for folder in required_deps['folders']:
                     folder_name = folder.get('name')
-                    print(f"  Folder: {folder_name}")
+                    logger.debug(f"  Folder: {folder_name}")
                     if folder_name:
                         root = self.tree.invisibleRootItem()
                         for i in range(root.childCount()):
@@ -979,12 +982,12 @@ class ComponentSelectionDialog(QDialog):
                         
                         # Check objects within this folder
                         if 'objects' in folder:
-                            print(f"    Folder has objects to check")
+                            logger.debug(f"    Folder has objects to check")
                             for obj_type, obj_list in folder.get('objects', {}).items():
-                                print(f"      {obj_type}: {len(obj_list)} items")
+                                logger.debug(f"      {obj_type}: {len(obj_list)} items")
                                 for obj in obj_list:
                                     obj_name = obj.get('name')
-                                    print(f"        Checking object: {obj_name}")
+                                    logger.debug(f"        Checking object: {obj_name}")
                                     if obj_name:
                                         # Find the folder in the tree
                                         for i in range(root.childCount()):
@@ -999,23 +1002,23 @@ class ComponentSelectionDialog(QDialog):
                         
                         # Check security rules within this folder
                         if 'security_rules' in folder:
-                            print(f"    Folder has security rules to check")
+                            logger.debug(f"    Folder has security rules to check")
                             rules = folder.get('security_rules', [])
-                            print(f"      security_rules: {len(rules)} items")
+                            logger.debug(f"      security_rules: {len(rules)} items")
                             for rule in rules:
                                 rule_name = rule.get('name')
-                                print(f"        Checking rule: {rule_name}")
+                                logger.debug(f"        Checking rule: {rule_name}")
                                 # Rules would need similar logic, but let's focus on objects first
             
             # Check object dependencies
             if 'objects' in required_deps:
-                print(f"\nDEBUG: Checking object dependencies")
+                logger.debug(f" Checking object dependencies")
                 for obj_type, obj_list in required_deps['objects'].items():
-                    print(f"  Object type: {obj_type}, Count: {len(obj_list)}")
+                    logger.debug(f"  Object type: {obj_type}, Count: {len(obj_list)}")
                     for obj in obj_list:
                         obj_name = obj.get('name')
                         folder_name = obj.get('folder')
-                        print(f"    Object: {obj_name}, Folder: {folder_name}")
+                        logger.debug(f"    Object: {obj_name}, Folder: {folder_name}")
                         if obj_name and folder_name:
                             # Objects are under folders, need to find the right folder
                             root = self.tree.invisibleRootItem()
@@ -1027,7 +1030,7 @@ class ComponentSelectionDialog(QDialog):
                                         folders_section = section.child(j)
                                         if folders_section.text(0) == "Folders":
                                             # Need to recursively find the folder, then the object
-                                            print(f"    Searching for object '{obj_name}' in folder '{folder_name}'")
+                                            logger.debug(f"    Searching for object '{obj_name}' in folder '{folder_name}'")
                                             self._check_object_in_folder(folders_section, folder_name, obj_name, obj_type)
                                             break
                                     break
@@ -1043,18 +1046,18 @@ class ComponentSelectionDialog(QDialog):
             folder_data = folder_item.data(0, Qt.ItemDataRole.UserRole)
             if folder_data and folder_data.get('type') == 'folder':
                 if folder_data.get('data', {}).get('name') == folder_name:
-                    print(f"      Found folder: {folder_name}")
+                    logger.debug(f"      Found folder: {folder_name}")
                     # Found the folder, now find the Objects container
                     for j in range(folder_item.childCount()):
                         content_item = folder_item.child(j)
                         if content_item.text(0) == "Objects":
-                            print(f"      Found Objects container")
+                            logger.debug(f"      Found Objects container")
                             # Found Objects container, now find the object type
                             for k in range(content_item.childCount()):
                                 obj_type_item = content_item.child(k)
                                 obj_type_data = obj_type_item.data(0, Qt.ItemDataRole.UserRole)
                                 if obj_type_data and obj_type_data.get('object_type') == obj_type:
-                                    print(f"      Found object type: {obj_type}")
+                                    logger.debug(f"      Found object type: {obj_type}")
                                     # Found the object type, now find the specific object
                                     for m in range(obj_type_item.childCount()):
                                         obj_item = obj_type_item.child(m)
@@ -1062,7 +1065,7 @@ class ComponentSelectionDialog(QDialog):
                                         if obj_item_data:
                                             item_name = obj_item_data.get('data', {}).get('name')
                                             if item_name == obj_name:
-                                                print(f"      MATCH! Checking object: {obj_name}")
+                                                logger.debug(f"      MATCH! Checking object: {obj_name}")
                                                 obj_item.setCheckState(0, Qt.CheckState.Checked)
                                                 return True
                     return False
@@ -1070,13 +1073,13 @@ class ComponentSelectionDialog(QDialog):
     
     def _restore_selections(self):
         """Restore previously selected items in the tree."""
-        print(f"DEBUG _restore_selections: Called!")
-        print(f"  previous_selection is None? {self.previous_selection is None}")
+        logger.debug(f"DEBUG _restore_selections: Called!")
+        logger.debug(f"  previous_selection is None? {self.previous_selection is None}")
         if self.previous_selection:
-            print(f"  previous_selection keys: {list(self.previous_selection.keys())}")
+            logger.debug(f"  previous_selection keys: {list(self.previous_selection.keys())}")
         
         if not self.previous_selection:
-            print(f"  Returning early - no previous selection")
+            logger.debug(f"  Returning early - no previous selection")
             return
         
         self.tree.blockSignals(True)
@@ -1086,35 +1089,35 @@ class ComponentSelectionDialog(QDialog):
         selected_snippet_names = {s.get('name') for s in self.previous_selection.get('snippets', [])}
         
         # For infrastructure, build a dict of {infra_type: set of item names}
-        print(f"DEBUG _restore_selections: Starting infrastructure restoration")
-        print(f"DEBUG: previous_selection.infrastructure keys: {list(self.previous_selection.get('infrastructure', {}).keys())}")
+        logger.debug(f"DEBUG _restore_selections: Starting infrastructure restoration")
+        logger.debug(f"DEBUG: previous_selection.infrastructure keys: {list(self.previous_selection.get('infrastructure', {}).keys())}")
         selected_infra_items = {}
         try:
             for infra_type, items in self.previous_selection.get('infrastructure', {}).items():
-                print(f"DEBUG: Processing infra_type={infra_type}, items type={type(items)}, count={len(items) if isinstance(items, (list, dict)) else '?'}")
+                logger.debug(f"DEBUG: Processing infra_type={infra_type}, items type={type(items)}, count={len(items) if isinstance(items, (list, dict)) else '?'}")
                 selected_infra_items[infra_type] = set()
                 if isinstance(items, list):
                     for idx, item in enumerate(items):
-                        print(f"  DEBUG: Item {idx}: type={type(item)}")
+                        logger.debug(f"  DEBUG: Item {idx}: type={type(item)}")
                         if isinstance(item, dict):
                             item_name = item.get('name') or item.get('id')
                             if item_name:
-                                print(f"    Adding to selected_infra_items[{infra_type}]: {item_name}")
+                                logger.debug(f"    Adding to selected_infra_items[{infra_type}]: {item_name}")
                                 selected_infra_items[infra_type].add(item_name)
                         else:
-                            print(f"    WARNING: Item is not a dict, it's {type(item)}")
+                            logger.debug(f"    WARNING: Item is not a dict, it's {type(item)}")
                 elif isinstance(items, dict):
                     # Single item (not a list)
-                    print(f"  DEBUG: Single dict item")
+                    logger.debug(f"  DEBUG: Single dict item")
                     item_name = items.get('name') or items.get('id')
                     if item_name:
-                        print(f"    Adding to selected_infra_items[{infra_type}]: {item_name}")
+                        logger.debug(f"    Adding to selected_infra_items[{infra_type}]: {item_name}")
                         selected_infra_items[infra_type].add(item_name)
                 else:
-                    print(f"  WARNING: items is neither list nor dict, it's {type(items)}")
-            print(f"DEBUG: Built selected_infra_items: {selected_infra_items}")
+                    logger.debug(f"  WARNING: items is neither list nor dict, it's {type(items)}")
+            logger.debug(f"DEBUG: Built selected_infra_items: {selected_infra_items}")
         except Exception as e:
-            print(f"ERROR building selected_infra_items: {e}")
+            logger.error(f"ERROR building selected_infra_items: {e}")
             import traceback
             traceback.print_exc()
             selected_infra_items = {}
@@ -1122,14 +1125,14 @@ class ComponentSelectionDialog(QDialog):
         # Recursively check items
         def restore_item(item: QTreeWidgetItem):
             try:
-                print(f"DEBUG restore_item: Processing item '{item.text(0)}'")
+                logger.debug(f"DEBUG restore_item: Processing item '{item.text(0)}'")
                 item_data = item.data(0, Qt.ItemDataRole.UserRole)
-                print(f"  item_data: {type(item_data)}")
+                logger.debug(f"  item_data: {type(item_data)}")
                 
                 if item_data:
                     item_type = item_data.get('type')
                     data = item_data.get('data', {})
-                    print(f"  item_type: {item_type}, has data: {bool(data)}")
+                    logger.debug(f"  item_type: {item_type}, has data: {bool(data)}")
                     
                     # Check folders
                     if item_type == 'folder':
@@ -1186,30 +1189,30 @@ class ComponentSelectionDialog(QDialog):
                     
                     # Check snippets (item_data is the snippet itself, not wrapped)
                     elif not item_type and isinstance(item_data, dict) and item_data.get('name') in selected_snippet_names:
-                        print(f"  SNIPPET CHECK MATCHED")
+                        logger.debug(f"  SNIPPET CHECK MATCHED")
                         item.setCheckState(0, Qt.CheckState.Checked)
                     
                     # Check infrastructure
                     elif item_type == 'infrastructure':
-                        print(f"DEBUG: ENTERED infrastructure elif block!")
+                        logger.debug(f"DEBUG: ENTERED infrastructure elif block!")
                         infra_type = item_data.get('infra_type')
                         item_name = data.get('name', data.get('id'))
-                        print(f"DEBUG restore_item: Checking infrastructure item '{item_name}' (infra_type={infra_type})")
+                        logger.debug(f"DEBUG restore_item: Checking infrastructure item '{item_name}' (infra_type={infra_type})")
                         
                         # Skip if item_name is None (container items like Mobile Users, Regions, etc.)
                         if item_name is None:
-                            print(f"  Skipping - item_name is None (likely a container)")
+                            logger.debug(f"  Skipping - item_name is None (likely a container)")
                         elif infra_type in selected_infra_items:
-                            print(f"  infra_type in selected_infra_items? True")
-                            print(f"  item_name in selected_infra_items[{infra_type}]? {item_name in selected_infra_items[infra_type]}")
+                            logger.debug(f"  infra_type in selected_infra_items? True")
+                            logger.debug(f"  item_name in selected_infra_items[{infra_type}]? {item_name in selected_infra_items[infra_type]}")
                             # Check if this specific infrastructure item is in the selection
                             if item_name in selected_infra_items[infra_type]:
-                                print(f"  RESTORING: Checking item '{item_name}'")
+                                logger.debug(f"  RESTORING: Checking item '{item_name}'")
                                 item.setCheckState(0, Qt.CheckState.Checked)
                         else:
-                            print(f"  infra_type NOT in selected_infra_items")
+                            logger.debug(f"  infra_type NOT in selected_infra_items")
                     else:
-                        print(f"  No matching elif for item_type='{item_type}'")
+                        logger.debug(f"  No matching elif for item_type='{item_type}'")
                     
                     # Check HIP items (stored directly in item_data)
                     # HIP items don't have a 'type' field, so check by parent structure
@@ -1243,16 +1246,16 @@ class ComponentSelectionDialog(QDialog):
                 for i in range(item.childCount()):
                     restore_item(item.child(i))
             except Exception as e:
-                print(f"ERROR in restore_item for '{item.text(0)}': {e}")
+                logger.error(f"ERROR in restore_item for '{item.text(0)}': {e}")
                 import traceback
                 traceback.print_exc()
         
         # Start restoration from top level
-        print(f"DEBUG: Starting tree restoration loop")
-        print(f"  Tree has {self.tree.topLevelItemCount()} top-level items")
+        logger.debug(f"DEBUG: Starting tree restoration loop")
+        logger.debug(f"  Tree has {self.tree.topLevelItemCount()} top-level items")
         for i in range(self.tree.topLevelItemCount()):
             top_item = self.tree.topLevelItem(i)
-            print(f"  Restoring top-level item {i}: {top_item.text(0)}")
+            logger.debug(f"  Restoring top-level item {i}: {top_item.text(0)}")
             restore_item(top_item)
         
         # Update parent check states

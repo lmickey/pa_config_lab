@@ -1,0 +1,14 @@
+{
+  "id": "5d28095b-5c74-4ea7-a1a8-29662108412a",
+  "name": "CIE-Okta",
+  "folder": "All",
+  "lockout": {},
+  "method": {
+    "cloud": {
+      "profile_name": "CIE-Okta"
+    }
+  },
+  "allow_list": [
+    "all"
+  ]
+}

@@ -10,6 +10,23 @@ are used to:
 - Create comprehensive test cases
 - Document real-world usage patterns
 
+Expected Output:
+- Raw JSON files saved to: tests/examples/production/raw/<type>/*.json
+- Detailed report saved to: tests/examples/production/capture_report.json
+- Console output showing progress and summary
+
+Errors & Warnings:
+Some errors are EXPECTED and normal:
+- "404 Not Found" - Type doesn't exist in this folder/snippet (normal)
+- "No items found" - Folder/snippet has no items of this type (normal)
+- Other API errors may indicate permission issues or unsupported types
+
+All errors are logged to capture_report.json for review.
+
+Excluded Items:
+- Folders: "Colo Connect", "Service Connections" (sensitive/production-specific)
+- Types: service_connection (sensitive/production-specific)
+
 Usage:
     python scripts/capture_production_examples.py --tenant "Lab Tenant"
     python scripts/capture_production_examples.py --all-types
@@ -82,7 +99,7 @@ class ProductionExampleCapture:
         ('ipsec_crypto_profile', IPsecCryptoProfile),
         ('ike_gateway', IKEGateway),
         ('ipsec_tunnel', IPsecTunnel),
-        ('service_connection', ServiceConnection),
+        # ('service_connection', ServiceConnection),  # Excluded - sensitive/production-specific
         ('agent_profile', AgentProfile),
         ('portal', Portal),
         ('gateway', Gateway),
@@ -110,7 +127,8 @@ class ProductionExampleCapture:
         self,
         folders: Optional[List[str]] = None,
         snippets: Optional[List[str]] = None,
-        max_per_type: int = 10
+        max_per_type: int = 10,
+        filter_types: Optional[List[str]] = None
     ):
         """
         Capture examples for all types.
@@ -119,12 +137,15 @@ class ProductionExampleCapture:
             folders: List of folders to capture from (None = all)
             snippets: List of snippets to capture from (None = all)
             max_per_type: Maximum examples per type
+            filter_types: List of specific types to capture (None = all types)
         """
         print("=" * 60)
         print("PRODUCTION EXAMPLE CAPTURE")
         print("=" * 60)
         print(f"Output directory: {self.output_dir}")
         print(f"Max per type: {max_per_type}")
+        if filter_types:
+            print(f"Filtering types: {', '.join(filter_types)}")
         print()
         
         # Get folders and snippets if not specified
@@ -140,31 +161,43 @@ class ProductionExampleCapture:
         # Capture objects
         print("Capturing Objects...")
         for item_type, item_class in self.OBJECT_TYPES:
-            self._capture_type(item_type, item_class, folders, snippets, max_per_type, "objects")
+            if filter_types is None or item_type in filter_types:
+                self._capture_type(item_type, item_class, folders, snippets, max_per_type, "objects")
         
         # Capture profiles
         print("\nCapturing Profiles...")
         for item_type, item_class in self.PROFILE_TYPES:
-            self._capture_type(item_type, item_class, folders, snippets, max_per_type, "profiles")
+            if filter_types is None or item_type in filter_types:
+                self._capture_type(item_type, item_class, folders, snippets, max_per_type, "profiles")
         
         # Capture policies
         print("\nCapturing Policies...")
         for item_type, item_class in self.POLICY_TYPES:
-            self._capture_type(item_type, item_class, folders, snippets, max_per_type, "policies")
+            if filter_types is None or item_type in filter_types:
+                self._capture_type(item_type, item_class, folders, snippets, max_per_type, "policies")
         
         # Capture infrastructure
         print("\nCapturing Infrastructure...")
         for item_type, item_class in self.INFRASTRUCTURE_TYPES:
-            self._capture_type(item_type, item_class, folders, None, max_per_type, "infrastructure")
+            if filter_types is None or item_type in filter_types:
+                self._capture_type(item_type, item_class, folders, None, max_per_type, "infrastructure")
         
         # Print summary
         self._print_summary()
+        
+        # Save detailed report
+        report_file = self._save_capture_report()
+        print()
+        print(f"Detailed report saved to: {report_file}")
     
     def _get_folders(self) -> List[str]:
         """Get list of folders from tenant"""
+        # Folders to exclude from capture (sensitive/special purpose)
+        EXCLUDED_FOLDERS = {'Colo Connect', 'Service Connections'}
+        
         try:
             response = self.client.get_security_policy_folders()
-            folders = [f['name'] for f in response if 'name' in f]
+            folders = [f['name'] for f in response if 'name' in f and f['name'] not in EXCLUDED_FOLDERS]
             return folders
         except Exception as e:
             print(f"Warning: Could not fetch folders: {e}")
@@ -291,6 +324,26 @@ class ProductionExampleCapture:
                 print(f"  - {error}")
             if len(self.stats['errors']) > 10:
                 print(f"  ... and {len(self.stats['errors']) - 10} more")
+    
+    def _save_capture_report(self):
+        """Save detailed capture report to file"""
+        report_file = self.output_dir / "capture_report.json"
+        
+        report = {
+            "timestamp": datetime.now().isoformat(),
+            "summary": {
+                "total_captured": self.stats['total_captured'],
+                "by_type": self.stats['by_type'],
+                "total_errors": len(self.stats['errors'])
+            },
+            "errors": self.stats['errors'],
+            "output_directory": str(self.raw_dir)
+        }
+        
+        with open(report_file, 'w') as f:
+            json.dump(report, f, indent=2)
+        
+        return report_file
 
 
 def main():
@@ -309,6 +362,9 @@ Examples:
   # Capture specific type
   python scripts/capture_production_examples.py --type address_object
   
+  # Capture multiple specific types (FAST!)
+  python scripts/capture_production_examples.py --types schedule service_group antivirus_profile
+  
   # Capture with custom limit
   python scripts/capture_production_examples.py --max 20
         """
@@ -321,6 +377,11 @@ Examples:
     parser.add_argument(
         '--type',
         help='Specific type to capture (e.g., address_object)'
+    )
+    parser.add_argument(
+        '--types',
+        nargs='+',
+        help='Multiple specific types to capture (e.g., --types schedule service_group)'
     )
     parser.add_argument(
         '--folder',
@@ -388,25 +449,11 @@ Examples:
                 print("\n\nCancelled by user")
                 return 0
     
-    # Decrypt credentials
-    # TenantManager automatically handles encryption using system password
-    from config.storage.crypto_utils import derive_key_secure, decrypt_data
-    import platform
-    
-    # Generate system password (same as TenantManager)
-    system_info = f"{platform.node()}-{platform.system()}"
-    cipher, _ = derive_key_secure(system_info)
-    
-    # Re-derive with stored salt if present
-    if 'salt' in tenant:
-        import base64
-        salt = base64.b64decode(tenant['salt'])
-        cipher, _ = derive_key_secure(system_info, salt)
-    
-    tsg_id = decrypt_data(tenant['tsg_id'], cipher).decode()
-    api_user = decrypt_data(tenant['api_user'], cipher).decode()
-    api_secret = decrypt_data(tenant['api_secret'], cipher).decode()
-    
+    # Get credentials from tenant dictionary
+    # TenantManager automatically handles decryption when loading tenants
+    tsg_id = tenant['tsg_id']
+    api_user = tenant['client_id']
+    api_secret = tenant['client_secret']
     tenant_name = tenant['name']
     
     # Connect to API
@@ -422,13 +469,28 @@ Examples:
     # Create capture instance
     capture = ProductionExampleCapture(client, args.output)
     
+    # Determine which types to capture
+    filter_types = None
+    if args.type:
+        filter_types = [args.type]
+    elif args.types:
+        filter_types = args.types
+    
     # Capture examples
     folders = [args.folder] if args.folder else None
-    capture.capture_all(folders=folders, max_per_type=args.max)
+    capture.capture_all(folders=folders, max_per_type=args.max, filter_types=filter_types)
     
     print()
-    print("✓ Capture complete!")
+    print("=" * 60)
+    print("✓ CAPTURE COMPLETE!")
+    print("=" * 60)
     print(f"Raw examples saved to: {capture.raw_dir}")
+    print(f"Capture report: {args.output / 'capture_report.json'}")
+    print()
+    print("The capture report contains:")
+    print("  - Summary of items captured by type")
+    print("  - Complete list of all errors encountered")
+    print("  - Timestamp and output directory info")
     
     return 0
 

@@ -1,0 +1,9 @@
+{
+  "id": "70b79819-a564-4342-aa80-5d628abe8d78",
+  "name": "Panorama Ports",
+  "folder": "Shared",
+  "members": [
+    "Mgmt Ports",
+    "Web Ports"
+  ]
+}

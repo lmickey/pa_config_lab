@@ -3,13 +3,14 @@ Enhanced Prisma Access API client.
 
 This module provides a comprehensive API client for interacting with
 Prisma Access SCM API, including authentication, request handling,
-pagination, rate limiting, and caching.
+pagination, rate limiting, caching, error handling, and response validation.
 """
 
 import requests
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from urllib.parse import quote
+import logging
 
 from .api_endpoints import (
     APIEndpoints,
@@ -24,6 +25,16 @@ from .api_utils import (
     paginate_api_request,
     build_headers,
 )
+from .api.errors import (
+    parse_api_error,
+    NetworkError,
+    RateLimitError,
+    AuthenticationError,
+)
+from .api.response_validator import validate_response
+
+
+logger = logging.getLogger(__name__)
 
 
 def encode_folder_name(folder: str) -> str:
@@ -59,8 +70,9 @@ class PrismaAccessAPIClient:
         tsg_id: str,
         api_user: str,
         api_secret: str,
-        rate_limit: int = 45,  # Changed from 100 to 45 (90% of 50 req/min for safety buffer)
+        rate_limit: int = 50,  # Set to 50 req/min (83% of 60 req/min API limit for safety buffer)
         cache_ttl: int = 300,
+        timeout: int = 60,  # Request timeout in seconds
     ):
         """
         Initialize API client.
@@ -69,12 +81,14 @@ class PrismaAccessAPIClient:
             tsg_id: Tenant Service Group ID
             api_user: API client ID
             api_secret: API client secret
-            rate_limit: Maximum requests per minute (default: 45 - 90% of 50 req/min limit)
+            rate_limit: Maximum requests per minute (default: 50 - 83% of 60 req/min API limit)
             cache_ttl: Cache time-to-live in seconds
+            timeout: Request timeout in seconds (default: 60)
         """
         self.tsg_id = tsg_id
         self.api_user = api_user
         self.api_secret = api_secret
+        self.timeout = timeout
 
         self.token: Optional[str] = None
         self.token_expires: Optional[datetime] = None
@@ -95,6 +109,10 @@ class PrismaAccessAPIClient:
         Returns:
             True if successful, False otherwise
         """
+        logger.info(f"Authenticating with Prisma Access API (TSG: {self.tsg_id})")
+        logger.debug(f"Auth URL: {AUTH_URL}")
+        logger.debug(f"API User: {self.api_user[:10]}...")
+        
         try:
             scope = f"tsg_id:{self.tsg_id}"
 
@@ -103,6 +121,8 @@ class PrismaAccessAPIClient:
 
             # Headers for form-urlencoded content type
             headers = {"Content-Type": "application/x-www-form-urlencoded"}
+            
+            logger.debug(f"Auth request scope: {scope}")
 
             # Basic auth: Client ID as username, Client Secret as password
             response = requests.post(
@@ -111,13 +131,15 @@ class PrismaAccessAPIClient:
                 data=data,  # Form data in body, not params
                 headers=headers,
             )
+            
+            logger.debug(f"Auth response status: {response.status_code}")
 
             if response.status_code == 200:
                 response_data = response.json()
                 self.token = response_data.get("access_token")
 
                 if not self.token:
-                    print("Authentication succeeded but no access_token in response")
+                    logger.error("Authentication succeeded but no access_token in response")
                     return False
 
                 # Tokens expire in 15 minutes (900 seconds)
@@ -125,16 +147,19 @@ class PrismaAccessAPIClient:
                 self.token_expires = datetime.now() + timedelta(
                     seconds=expires_in - 60
                 )  # Refresh 1 min early
+                
+                logger.info(f"Authentication successful (token expires in {expires_in}s)")
+                logger.debug(f"Token: {self.token[:20]}...")
 
                 return True
             else:
-                print(
+                logger.error(
                     f"Authentication failed: {response.status_code} - {response.text}"
                 )
                 return False
 
         except Exception as e:
-            print(f"Authentication error: {e}")
+            logger.error(f"Authentication error: {e}", exc_info=True)
             return False
 
     def _ensure_token(self) -> bool:
@@ -142,7 +167,9 @@ class PrismaAccessAPIClient:
         if not self.token or (
             self.token_expires and datetime.now() >= self.token_expires
         ):
+            logger.debug("Token expired or missing, re-authenticating")
             return self.authenticate()
+        logger.debug("Token valid")
         return True
 
     def _get_headers(self) -> Dict[str, str]:
@@ -160,9 +187,10 @@ class PrismaAccessAPIClient:
         params: Optional[Dict[str, Any]] = None,
         data: Optional[Dict[str, Any]] = None,
         use_cache: bool = True,
+        item_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Make API request with rate limiting and caching.
+        Make API request with rate limiting, caching, error handling, and validation.
 
         Args:
             method: HTTP method
@@ -170,52 +198,127 @@ class PrismaAccessAPIClient:
             params: Query parameters
             data: Request body data
             use_cache: Whether to use cache for GET requests
+            item_type: Optional item type for response validation
 
         Returns:
             Response data
+            
+        Raises:
+            AuthenticationError: If authentication fails
+            RateLimitError: If rate limit is exceeded
+            NetworkError: If network/server error occurs
+            ValidationError: If request validation fails
         """
+        logger.info(f"API {method} request to {url}")
+        logger.debug(f"Request params: {params}")
+        if data:
+            import json
+            logger.debug(f"Request body: {json.dumps(data, indent=2)}")
+        
         # Check cache for GET requests
         if method.upper() == "GET" and use_cache:
             cache_key = f"{method}:{url}:{params}"
             cached = self.cache.get(cache_key)
             if cached is not None:
+                logger.debug(f"Cache HIT for {cache_key[:100]}")
+                logger.debug(f"Cached data items: {len(cached.get('data', []))}")
                 return cached
+            logger.debug(f"Cache MISS for {cache_key[:100]}")
 
         # Rate limiting
+        logger.debug("Checking rate limit")
         self.rate_limiter.wait_if_needed()
 
         # Make request
         headers = self._get_headers()
+        logger.debug(f"Request headers: Authorization=Bearer {self.token[:15] if self.token else 'None'}...")
 
-        # Prepare request details for error logging
-        # Note: The actual final URL will be logged from response.url after the request
-        request_details = {
-            "method": method,
-            "url": url,  # Base URL (final URL with merged params will be in response.url)
-            "headers": headers,
-            "params": params,
-            "data": data if data and method.upper() != "GET" else None,
-            "json": (
-                data if data and method.upper() in ["POST", "PUT", "PATCH"] else None
-            ),
-        }
-
-        response = requests.request(
-            method=method,
-            url=url,
-            headers=headers,
-            params=params,
-            json=data if data else None,
-        )
-
-        result = handle_api_response(response, request_details)
-
-        # Cache GET requests
-        if method.upper() == "GET" and use_cache:
-            cache_key = f"{method}:{url}:{params}"
-            self.cache.set(cache_key, result)
-
-        return result
+        try:
+            logger.debug(f"Sending {method} request")
+            start_time = datetime.now()
+            
+            response = requests.request(
+                method=method,
+                url=url,
+                headers=headers,
+                params=params,
+                json=data if data else None,
+                timeout=self.timeout,
+            )
+            
+            duration = (datetime.now() - start_time).total_seconds()
+            logger.info(f"API response: {response.status_code} in {duration:.2f}s")
+            logger.debug(f"Response headers: {dict(response.headers)}")
+            
+            # Check for HTTP errors
+            if not response.ok:
+                logger.warning(f"API returned error status: {response.status_code}")
+                logger.debug(f"Error response body: {response.text[:500]}")
+                
+                try:
+                    # Try to parse error with our structured error handler
+                    error = parse_api_error(response, response.status_code, url)
+                    
+                    # Handle rate limiting with retry
+                    if isinstance(error, RateLimitError) and error.retry_after:
+                        logger.warning(f"Rate limited. Retrying after {error.retry_after}s")
+                        import time
+                        time.sleep(error.retry_after)
+                        return self._make_request(method, url, params, data, use_cache, item_type)
+                    
+                    # Log and raise
+                    logger.error(f"API request failed: {error}")
+                    raise error
+                    
+                except Exception as parse_error:
+                    # If error parsing fails, create a generic error
+                    from .api.errors import PrismaAPIError
+                    error = PrismaAPIError(
+                        f"API request failed (status {response.status_code})",
+                        error_code=f"HTTP_{response.status_code}",
+                        details={'url': url, 'method': method, 'parse_error': str(parse_error)}
+                    )
+                    logger.error(f"API request failed: {error}")
+                    raise error
+            
+            # Parse response
+            result = response.json() if response.content else {}
+            logger.debug(f"Response parsed successfully")
+            
+            if 'data' in result:
+                logger.info(f"Response contains {len(result['data'])} data items")
+                logger.debug(f"First data item keys: {list(result['data'][0].keys()) if result['data'] else 'none'}")
+            else:
+                logger.debug(f"Response keys: {list(result.keys())}")
+            
+            # Validate response if item_type provided (for GET requests)
+            if method.upper() == "GET" and item_type:
+                logger.debug(f"Validating response for item_type: {item_type}")
+                try:
+                    validate_response(result, item_type, strict=False, endpoint=url)
+                    logger.debug(f"Response validation passed")
+                except Exception as e:
+                    logger.warning(f"Response validation warning for {item_type}: {e}")
+                    # Continue anyway in non-strict mode
+            
+            # Cache GET requests
+            if method.upper() == "GET" and use_cache:
+                cache_key = f"{method}:{url}:{params}"
+                self.cache.set(cache_key, result)
+                logger.debug(f"Cached response for {cache_key[:100]}")
+            
+            return result
+            
+        except requests.RequestException as e:
+            # Handle network-level errors
+            logger.error(f"Network exception: {type(e).__name__}: {e}")
+            error = NetworkError(
+                f"Network error: {str(e)}",
+                status_code=getattr(e.response, 'status_code', None) if hasattr(e, 'response') else None,
+                details={'url': url, 'method': method}
+            )
+            logger.error(f"Network error: {error}")
+            raise error
 
     # ========================================================================
     # ConfigItem-Aware Methods (New Object-Oriented API)
@@ -236,38 +339,60 @@ class PrismaAccessAPIClient:
             >>> success = client.create_item(address)
         """
         from config.models.base import ConfigItem
+        from .api.response_validator import validate_for_creation
+        
+        logger.info(f"Creating {item.item_type} '{item.name}'")
+        logger.debug(f"Item location: folder={item.folder}, snippet={item.snippet}")
         
         if not isinstance(item, ConfigItem):
+            logger.error(f"Type error: Expected ConfigItem, got {type(item)}")
             raise TypeError(f"Expected ConfigItem, got {type(item)}")
         
         if not item.api_endpoint:
+            logger.error(f"No API endpoint defined for {item.item_type}")
             raise ValueError(f"No API endpoint defined for {item.item_type}")
         
+        logger.debug(f"API endpoint: {item.api_endpoint}")
+        
         try:
+            # Get data from item (removes internal fields)
+            data = item.to_dict(include_id=False)
+            logger.debug(f"Item data prepared: {len(data)} fields")
+            logger.debug(f"Data keys: {list(data.keys())}")
+            
+            # Validate before creation
+            logger.debug(f"Validating item for creation")
+            validate_for_creation(data, item.item_type)
+            logger.debug(f"Validation passed")
+            
             # Build URL with folder or snippet parameter
             url = item.api_endpoint
             if item.folder:
-                url += f"?folder={quote(item.folder, safe='')}"
+                encoded_folder = quote(item.folder, safe='')
+                url += f"?folder={encoded_folder}"
+                logger.debug(f"URL with folder: {url}")
             elif item.snippet:
-                url += f"?snippet={quote(item.snippet, safe='')}"
-            
-            # Get data from item (removes internal fields)
-            data = item.to_dict()
+                encoded_snippet = quote(item.snippet, safe='')
+                url += f"?snippet={encoded_snippet}"
+                logger.debug(f"URL with snippet: {url}")
             
             # Make request
+            logger.debug(f"Sending POST request")
             response = self._make_request("POST", url, data=data, use_cache=False)
             
             # Update item with response ID if available
             if isinstance(response, dict) and 'id' in response:
                 item.id = response['id']
                 item.raw_config['id'] = response['id']
+                logger.info(f"Created {item.item_type} '{item.name}' (ID: {item.id})")
+                logger.debug(f"Response data: {response}")
+            else:
+                logger.info(f"Created {item.item_type} '{item.name}' (no ID in response)")
             
             return True
             
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error creating {item.item_type} '{item.name}': {e}")
+            logger.error(f"Error creating {item.item_type} '{item.name}': {e}", exc_info=True)
             return False
     
     def update_item(self, item: 'ConfigItem') -> bool:
@@ -286,31 +411,39 @@ class PrismaAccessAPIClient:
         """
         from config.models.base import ConfigItem
         
+        logger.info(f"Updating {item.item_type} '{item.name}'")
+        logger.debug(f"Item ID: {item.id}")
+        
         if not isinstance(item, ConfigItem):
+            logger.error(f"Type error: Expected ConfigItem, got {type(item)}")
             raise TypeError(f"Expected ConfigItem, got {type(item)}")
         
         if not item.id:
+            logger.error(f"Cannot update {item.item_type} '{item.name}': no ID set")
             raise ValueError(f"Cannot update {item.item_type} '{item.name}': no ID set")
         
         if not item.api_endpoint:
+            logger.error(f"No API endpoint defined for {item.item_type}")
             raise ValueError(f"No API endpoint defined for {item.item_type}")
         
         try:
             # Build URL with item ID
             url = f"{item.api_endpoint}/{item.id}"
+            logger.debug(f"Update URL: {url}")
             
             # Get data from item (removes internal fields)
             data = item.to_dict()
+            logger.debug(f"Update data prepared: {len(data)} fields")
             
             # Make request
+            logger.debug(f"Sending PUT request")
             self._make_request("PUT", url, data=data, use_cache=False)
             
+            logger.info(f"Updated {item.item_type} '{item.name}'")
             return True
             
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error updating {item.item_type} '{item.name}': {e}")
+            logger.error(f"Error updating {item.item_type} '{item.name}': {e}", exc_info=True)
             return False
     
     def delete_item(self, item: 'ConfigItem') -> bool:
@@ -328,22 +461,31 @@ class PrismaAccessAPIClient:
         """
         from config.models.base import ConfigItem
         
+        logger.info(f"Deleting {item.item_type} '{item.name}'")
+        logger.debug(f"Item ID: {item.id}")
+        
         if not isinstance(item, ConfigItem):
+            logger.error(f"Type error: Expected ConfigItem, got {type(item)}")
             raise TypeError(f"Expected ConfigItem, got {type(item)}")
         
         if not item.id:
+            logger.error(f"Cannot delete {item.item_type} '{item.name}': no ID set")
             raise ValueError(f"Cannot delete {item.item_type} '{item.name}': no ID set")
         
         if not item.api_endpoint:
+            logger.error(f"No API endpoint defined for {item.item_type}")
             raise ValueError(f"No API endpoint defined for {item.item_type}")
         
         try:
             # Build URL with item ID
             url = f"{item.api_endpoint}/{item.id}"
+            logger.debug(f"Delete URL: {url}")
             
             # Make request
+            logger.debug(f"Sending DELETE request")
             self._make_request("DELETE", url, use_cache=False)
             
+            logger.info(f"Deleted {item.item_type} '{item.name}'")
             return True
             
         except Exception as e:
@@ -386,8 +528,11 @@ class PrismaAccessAPIClient:
             param = "snippet" if is_snippet else "folder"
             url += f"?{param}={quote(location, safe='')}"
             
-            # Make request
-            response = self._make_request("GET", url)
+            # Get item_type for validation
+            item_type = getattr(item_class, 'item_type', None)
+            
+            # Make request with validation
+            response = self._make_request("GET", url, item_type=item_type)
             
             # Extract items from response
             if isinstance(response, dict):
@@ -405,13 +550,11 @@ class PrismaAccessAPIClient:
                 for raw_item in raw_items:
                     try:
                         item = ConfigItemFactory.create_from_dict(
-                            item_class.item_type,
+                            item_type if item_type else item_class.__name__,
                             raw_item
                         )
                         items.append(item)
                     except Exception as e:
-                        import logging
-                        logger = logging.getLogger(__name__)
                         logger.warning(f"Skipping item due to error: {e}")
             else:
                 for raw_item in raw_items:
@@ -419,15 +562,11 @@ class PrismaAccessAPIClient:
                         item = item_class(raw_item)
                         items.append(item)
                     except Exception as e:
-                        import logging
-                        logger = logging.getLogger(__name__)
                         logger.warning(f"Skipping item due to error: {e}")
             
             return items
             
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.error(f"Error fetching {item_class.__name__} from {location}: {e}")
             return []
     

@@ -6,9 +6,41 @@ Prisma Access configurations. Used by both the config viewer and
 component selection dialog to ensure consistency.
 """
 
+import logging
 from typing import Dict, Any, Optional, Callable
 from PyQt6.QtWidgets import QTreeWidget, QTreeWidgetItem
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
+
+logger = logging.getLogger(__name__)
+
+
+# Default snippet values that indicate system/predefined items
+DEFAULT_SNIPPETS = {
+    'default',           # General system defaults
+    'hip-default',       # HIP-specific defaults
+    'optional-default',  # Optional pre-built defaults
+}
+
+
+def is_default_item(item_dict: Dict[str, Any]) -> bool:
+    """
+    Check if an item is a system default based on its snippet field.
+    
+    Args:
+        item_dict: Item dictionary containing 'snippet' field
+        
+    Returns:
+        True if item is a system default
+    """
+    snippet = item_dict.get('snippet', '')
+    if not snippet:
+        return False
+    if snippet in DEFAULT_SNIPPETS:
+        return True
+    if snippet.endswith('-default'):
+        return True
+    return False
 
 
 class ConfigTreeBuilder:
@@ -33,6 +65,11 @@ class ConfigTreeBuilder:
             tree: QTreeWidget to populate
             config: Configuration dictionary
         """
+        logger.info("ConfigTreeBuilder.build_tree called")
+        logger.info(f"  config type: {type(config)}")
+        logger.info(f"  config keys: {list(config.keys()) if isinstance(config, dict) else 'not a dict'}")
+        logger.info(f"  simplified mode: {self.simplified}")
+        
         tree.clear()
         root = tree.invisibleRootItem()
         
@@ -41,12 +78,17 @@ class ConfigTreeBuilder:
             # Only show metadata in viewer mode
             self._build_metadata_section(root, config)
         
+        logger.info("  Calling _build_security_policies_section")
         self._build_security_policies_section(root, config)
+        logger.info("  Calling _build_objects_section")
         self._build_objects_section(root, config)
+        logger.info("  Calling _build_infrastructure_section")
         self._build_infrastructure_section(root, config)
         
         # Expand top level
+        logger.info("  Expanding tree to depth 0")
         tree.expandToDepth(0)
+        logger.info("  Tree building complete")
     
     def _create_item(self, texts: list, data: Any = None, item_type: str = None) -> QTreeWidgetItem:
         """
@@ -92,20 +134,45 @@ class ConfigTreeBuilder:
         root.addChild(metadata_item)
     
     def _build_security_policies_section(self, root: QTreeWidgetItem, config: Dict[str, Any]):
-        """Build security policies section (folders and snippets)."""
-        sec_policies = config.get("security_policies", {})
-        if not sec_policies:
-            return
+        """Build security policies section (folders and snippets) - added directly to root."""
+        # Check for new format (folders/snippets at top level)
+        has_folders = "folders" in config
+        has_snippets = "snippets" in config
+        has_security_policies = "security_policies" in config
         
-        sec_item = self._create_item(["Security Policies", "container", ""])
+        logger.info(f"  _build_security_policies_section: has_folders={has_folders}, has_snippets={has_snippets}, has_security_policies={has_security_policies}")
         
-        # Folders
-        self._build_folders_section(sec_item, sec_policies)
+        if "folders" in config or "snippets" in config:
+            # New format from ConfigAdapter - add Folders and Snippets directly to root
+            logger.info("  Using NEW format (folders/snippets at top level)")
+            
+            # Folders - added directly to root
+            if config.get("folders"):
+                logger.info(f"  Calling _build_folders_section_new with {len(config.get('folders', {}))} folders")
+                self._build_folders_section_new(root, config.get("folders", {}))
+            
+            # Snippets - added directly to root
+            if config.get("snippets"):
+                logger.info(f"  Calling _build_snippets_section_new with {len(config.get('snippets', {}))} snippets")
+                self._build_snippets_section_new(root, config.get("snippets", {}))
         
-        # Snippets
-        self._build_snippets_section(sec_item, sec_policies)
-        
-        root.addChild(sec_item)
+        elif has_security_policies:
+            # Old format with security_policies
+            logger.info("  Using OLD format (security_policies)")
+            sec_policies = config.get("security_policies", {})
+            if not sec_policies:
+                logger.warning("  No security_policies found in config!")
+                return
+            
+            sec_item = self._create_item(["Security Policies", "container", ""])
+            
+            # Folders
+            self._build_folders_section(sec_item, sec_policies)
+            
+            # Snippets
+            self._build_snippets_section(sec_item, sec_policies)
+            
+            root.addChild(sec_item)
     
     def _build_folders_section(self, parent: QTreeWidgetItem, sec_policies: Dict[str, Any]):
         """Build folders section with full drill-down."""
@@ -533,152 +600,168 @@ class ConfigTreeBuilder:
         """Build infrastructure section."""
         infrastructure = config.get("infrastructure", {})
         if not infrastructure:
+            logger.debug("No infrastructure data found")
             return
+        
+        logger.info(f"Building infrastructure section with keys: {list(infrastructure.keys())}")
         
         infra_item = self._create_item(["Infrastructure", "container", ""])
         
-        # Remote Networks
-        remote_networks = infrastructure.get("remote_networks", [])
-        if remote_networks:
-            rn_item = self._create_item(["Remote Networks", "list", str(len(remote_networks))])
-            for rn in remote_networks:
-                name = rn.get("name", "Unknown")
-                rn_child = self._create_item([name, "remote_network", ""], item_type="infrastructure")
-                rn_child.setData(0, Qt.ItemDataRole.UserRole, {'type': 'infrastructure', 'infra_type': 'remote_networks', 'data': rn})
-                rn_item.addChild(rn_child)
-            infra_item.addChild(rn_item)
+        # Mapping from item_type to display name
+        # Handles both singular (from ConfigAdapter) and plural (legacy) formats
+        INFRA_TYPE_DISPLAY = {
+            # Singular (current format from item_type)
+            'remote_network': 'Remote Networks',
+            'service_connection': 'Service Connections',
+            'ipsec_tunnel': 'IPSec Tunnels',
+            'ike_gateway': 'IKE Gateways',
+            'ike_crypto_profile': 'IKE Crypto Profiles',
+            'ipsec_crypto_profile': 'IPSec Crypto Profiles',
+            'agent_profile': 'Agent Profiles',
+            'portal': 'Portals',
+            'gateway': 'Gateways',
+            # Plural (legacy format)
+            'remote_networks': 'Remote Networks',
+            'service_connections': 'Service Connections',
+            'ipsec_tunnels': 'IPSec Tunnels',
+            'ike_gateways': 'IKE Gateways',
+            'ike_crypto_profiles': 'IKE Crypto Profiles',
+            'ipsec_crypto_profiles': 'IPSec Crypto Profiles',
+            'agent_profiles': 'Agent Profiles',
+            'portals': 'Portals',
+            'gateways': 'Gateways',
+        }
         
-        # Service Connections
-        service_connections = infrastructure.get("service_connections", [])
-        if service_connections:
-            sc_item = self._create_item(["Service Connections", "list", str(len(service_connections))])
-            for sc in service_connections:
-                name = sc.get("name", "Unknown")
-                sc_child = self._create_item([name, "service_connection", ""], item_type="infrastructure")
-                sc_child.setData(0, Qt.ItemDataRole.UserRole, {'type': 'infrastructure', 'infra_type': 'service_connections', 'data': sc})
-                sc_item.addChild(sc_child)
-            infra_item.addChild(sc_item)
+        # Order for display
+        INFRA_ORDER = [
+            'remote_network', 'remote_networks',
+            'service_connection', 'service_connections',
+            'ike_gateway', 'ike_gateways',
+            'ipsec_tunnel', 'ipsec_tunnels',
+            'ike_crypto_profile', 'ike_crypto_profiles',
+            'ipsec_crypto_profile', 'ipsec_crypto_profiles',
+            'agent_profile', 'agent_profiles',
+            'portal', 'portals',
+            'gateway', 'gateways',
+        ]
         
-        # IPSec Tunnels
-        ipsec_tunnels = infrastructure.get("ipsec_tunnels", [])
-        if ipsec_tunnels:
-            it_item = self._create_item(["IPSec Tunnels", "list", str(len(ipsec_tunnels))])
-            for it in ipsec_tunnels:
-                name = it.get("name", "Unknown")
-                it_child = self._create_item([name, "ipsec_tunnel", ""], item_type="infrastructure")
-                it_child.setData(0, Qt.ItemDataRole.UserRole, {'type': 'infrastructure', 'infra_type': 'ipsec_tunnels', 'data': it})
-                it_item.addChild(it_child)
-            infra_item.addChild(it_item)
+        # Sort infrastructure keys by order, then alphabetically for unknowns
+        def infra_sort_key(key):
+            if key in INFRA_ORDER:
+                return (0, INFRA_ORDER.index(key))
+            return (1, key.lower())
         
-        # IKE Gateways
-        ike_gateways = infrastructure.get("ike_gateways", [])
-        if ike_gateways:
-            ike_item = self._create_item(["IKE Gateways", "list", str(len(ike_gateways))])
-            for ike in ike_gateways:
-                name = ike.get("name", "Unknown")
-                ike_child = self._create_item([name, "ike_gateway", ""], item_type="infrastructure")
-                ike_child.setData(0, Qt.ItemDataRole.UserRole, {'type': 'infrastructure', 'infra_type': 'ike_gateways', 'data': ike})
-                ike_item.addChild(ike_child)
-            infra_item.addChild(ike_item)
+        sorted_keys = sorted(infrastructure.keys(), key=infra_sort_key)
         
-        # IKE Crypto Profiles
-        ike_crypto_profiles = infrastructure.get("ike_crypto_profiles", [])
-        if ike_crypto_profiles:
-            ike_crypto_item = self._create_item(["IKE Crypto Profiles", "list", str(len(ike_crypto_profiles))])
+        # Handle legacy nested format (items list)
+        if "items" in infrastructure and isinstance(infrastructure["items"], list):
+            logger.debug("Found legacy 'items' format in infrastructure")
+            items_list = infrastructure["items"]
+            # Group by item_type
+            grouped = {}
+            for item in items_list:
+                item_type = item.get("item_type", "unknown")
+                if item_type not in grouped:
+                    grouped[item_type] = []
+                grouped[item_type].append(item)
             
-            # Sort: custom first (snippet != 'default'), then default, alphabetically
-            def crypto_sort_key(p):
-                snippet = p.get("snippet", "")
-                is_default = snippet == "default"
-                name = p.get("name", "").lower()
-                return (is_default, name)
-            
-            sorted_profiles = sorted(ike_crypto_profiles, key=crypto_sort_key)
-            
-            for prof in sorted_profiles:
-                name = prof.get("name", "Unknown")
-                snippet = prof.get("snippet", "")
-                type_indicator = "default" if snippet == "default" else "custom"
-                prof_child = self._create_item([name, type_indicator, ""], item_type="infrastructure")
-                prof_child.setData(0, Qt.ItemDataRole.UserRole, {'type': 'infrastructure', 'infra_type': 'ike_crypto_profiles', 'data': prof})
-                ike_crypto_item.addChild(prof_child)
-            infra_item.addChild(ike_crypto_item)
-        
-        # IPSec Crypto Profiles
-        ipsec_crypto_profiles = infrastructure.get("ipsec_crypto_profiles", [])
-        if ipsec_crypto_profiles:
-            ipsec_crypto_item = self._create_item(["IPSec Crypto Profiles", "list", str(len(ipsec_crypto_profiles))])
-            
-            # Sort: custom first (snippet != 'default'), then default, alphabetically
-            def crypto_sort_key(p):
-                snippet = p.get("snippet", "")
-                is_default = snippet == "default"
-                name = p.get("name", "").lower()
-                return (is_default, name)
-            
-            sorted_profiles = sorted(ipsec_crypto_profiles, key=crypto_sort_key)
-            
-            for prof in sorted_profiles:
-                name = prof.get("name", "Unknown")
-                snippet = prof.get("snippet", "")
-                type_indicator = "default" if snippet == "default" else "custom"
-                prof_child = self._create_item([name, type_indicator, ""], item_type="infrastructure")
-                prof_child.setData(0, Qt.ItemDataRole.UserRole, {'type': 'infrastructure', 'infra_type': 'ipsec_crypto_profiles', 'data': prof})
-                ipsec_crypto_item.addChild(prof_child)
-            infra_item.addChild(ipsec_crypto_item)
-        
-        # Mobile Users
-        mobile_users = infrastructure.get("mobile_users", {})
-        if mobile_users:
-            if self.simplified:
-                # Simplified mode: Show high-level items as pushable units
-                mu_item = self._create_item(["Mobile Users", "container", ""], item_type="infrastructure")
-                mu_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'infrastructure', 'infra_type': 'mobile_users', 'data': mobile_users})
+            # Process grouped items
+            for item_type in sorted(grouped.keys(), key=infra_sort_key):
+                items = grouped[item_type]
+                self._build_infra_type_section(infra_item, item_type, items, INFRA_TYPE_DISPLAY)
+        else:
+            # New format: infrastructure is Dict[item_type, List[items]]
+            for item_type in sorted_keys:
+                items = infrastructure[item_type]
                 
-                # Show major components as individual pushable items
-                if mobile_users.get("agent_profiles"):
-                    profiles = mobile_users["agent_profiles"]
-                    count = len(profiles) if isinstance(profiles, list) else 1
-                    prof_item = self._create_item([f"Agent Profiles ({count})", "mobile_users", ""], item_type="infrastructure")
-                    prof_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'infrastructure', 'infra_type': 'agent_profiles', 'data': profiles})
-                    mu_item.addChild(prof_item)
+                # Skip non-list items (like nested dicts for mobile_users/regions)
+                if isinstance(items, dict):
+                    logger.debug(f"  {item_type} is dict, using _add_dict_items")
+                    display_name = INFRA_TYPE_DISPLAY.get(item_type, item_type.replace('_', ' ').title())
+                    if self.simplified:
+                        type_item = self._create_item([display_name, "infrastructure", ""], item_type="infrastructure")
+                        type_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'infrastructure', 'infra_type': item_type, 'data': items})
+                        infra_item.addChild(type_item)
+                    else:
+                        type_item = self._create_item([display_name, "dict", ""])
+                        self._add_dict_items(type_item, items)
+                        infra_item.addChild(type_item)
+                    continue
                 
-                if mobile_users.get("agent_versions"):
-                    # Agent versions - just show as single item (will push activated version)
-                    ver_item = self._create_item(["Agent Versions", "mobile_users", ""], item_type="infrastructure")
-                    ver_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'infrastructure', 'infra_type': 'agent_versions', 'data': mobile_users["agent_versions"]})
-                    mu_item.addChild(ver_item)
+                if not isinstance(items, list):
+                    logger.debug(f"  Skipping {item_type} (not a list: {type(items)})")
+                    continue
                 
-                # Other mobile user settings as single items
-                for key in ["authentication_settings", "infrastructure_settings", "onboarding", "portal_settings"]:
-                    if mobile_users.get(key):
-                        display_name = key.replace("_", " ").title()
-                        item = self._create_item([display_name, "mobile_users", ""], item_type="infrastructure")
-                        item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'infrastructure', 'infra_type': key, 'data': mobile_users[key]})
-                        mu_item.addChild(item)
+                if not items:
+                    logger.debug(f"  Skipping {item_type} (empty list)")
+                    continue
                 
-                infra_item.addChild(mu_item)
-            else:
-                # Full detail mode for viewer
-                mu_item = self._create_item(["Mobile Users", "dict", ""])
-                self._add_dict_items(mu_item, mobile_users)
-                infra_item.addChild(mu_item)
-        
-        # Regions
-        regions = infrastructure.get("regions", {})
-        if regions:
-            if self.simplified:
-                # Simplified mode: Show as single pushable item
-                reg_item = self._create_item(["Regions", "infrastructure", ""], item_type="infrastructure")
-                reg_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'infrastructure', 'infra_type': 'regions', 'data': regions})
-                infra_item.addChild(reg_item)
-            else:
-                # Full detail mode for viewer
-                reg_item = self._create_item(["Regions", "dict", ""])
-                self._add_dict_items(reg_item, regions)
-                infra_item.addChild(reg_item)
+                self._build_infra_type_section(infra_item, item_type, items, INFRA_TYPE_DISPLAY)
         
         root.addChild(infra_item)
+    
+    def _build_infra_type_section(
+        self, 
+        parent: QTreeWidgetItem, 
+        item_type: str, 
+        items: list, 
+        display_names: Dict[str, str]
+    ):
+        """Build a section for a specific infrastructure type."""
+        display_name = display_names.get(item_type, item_type.replace('_', ' ').title())
+        logger.debug(f"  Building {item_type} section ({len(items)} items)")
+        
+        # Count custom vs default for crypto profiles
+        is_crypto_type = 'crypto' in item_type.lower()
+        
+        if is_crypto_type:
+            custom_count = sum(1 for p in items if not is_default_item(p))
+            default_count = len(items) - custom_count
+            
+            if default_count > 0 and custom_count > 0:
+                count_str = f"{custom_count} custom, {default_count} default"
+            elif default_count > 0:
+                count_str = f"{default_count} default"
+            else:
+                count_str = str(len(items))
+        else:
+            count_str = str(len(items))
+        
+        type_item = self._create_item([display_name, "list", count_str])
+        
+        # Sort items: custom first, then default, alphabetically
+        def sort_key(item):
+            is_def = is_default_item(item)
+            name = item.get("name", "").lower()
+            return (is_def, name)
+        
+        sorted_items = sorted(items, key=sort_key)
+        
+        for item in sorted_items:
+            name = item.get("name", "Unknown")
+            is_default = is_default_item(item)
+            
+            if is_default:
+                type_indicator = f"{item_type} (default)"
+            else:
+                type_indicator = item_type
+            
+            item_child = self._create_item([name, type_indicator, ""], item_type="infrastructure")
+            item_child.setData(0, Qt.ItemDataRole.UserRole, {
+                'type': 'infrastructure', 
+                'infra_type': item_type, 
+                'data': item,
+                'is_default': is_default
+            })
+            
+            # Gray out default items
+            if is_default:
+                item_child.setForeground(0, QColor(128, 128, 128))
+                item_child.setForeground(1, QColor(128, 128, 128))
+            
+            type_item.addChild(item_child)
+        
+        parent.addChild(type_item)
     
     def _add_dict_items(self, parent: QTreeWidgetItem, data: Dict):
         """Add dictionary items to tree, recursively expanding lists and dicts."""
@@ -705,3 +788,170 @@ class ConfigTreeBuilder:
             else:
                 item = self._create_item([str(key), "value", str(value)])
                 parent.addChild(item)
+    
+    def _build_folders_section_new(self, parent: QTreeWidgetItem, folders: Dict[str, Any]):
+        """Build folders section from new Configuration format."""
+        logger.info(f"    _build_folders_section_new called with {len(folders)} folders")
+        
+        # Folder display name mapping
+        FOLDER_DISPLAY_NAMES = {
+            'All': 'Global',
+            'Shared': 'Prisma Access',
+            'Mobile Users Container': 'Mobile Users Container',
+            'Mobile Users': 'Mobile Users',
+            'Mobile Users Explicit Proxy': 'Mobile Users Explicit Proxy',
+            'Remote Networks': 'Remote Networks',
+            'Service Connections': 'Service Connections',
+        }
+        
+        # Folder ordering (priority folders first)
+        FOLDER_ORDER = [
+            'All',  # Global - TLD
+            'Shared',  # Prisma Access - Shared folder
+            'Mobile Users Container',  # Container
+            'Mobile Users',
+            'Mobile Users Explicit Proxy',
+            'Remote Networks',
+            'Service Connections',
+        ]
+        
+        # Ensure Mobile Users Container exists (even if empty)
+        if 'Mobile Users Container' not in folders:
+            folders['Mobile Users Container'] = {}
+            logger.info("    Added empty 'Mobile Users Container' folder to maintain hierarchy")
+        
+        if not folders:
+            logger.warning("    No folders to build!")
+            return
+        
+        folders_item = self._create_item(["Folders", "container", str(len(folders))], item_type="folders_parent")
+        
+        # Sort folders: priority folders first (in order), then alphabetically
+        def folder_sort_key(folder_name):
+            if folder_name in FOLDER_ORDER:
+                return (0, FOLDER_ORDER.index(folder_name))
+            else:
+                return (1, folder_name.lower())
+        
+        sorted_folder_names = sorted(folders.keys(), key=folder_sort_key)
+        
+        for folder_name in sorted_folder_names:
+            folder_data = folders[folder_name]
+            logger.info(f"      Processing folder: {folder_name}")
+            logger.info(f"        folder_data type: {type(folder_data)}")
+            logger.info(f"        folder_data keys: {list(folder_data.keys()) if isinstance(folder_data, dict) else 'not a dict'}")
+            
+            # Get display name
+            display_name = FOLDER_DISPLAY_NAMES.get(folder_name, folder_name)
+            
+            # Create folder item with display name
+            folder_item = self._create_item([display_name, "folder", ""], item_type="folder")
+            folder_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'folder', 'name': folder_name, 'display_name': display_name, 'data': folder_data})
+            
+            # Add items by type
+            for item_type, items_list in folder_data.items():
+                if isinstance(items_list, list) and items_list:
+                    # Count custom vs default items
+                    custom_count = sum(1 for i in items_list if not is_default_item(i))
+                    default_count = len(items_list) - custom_count
+                    
+                    # Show counts in type display
+                    type_display = item_type.replace('_', ' ').title()
+                    if default_count > 0 and custom_count > 0:
+                        count_str = f"{custom_count} custom, {default_count} default"
+                    elif default_count > 0:
+                        count_str = f"{default_count} default"
+                    else:
+                        count_str = str(len(items_list))
+                    
+                    logger.info(f"        Adding {len(items_list)} items of type {item_type} ({custom_count} custom, {default_count} default)")
+                    type_item = self._create_item([type_display, "list", count_str], item_type=f"folder_{item_type}")
+                    type_item.setData(0, Qt.ItemDataRole.UserRole, {'type': f'folder_{item_type}', 'folder': folder_name, 'item_type': item_type})
+                    
+                    for item_dict in items_list:
+                        item_name = item_dict.get('name', 'Unknown')
+                        
+                        # Add indicator for default items
+                        is_default = is_default_item(item_dict)
+                        if is_default:
+                            display_type = f"{item_type} (default)"
+                        else:
+                            display_type = item_type
+                        
+                        item_child = self._create_item([item_name, display_type, ""], data=item_dict, item_type=item_type)
+                        item_child.setData(0, Qt.ItemDataRole.UserRole, {'type': item_type, 'folder': folder_name, 'data': item_dict, 'is_default': is_default})
+                        
+                        # Visual indicator: gray out default items
+                        if is_default:
+                            item_child.setForeground(0, QColor(128, 128, 128))  # Gray text
+                            item_child.setForeground(1, QColor(128, 128, 128))
+                        
+                        type_item.addChild(item_child)
+                    
+                    folder_item.addChild(type_item)
+            
+            folders_item.addChild(folder_item)
+        
+        logger.info(f"    Adding folders_item to parent")
+        parent.addChild(folders_item)
+    
+    def _build_snippets_section_new(self, parent: QTreeWidgetItem, snippets: Dict[str, Any]):
+        """Build snippets section from new Configuration format."""
+        logger.info(f"  _build_snippets_section_new: received {len(snippets) if snippets else 0} snippets")
+        if snippets:
+            logger.info(f"    Snippet names: {list(snippets.keys())}")
+        if not snippets:
+            logger.info(f"    No snippets to display")
+            return
+        
+        snippets_item = self._create_item(["Snippets", "container", str(len(snippets))], item_type="snippets_parent")
+        
+        for snippet_name, snippet_data in snippets.items():
+            # Create snippet item
+            snippet_item = self._create_item([snippet_name, "snippet", ""], item_type="snippet")
+            snippet_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'snippet', 'name': snippet_name, 'data': snippet_data})
+            
+            # Add items by type
+            for item_type, items_list in snippet_data.items():
+                if isinstance(items_list, list) and items_list:
+                    # Count custom vs default items
+                    custom_count = sum(1 for i in items_list if not is_default_item(i))
+                    default_count = len(items_list) - custom_count
+                    
+                    # Show counts in type display
+                    type_display = item_type.replace('_', ' ').title()
+                    if default_count > 0 and custom_count > 0:
+                        count_str = f"{custom_count} custom, {default_count} default"
+                    elif default_count > 0:
+                        count_str = f"{default_count} default"
+                    else:
+                        count_str = str(len(items_list))
+                    
+                    type_item = self._create_item([type_display, "list", count_str], item_type=f"snippet_{item_type}")
+                    type_item.setData(0, Qt.ItemDataRole.UserRole, {'type': f'snippet_{item_type}', 'snippet': snippet_name, 'item_type': item_type})
+                    
+                    for item_dict in items_list:
+                        item_name = item_dict.get('name', 'Unknown')
+                        
+                        # Add indicator for default items
+                        is_default = is_default_item(item_dict)
+                        if is_default:
+                            display_type = f"{item_type} (default)"
+                        else:
+                            display_type = item_type
+                        
+                        item_child = self._create_item([item_name, display_type, ""], data=item_dict, item_type=item_type)
+                        item_child.setData(0, Qt.ItemDataRole.UserRole, {'type': item_type, 'snippet': snippet_name, 'data': item_dict, 'is_default': is_default})
+                        
+                        # Visual indicator: gray out default items
+                        if is_default:
+                            item_child.setForeground(0, QColor(128, 128, 128))  # Gray text
+                            item_child.setForeground(1, QColor(128, 128, 128))
+                        
+                        type_item.addChild(item_child)
+                    
+                    snippet_item.addChild(type_item)
+            
+            snippets_item.addChild(snippet_item)
+        
+        parent.addChild(snippets_item)

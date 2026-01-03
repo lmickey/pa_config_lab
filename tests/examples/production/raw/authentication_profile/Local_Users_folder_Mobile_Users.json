@@ -1,0 +1,18 @@
+{
+  "id": "f751c42d-89fa-4861-bd9f-392fd419ee09",
+  "name": "Local Users",
+  "folder": "Mobile Users",
+  "multi_factor_auth": {
+    "mfa_enable": false
+  },
+  "method": {
+    "local_database": {}
+  },
+  "allow_list": [
+    "all"
+  ],
+  "lockout": {
+    "failed_attempts": 3,
+    "lockout_time": 5
+  }
+}

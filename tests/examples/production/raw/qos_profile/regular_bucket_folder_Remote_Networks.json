@@ -1,0 +1,27 @@
+{
+  "id": "5d10526f-2a0d-4994-969b-cc07f8e3bb13",
+  "name": "regular bucket",
+  "folder": "Remote Networks",
+  "class_bandwidth_type": {
+    "mbps": {
+      "class": [
+        {
+          "name": "class3",
+          "priority": "medium",
+          "class_bandwidth": {
+            "egress_max": 200,
+            "egress_guaranteed": 15
+          }
+        },
+        {
+          "name": "class1",
+          "priority": "real-time",
+          "class_bandwidth": {
+            "egress_max": 100,
+            "egress_guaranteed": 50
+          }
+        }
+      ]
+    }
+  }
+}

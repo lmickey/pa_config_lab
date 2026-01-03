@@ -1,0 +1,30 @@
+{
+  "id": "13b8ea0f-20cd-44c0-a748-ab1118e39278",
+  "name": "best-practice",
+  "snippet": "predefined",
+  "ssl_no_proxy": {
+    "block_expired_certificate": true,
+    "block_untrusted_issuer": true
+  },
+  "ssl_forward_proxy": {
+    "block_expired_certificate": true,
+    "block_untrusted_issuer": true,
+    "block_unknown_cert": true,
+    "restrict_cert_exts": true,
+    "auto_include_altname": true,
+    "block_unsupported_version": true,
+    "block_unsupported_cipher": true,
+    "block_client_cert": true
+  },
+  "ssl_inbound_proxy": {
+    "block_unsupported_version": true,
+    "block_unsupported_cipher": true
+  },
+  "ssl_protocol_settings": {
+    "min_version": "tls1-2",
+    "max_version": "max",
+    "enc_algo_3des": false,
+    "enc_algo_rc4": false,
+    "auth_algo_sha1": false
+  }
+}

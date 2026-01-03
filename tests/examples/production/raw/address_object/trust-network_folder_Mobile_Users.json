@@ -1,0 +1,6 @@
+{
+  "id": "5f4464f0-ae95-4b12-8847-af999fd1bc32",
+  "name": "trust-network",
+  "folder": "Mobile Users",
+  "ip_netmask": "10.12.2.0/24"
+}

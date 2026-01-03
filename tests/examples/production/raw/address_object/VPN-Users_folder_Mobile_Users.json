@@ -1,0 +1,9 @@
+{
+  "id": "8e451aac-0032-4996-9b5b-814c3713a23d",
+  "name": "VPN-Users",
+  "folder": "Mobile Users",
+  "override_loc": "Prisma Access",
+  "override_type": "container",
+  "override_id": "d92abb4e-b6fc-47e5-91a0-cf82dc870c72",
+  "ip_netmask": "172.16.0.0/20"
+}

@@ -1,0 +1,92 @@
+[
+  {
+    "id": "3e64b77b-e24b-4911-8992-24baf0baba14",
+    "name": "Mgmt Ports",
+    "folder": "Shared",
+    "members": [
+      "Service-SSH",
+      "service-RDP"
+    ]
+  },
+  {
+    "id": "3e64b77b-e24b-4911-8992-24baf0baba14",
+    "name": "Mgmt Ports",
+    "folder": "Shared",
+    "members": [
+      "Service-SSH",
+      "service-RDP"
+    ]
+  },
+  {
+    "id": "3e64b77b-e24b-4911-8992-24baf0baba14",
+    "name": "Mgmt Ports",
+    "folder": "Shared",
+    "members": [
+      "Service-SSH",
+      "service-RDP"
+    ]
+  },
+  {
+    "id": "70b79819-a564-4342-aa80-5d628abe8d78",
+    "name": "Panorama Ports",
+    "folder": "Shared",
+    "members": [
+      "Mgmt Ports",
+      "Web Ports"
+    ]
+  },
+  {
+    "id": "70b79819-a564-4342-aa80-5d628abe8d78",
+    "name": "Panorama Ports",
+    "folder": "Shared",
+    "members": [
+      "Mgmt Ports",
+      "Web Ports"
+    ]
+  },
+  {
+    "id": "3c752e9b-4202-41bc-9394-8b4f391476e0",
+    "name": "Quic",
+    "folder": "Shared",
+    "members": [
+      "Quic-HTTP",
+      "Quic-HTTPS"
+    ]
+  },
+  {
+    "id": "3c752e9b-4202-41bc-9394-8b4f391476e0",
+    "name": "Quic",
+    "folder": "Shared",
+    "members": [
+      "Quic-HTTP",
+      "Quic-HTTPS"
+    ]
+  },
+  {
+    "id": "e5bc86ac-af30-4115-a4a5-307af09a8e82",
+    "name": "Web Ports",
+    "folder": "Shared",
+    "members": [
+      "service-http",
+      "service-https"
+    ]
+  },
+  {
+    "id": "e5bc86ac-af30-4115-a4a5-307af09a8e82",
+    "name": "Web Ports",
+    "folder": "Shared",
+    "members": [
+      "service-http",
+      "service-https"
+    ]
+  },
+  {
+    "id": "e5bc86ac-af30-4115-a4a5-307af09a8e82",
+    "name": "Web Ports",
+    "folder": "Shared",
+    "members": [
+      "service-http",
+      "service-https"
+    ]
+  }
+]

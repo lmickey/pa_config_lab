@@ -56,7 +56,9 @@ class SavedConfigsManager:
                     "encrypted": is_encrypted,
                 })
             except Exception as e:
-                print(f"Error reading {config_file}: {e}")
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error reading {config_file}: {e}")
                 continue
         
         # Sort by modified time (newest first)

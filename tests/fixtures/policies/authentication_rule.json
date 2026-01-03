@@ -1,0 +1,111 @@
+[
+  {
+    "id": "83dc11c3-ced0-4717-bfd3-a3338135179f",
+    "name": "Authenticate Real-Estate Users",
+    "folder": "Mobile Users",
+    "from": [
+      "trust"
+    ],
+    "to": [
+      "untrust"
+    ],
+    "source": [
+      "any"
+    ],
+    "destination": [
+      "any"
+    ],
+    "source_user": [
+      "any"
+    ],
+    "category": [
+      "real-estate"
+    ],
+    "service": [
+      "service-http",
+      "service-https"
+    ],
+    "source_hip": [
+      "any"
+    ],
+    "log_setting": "Cortex Data Lake",
+    "destination_hip": [
+      "any"
+    ],
+    "authentication_enforcement": "enforcement13749"
+  },
+  {
+    "id": "09eb0191-efd0-4771-ad5f-6b9ff1999a2a",
+    "name": "Authenticate SSH Users",
+    "folder": "Mobile Users",
+    "from": [
+      "trust"
+    ],
+    "to": [
+      "untrust"
+    ],
+    "source": [
+      "any"
+    ],
+    "destination": [
+      "any"
+    ],
+    "source_user": [
+      "any"
+    ],
+    "category": [
+      "any"
+    ],
+    "source_hip": [
+      "any"
+    ],
+    "log_setting": "Cortex Data Lake",
+    "destination_hip": [
+      "any"
+    ],
+    "service": [
+      "service-SSH"
+    ],
+    "authentication_enforcement": "enforcement67006"
+  },
+  {
+    "id": "a86c1069-aa99-4d63-a5e8-ac5d8b1394ce",
+    "name": "Auto-VPN-Default-Snippet",
+    "folder": "ngfw-shared"
+  },
+  {
+    "id": "eed66ea4-f391-426c-a196-b9aacc85a9b7",
+    "name": "Web-Security-Default",
+    "folder": "All"
+  },
+  {
+    "id": "eed66ea4-f391-426c-a196-b9aacc85a9b7",
+    "name": "Web-Security-Default",
+    "folder": "All"
+  },
+  {
+    "id": "256d378f-419b-492c-bcf2-4e4d7e84443c",
+    "name": "default",
+    "folder": "All"
+  },
+  {
+    "id": "256d378f-419b-492c-bcf2-4e4d7e84443c",
+    "name": "default",
+    "folder": "All"
+  },
+  {
+    "id": "ae50213c-d3d7-4719-be3f-072818ee189d",
+    "name": "hip-default",
+    "folder": "All"
+  },
+  {
+    "id": "ae50213c-d3d7-4719-be3f-072818ee189d",
+    "name": "hip-default",
+    "folder": "All"
+  },
+  {
+    "id": "0806ada5-8d5f-4f6c-a4e4-afdb8459a31f",
+    "name": "optional-default",
+    "folder": "Prisma Access"
+  }
+]

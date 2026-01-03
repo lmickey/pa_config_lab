@@ -38,17 +38,16 @@ class ConfigItem(ABC):
         
         # Core identification
         self.name = raw_config.get('name', '')
-        self.id = raw_config.get('id')  # Transient, not saved
+        self.id = raw_config.get('id')  # UUID from SCM API (optional, read-only)
         
         # Location - one of folder/snippet MUST be set
         self.folder = raw_config.get('folder')
         self.snippet = raw_config.get('snippet')
         
-        # Validation: exactly one of folder/snippet must be set
+        # Validation: at least one of folder/snippet should be set
+        # Note: Some items may have BOTH when a snippet is assigned to a folder
         if not self.folder and not self.snippet:
             raise ValueError(f"Either folder or snippet must be set for {self.name}")
-        if self.folder and self.snippet:
-            raise ValueError(f"Cannot set both folder and snippet for {self.name}")
         
         # Configuration state
         self.is_default = raw_config.get('is_default', False)
@@ -178,24 +177,40 @@ class ConfigItem(ABC):
     
     # ========== Serialization Methods ==========
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self, include_id: bool = True) -> Dict[str, Any]:
         """
         Serialize item to JSON-compatible dictionary.
+        
+        IMPORTANT: Uses json.loads(json.dumps()) to ensure clean copy
+        without shared references. This is slower but safer for GUI threading.
+        
+        Args:
+            include_id: Whether to include the 'id' field (default: True)
         
         Returns:
             Dictionary representation suitable for JSON serialization
         """
-        data = self.raw_config.copy()
+        import json
+        
+        # Use JSON serialization for clean copy (no shared references)
+        # This is slower but prevents memory corruption
+        data = json.loads(json.dumps(self.raw_config))
+        
+        # Add item_type for factory deserialization
+        data['item_type'] = self.item_type
         
         # Add our tracking fields
         data['is_default'] = self.is_default
         data['push_strategy'] = self.push_strategy
         data['deleted'] = self.deleted
         data['delete_success'] = self.delete_success
-        data['metadata'] = self.metadata
+        data['metadata'] = json.loads(json.dumps(self.metadata)) if self.metadata else {}
         
-        # Remove transient fields
-        data.pop('id', None)
+        # Include id if present and requested
+        if include_id and self.id:
+            data['id'] = self.id
+        elif not include_id:
+            data.pop('id', None)
         
         return data
     
@@ -241,8 +256,7 @@ class ConfigItem(ABC):
         if not self.folder and not self.snippet:
             errors.append("Either folder or snippet must be set")
         
-        if self.folder and self.snippet:
-            errors.append("Cannot set both folder and snippet")
+        # Note: Items CAN have both folder and snippet when snippet is assigned to folder
         
         # Subclasses can add more validation
         errors.extend(self._validate_specific())

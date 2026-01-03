@@ -1,0 +1,7 @@
+{
+  "id": "be7fbc94-7fcc-4c6b-917e-50655db932fb",
+  "name": "is-win-and-disk-backup",
+  "snippet": "hip-default",
+  "match": "\"is-win\"  and \"is-disk-backup-installed\" ",
+  "description": "Matches Windows endpoints that have disk backup software installed"
+}

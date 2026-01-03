@@ -1,0 +1,215 @@
+[
+  {
+    "id": "bd31f511-2354-4ae5-bccf-ac199d1342c4",
+    "name": "Allow DNS",
+    "folder": "Shared",
+    "policy_type": "Security",
+    "position": "pre",
+    "description": "Allow DNS to Prisma Access Infrastructure",
+    "from": [
+      "trust"
+    ],
+    "source": [
+      "VPN-Users"
+    ],
+    "source_user": [
+      "any"
+    ],
+    "source_hip": [
+      "any"
+    ],
+    "to": [
+      "untrust"
+    ],
+    "destination": [
+      "169.254.169.254"
+    ],
+    "destination_hip": [
+      "any"
+    ],
+    "application": [
+      "dns-base"
+    ],
+    "service": [
+      "application-default"
+    ],
+    "category": [
+      "any"
+    ],
+    "action": "allow",
+    "profile_setting": {
+      "group": [
+        "Best Practice - Block Post"
+      ]
+    },
+    "log_setting": "Cortex Data Lake",
+    "log_end": true,
+    "log_start": false,
+    "disabled": false,
+    "negate_source": false,
+    "negate_destination": false
+  },
+  {
+    "id": "7d0fbe5c-5152-4a6f-9754-d005903cb218",
+    "name": "Allow DNS to Azure DC",
+    "folder": "Shared",
+    "policy_type": "Security",
+    "position": "pre",
+    "disabled": false,
+    "description": "Allow Ping to Azure DC",
+    "from": [
+      "trust"
+    ],
+    "source": [
+      "VPN-Users"
+    ],
+    "source_user": [
+      "known-user"
+    ],
+    "source_hip": [
+      "any"
+    ],
+    "to": [
+      "trust"
+    ],
+    "destination": [
+      "10.12.0.0/16"
+    ],
+    "destination_hip": [
+      "any"
+    ],
+    "application": [
+      "dns-base"
+    ],
+    "service": [
+      "application-default"
+    ],
+    "category": [
+      "any"
+    ],
+    "action": "allow",
+    "profile_setting": {
+      "group": [
+        "Best Practice - Block Post"
+      ]
+    },
+    "log_start": false,
+    "log_end": true,
+    "negate_source": false,
+    "negate_destination": false,
+    "log_setting": "Cortex Data Lake"
+  },
+  {
+    "id": "6cdb3e72-5bfd-4318-9674-09983dc6a0d8",
+    "name": "Auto-VPN-Default-Snippet",
+    "folder": "ngfw-shared",
+    "policy_type": "Security",
+    "log_setting": "Cortex Data Lake",
+    "log_end": true
+  },
+  {
+    "id": "b58b6902-ae2f-48cf-98d9-0d20fd2e367c",
+    "name": "Block Personal Email",
+    "folder": "Shared",
+    "policy_type": "Internet",
+    "position": "pre",
+    "source": [
+      "any"
+    ],
+    "source_user": [
+      "any"
+    ],
+    "security_settings": {
+      "anti_spyware": "yes",
+      "virus_and_wildfire_analysis": "yes",
+      "vulnerability": "yes"
+    },
+    "allow_web_application": [
+      {
+        "name": "gmail",
+        "position": "pre",
+        "dlp": "none",
+        "type": "application",
+        "saas_enterprise_control": {
+          "consumer_access": {
+            "enable": "no"
+          },
+          "enterprise_access": {
+            "enable": "yes"
+          }
+        },
+        "file_control": {
+          "upload": "best-practice",
+          "download": "best-practice"
+        },
+        "application_function": [
+          "gmail-uploading"
+        ]
+      }
+    ],
+    "disabled": true
+  },
+  {
+    "id": "984421d8-a716-4170-8956-906b5940e747",
+    "name": "Default Category Block",
+    "folder": "Shared",
+    "policy_type": "Internet",
+    "position": "pre",
+    "source": [
+      "any"
+    ],
+    "source_user": [
+      "any"
+    ],
+    "security_settings": {
+      "anti_spyware": "yes",
+      "virus_and_wildfire_analysis": "yes",
+      "vulnerability": "yes"
+    },
+    "description": "block these categories for all users regardless of rules",
+    "block_url_category": [
+      "social-networking"
+    ],
+    "disabled": true
+  },
+  {
+    "id": "2a514310-d44e-401f-af58-699759f44d0e",
+    "name": "Web-Security-Default",
+    "folder": "All",
+    "policy_type": "Security",
+    "log_setting": "Cortex Data Lake",
+    "log_end": true
+  },
+  {
+    "id": "7f31ba8c-ec33-4a2f-9921-e23196b04b9d",
+    "name": "default",
+    "folder": "All",
+    "policy_type": "Security",
+    "log_setting": "Cortex Data Lake",
+    "log_end": true
+  },
+  {
+    "id": "c6396267-347f-4e54-92b4-ac410590e046",
+    "name": "hip-default",
+    "folder": "All",
+    "policy_type": "Security"
+  },
+  {
+    "id": "25441ad9-d2bf-4dcc-916f-a18c7f26c68b",
+    "name": "office365",
+    "folder": "Shared",
+    "policy_type": "Security",
+    "position": "pre",
+    "log_setting": "Cortex Data Lake",
+    "log_end": true
+  },
+  {
+    "id": "d19cdffa-c3eb-47fd-b98a-25b89c1ccf3f",
+    "name": "optional-default",
+    "folder": "Shared",
+    "policy_type": "Security",
+    "position": "pre",
+    "log_setting": "Cortex Data Lake",
+    "log_end": true
+  }
+]

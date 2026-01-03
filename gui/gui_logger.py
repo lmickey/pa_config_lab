@@ -2,7 +2,7 @@
 Centralized GUI logging handler.
 
 This module provides a logging handler that redirects all application
-logging to the GUI logs widget.
+logging to the GUI logs widget using thread-safe Qt signals.
 """
 
 import sys
@@ -10,10 +10,16 @@ import logging
 from datetime import datetime
 from typing import Optional
 from io import StringIO
+from PyQt6.QtCore import QObject, pyqtSignal
+
+
+class LogSignalEmitter(QObject):
+    """QObject that emits signals for thread-safe logging."""
+    log_signal = pyqtSignal(str, str)  # message, level
 
 
 class GUILogHandler(logging.Handler):
-    """Custom logging handler that sends logs to GUI widget and file."""
+    """Custom logging handler that sends logs to GUI widget and file using thread-safe signals."""
     
     def __init__(self, logs_widget=None, log_file="activity.log"):
         """
@@ -28,16 +34,28 @@ class GUILogHandler(logging.Handler):
         self.log_file = log_file
         self.setFormatter(logging.Formatter('%(message)s'))
         
+        # Create signal emitter for thread-safe logging
+        self.signal_emitter = LogSignalEmitter()
+        
+        # Connect signal to logs widget if provided
+        if self.logs_widget:
+            from PyQt6.QtCore import Qt
+            self.signal_emitter.log_signal.connect(
+                self.logs_widget.log,
+                Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+            )
+        
         # Clear the log file on initialization (overwrite mode)
         try:
             with open(self.log_file, 'w') as f:
                 f.write(f"=== Activity Log Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n")
-        except Exception as e:
-            print(f"Warning: Could not initialize log file {self.log_file}: {e}")
+        except Exception:
+            # Silently fail - can't log before logging is set up
+            pass
     
     def emit(self, record):
         """
-        Emit a log record to the GUI and file.
+        Emit a log record to the GUI and file using thread-safe signals.
         
         Args:
             record: LogRecord to emit
@@ -56,9 +74,9 @@ class GUILogHandler(logging.Handler):
             
             gui_level = level_map.get(record.levelno, 'info')
             
-            # Send to GUI logs widget
+            # Send to GUI logs widget via SIGNAL (thread-safe)
             if self.logs_widget:
-                self.logs_widget.log(msg, gui_level)
+                self.signal_emitter.log_signal.emit(msg, gui_level)
             
             # Write to log file with timestamp
             try:
@@ -74,7 +92,7 @@ class GUILogHandler(logging.Handler):
 
 
 class PrintRedirector:
-    """Redirect print statements to GUI log and file."""
+    """Redirect print statements to GUI log and file using thread-safe signals."""
     
     def __init__(self, logs_widget=None, level='info', log_file="activity.log"):
         """
@@ -90,9 +108,20 @@ class PrintRedirector:
         self.log_file = log_file
         self.buffer = StringIO()
         
+        # Create signal emitter for thread-safe logging
+        self.signal_emitter = LogSignalEmitter()
+        
+        # Connect signal to logs widget if provided
+        if self.logs_widget:
+            from PyQt6.QtCore import Qt
+            self.signal_emitter.log_signal.connect(
+                self.logs_widget.log,
+                Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+            )
+        
     def write(self, text):
         """
-        Write text to GUI log and file.
+        Write text to GUI log and file using thread-safe signals.
         
         Args:
             text: Text to write
@@ -111,9 +140,9 @@ class PrintRedirector:
         elif any(keyword in text.lower() for keyword in ['success', 'completed', 'done']):
             level = 'success'
         
-        # Send to GUI
+        # Send to GUI via SIGNAL (thread-safe)
         if self.logs_widget:
-            self.logs_widget.log(text, level)
+            self.signal_emitter.log_signal.emit(text, level)
         
         # Write to file
         try:
@@ -129,14 +158,16 @@ class PrintRedirector:
 
 
 class ErrorLoggerGUIAdapter:
-    """Adapter to send ErrorLogger output to GUI."""
+    """Adapter to send ErrorLogger output to GUI using thread-safe signals."""
     
     _instance = None
     _logs_widget = None
+    _signal_emitter = None
     
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(ErrorLoggerGUIAdapter, cls).__new__(cls)
+            cls._signal_emitter = LogSignalEmitter()
         return cls._instance
     
     @classmethod
@@ -148,50 +179,58 @@ class ErrorLoggerGUIAdapter:
             logs_widget: LogsWidget instance
         """
         cls._logs_widget = logs_widget
+        
+        # Connect signal to logs widget
+        if cls._logs_widget and cls._signal_emitter:
+            from PyQt6.QtCore import Qt
+            cls._signal_emitter.log_signal.connect(
+                cls._logs_widget.log,
+                Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+            )
     
     @classmethod
     def log_api_error(cls, message: str):
         """
-        Log an API error to GUI.
+        Log an API error to GUI using thread-safe signal.
         
         Args:
             message: Error message
         """
-        if cls._logs_widget:
-            cls._logs_widget.log(message, 'error')
+        if cls._logs_widget and cls._signal_emitter:
+            cls._signal_emitter.log_signal.emit(message, 'error')
     
     @classmethod
     def log_info(cls, message: str):
         """
-        Log info message to GUI.
+        Log info message to GUI using thread-safe signal.
         
         Args:
             message: Info message
         """
-        if cls._logs_widget:
-            cls._logs_widget.log(message, 'info')
+        if cls._logs_widget and cls._signal_emitter:
+            cls._signal_emitter.log_signal.emit(message, 'info')
     
     @classmethod
     def log_warning(cls, message: str):
         """
-        Log warning message to GUI.
+        Log warning message to GUI using thread-safe signal.
         
         Args:
             message: Warning message
         """
-        if cls._logs_widget:
-            cls._logs_widget.log(message, 'warning')
+        if cls._logs_widget and cls._signal_emitter:
+            cls._signal_emitter.log_signal.emit(message, 'warning')
     
     @classmethod
     def log_success(cls, message: str):
         """
-        Log success message to GUI.
+        Log success message to GUI using thread-safe signal.
         
         Args:
             message: Success message
         """
-        if cls._logs_widget:
-            cls._logs_widget.log(message, 'success')
+        if cls._logs_widget and cls._signal_emitter:
+            cls._signal_emitter.log_signal.emit(message, 'success')
 
 
 def setup_gui_logging(logs_widget):

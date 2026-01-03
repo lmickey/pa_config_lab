@@ -1,0 +1,354 @@
+{
+  "timestamp": "2026-01-02T18:05:12.790441",
+  "summary": {
+    "total_fixtures": 223,
+    "successful_parses": 223,
+    "failed_parses": 0,
+    "success_rate": 100.0
+  },
+  "by_type": {
+    "agent_profile": {
+      "total": 3,
+      "success": 3,
+      "failures": []
+    },
+    "ike_crypto_profile": {
+      "total": 2,
+      "success": 2,
+      "failures": []
+    },
+    "ike_gateway": {
+      "total": 3,
+      "success": 3,
+      "failures": []
+    },
+    "ipsec_crypto_profile": {
+      "total": 2,
+      "success": 2,
+      "failures": []
+    },
+    "ipsec_tunnel": {
+      "total": 3,
+      "success": 3,
+      "failures": []
+    },
+    "address_group": {
+      "total": 6,
+      "success": 6,
+      "failures": []
+    },
+    "address_object": {
+      "total": 10,
+      "success": 10,
+      "failures": []
+    },
+    "application_filter": {
+      "total": 10,
+      "success": 10,
+      "failures": []
+    },
+    "application_group": {
+      "total": 10,
+      "success": 10,
+      "failures": []
+    },
+    "schedule": {
+      "total": 10,
+      "success": 10,
+      "failures": []
+    },
+    "service_group": {
+      "total": 10,
+      "success": 10,
+      "failures": []
+    },
+    "service_object": {
+      "total": 11,
+      "success": 11,
+      "failures": []
+    },
+    "tag": {
+      "total": 10,
+      "success": 10,
+      "failures": []
+    },
+    "authentication_rule": {
+      "total": 10,
+      "success": 10,
+      "failures": []
+    },
+    "decryption_rule": {
+      "total": 10,
+      "success": 10,
+      "failures": []
+    },
+    "qos_policy_rule": {
+      "total": 10,
+      "success": 10,
+      "failures": []
+    },
+    "security_rule": {
+      "total": 10,
+      "success": 10,
+      "failures": []
+    },
+    "anti_spyware_profile": {
+      "total": 10,
+      "success": 10,
+      "failures": []
+    },
+    "authentication_profile": {
+      "total": 10,
+      "success": 10,
+      "failures": []
+    },
+    "certificate_profile": {
+      "total": 6,
+      "success": 6,
+      "failures": []
+    },
+    "decryption_profile": {
+      "total": 10,
+      "success": 10,
+      "failures": []
+    },
+    "file_blocking_profile": {
+      "total": 10,
+      "success": 10,
+      "failures": []
+    },
+    "hip_object": {
+      "total": 10,
+      "success": 10,
+      "failures": []
+    },
+    "hip_profile": {
+      "total": 10,
+      "success": 10,
+      "failures": []
+    },
+    "http_header_profile": {
+      "total": 5,
+      "success": 5,
+      "failures": []
+    },
+    "profile_group": {
+      "total": 10,
+      "success": 10,
+      "failures": []
+    },
+    "qos_profile": {
+      "total": 2,
+      "success": 2,
+      "failures": []
+    },
+    "vulnerability_profile": {
+      "total": 10,
+      "success": 10,
+      "failures": []
+    }
+  },
+  "issues": {
+    "missing_fields": {},
+    "extra_fields": {
+      "agent_profile": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "ike_crypto_profile": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "ike_gateway": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "ipsec_crypto_profile": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "ipsec_tunnel": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "address_group": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "address_object": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "application_filter": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "application_group": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "schedule": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "service_group": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "service_object": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "tag": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "authentication_rule": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "decryption_rule": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "qos_policy_rule": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "security_rule": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "anti_spyware_profile": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "authentication_profile": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "certificate_profile": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "decryption_profile": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "file_blocking_profile": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "hip_object": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "hip_profile": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "http_header_profile": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "profile_group": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "qos_profile": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ],
+      "vulnerability_profile": [
+        "metadata",
+        "is_default",
+        "delete_success",
+        "deleted",
+        "push_strategy"
+      ]
+    },
+    "type_mismatches": [],
+    "value_changes": []
+  }
+}

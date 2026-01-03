@@ -1,0 +1,860 @@
+{
+  "tag": [
+    {
+      "id": "56391305-7042-46b5-b2fd-09677bcf6fe2",
+      "name": "Block-brute-force",
+      "folder": "All",
+      "snippet": "default",
+      "color": "Red"
+    },
+    {
+      "id": "aeb0ee0d-3c1e-4104-882f-a41366499252",
+      "name": "PA_predefined_embargo_rule",
+      "folder": "All",
+      "snippet": "Web-Security-Default",
+      "color": "Green"
+    },
+    {
+      "id": "aeb0ee0d-3c1e-4104-882f-a41366499252",
+      "name": "PA_predefined_embargo_rule",
+      "folder": "All",
+      "snippet": "Web-Security-Default",
+      "color": "Green"
+    },
+    {
+      "id": "852dadab-6e82-4872-8793-2ec7f3a3755d",
+      "name": "Sanctioned",
+      "folder": "All",
+      "color": "Olive"
+    },
+    {
+      "id": "20faa7e3-5ac7-4ada-ac22-0c07498676d7",
+      "name": "Tolerated",
+      "folder": "All",
+      "color": "Maroon"
+    },
+    {
+      "id": "e19f776e-b2f7-40c6-920c-91e46ffd5d9c",
+      "name": "Web Security Global",
+      "folder": "All",
+      "snippet": "Web-Security-Default",
+      "color": "Green"
+    },
+    {
+      "id": "e19f776e-b2f7-40c6-920c-91e46ffd5d9c",
+      "name": "Web Security Global",
+      "folder": "All",
+      "snippet": "Web-Security-Default",
+      "color": "Green"
+    },
+    {
+      "id": "5cb59450-4a32-4cc6-a1a0-cdf9350d1d27",
+      "name": "best-practice",
+      "folder": "All",
+      "snippet": "default",
+      "color": "Green"
+    },
+    {
+      "id": "cdc30f04-1086-4bba-9b1c-7c1c6ff1df99",
+      "name": "decrypt-bypass",
+      "folder": "All",
+      "snippet": "default",
+      "color": "Red"
+    },
+    {
+      "id": "1fcedfa3-9196-4f0d-9c75-75d36e230c33",
+      "name": "empty",
+      "folder": "All"
+    }
+  ],
+  "address_object": [
+    {
+      "id": "8e451aac-0032-4996-9b5b-814c3713a23d",
+      "name": "VPN-Users",
+      "folder": "Mobile Users",
+      "override_loc": "Prisma Access",
+      "override_type": "container",
+      "override_id": "d92abb4e-b6fc-47e5-91a0-cf82dc870c72",
+      "ip_netmask": "172.16.0.0/20"
+    },
+    {
+      "id": "d92abb4e-b6fc-47e5-91a0-cf82dc870c72",
+      "name": "VPN-Users",
+      "folder": "Shared",
+      "ip_netmask": "172.16.0.0/20"
+    },
+    {
+      "id": "d92abb4e-b6fc-47e5-91a0-cf82dc870c72",
+      "name": "VPN-Users",
+      "folder": "Shared",
+      "ip_netmask": "172.16.0.0/20"
+    },
+    {
+      "id": "5f4464f0-ae95-4b12-8847-af999fd1bc32",
+      "name": "trust-network",
+      "folder": "Mobile Users",
+      "ip_netmask": "10.12.2.0/24"
+    },
+    {
+      "id": "a9a74af7-03b9-439f-9c8b-f1c3c025ad14",
+      "name": "zoom-1",
+      "folder": "All",
+      "ip_netmask": "3.7.35.0/25"
+    },
+    {
+      "id": "a9a74af7-03b9-439f-9c8b-f1c3c025ad14",
+      "name": "zoom-1",
+      "folder": "All",
+      "ip_netmask": "3.7.35.0/25"
+    },
+    {
+      "id": "a9a74af7-03b9-439f-9c8b-f1c3c025ad14",
+      "name": "zoom-1",
+      "folder": "All",
+      "ip_netmask": "3.7.35.0/25"
+    },
+    {
+      "id": "a9a74af7-03b9-439f-9c8b-f1c3c025ad14",
+      "name": "zoom-1",
+      "folder": "All",
+      "ip_netmask": "3.7.35.0/25"
+    },
+    {
+      "id": "a9a74af7-03b9-439f-9c8b-f1c3c025ad14",
+      "name": "zoom-1",
+      "folder": "All",
+      "ip_netmask": "3.7.35.0/25"
+    },
+    {
+      "id": "780ca193-3a1e-4361-a9bb-9d1ee6bb1493",
+      "name": "zoom-8",
+      "folder": "Mobile Users",
+      "ip_netmask": "3.21.137.128/25"
+    }
+  ],
+  "address_group": [
+    {
+      "id": "ee60b649-1a77-495c-8dcb-aeed1f8a13be",
+      "name": "zoom-static",
+      "folder": "Shared",
+      "static": [
+        "VPN-Users"
+      ]
+    },
+    {
+      "id": "ee60b649-1a77-495c-8dcb-aeed1f8a13be",
+      "name": "zoom-static",
+      "folder": "Shared",
+      "static": [
+        "VPN-Users"
+      ]
+    },
+    {
+      "id": "ee60b649-1a77-495c-8dcb-aeed1f8a13be",
+      "name": "zoom-static",
+      "folder": "Shared",
+      "static": [
+        "VPN-Users"
+      ]
+    },
+    {
+      "id": "ee60b649-1a77-495c-8dcb-aeed1f8a13be",
+      "name": "zoom-static",
+      "folder": "Shared",
+      "static": [
+        "VPN-Users"
+      ]
+    },
+    {
+      "id": "ee60b649-1a77-495c-8dcb-aeed1f8a13be",
+      "name": "zoom-static",
+      "folder": "Shared",
+      "static": [
+        "VPN-Users"
+      ]
+    },
+    {
+      "id": "ee60b649-1a77-495c-8dcb-aeed1f8a13be",
+      "name": "zoom-static",
+      "folder": "Shared",
+      "static": [
+        "VPN-Users"
+      ]
+    }
+  ],
+  "service_object": [
+    {
+      "id": "86f44faf-771f-4dc6-a58b-1aea6f09dc5d",
+      "name": "Quic-HTTPS",
+      "folder": "Shared",
+      "protocol": {
+        "udp": {
+          "port": "443"
+        }
+      }
+    },
+    {
+      "id": "86f44faf-771f-4dc6-a58b-1aea6f09dc5d",
+      "name": "Quic-HTTPS",
+      "folder": "Shared",
+      "protocol": {
+        "udp": {
+          "port": "443"
+        }
+      }
+    },
+    {
+      "id": "86f44faf-771f-4dc6-a58b-1aea6f09dc5d",
+      "name": "Quic-HTTPS",
+      "folder": "Shared",
+      "protocol": {
+        "udp": {
+          "port": "443"
+        }
+      }
+    },
+    {
+      "id": "86f44faf-771f-4dc6-a58b-1aea6f09dc5d",
+      "name": "Quic-HTTPS",
+      "folder": "Shared",
+      "protocol": {
+        "udp": {
+          "port": "443"
+        }
+      }
+    },
+    {
+      "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+      "name": "Quic-HTTP",
+      "folder": "Shared",
+      "protocol": {
+        "udp": {
+          "port": "80"
+        }
+      }
+    },
+    {
+      "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+      "name": "Quic-HTTP",
+      "folder": "Shared",
+      "protocol": {
+        "udp": {
+          "port": "80"
+        }
+      }
+    },
+    {
+      "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+      "name": "Quic-HTTP",
+      "folder": "Shared",
+      "protocol": {
+        "udp": {
+          "port": "80"
+        }
+      }
+    },
+    {
+      "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+      "name": "Quic-HTTP",
+      "folder": "Shared",
+      "protocol": {
+        "udp": {
+          "port": "80"
+        }
+      }
+    },
+    {
+      "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+      "name": "Quic-HTTP",
+      "folder": "Shared",
+      "protocol": {
+        "udp": {
+          "port": "80"
+        }
+      }
+    },
+    {
+      "id": "58dd7fe1-8aeb-48a0-ac8e-15ec963c2c5f",
+      "name": "Quic-HTTP",
+      "folder": "Shared",
+      "protocol": {
+        "udp": {
+          "port": "80"
+        }
+      }
+    },
+    {
+      "id": "0619326e-4d01-41da-8f89-520ee5922fa3",
+      "name": "service-SSH",
+      "folder": "Mobile Users",
+      "protocol": {
+        "tcp": {
+          "port": "22"
+        }
+      }
+    }
+  ],
+  "service_group": [
+    {
+      "id": "3e64b77b-e24b-4911-8992-24baf0baba14",
+      "name": "Mgmt Ports",
+      "folder": "Shared",
+      "members": [
+        "Service-SSH",
+        "service-RDP"
+      ]
+    },
+    {
+      "id": "3e64b77b-e24b-4911-8992-24baf0baba14",
+      "name": "Mgmt Ports",
+      "folder": "Shared",
+      "members": [
+        "Service-SSH",
+        "service-RDP"
+      ]
+    },
+    {
+      "id": "3e64b77b-e24b-4911-8992-24baf0baba14",
+      "name": "Mgmt Ports",
+      "folder": "Shared",
+      "members": [
+        "Service-SSH",
+        "service-RDP"
+      ]
+    },
+    {
+      "id": "70b79819-a564-4342-aa80-5d628abe8d78",
+      "name": "Panorama Ports",
+      "folder": "Shared",
+      "members": [
+        "Mgmt Ports",
+        "Web Ports"
+      ]
+    },
+    {
+      "id": "70b79819-a564-4342-aa80-5d628abe8d78",
+      "name": "Panorama Ports",
+      "folder": "Shared",
+      "members": [
+        "Mgmt Ports",
+        "Web Ports"
+      ]
+    },
+    {
+      "id": "3c752e9b-4202-41bc-9394-8b4f391476e0",
+      "name": "Quic",
+      "folder": "Shared",
+      "members": [
+        "Quic-HTTP",
+        "Quic-HTTPS"
+      ]
+    },
+    {
+      "id": "3c752e9b-4202-41bc-9394-8b4f391476e0",
+      "name": "Quic",
+      "folder": "Shared",
+      "members": [
+        "Quic-HTTP",
+        "Quic-HTTPS"
+      ]
+    },
+    {
+      "id": "e5bc86ac-af30-4115-a4a5-307af09a8e82",
+      "name": "Web Ports",
+      "folder": "Shared",
+      "members": [
+        "service-http",
+        "service-https"
+      ]
+    },
+    {
+      "id": "e5bc86ac-af30-4115-a4a5-307af09a8e82",
+      "name": "Web Ports",
+      "folder": "Shared",
+      "members": [
+        "service-http",
+        "service-https"
+      ]
+    },
+    {
+      "id": "e5bc86ac-af30-4115-a4a5-307af09a8e82",
+      "name": "Web Ports",
+      "folder": "Shared",
+      "members": [
+        "service-http",
+        "service-https"
+      ]
+    }
+  ],
+  "application_group": [
+    {
+      "id": "04222009-7ece-4061-bd17-f665b5fd42b4",
+      "name": "Facebook",
+      "folder": "Shared",
+      "members": [
+        "facebook"
+      ]
+    },
+    {
+      "id": "04222009-7ece-4061-bd17-f665b5fd42b4",
+      "name": "Facebook",
+      "folder": "Shared",
+      "members": [
+        "facebook"
+      ]
+    },
+    {
+      "id": "04222009-7ece-4061-bd17-f665b5fd42b4",
+      "name": "Facebook",
+      "folder": "Shared",
+      "members": [
+        "facebook"
+      ]
+    },
+    {
+      "id": "04222009-7ece-4061-bd17-f665b5fd42b4",
+      "name": "Facebook",
+      "folder": "Shared",
+      "members": [
+        "facebook"
+      ]
+    },
+    {
+      "id": "59ac5c98-179f-4c73-98e6-52fda381a7fe",
+      "name": "Google-Gmail",
+      "folder": "Shared",
+      "members": [
+        "google-analytics",
+        "google-app-engine",
+        "google-app-engine-uploading",
+        "google-base",
+        "google-cache",
+        "google-chat",
+        "google-classroom",
+        "google-cloud-console",
+        "google-cloud-print",
+        "google-drive-web",
+        "google-duo",
+        "google-earth",
+        "google-expeditions",
+        "google-finance-posting",
+        "google-keep",
+        "google-location-service",
+        "google-maps",
+        "google-meet",
+        "google-messages",
+        "google-play",
+        "google-safebrowsing",
+        "google-toolbar",
+        "google-voice-actions",
+        "google-workspace-duet-ai",
+        "google-bard",
+        "google-calendar",
+        "google-cloud-storage",
+        "google-docs",
+        "google-hangouts",
+        "google-photos",
+        "google-plus",
+        "google-surveys",
+        "google-translate",
+        "google-vertex-ai",
+        "google-video",
+        "gmail-drive",
+        "gmail"
+      ]
+    },
+    {
+      "id": "59ac5c98-179f-4c73-98e6-52fda381a7fe",
+      "name": "Google-Gmail",
+      "folder": "Shared",
+      "members": [
+        "google-analytics",
+        "google-app-engine",
+        "google-app-engine-uploading",
+        "google-base",
+        "google-cache",
+        "google-chat",
+        "google-classroom",
+        "google-cloud-console",
+        "google-cloud-print",
+        "google-drive-web",
+        "google-duo",
+        "google-earth",
+        "google-expeditions",
+        "google-finance-posting",
+        "google-keep",
+        "google-location-service",
+        "google-maps",
+        "google-meet",
+        "google-messages",
+        "google-play",
+        "google-safebrowsing",
+        "google-toolbar",
+        "google-voice-actions",
+        "google-workspace-duet-ai",
+        "google-bard",
+        "google-calendar",
+        "google-cloud-storage",
+        "google-docs",
+        "google-hangouts",
+        "google-photos",
+        "google-plus",
+        "google-surveys",
+        "google-translate",
+        "google-vertex-ai",
+        "google-video",
+        "gmail-drive",
+        "gmail"
+      ]
+    },
+    {
+      "id": "59ac5c98-179f-4c73-98e6-52fda381a7fe",
+      "name": "Google-Gmail",
+      "folder": "Shared",
+      "members": [
+        "google-analytics",
+        "google-app-engine",
+        "google-app-engine-uploading",
+        "google-base",
+        "google-cache",
+        "google-chat",
+        "google-classroom",
+        "google-cloud-console",
+        "google-cloud-print",
+        "google-drive-web",
+        "google-duo",
+        "google-earth",
+        "google-expeditions",
+        "google-finance-posting",
+        "google-keep",
+        "google-location-service",
+        "google-maps",
+        "google-meet",
+        "google-messages",
+        "google-play",
+        "google-safebrowsing",
+        "google-toolbar",
+        "google-voice-actions",
+        "google-workspace-duet-ai",
+        "google-bard",
+        "google-calendar",
+        "google-cloud-storage",
+        "google-docs",
+        "google-hangouts",
+        "google-photos",
+        "google-plus",
+        "google-surveys",
+        "google-translate",
+        "google-vertex-ai",
+        "google-video",
+        "gmail-drive",
+        "gmail"
+      ]
+    },
+    {
+      "id": "935ee92c-465e-46ed-9441-9b1ac50c3b25",
+      "name": "Social Networking Allowed",
+      "folder": "Shared",
+      "members": [
+        "facebook-base",
+        "instagram-base",
+        "twitter-base",
+        "linkedin-base"
+      ]
+    },
+    {
+      "id": "935ee92c-465e-46ed-9441-9b1ac50c3b25",
+      "name": "Social Networking Allowed",
+      "folder": "Shared",
+      "members": [
+        "facebook-base",
+        "instagram-base",
+        "twitter-base",
+        "linkedin-base"
+      ]
+    },
+    {
+      "id": "935ee92c-465e-46ed-9441-9b1ac50c3b25",
+      "name": "Social Networking Allowed",
+      "folder": "Shared",
+      "members": [
+        "facebook-base",
+        "instagram-base",
+        "twitter-base",
+        "linkedin-base"
+      ]
+    }
+  ],
+  "application_filter": [
+    {
+      "id": "12ba63f2-cfd5-4e8b-8780-ffbaed27ca10",
+      "name": "Collaboration Apps",
+      "folder": "All",
+      "category": [
+        "collaboration"
+      ]
+    },
+    {
+      "id": "12ba63f2-cfd5-4e8b-8780-ffbaed27ca10",
+      "name": "Collaboration Apps",
+      "folder": "All",
+      "category": [
+        "collaboration"
+      ]
+    },
+    {
+      "id": "12ba63f2-cfd5-4e8b-8780-ffbaed27ca10",
+      "name": "Collaboration Apps",
+      "folder": "All",
+      "category": [
+        "collaboration"
+      ]
+    },
+    {
+      "id": "12ba63f2-cfd5-4e8b-8780-ffbaed27ca10",
+      "name": "Collaboration Apps",
+      "folder": "All",
+      "category": [
+        "collaboration"
+      ]
+    },
+    {
+      "id": "12ba63f2-cfd5-4e8b-8780-ffbaed27ca10",
+      "name": "Collaboration Apps",
+      "folder": "All",
+      "category": [
+        "collaboration"
+      ]
+    },
+    {
+      "id": "12ba63f2-cfd5-4e8b-8780-ffbaed27ca10",
+      "name": "Collaboration Apps",
+      "folder": "All",
+      "category": [
+        "collaboration"
+      ]
+    },
+    {
+      "id": "e94d3cfe-3636-4206-a6f9-f123d6285989",
+      "name": "Gen-AI Sanctioned",
+      "folder": "Shared",
+      "tagging": {
+        "tag": [
+          "[Generative AI]"
+        ]
+      },
+      "risk": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "e94d3cfe-3636-4206-a6f9-f123d6285989",
+      "name": "Gen-AI Sanctioned",
+      "folder": "Shared",
+      "tagging": {
+        "tag": [
+          "[Generative AI]"
+        ]
+      },
+      "risk": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "e94d3cfe-3636-4206-a6f9-f123d6285989",
+      "name": "Gen-AI Sanctioned",
+      "folder": "Shared",
+      "tagging": {
+        "tag": [
+          "[Generative AI]"
+        ]
+      },
+      "risk": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "e94d3cfe-3636-4206-a6f9-f123d6285989",
+      "name": "Gen-AI Sanctioned",
+      "folder": "Shared",
+      "tagging": {
+        "tag": [
+          "[Generative AI]"
+        ]
+      },
+      "risk": [
+        1,
+        2,
+        3
+      ]
+    }
+  ],
+  "schedule": [
+    {
+      "id": "c5f3d0a6-fdf9-4b49-b487-936c2ac015b6",
+      "name": "Contractor Term",
+      "folder": "Shared",
+      "schedule_type": {
+        "non_recurring": [
+          "2026/01/02@18:15-2026/06/11@19:15"
+        ]
+      }
+    },
+    {
+      "id": "c5f3d0a6-fdf9-4b49-b487-936c2ac015b6",
+      "name": "Contractor Term",
+      "folder": "Shared",
+      "schedule_type": {
+        "non_recurring": [
+          "2026/01/02@18:15-2026/06/11@19:15"
+        ]
+      }
+    },
+    {
+      "id": "c5f3d0a6-fdf9-4b49-b487-936c2ac015b6",
+      "name": "Contractor Term",
+      "folder": "Shared",
+      "schedule_type": {
+        "non_recurring": [
+          "2026/01/02@18:15-2026/06/11@19:15"
+        ]
+      }
+    },
+    {
+      "id": "0f35f0ea-5c6c-4a0b-8702-64b4966b4fe8",
+      "name": "Cutover Window",
+      "folder": "Shared",
+      "schedule_type": {
+        "recurring": {
+          "daily": [
+            "23:00-23:45",
+            "00:00-01:30"
+          ]
+        }
+      }
+    },
+    {
+      "id": "0f35f0ea-5c6c-4a0b-8702-64b4966b4fe8",
+      "name": "Cutover Window",
+      "folder": "Shared",
+      "schedule_type": {
+        "recurring": {
+          "daily": [
+            "23:00-23:45",
+            "00:00-01:30"
+          ]
+        }
+      }
+    },
+    {
+      "id": "0f35f0ea-5c6c-4a0b-8702-64b4966b4fe8",
+      "name": "Cutover Window",
+      "folder": "Shared",
+      "schedule_type": {
+        "recurring": {
+          "daily": [
+            "23:00-23:45",
+            "00:00-01:30"
+          ]
+        }
+      }
+    },
+    {
+      "id": "0f35f0ea-5c6c-4a0b-8702-64b4966b4fe8",
+      "name": "Cutover Window",
+      "folder": "Shared",
+      "schedule_type": {
+        "recurring": {
+          "daily": [
+            "23:00-23:45",
+            "00:00-01:30"
+          ]
+        }
+      }
+    },
+    {
+      "id": "3340c2af-b314-42ba-9063-d610d640fe61",
+      "name": "Protected system access",
+      "folder": "Shared",
+      "schedule_type": {
+        "recurring": {
+          "weekly": {
+            "monday": [
+              "07:30-18:00"
+            ],
+            "tuesday": [
+              "07:30-18:00"
+            ],
+            "wednesday": [
+              "07:30-18:00"
+            ],
+            "thursday": [
+              "07:30-18:00"
+            ],
+            "friday": [
+              "07:30-16:00"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "3340c2af-b314-42ba-9063-d610d640fe61",
+      "name": "Protected system access",
+      "folder": "Shared",
+      "schedule_type": {
+        "recurring": {
+          "weekly": {
+            "monday": [
+              "07:30-18:00"
+            ],
+            "tuesday": [
+              "07:30-18:00"
+            ],
+            "wednesday": [
+              "07:30-18:00"
+            ],
+            "thursday": [
+              "07:30-18:00"
+            ],
+            "friday": [
+              "07:30-16:00"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "3340c2af-b314-42ba-9063-d610d640fe61",
+      "name": "Protected system access",
+      "folder": "Shared",
+      "schedule_type": {
+        "recurring": {
+          "weekly": {
+            "monday": [
+              "07:30-18:00"
+            ],
+            "tuesday": [
+              "07:30-18:00"
+            ],
+            "wednesday": [
+              "07:30-18:00"
+            ],
+            "thursday": [
+              "07:30-18:00"
+            ],
+            "friday": [
+              "07:30-16:00"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

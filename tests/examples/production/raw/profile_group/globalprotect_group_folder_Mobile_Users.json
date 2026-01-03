@@ -1,0 +1,23 @@
+{
+  "id": "bb69161a-35d2-43af-985a-f579e24f1d2e",
+  "name": "globalprotect group",
+  "folder": "Mobile Users",
+  "spyware": [
+    "best-practice"
+  ],
+  "vulnerability": [
+    "best-practice"
+  ],
+  "url_filtering": [
+    "best-practice"
+  ],
+  "file_blocking": [
+    "best-practice"
+  ],
+  "virus_and_wildfire_analysis": [
+    "best-practice"
+  ],
+  "dns_security": [
+    "best-practice"
+  ]
+}

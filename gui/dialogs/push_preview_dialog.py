@@ -720,9 +720,9 @@ class PushPreviewDialog(QDialog):
     def _start_fetch(self):
         """Start fetching destination configurations."""
         self.worker = ConfigFetchWorker(self.api_client, self.selected_items)
-        self.worker.progress.connect(self._on_fetch_progress)
-        self.worker.finished.connect(self._on_fetch_finished)
-        self.worker.error.connect(self._on_fetch_error)
+        self.worker.progress.connect(self._on_fetch_progress, Qt.ConnectionType.QueuedConnection)
+        self.worker.finished.connect(self._on_fetch_finished, Qt.ConnectionType.QueuedConnection)
+        self.worker.error.connect(self._on_fetch_error, Qt.ConnectionType.QueuedConnection)
         self.worker.start()
     
     def _on_fetch_progress(self, message: str, percentage: int):

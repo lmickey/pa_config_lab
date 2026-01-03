@@ -5,6 +5,7 @@ This module provides the UI for selecting specific components
 (folders, snippets, objects) from the currently loaded configuration.
 """
 
+import logging
 from typing import Optional, Dict, Any
 from PyQt6.QtWidgets import (
     QWidget,
@@ -16,6 +17,8 @@ from PyQt6.QtWidgets import (
     QMessageBox,
 )
 from PyQt6.QtCore import pyqtSignal
+
+logger = logging.getLogger(__name__)
 
 
 class SelectionWidget(QWidget):
@@ -132,12 +135,12 @@ class SelectionWidget(QWidget):
         from gui.dialogs.component_selection_dialog import ComponentSelectionDialog
         
         # Debug: Print what we're passing
-        print(f"DEBUG _select_components: Passing previous_selection to dialog")
-        print(f"  self.selected_items keys: {list(self.selected_items.keys()) if self.selected_items else 'None'}")
+        logger.debug(f"DEBUG _select_components: Passing previous_selection to dialog")
+        logger.debug(f"  self.selected_items keys: {list(self.selected_items.keys()) if self.selected_items else 'None'}")
         if self.selected_items and 'infrastructure' in self.selected_items:
-            print(f"  Infrastructure keys: {list(self.selected_items['infrastructure'].keys())}")
+            logger.debug(f"  Infrastructure keys: {list(self.selected_items['infrastructure'].keys())}")
             for infra_type, items in self.selected_items['infrastructure'].items():
-                print(f"    {infra_type}: {len(items)} items")
+                logger.debug(f"    {infra_type}: {len(items)} items")
         
         # Pass current_config, full_config, and previous selection to restore
         dialog = ComponentSelectionDialog(

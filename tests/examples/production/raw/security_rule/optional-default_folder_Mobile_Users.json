@@ -1,0 +1,9 @@
+{
+  "id": "d19cdffa-c3eb-47fd-b98a-25b89c1ccf3f",
+  "name": "optional-default",
+  "folder": "Shared",
+  "policy_type": "Security",
+  "position": "pre",
+  "log_setting": "Cortex Data Lake",
+  "log_end": true
+}

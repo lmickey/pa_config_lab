@@ -1,0 +1,7 @@
+{
+  "id": "cf0e866d-4b1f-4d09-aee4-ef056b6a3fbe",
+  "name": "is-win-and-patch-management",
+  "snippet": "hip-default",
+  "match": "\"is-win\"  and \"is-patch-management-enabled\" ",
+  "description": "Matches Windows endpoints that have patch management software installed and enabled"
+}

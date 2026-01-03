@@ -1,0 +1,10 @@
+{
+  "id": "6210736e-20b9-4509-8d8f-f27e228b9ad4",
+  "name": "EDL-Hosting-Service-Profile",
+  "snippet": "default",
+  "ca_certificates": [
+    {
+      "name": "GlobalSign-Root-CA"
+    }
+  ]
+}

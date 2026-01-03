@@ -1,0 +1,7 @@
+{
+  "id": "dcf6102b-4c6c-4b90-956e-ecce819461ad",
+  "name": "Web-Security-Default",
+  "folder": "All",
+  "log_setting": "Cortex Data Lake",
+  "log_fail": true
+}

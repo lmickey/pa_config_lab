@@ -1,0 +1,34 @@
+{
+  "id": "09eb0191-efd0-4771-ad5f-6b9ff1999a2a",
+  "name": "Authenticate SSH Users",
+  "folder": "Mobile Users",
+  "from": [
+    "trust"
+  ],
+  "to": [
+    "untrust"
+  ],
+  "source": [
+    "any"
+  ],
+  "destination": [
+    "any"
+  ],
+  "source_user": [
+    "any"
+  ],
+  "category": [
+    "any"
+  ],
+  "source_hip": [
+    "any"
+  ],
+  "log_setting": "Cortex Data Lake",
+  "destination_hip": [
+    "any"
+  ],
+  "service": [
+    "service-SSH"
+  ],
+  "authentication_enforcement": "enforcement67006"
+}

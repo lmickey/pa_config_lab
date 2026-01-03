@@ -168,30 +168,30 @@ class SnippetCapture:
             # Add detailed logging for debugging
             if not snippet_data:
                 if not self.suppress_output:
-                    print(f"  ⚠ WARNING: Empty response for snippet ID {snippet_id}")
-                    print(
+                    logger.warning(f"  ⚠ WARNING: Empty response for snippet ID {snippet_id}")
+                    logger.warning(
                         f"    API URL: {self.api_client._make_request.__self__.__class__.__module__}"
                     )
-                    print(f"    Response was empty or None")
+                    logger.warning(f"    Response was empty or None")
                 return None
 
             # Check if response looks valid (should have 'id' or 'name' field)
             if not isinstance(snippet_data, dict):
                 if not self.suppress_output:
-                    print(
+                    logger.warning(
                         f"  ⚠ WARNING: Unexpected response type for snippet ID {snippet_id}"
                     )
-                    print(f"    Expected: dict")
-                    print(f"    Got: {type(snippet_data).__name__}")
-                    print(f"    Response: {snippet_data}")
+                    logger.warning(f"    Expected: dict")
+                    logger.warning(f"    Got: {type(snippet_data).__name__}")
+                    logger.warning(f"    Response: {snippet_data}")
                 return None
 
             if "id" not in snippet_data and "name" not in snippet_data:
                 if not self.suppress_output:
-                    print(f"  ⚠ WARNING: Response doesn't look like a snippet object")
-                    print(f"    Snippet ID: {snippet_id}")
-                    print(f"    Response keys: {list(snippet_data.keys())}")
-                    print(f"    Response preview: {str(snippet_data)[:200]}")
+                    logger.warning(f"  ⚠ WARNING: Response doesn't look like a snippet object")
+                    logger.warning(f"    Snippet ID: {snippet_id}")
+                    logger.warning(f"    Response keys: {list(snippet_data.keys())}")
+                    logger.warning(f"    Response preview: {str(snippet_data)[:200]}")
                 # Still try to normalize it - might be valid but missing expected fields
                 # return None
 
@@ -200,9 +200,9 @@ class SnippetCapture:
 
         except Exception as e:
             if not self.suppress_output:
-                print(f"  ✗ FAILED: Error getting snippet details for ID {snippet_id}")
-                print(f"    Error type: {type(e).__name__}")
-                print(f"    Error message: {str(e)}")
+                logger.error(f"  ✗ FAILED: Error getting snippet details for ID {snippet_id}")
+                logger.error(f"    Error type: {type(e).__name__}")
+                logger.error(f"    Error message: {str(e)}")
             
             from prisma.error_logger import error_logger
 
