@@ -85,10 +85,76 @@ class ConfigTreeBuilder:
         logger.info("  Calling _build_infrastructure_section")
         self._build_infrastructure_section(root, config)
         
-        # Expand top level
-        logger.info("  Expanding tree to depth 0")
-        tree.expandToDepth(0)
+        # Smart expand based on config size
+        self._smart_expand(tree, root)
         logger.info("  Tree building complete")
+    
+    def _smart_expand(self, tree: QTreeWidget, root: QTreeWidgetItem):
+        """
+        Smart expand tree based on configuration size.
+        
+        Rules:
+        - Metadata is always collapsed
+        - If < 20 objects total, expand all
+        - If >= 20 objects and only 1 main section (folders/snippets/infrastructure), expand 2 levels
+        - If >= 20 objects and multiple sections, expand only 1 level
+        """
+        # Count total objects and sections
+        total_objects = 0
+        main_sections = []  # Folders, Snippets, Infrastructure
+        metadata_item = None
+        
+        for i in range(root.childCount()):
+            child = root.child(i)
+            child_text = child.text(0).lower()
+            
+            if 'metadata' in child_text:
+                metadata_item = child
+                # Always collapse metadata
+                child.setExpanded(False)
+            elif child_text in ('folders', 'snippets', 'infrastructure'):
+                main_sections.append(child)
+                # Count objects in this section
+                total_objects += self._count_leaf_items(child)
+        
+        logger.info(f"  Smart expand: {total_objects} objects, {len(main_sections)} main sections")
+        
+        if total_objects < 20:
+            # Small config - expand everything except metadata
+            logger.info("  Expanding all (small config)")
+            tree.expandAll()
+            # Re-collapse metadata
+            if metadata_item:
+                metadata_item.setExpanded(False)
+        elif len(main_sections) == 1:
+            # One main section - expand 2 levels
+            logger.info("  Expanding 2 levels (single section)")
+            tree.expandToDepth(1)
+            # Re-collapse metadata
+            if metadata_item:
+                metadata_item.setExpanded(False)
+        else:
+            # Multiple sections - expand only 1 level
+            logger.info("  Expanding 1 level (multiple sections)")
+            tree.expandToDepth(0)
+            # Re-collapse metadata
+            if metadata_item:
+                metadata_item.setExpanded(False)
+    
+    def _count_leaf_items(self, item: QTreeWidgetItem) -> int:
+        """Count leaf items (actual config objects) under an item."""
+        if item.childCount() == 0:
+            return 1
+        
+        count = 0
+        for i in range(item.childCount()):
+            child = item.child(i)
+            # Check if this is a config item (has data) or a container
+            child_type = child.text(1) if child.columnCount() > 1 else ''
+            if child_type and child_type not in ('container', 'section', 'info', 'dict', 'list', ''):
+                count += 1
+            count += self._count_leaf_items(child)
+        return count
     
     def _create_item(self, texts: list, data: Any = None, item_type: str = None) -> QTreeWidgetItem:
         """
@@ -815,10 +881,8 @@ class ConfigTreeBuilder:
             'Service Connections',
         ]
         
-        # Ensure Mobile Users Container exists (even if empty)
-        if 'Mobile Users Container' not in folders:
-            folders['Mobile Users Container'] = {}
-            logger.info("    Added empty 'Mobile Users Container' folder to maintain hierarchy")
+        # Note: We no longer add empty 'Mobile Users Container' folder automatically
+        # Only folders with actual content should be displayed
         
         if not folders:
             logger.warning("    No folders to build!")

@@ -169,7 +169,7 @@ class ConfigViewerWidget(QWidget):
 
         # Update info
         metadata = self.current_config.get("metadata", {})
-        version = metadata.get("version", "Unknown")
+        version = metadata.get("program_version", "Unknown")
         
         # Determine action and source
         source = metadata.get("source_tenant", "Unknown")
@@ -182,8 +182,8 @@ class ConfigViewerWidget(QWidget):
         else:
             action = "Source"
         
-        self.info_label.setText(f"<b>{action}:</b> {source}")
-        self.info_label.setStyleSheet("color: #2196F3;")
+        self.info_label.setText(f"<b>Version:</b> {version} | <b>{action}:</b> {source}")
+        self.info_label.setStyleSheet("color: #4CAF50;")
 
         # Calculate and display stats
         stats = self.current_config.get("stats", {})

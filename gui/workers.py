@@ -43,6 +43,9 @@ class PullWorker(QThread):
 
     def run(self):
         """Run the pull operation."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
         try:
             from prisma.pull.pull_orchestrator import PullOrchestrator
 
@@ -55,6 +58,7 @@ class PullWorker(QThread):
                 validate_before_pull=True,
             )
             orchestrator = PullOrchestrator(self.api_client, config=workflow_config)
+            self._orchestrator = orchestrator  # Store reference for cancellation
             
             # Set progress callback so orchestrator can emit detailed progress
             orchestrator.set_progress_callback(lambda msg, pct: self.progress.emit(msg, pct))
@@ -73,57 +77,203 @@ class PullWorker(QThread):
             selected_folders = self.options.get("selected_folders", [])
             selected_snippets = self.options.get("selected_snippets", [])
             
+            logger.debug(f"Selected folders raw: {selected_folders}")
+            logger.debug(f"Selected snippets raw: {selected_snippets}")
+            
             # Build folder filter: which folders/components to STORE (not query)
             # API queries always run against bottom folders for efficiency
             # UI selection controls what config gets stored from the results
+            
             folder_filter = {}
+            has_real_components = False  # Track if any real (non-custom) components selected
+            
             if selected_folders:
                 for f in selected_folders:
                     if isinstance(f, dict):
                         # Get the API name from data, or use display name
                         data = f.get('data', {})
                         api_name = data.get('name') if isinstance(data, dict) else f.get('name')
+                        components = f.get('components', [])
+                        logger.debug(f"Folder '{api_name}' has components: {components}")
                         if api_name:
-                            folder_filter[api_name] = f.get('components', [])
+                            folder_filter[api_name] = components
+                            if components:  # Non-empty component list = real components selected
+                                has_real_components = True
                     elif isinstance(f, str):
                         folder_filter[f] = []  # All components
+                        has_real_components = True  # String format = all components
             
             # Extract snippet names (snippets must be queried individually, no filtering optimization)
             snippet_names = None
+            snippet_components = {}  # Track snippet component selections
             if selected_snippets:
                 snippet_names = []
                 for s in selected_snippets:
                     if isinstance(s, dict):
                         name = s.get('name')
+                        components = s.get('components', [])
                         # Skip placeholder items
                         if name and not name.startswith('('):
                             snippet_names.append(name)
+                            snippet_components[name] = components
+                            if components:
+                                has_real_components = True
                     elif isinstance(s, str):
                         snippet_names.append(s)
+                        has_real_components = True
             
-            # Pull configuration using orchestrator
-            # Always use bottom folders for API efficiency - folder_filter controls storage
-            # Snippets and infrastructure must be queried individually (no optimization)
-            result = orchestrator.pull_all(
-                include_folders=bool(folder_filter),
-                include_snippets=bool(snippet_names),
-                include_infrastructure=include_infrastructure,
-                use_bottom_folders=True,  # Always query bottom folders for efficiency
-                folder_list=None,  # Don't override - use bottom folders
-                snippet_list=snippet_names if snippet_names else None,
-                folder_filter=folder_filter,  # Controls what folder items get stored
-            )
-
-            if not self._is_running:
-                return
-
-            # Extract Configuration object from result
-            configuration = result.configuration
+            # Log the folder filter for debugging
+            logger.info(f"Folder filter being sent to orchestrator: {folder_filter}")
+            logger.info(f"Has real components to pull: {has_real_components}")
+            logger.info(f"Include infrastructure: {include_infrastructure}")
             
-            if not configuration:
-                raise Exception("Pull operation returned no configuration")
+            # Check if we need to run the orchestrator at all
+            custom_applications = self.options.get('custom_applications', {})
+            has_custom_apps = bool(custom_applications and any(custom_applications.values()))
+            logger.info(f"Has custom apps: {has_custom_apps}, custom_applications keys: {list(custom_applications.keys())}")
+            # Log the actual content
+            for k, v in custom_applications.items():
+                logger.info(f"  custom_applications['{k}']: {len(v) if v else 0} apps, first app: {v[0].get('name') if v else 'N/A'}")
+            
+            if not has_real_components and not include_infrastructure:
+                # No real components selected - skip orchestrator entirely
+                if has_custom_apps:
+                    logger.info("Only custom applications selected - skipping API pull")
+                    self.progress.emit("Creating configuration with custom applications...", 50)
+                    
+                    logger.debug("DEBUG: Importing containers module...")
+                    # Create minimal configuration with just custom apps
+                    from config.models.containers import Configuration, FolderConfig
+                    logger.debug("DEBUG: Imported Configuration and FolderConfig")
+                    
+                    from datetime import datetime
+                    logger.debug("DEBUG: Imported datetime")
+                    
+                    logger.debug(f"DEBUG: Creating Configuration with tsg_id={self.api_client.tsg_id if self.api_client else None}")
+                    configuration = Configuration(
+                        source_tsg=self.api_client.tsg_id if self.api_client else None,
+                        load_type='From Pull (Custom Apps Only)',
+                        saved_credentials_ref=self.connection_name
+                    )
+                    logger.debug("DEBUG: Configuration object created")
+                    
+                    configuration.source_tenant = self.connection_name
+                    configuration.created_at = datetime.now().isoformat()
+                    configuration.modified_at = datetime.now().isoformat()
+                    configuration.config_version = 1
+                    logger.debug("DEBUG: Configuration metadata set")
+                    
+                    # Add custom applications
+                    custom_app_count = 0
+                    logger.info(f"DEBUG: Processing {len(custom_applications)} folder(s) with custom apps")
+                    
+                    for folder_name, apps in custom_applications.items():
+                        logger.info(f"DEBUG: Processing folder '{folder_name}' with {len(apps) if apps else 0} apps")
+                        if not apps:
+                            continue
+                        
+                        for app_data in apps:
+                            try:
+                                app_name = app_data.get('name', 'unknown')
+                                # Get the app's actual folder from API response
+                                actual_folder = app_data.get('folder', folder_name)
+                                logger.info(f"DEBUG: Creating ApplicationObject for '{app_name}' in folder '{actual_folder}'")
+                                
+                                # Import here to catch import errors
+                                from config.models.objects import ApplicationObject
+                                
+                                # Create folder if it doesn't exist
+                                if actual_folder not in configuration.folders:
+                                    logger.info(f"DEBUG: Creating FolderConfig for '{actual_folder}'")
+                                    configuration.folders[actual_folder] = FolderConfig(name=actual_folder)
+                                
+                                # Check if from_api_response exists
+                                if hasattr(ApplicationObject, 'from_api_response'):
+                                    app_obj = ApplicationObject.from_api_response(app_data)
+                                else:
+                                    app_obj = ApplicationObject(raw_config=app_data)
+                                
+                                logger.info(f"DEBUG: ApplicationObject created, adding to folder '{actual_folder}'")
+                                configuration.folders[actual_folder].add_item(app_obj)
+                                custom_app_count += 1
+                                logger.info(f"DEBUG: Added app '{app_name}' to folder '{actual_folder}'")
+                            except Exception as e:
+                                logger.warning(f"Failed to add custom app {app_data.get('name')}: {e}")
+                                import traceback
+                                logger.info(f"DEBUG: Traceback: {traceback.format_exc()}")
+                    
+                    logger.info(f"Created configuration with {custom_app_count} custom applications")
+                    
+                    # Skip to finalization (no WorkflowResult, create minimal stats)
+                    result = None  # No orchestrator result
+                    logger.debug("DEBUG: Custom apps only path complete, proceeding to finalization")
+                else:
+                    raise Exception("No configuration items selected to pull")
+            else:
+                # Pull configuration using orchestrator
+                # Determine which folders to actually query based on selection
+                # Only query folders that have real components selected (not just custom apps)
+                folders_to_query = []
+                for folder_name, components in folder_filter.items():
+                    if components:  # Has real component types selected
+                        folders_to_query.append(folder_name)
+                
+                logger.info(f"Folders to query (with real components): {folders_to_query}")
+                
+                # If no specific folders with real components, don't query any folders
+                # (custom apps are handled separately)
+                include_folders_in_pull = bool(folders_to_query) and has_real_components
+                
+                result = orchestrator.pull_all(
+                    include_folders=include_folders_in_pull,
+                    include_snippets=bool(snippet_names),
+                    include_infrastructure=include_infrastructure,
+                    use_bottom_folders=False,  # Use specific folder list instead
+                    folder_list=folders_to_query if folders_to_query else None,
+                    snippet_list=snippet_names if snippet_names else None,
+                    folder_filter=folder_filter,  # Controls what folder items get stored
+                )
+
+                if not self._is_running:
+                    return
+
+                # Extract Configuration object from result
+                configuration = result.configuration
+                
+                if not configuration:
+                    raise Exception("Pull operation returned no configuration")
 
             self.progress.emit("Finalizing configuration...", 80)
+            
+            # Add custom applications that were loaded via Find Applications dialog
+            # (only if we went through the orchestrator path - custom apps only path handles this above)
+            if result is not None:
+                custom_applications = self.options.get('custom_applications', {})
+                if custom_applications:
+                    from config.models.containers import FolderConfig
+                    from config.models.objects import ApplicationObject
+                    
+                    custom_app_count = 0
+                    for folder_name, apps in custom_applications.items():
+                        if not apps:
+                            continue
+                        
+                        # Create folder if it doesn't exist
+                        if folder_name not in configuration.folders:
+                            configuration.folders[folder_name] = FolderConfig(name=folder_name)
+                        
+                        # Add each application
+                        for app_data in apps:
+                            try:
+                                # Create ApplicationObject from the loaded app data
+                                app_obj = ApplicationObject.from_api_response(app_data)
+                                configuration.folders[folder_name].add_item(app_obj)
+                                custom_app_count += 1
+                            except Exception as e:
+                                logger.warning(f"Failed to add custom app {app_data.get('name')}: {e}")
+                    
+                    if custom_app_count > 0:
+                        logger.info(f"Added {custom_app_count} custom applications to configuration")
             
             # Set additional metadata on the Configuration object
             if self.connection_name:
@@ -146,13 +296,25 @@ class PullWorker(QThread):
             self.progress.emit("Pull operation complete!", 100)
 
             # Build stats from workflow result
-            stats = {
-                'items_processed': result.items_processed,
-                'items_created': result.items_created,
-                'items_skipped': result.items_skipped,
-                'errors': [e.to_dict() for e in result.errors],
-                'warnings': [w.to_dict() for w in result.warnings],
-            }
+            if result is not None:
+                stats = {
+                    'items_processed': result.items_processed,
+                    'items_created': result.items_created,
+                    'items_skipped': result.items_skipped,
+                    'errors': [e.to_dict() for e in result.errors],
+                    'warnings': [w.to_dict() for w in result.warnings],
+                }
+            else:
+                # Custom apps only - minimal stats
+                custom_apps = self.options.get('custom_applications', {})
+                total_apps = sum(len(apps) for apps in custom_apps.values())
+                stats = {
+                    'items_processed': total_apps,
+                    'items_created': total_apps,
+                    'items_skipped': 0,
+                    'errors': [],
+                    'warnings': [],
+                }
             
             # Add folder/snippet counts from config dict
             stats['folders_captured'] = len(config.get('folders', {}))
@@ -290,6 +452,9 @@ class PullWorker(QThread):
     def stop(self):
         """Stop the worker thread gracefully."""
         self._is_running = False
+        # Also cancel the orchestrator if it's running
+        if hasattr(self, '_orchestrator') and self._orchestrator:
+            self._orchestrator.cancel()
 
 
 class PushWorker(QThread):

@@ -447,8 +447,12 @@ class Configuration:
     Metadata includes source information, version tracking, and push history.
     """
     
-    # Program version - update this when releasing new versions
-    PROGRAM_VERSION = "1.0.0"
+    # Program version - dynamically determined from git
+    try:
+        from config.version import __version__ as _version
+        PROGRAM_VERSION = _version
+    except ImportError:
+        PROGRAM_VERSION = "1.0.0"
     
     def __init__(self, 
                  source_tsg: Optional[str] = None,

@@ -2,7 +2,7 @@
 Selection Tree Widget for Pull Configuration.
 
 Reusable tree widget with checkboxes for selecting folders, snippets,
-and their component types.
+and their component types organized by section.
 """
 
 import logging
@@ -18,35 +18,63 @@ from PyQt6.QtWidgets import (
     QHeaderView,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QFont
 
 logger = logging.getLogger(__name__)
 
 
-# Shared component types for folders and snippets
-COMPONENT_TYPES: List[Tuple[str, str]] = [
-    ('address_object', 'Address Objects'),
-    ('address_group', 'Address Groups'),
-    ('service_object', 'Service Objects'),
-    ('service_group', 'Service Groups'),
-    ('tag', 'Tags'),
-    ('application_group', 'Application Groups'),
-    ('application_filter', 'Application Filters'),
-    ('schedule', 'Schedules'),
-    ('hip_object', 'HIP Objects'),
-    ('hip_profile', 'HIP Profiles'),
-    ('anti_spyware_profile', 'Anti-Spyware Profiles'),
-    ('vulnerability_profile', 'Vulnerability Profiles'),
-    ('file_blocking_profile', 'File Blocking Profiles'),
-    ('wildfire_profile', 'WildFire Profiles'),
-    ('dns_security_profile', 'DNS Security Profiles'),
-    ('decryption_profile', 'Decryption Profiles'),
-    ('http_header_profile', 'HTTP Header Profiles'),
-    ('certificate_profile', 'Certificate Profiles'),
-    ('security_rule', 'Security Rules'),
-    ('decryption_rule', 'Decryption Rules'),
-    ('authentication_rule', 'Authentication Rules'),
-    ('qos_policy_rule', 'QoS Policy Rules'),
-]
+# Component types organized by section - matches config viewer organization
+COMPONENT_SECTIONS: Dict[str, List[Tuple[str, str]]] = {
+    'Addresses': [
+        ('address_object', 'Address Objects'),
+        ('address_group', 'Address Groups'),
+    ],
+    'Services': [
+        ('service_object', 'Service Objects'),
+        ('service_group', 'Service Groups'),
+    ],
+    'Applications': [
+        ('application_group', 'Application Groups'),
+        ('application_filter', 'Application Filters'),
+    ],
+    'Tags & Schedules': [
+        ('tag', 'Tags'),
+        ('schedule', 'Schedules'),
+    ],
+    'External Lists': [
+        ('external_dynamic_list', 'External Dynamic Lists'),
+        ('custom_url_category', 'Custom URL Categories'),
+    ],
+    'Security Profiles': [
+        ('anti_spyware_profile', 'Anti-Spyware Profiles'),
+        ('vulnerability_profile', 'Vulnerability Profiles'),
+        ('file_blocking_profile', 'File Blocking Profiles'),
+        ('wildfire_profile', 'WildFire Profiles'),
+        ('dns_security_profile', 'DNS Security Profiles'),
+        ('decryption_profile', 'Decryption Profiles'),
+    ],
+    'Other Profiles': [
+        ('http_header_profile', 'HTTP Header Profiles'),
+        ('certificate_profile', 'Certificate Profiles'),
+    ],
+    'HIP': [
+        ('hip_object', 'HIP Objects'),
+        ('hip_profile', 'HIP Profiles'),
+    ],
+    'Security Policy': [
+        ('security_rule', 'Security Rules'),
+        ('decryption_rule', 'Decryption Rules'),
+    ],
+    'Other Policies': [
+        ('authentication_rule', 'Authentication Rules'),
+        ('qos_policy_rule', 'QoS Policy Rules'),
+    ],
+}
+
+# Flat list for backwards compatibility
+COMPONENT_TYPES: List[Tuple[str, str]] = []
+for section_items in COMPONENT_SECTIONS.values():
+    COMPONENT_TYPES.extend(section_items)
 
 
 class SelectionTreeWidget(QWidget):
@@ -54,6 +82,7 @@ class SelectionTreeWidget(QWidget):
     Reusable tree widget with checkboxes for hierarchical selection.
     
     Used for folders, snippets, and infrastructure selection in the pull tab.
+    Components are organized into sections matching the config viewer.
     """
     
     # Signal emitted when selection changes
@@ -98,7 +127,7 @@ class SelectionTreeWidget(QWidget):
         # Tree widget
         self.tree = QTreeWidget()
         self.tree.setHeaderLabels(["Name", "Type"])
-        self.tree.setColumnWidth(0, 200)
+        self.tree.setColumnWidth(0, 220)
         self.tree.header().setStretchLastSection(True)
         self.tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
         self.tree.itemChanged.connect(self._on_item_changed)
@@ -120,7 +149,7 @@ class SelectionTreeWidget(QWidget):
             item_type: Type label (e.g., "folder", "snippet")
             data: Custom data to store with the item
             checked: Initial checked state
-            add_components: Whether to add component type children
+            add_components: Whether to add component type children (with sections)
             
         Returns:
             The created QTreeWidgetItem
@@ -132,17 +161,55 @@ class SelectionTreeWidget(QWidget):
         if data is not None:
             item.setData(0, Qt.ItemDataRole.UserRole, data)
         
-        # Add component type children if requested
+        # Add component sections and types if requested
         if add_components and self.show_components:
-            for comp_type, comp_display in COMPONENT_TYPES:
+            self._add_component_sections(item, name, checked)
+        
+        self.tree.addTopLevelItem(item)
+        
+        # Update Select All checkbox state after adding item
+        self._update_select_all_state()
+        
+        return item
+    
+    def _add_component_sections(self, parent_item: QTreeWidgetItem, parent_name: str, checked: bool):
+        """
+        Add component sections with their items.
+        
+        Args:
+            parent_item: The parent tree item (folder/snippet)
+            parent_name: Name of the parent for data storage
+            checked: Initial checked state
+        """
+        for section_name, components in COMPONENT_SECTIONS.items():
+            # Create section item (bold)
+            section_item = QTreeWidgetItem([section_name, "section"])
+            section_item.setFlags(section_item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            section_item.setCheckState(0, Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
+            section_item.setData(0, Qt.ItemDataRole.UserRole, {
+                'type': 'section',
+                'section': section_name,
+                'parent': parent_name
+            })
+            
+            # Make section name bold
+            font = section_item.font(0)
+            font.setBold(True)
+            section_item.setFont(0, font)
+            
+            # Add component types under section
+            for comp_type, comp_display in components:
                 child = QTreeWidgetItem([comp_display, comp_type])
                 child.setFlags(child.flags() | Qt.ItemFlag.ItemIsUserCheckable)
                 child.setCheckState(0, Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
-                child.setData(0, Qt.ItemDataRole.UserRole, {'type': comp_type, 'parent': name})
-                item.addChild(child)
-        
-        self.tree.addTopLevelItem(item)
-        return item
+                child.setData(0, Qt.ItemDataRole.UserRole, {
+                    'type': comp_type,
+                    'section': section_name,
+                    'parent': parent_name
+                })
+                section_item.addChild(child)
+            
+            parent_item.addChild(section_item)
     
     def add_child_item(
         self,
@@ -188,9 +255,17 @@ class SelectionTreeWidget(QWidget):
         self._updating = True
         try:
             checked = state == Qt.CheckState.Checked.value
+            has_locked = False
             for i in range(self.tree.topLevelItemCount()):
                 item = self.tree.topLevelItem(i)
-                self._set_item_checked_recursive(item, checked)
+                if not self._set_item_checked_recursive(item, checked):
+                    has_locked = True
+            
+            # If there are locked items that stayed checked, we might be partially checked
+            if has_locked and not checked:
+                # Some items couldn't be unchecked - update parents
+                for i in range(self.tree.topLevelItemCount()):
+                    self._update_parent_check_state_from_root(self.tree.topLevelItem(i))
         finally:
             self._updating = False
         
@@ -203,14 +278,11 @@ class SelectionTreeWidget(QWidget):
         
         self._updating = True
         try:
-            # If parent item changed, update all children
+            # If item has children and was checked/unchecked, update all children
             if item.childCount() > 0:
                 checked = item.checkState(0) == Qt.CheckState.Checked
                 for i in range(item.childCount()):
-                    child = item.child(i)
-                    child.setCheckState(0, Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
-                    # Recurse for nested children
-                    self._set_item_checked_recursive(child, checked)
+                    self._set_item_checked_recursive(item.child(i), checked)
             
             # Update parent state based on children
             parent = item.parent()
@@ -224,22 +296,70 @@ class SelectionTreeWidget(QWidget):
         
         self.selection_changed.emit()
     
-    def _set_item_checked_recursive(self, item: QTreeWidgetItem, checked: bool):
-        """Recursively set checked state for item and all children."""
-        item.setCheckState(0, Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
+    def _set_item_checked_recursive(self, item: QTreeWidgetItem, checked: bool) -> bool:
+        """
+        Recursively set checked state for item and all children.
+        
+        Args:
+            item: Tree item to update
+            checked: Whether to check or uncheck
+            
+        Returns:
+            True if the item was modified, False if locked
+        """
+        # Check if item is locked (not user-checkable)
+        is_locked = not (item.flags() & Qt.ItemFlag.ItemIsUserCheckable)
+        
+        # Also check data for locked items (custom applications)
+        item_data = item.data(0, Qt.ItemDataRole.UserRole)
+        if item_data and item_data.get('type') == 'custom_applications':
+            is_locked = True
+        
+        if not is_locked:
+            item.setCheckState(0, Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
+        
+        has_locked_children = is_locked
         for i in range(item.childCount()):
-            self._set_item_checked_recursive(item.child(i), checked)
+            if not self._set_item_checked_recursive(item.child(i), checked):
+                has_locked_children = True
+        
+        return not has_locked_children
     
     def _update_parent_check_state(self, parent: QTreeWidgetItem):
         """Update parent check state based on children."""
         checked_count = 0
+        unlocked_unchecked = 0
+        locked_checked = 0
         total_count = parent.childCount()
         
         for i in range(total_count):
-            if parent.child(i).checkState(0) == Qt.CheckState.Checked:
+            child = parent.child(i)
+            child_state = child.checkState(0)
+            
+            # Check if child is locked
+            child_data = child.data(0, Qt.ItemDataRole.UserRole)
+            is_locked = (child_data and child_data.get('type') == 'custom_applications') or \
+                        not (child.flags() & Qt.ItemFlag.ItemIsUserCheckable)
+            
+            if child_state == Qt.CheckState.Checked:
                 checked_count += 1
+                if is_locked:
+                    locked_checked += 1
+            elif child_state == Qt.CheckState.PartiallyChecked:
+                # If any child is partial, parent is partial
+                parent.setCheckState(0, Qt.CheckState.PartiallyChecked)
+                grandparent = parent.parent()
+                if grandparent:
+                    self._update_parent_check_state(grandparent)
+                return
+            elif not is_locked:
+                # Only count unlocked unchecked items
+                unlocked_unchecked += 1
         
-        if checked_count == 0:
+        # If there are locked checked items but other items are unchecked, show partial
+        if locked_checked > 0 and unlocked_unchecked > 0:
+            parent.setCheckState(0, Qt.CheckState.PartiallyChecked)
+        elif checked_count == 0 and unlocked_unchecked == total_count:
             parent.setCheckState(0, Qt.CheckState.Unchecked)
         elif checked_count == total_count:
             parent.setCheckState(0, Qt.CheckState.Checked)
@@ -250,6 +370,57 @@ class SelectionTreeWidget(QWidget):
         grandparent = parent.parent()
         if grandparent:
             self._update_parent_check_state(grandparent)
+    
+    def _update_parent_check_state_from_root(self, item: QTreeWidgetItem):
+        """
+        Update check states from a root item down, then back up.
+        Used after bulk operations to fix parent states when locked items exist.
+        """
+        # First update all children recursively
+        for i in range(item.childCount()):
+            child = item.child(i)
+            if child.childCount() > 0:
+                self._update_parent_check_state_from_root(child)
+        
+        # Then update this item's state based on children
+        if item.childCount() > 0:
+            self._update_parent_check_state_for_item(item)
+    
+    def _update_parent_check_state_for_item(self, item: QTreeWidgetItem):
+        """Update a single item's check state based on its children."""
+        checked_count = 0
+        unlocked_unchecked = 0
+        locked_checked = 0
+        total_count = item.childCount()
+        
+        for i in range(total_count):
+            child = item.child(i)
+            child_state = child.checkState(0)
+            
+            # Check if child is locked
+            child_data = child.data(0, Qt.ItemDataRole.UserRole)
+            is_locked = (child_data and child_data.get('type') == 'custom_applications') or \
+                        not (child.flags() & Qt.ItemFlag.ItemIsUserCheckable)
+            
+            if child_state == Qt.CheckState.Checked:
+                checked_count += 1
+                if is_locked:
+                    locked_checked += 1
+            elif child_state == Qt.CheckState.PartiallyChecked:
+                item.setCheckState(0, Qt.CheckState.PartiallyChecked)
+                return
+            elif not is_locked:
+                unlocked_unchecked += 1
+        
+        # If there are locked checked items but other items are unchecked, show partial
+        if locked_checked > 0 and unlocked_unchecked > 0:
+            item.setCheckState(0, Qt.CheckState.PartiallyChecked)
+        elif checked_count == 0 and unlocked_unchecked == total_count:
+            item.setCheckState(0, Qt.CheckState.Unchecked)
+        elif checked_count == total_count:
+            item.setCheckState(0, Qt.CheckState.Checked)
+        else:
+            item.setCheckState(0, Qt.CheckState.PartiallyChecked)
     
     def _update_select_all_state(self):
         """Update Select All checkbox based on tree state."""
@@ -277,7 +448,8 @@ class SelectionTreeWidget(QWidget):
         Get list of selected top-level items with their selected components.
         
         Returns:
-            List of dicts with 'name', 'data', and 'components' keys
+            List of dicts with 'name', 'data', and 'components' keys.
+            Components are collected from all sections (flattened).
         """
         selected = []
         
@@ -290,19 +462,41 @@ class SelectionTreeWidget(QWidget):
                     'components': [],
                 }
                 
-                # Collect selected components
-                for j in range(item.childCount()):
-                    child = item.child(j)
-                    if child.checkState(0) == Qt.CheckState.Checked:
-                        child_data = child.data(0, Qt.ItemDataRole.UserRole)
-                        if child_data and 'type' in child_data:
-                            entry['components'].append(child_data['type'])
-                        else:
-                            entry['components'].append(child.text(1))  # Use type column
+                # Collect selected components from sections
+                self._collect_selected_components(item, entry['components'])
                 
                 selected.append(entry)
         
         return selected
+    
+    def _collect_selected_components(self, item: QTreeWidgetItem, components: List[str]):
+        """
+        Recursively collect selected component types from an item.
+        
+        Args:
+            item: Tree item to collect from
+            components: List to append component type strings to
+        """
+        # Pseudo-types that are handled separately (not real API item types)
+        SKIP_TYPES = {'custom_applications', 'section', 'info'}
+        
+        for i in range(item.childCount()):
+            child = item.child(i)
+            child_data = child.data(0, Qt.ItemDataRole.UserRole)
+            
+            if child_data:
+                item_type = child_data.get('type')
+                
+                # If it's a section, recurse into it
+                if item_type == 'section':
+                    self._collect_selected_components(child, components)
+                # If it's a component type and checked, add it (skip pseudo-types)
+                elif item_type and item_type not in SKIP_TYPES and child.checkState(0) == Qt.CheckState.Checked:
+                    components.append(item_type)
+            else:
+                # Fallback: use type column text
+                if child.checkState(0) == Qt.CheckState.Checked:
+                    components.append(child.text(1))
     
     def expand_all(self):
         """Expand all items in the tree."""

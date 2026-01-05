@@ -172,6 +172,9 @@ class PullOrchestrator:
         # Only folders use filtering - snippets/infrastructure query all items
         self._folder_filter: Optional[Dict[str, List[str]]] = None
         
+        # Cancellation flag
+        self._cancelled = False
+        
         # Validate configuration
         is_valid, errors = validate_configuration(self.config)
         if not is_valid:
@@ -187,6 +190,15 @@ class PullOrchestrator:
             callback: Function(message: str, percentage: int)
         """
         self.progress_callback = callback
+    
+    def cancel(self):
+        """Request cancellation of the current pull operation."""
+        logger.info("Pull cancellation requested")
+        self._cancelled = True
+    
+    def is_cancelled(self) -> bool:
+        """Check if cancellation has been requested."""
+        return self._cancelled
         
     def _emit_progress(self, message: str, percentage: int):
         """Emit progress update if callback is set."""
@@ -489,27 +501,33 @@ class PullOrchestrator:
                 if core_folder not in configuration.folders:
                     configuration.folders[core_folder] = FolderConfig(name=core_folder)
             
+            # Build a unified set of allowed component types across all selected folders
+            # This handles the inheritance model where items from parent folders appear in child queries
+            allowed_component_types = set()
+            if self._folder_filter is not None:
+                for folder, components in self._folder_filter.items():
+                    if components:
+                        allowed_component_types.update(components)
+                    else:
+                        # Empty list means all components - don't filter by type
+                        allowed_component_types = None
+                        break
+                logger.info(f"Folder filter active: allowed components = {allowed_component_types or 'ALL'}")
+            
+            items_stored = 0
+            items_filtered = 0
             for folder_name, item_types_dict in folder_items_dict.items():
                 for item_type, items_list in item_types_dict.items():
+                    # Apply component type filter if active
+                    if allowed_component_types is not None and item_type not in allowed_component_types:
+                        items_filtered += len(items_list)
+                        continue
+                    
                     for item in items_list:
                         # Use the item's actual folder from the API response
                         # Items can be in parent folders (All, Prisma Access, Mobile Users Container)
                         # when querying child folders (Mobile Users, Remote Networks, etc.)
                         item_folder = getattr(item, 'folder', folder_name)
-                        
-                        # Apply folder filter if provided
-                        # Filter controls which folders/components get STORED (not queried)
-                        if self._folder_filter is not None:
-                            # Check if this folder is in the filter
-                            if item_folder not in self._folder_filter:
-                                # Folder not selected - skip this item
-                                continue
-                            
-                            # Check if this component type is selected for this folder
-                            allowed_components = self._folder_filter.get(item_folder, [])
-                            if allowed_components and item_type not in allowed_components:
-                                # Component type not selected for this folder - skip
-                                continue
                         
                         # Create folder config if it doesn't exist
                         if item_folder not in configuration.folders:
@@ -528,6 +546,9 @@ class PullOrchestrator:
                             continue
                         
                         configuration.folders[item_folder].add_item(item)
+                        items_stored += 1
+            
+            logger.info(f"Folder items: {items_stored} stored, {items_filtered} filtered by component type")
             
             # Add snippet items
             snippet_items_dict = state.get_result('snippet_items') or {}
@@ -775,6 +796,12 @@ class PullOrchestrator:
         
         # Process each folder
         for folder_idx, folder in enumerate(folders, 1):
+            # Check for cancellation
+            if self._cancelled:
+                logger.info("Pull cancelled by user")
+                self._emit_progress("Pull cancelled", 0)
+                break
+            
             # Calculate progress for this folder using dynamic range
             folder_progress = self._calculate_progress(
                 progress_ranges['folders_start'],
@@ -789,22 +816,40 @@ class PullOrchestrator:
             
             folder_item_count = 0
             
+            # Determine which item types to query for this folder
+            # If folder_filter specifies components, only query those
+            if self._folder_filter and folder in self._folder_filter:
+                allowed_types = self._folder_filter[folder]
+                if allowed_types:
+                    # Filter to only selected component types
+                    types_to_query = [t for t in self.FOLDER_TYPES if t in allowed_types]
+                    logger.info(f"  Filtering to selected components: {types_to_query}")
+                else:
+                    # Empty list means all components
+                    types_to_query = self.FOLDER_TYPES
+            else:
+                types_to_query = self.FOLDER_TYPES
+            
             # Process each item type for this folder
-            for type_idx, item_type in enumerate(self.FOLDER_TYPES, 1):
+            for type_idx, item_type in enumerate(types_to_query, 1):
+                # Check for cancellation
+                if self._cancelled:
+                    break
+                
                 # Update progress for each type
                 type_progress = self._calculate_progress(
                     folder_progress,
                     type_idx - 1,
-                    len(self.FOLDER_TYPES),
+                    len(types_to_query),
                     int(progress_ranges['folders_range'] / len(folders))  # Use dynamic range
                 )
                 type_display = item_type.replace('_', ' ').title()
                 self._emit_progress(
-                    f"[{folder_idx}/{len(folders)}] {folder}: {type_display} ({type_idx}/{len(self.FOLDER_TYPES)})...",
+                    f"[{folder_idx}/{len(folders)}] {folder}: {type_display} ({type_idx}/{len(types_to_query)})...",
                     type_progress
                 )
                 
-                logger.debug(f"  [{type_idx}/{len(self.FOLDER_TYPES)}] Processing {item_type}")
+                logger.debug(f"  [{type_idx}/{len(types_to_query)}] Processing {item_type}")
                 
                 try:
                     # Check if this type is restricted to specific folders

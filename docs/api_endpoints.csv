@@ -1,0 +1,55 @@
+Name,API Source,URI,Scope Required,Folder Restrictions,GET,GET_ALL,CREATE,UPDATE,DELETE,Implementation,Notes
+Folders,Strata,/config/setup/v1/folders,none,,Yes,Yes,Yes,No,No,"Config Migration/Pull, Config Migration/Push",Uses /setup/v1/ path not /v1/
+Snippets,Strata,/config/setup/v1/snippets,none,,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",Uses /setup/v1/ path not /v1/
+Addresses,SASE,/sse/config/v1/addresses,folder_or_snippet,,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",
+Address Groups,SASE,/sse/config/v1/address-groups,folder_or_snippet,,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",
+Services,SASE,/sse/config/v1/services,folder_or_snippet,,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",
+Service Groups,SASE,/sse/config/v1/service-groups,folder_or_snippet,,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",
+Tags,SASE,/sse/config/v1/tags,folder_or_snippet,,Yes,Yes,No,No,No,Config Migration/Pull,
+Applications,SASE,/sse/config/v1/applications,folder_or_snippet,,Yes,Yes,No,No,No,"Config Migration/Pull, Find Custom Applications",7000+ predefined apps - excluded from default pull
+Application Groups,SASE,/sse/config/v1/application-groups,folder_or_snippet,,Yes,Yes,No,No,No,Config Migration/Pull,
+Application Filters,SASE,/sse/config/v1/application-filters,folder_or_snippet,,Yes,Yes,No,No,No,Config Migration/Pull,
+Schedules,SASE,/sse/config/v1/schedules,folder_or_snippet,,Yes,Yes,No,No,No,Config Migration/Pull,
+External Dynamic Lists,SASE,/sse/config/v1/external-dynamic-lists,folder_or_snippet,,Yes,Yes,No,No,No,Config Migration/Pull,
+Custom URL Categories,SASE,/sse/config/v1/url-categories,folder_or_snippet,,Yes,Yes,No,No,No,Config Migration/Pull,
+Security Rules,SASE,/sse/config/v1/security-rules,folder_or_snippet,,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",
+Decryption Rules,SASE,/sse/config/v1/decryption-rules,folder_or_snippet,,Yes,Yes,No,No,No,Config Migration/Pull,
+Authentication Rules,SASE,/sse/config/v1/authentication-rules,folder_or_snippet,,Yes,Yes,No,No,No,Config Migration/Pull,
+QoS Policy Rules,SASE,/sse/config/v1/qos-policy-rules,folder_or_snippet,,Yes,Yes,No,No,No,Config Migration/Pull,
+Anti-Spyware Profiles,SASE,/sse/config/v1/anti-spyware-profiles,folder_or_snippet,,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",
+Vulnerability Protection Profiles,SASE,/sse/config/v1/vulnerability-protection-profiles,folder_or_snippet,,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",
+File Blocking Profiles,SASE,/sse/config/v1/file-blocking-profiles,folder_or_snippet,,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",
+WildFire Anti-Virus Profiles,SASE,/config/security/v1/wildfire-anti-virus-profiles,folder_or_snippet,,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",Uses /config/security/v1/ path
+DNS Security Profiles,SASE,/sse/config/v1/dns-security-profiles,folder_or_snippet,,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",
+Decryption Profiles,SASE,/sse/config/v1/decryption-profiles,folder_or_snippet,,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",
+HTTP Header Profiles,SASE,/sse/config/v1/http-header-profiles,folder_or_snippet,,Yes,Yes,No,No,No,Config Migration/Pull,
+Certificate Profiles,SASE,/sse/config/v1/certificate-profiles,folder_or_snippet,,Yes,Yes,No,No,No,Config Migration/Pull,
+Authentication Profiles,SASE,/sse/config/v1/authentication-profiles,folder_or_snippet,,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",
+Profile Groups,SASE,/sse/config/v1/profile-groups,folder_or_snippet,,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",
+URL Access Profiles,SASE,/sse/config/v1/url-access-profiles,folder_or_snippet,,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",
+HIP Objects,SASE,/sse/config/v1/hip-objects,folder_or_snippet,,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",
+HIP Profiles,SASE,/sse/config/v1/hip-profiles,folder_or_snippet,,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",
+QoS Profiles,SASE,/sse/config/v1/qos-profiles,folder,"Remote Networks, Service Connections",Yes,Yes,No,No,No,Config Migration/Pull,Only in Remote Networks and Service Connections
+Remote Networks,SASE,/sse/config/v1/remote-networks,folder,Remote Networks,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",Infrastructure only
+Service Connections,SASE,/sse/config/v1/service-connections,folder,Service Connections,Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",Infrastructure only
+IKE Gateways,SASE,/sse/config/v1/ike-gateways,folder,"Remote Networks, Service Connections",Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",Infrastructure - both folders
+IPSec Tunnels,SASE,/sse/config/v1/ipsec-tunnels,folder,"Remote Networks, Service Connections",Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",Infrastructure - both folders
+IKE Crypto Profiles,SASE,/sse/config/v1/ike-crypto-profiles,folder,"Remote Networks, Service Connections",Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",Infrastructure - both folders
+IPSec Crypto Profiles,SASE,/sse/config/v1/ipsec-crypto-profiles,folder,"Remote Networks, Service Connections",Yes,Yes,Yes,Yes,Yes,"Config Migration/Pull, Config Migration/Push",Infrastructure - both folders
+Mobile Agent Profiles,SASE,/sse/config/v1/mobile-agent/agent-profiles,folder,Mobile Users,Yes,Yes,No,No,No,Config Migration/Pull,GlobalProtect agent profiles
+Mobile Agent Versions,SASE,/sse/config/v1/mobile-agent/agent-versions,folder,Mobile Users,Yes,No,No,No,No,Config Migration/Pull,GlobalProtect agent versions
+Mobile Agent Auth Settings,SASE,/sse/config/v1/mobile-agent/authentication-settings,folder,Mobile Users,Yes,No,No,No,No,Config Migration/Pull,GlobalProtect authentication
+Mobile Agent Enable,SASE,/sse/config/v1/mobile-agent/enable,folder,Mobile Users,Yes,No,No,No,No,Config Migration/Pull,GlobalProtect enable status
+Mobile Agent Global Settings,SASE,/sse/config/v1/mobile-agent/global-settings,folder,Mobile Users,Yes,No,No,No,No,Config Migration/Pull,GlobalProtect global settings
+Mobile Agent Infrastructure Settings,SASE,/sse/config/v1/mobile-agent/infrastructure-settings,folder,Mobile Users,Yes,No,No,No,No,Config Migration/Pull,GlobalProtect infrastructure
+Mobile Agent Locations,SASE,/sse/config/v1/mobile-agent/locations,folder,Mobile Users,Yes,No,No,No,No,Config Migration/Pull,GlobalProtect locations
+Mobile Agent Tunnel Profiles,SASE,/sse/config/v1/mobile-agent/tunnel-profiles,folder,Mobile Users,Yes,No,No,No,No,Config Migration/Pull,GlobalProtect tunnel profiles
+Bandwidth Allocations,SASE,/sse/config/v1/bandwidth-allocations,none,,Yes,Yes,No,No,No,Config Migration/Pull,Infrastructure - global
+Locations,SASE,/sse/config/v1/locations,none,,Yes,Yes,No,No,No,Config Migration/Pull,Infrastructure - regions
+Shared Infrastructure Settings,SASE,/sse/config/v1/shared-infrastructure-settings,none,,Yes,No,No,No,No,Config Migration/Pull,Infrastructure - shared
+Config Versions,SASE,/sse/config/v1/config-versions,none,,Yes,No,No,No,No,Config Migration/Push,Version tracking
+Config Push,SASE,/sse/config/v1/config-versions/candidate:push,none,,No,No,Yes,No,No,Config Migration/Push,Push candidate to running
+Jobs,SASE,/sse/config/v1/jobs,none,,Yes,No,No,No,No,Config Migration/Push,Job status tracking
+FQDN Objects,SASE,/sse/config/v1/fqdn,folder_or_snippet,,Yes,Yes,No,No,No,Config Migration/Pull,
+OCSP Responder,SASE,/sse/config/v1/ocsp-responder,folder_or_snippet,,Yes,Yes,No,No,No,Config Migration/Pull,
+SCEP Profiles,SASE,/sse/config/v1/scep-profiles,folder_or_snippet,,Yes,Yes,No,No,No,Config Migration/Pull,

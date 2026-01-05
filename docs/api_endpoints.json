@@ -1,0 +1,930 @@
+{
+  "metadata": {
+    "generated": "2026-01-02",
+    "description": "Prisma Access API Endpoints used by PA Config Lab",
+    "api_sources": {
+      "SASE": "https://api.sase.paloaltonetworks.com",
+      "Strata": "https://api.strata.paloaltonetworks.com"
+    }
+  },
+  "endpoints": [
+    {
+      "name": "Folders",
+      "api_source": "Strata",
+      "uri": "/config/setup/v1/folders",
+      "scope_required": "none",
+      "scope_type": null,
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": "Uses /setup/v1/ path, not /v1/"
+    },
+    {
+      "name": "Snippets",
+      "api_source": "Strata",
+      "uri": "/config/setup/v1/snippets",
+      "scope_required": "none",
+      "scope_type": null,
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": "Uses /setup/v1/ path, not /v1/"
+    },
+    {
+      "name": "Addresses",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/addresses",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": null
+    },
+    {
+      "name": "Address Groups",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/address-groups",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": null
+    },
+    {
+      "name": "Services",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/services",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": null
+    },
+    {
+      "name": "Service Groups",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/service-groups",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": null
+    },
+    {
+      "name": "Tags",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/tags",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": null
+    },
+    {
+      "name": "Applications",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/applications",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull", "Find Custom Applications"],
+      "notes": "7000+ predefined apps - excluded from default pull, use Find Custom Applications"
+    },
+    {
+      "name": "Application Groups",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/application-groups",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": null
+    },
+    {
+      "name": "Application Filters",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/application-filters",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": null
+    },
+    {
+      "name": "Schedules",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/schedules",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": null
+    },
+    {
+      "name": "External Dynamic Lists",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/external-dynamic-lists",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": null
+    },
+    {
+      "name": "Custom URL Categories",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/url-categories",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": null
+    },
+    {
+      "name": "Security Rules",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/security-rules",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": null
+    },
+    {
+      "name": "Decryption Rules",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/decryption-rules",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": null
+    },
+    {
+      "name": "Authentication Rules",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/authentication-rules",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": null
+    },
+    {
+      "name": "QoS Policy Rules",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/qos-policy-rules",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": null
+    },
+    {
+      "name": "Anti-Spyware Profiles",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/anti-spyware-profiles",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": null
+    },
+    {
+      "name": "Vulnerability Protection Profiles",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/vulnerability-protection-profiles",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": null
+    },
+    {
+      "name": "File Blocking Profiles",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/file-blocking-profiles",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": null
+    },
+    {
+      "name": "WildFire Anti-Virus Profiles",
+      "api_source": "SASE",
+      "uri": "/config/security/v1/wildfire-anti-virus-profiles",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": "Uses /config/security/v1/ path instead of /sse/config/v1/"
+    },
+    {
+      "name": "DNS Security Profiles",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/dns-security-profiles",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": null
+    },
+    {
+      "name": "Decryption Profiles",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/decryption-profiles",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": null
+    },
+    {
+      "name": "HTTP Header Profiles",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/http-header-profiles",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": null
+    },
+    {
+      "name": "Certificate Profiles",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/certificate-profiles",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": null
+    },
+    {
+      "name": "Authentication Profiles",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/authentication-profiles",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": null
+    },
+    {
+      "name": "Profile Groups",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/profile-groups",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": null
+    },
+    {
+      "name": "URL Access Profiles",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/url-access-profiles",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": null
+    },
+    {
+      "name": "HIP Objects",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/hip-objects",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": null
+    },
+    {
+      "name": "HIP Profiles",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/hip-profiles",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": null
+    },
+    {
+      "name": "QoS Profiles",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/qos-profiles",
+      "scope_required": "folder",
+      "scope_type": "folder",
+      "folder_restrictions": ["Remote Networks", "Service Connections"],
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": "Only available in Remote Networks and Service Connections folders"
+    },
+    {
+      "name": "Remote Networks",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/remote-networks",
+      "scope_required": "folder",
+      "scope_type": "folder",
+      "folder_restrictions": ["Remote Networks"],
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": "Infrastructure - only in Remote Networks folder"
+    },
+    {
+      "name": "Service Connections",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/service-connections",
+      "scope_required": "folder",
+      "scope_type": "folder",
+      "folder_restrictions": ["Service Connections"],
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": "Infrastructure - only in Service Connections folder"
+    },
+    {
+      "name": "IKE Gateways",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/ike-gateways",
+      "scope_required": "folder",
+      "scope_type": "folder",
+      "folder_restrictions": ["Remote Networks", "Service Connections"],
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": "Infrastructure - exists in both Remote Networks and Service Connections"
+    },
+    {
+      "name": "IPSec Tunnels",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/ipsec-tunnels",
+      "scope_required": "folder",
+      "scope_type": "folder",
+      "folder_restrictions": ["Remote Networks", "Service Connections"],
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": "Infrastructure - exists in both Remote Networks and Service Connections"
+    },
+    {
+      "name": "IKE Crypto Profiles",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/ike-crypto-profiles",
+      "scope_required": "folder",
+      "scope_type": "folder",
+      "folder_restrictions": ["Remote Networks", "Service Connections"],
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": "Infrastructure - exists in both Remote Networks and Service Connections"
+    },
+    {
+      "name": "IPSec Crypto Profiles",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/ipsec-crypto-profiles",
+      "scope_required": "folder",
+      "scope_type": "folder",
+      "folder_restrictions": ["Remote Networks", "Service Connections"],
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": true,
+        "update": true,
+        "delete": true
+      },
+      "implementation": ["Config Migration/Pull", "Config Migration/Push"],
+      "notes": "Infrastructure - exists in both Remote Networks and Service Connections"
+    },
+    {
+      "name": "Mobile Agent Profiles",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/mobile-agent/agent-profiles",
+      "scope_required": "folder",
+      "scope_type": "folder",
+      "folder_restrictions": ["Mobile Users"],
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": "GlobalProtect agent profiles - only in Mobile Users folder"
+    },
+    {
+      "name": "Mobile Agent Versions",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/mobile-agent/agent-versions",
+      "scope_required": "folder",
+      "scope_type": "folder",
+      "folder_restrictions": ["Mobile Users"],
+      "methods": {
+        "get": true,
+        "get_all": false,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": "GlobalProtect agent versions"
+    },
+    {
+      "name": "Mobile Agent Auth Settings",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/mobile-agent/authentication-settings",
+      "scope_required": "folder",
+      "scope_type": "folder",
+      "folder_restrictions": ["Mobile Users"],
+      "methods": {
+        "get": true,
+        "get_all": false,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": "GlobalProtect authentication settings"
+    },
+    {
+      "name": "Mobile Agent Enable",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/mobile-agent/enable",
+      "scope_required": "folder",
+      "scope_type": "folder",
+      "folder_restrictions": ["Mobile Users"],
+      "methods": {
+        "get": true,
+        "get_all": false,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": "GlobalProtect enable status"
+    },
+    {
+      "name": "Mobile Agent Global Settings",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/mobile-agent/global-settings",
+      "scope_required": "folder",
+      "scope_type": "folder",
+      "folder_restrictions": ["Mobile Users"],
+      "methods": {
+        "get": true,
+        "get_all": false,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": "GlobalProtect global settings"
+    },
+    {
+      "name": "Mobile Agent Infrastructure Settings",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/mobile-agent/infrastructure-settings",
+      "scope_required": "folder",
+      "scope_type": "folder",
+      "folder_restrictions": ["Mobile Users"],
+      "methods": {
+        "get": true,
+        "get_all": false,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": "GlobalProtect infrastructure settings"
+    },
+    {
+      "name": "Mobile Agent Locations",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/mobile-agent/locations",
+      "scope_required": "folder",
+      "scope_type": "folder",
+      "folder_restrictions": ["Mobile Users"],
+      "methods": {
+        "get": true,
+        "get_all": false,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": "GlobalProtect locations"
+    },
+    {
+      "name": "Mobile Agent Tunnel Profiles",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/mobile-agent/tunnel-profiles",
+      "scope_required": "folder",
+      "scope_type": "folder",
+      "folder_restrictions": ["Mobile Users"],
+      "methods": {
+        "get": true,
+        "get_all": false,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": "GlobalProtect tunnel profiles"
+    },
+    {
+      "name": "Bandwidth Allocations",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/bandwidth-allocations",
+      "scope_required": "none",
+      "scope_type": null,
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": "Infrastructure - global bandwidth settings"
+    },
+    {
+      "name": "Locations",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/locations",
+      "scope_required": "none",
+      "scope_type": null,
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": "Infrastructure - available regions/locations"
+    },
+    {
+      "name": "Shared Infrastructure Settings",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/shared-infrastructure-settings",
+      "scope_required": "none",
+      "scope_type": null,
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": false,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": "Infrastructure - shared settings"
+    },
+    {
+      "name": "Config Versions",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/config-versions",
+      "scope_required": "none",
+      "scope_type": null,
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": false,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Push"],
+      "notes": "Configuration management - version tracking"
+    },
+    {
+      "name": "Config Push",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/config-versions/candidate:push",
+      "scope_required": "none",
+      "scope_type": null,
+      "folder_restrictions": null,
+      "methods": {
+        "get": false,
+        "get_all": false,
+        "create": true,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Push"],
+      "notes": "Push candidate configuration to running"
+    },
+    {
+      "name": "Jobs",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/jobs",
+      "scope_required": "none",
+      "scope_type": null,
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": false,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Push"],
+      "notes": "Job status tracking for async operations"
+    },
+    {
+      "name": "FQDN Objects",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/fqdn",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": null
+    },
+    {
+      "name": "OCSP Responder",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/ocsp-responder",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": null
+    },
+    {
+      "name": "SCEP Profiles",
+      "api_source": "SASE",
+      "uri": "/sse/config/v1/scep-profiles",
+      "scope_required": "folder_or_snippet",
+      "scope_type": "folder",
+      "folder_restrictions": null,
+      "methods": {
+        "get": true,
+        "get_all": true,
+        "create": false,
+        "update": false,
+        "delete": false
+      },
+      "implementation": ["Config Migration/Pull"],
+      "notes": null
+    }
+  ]
+}

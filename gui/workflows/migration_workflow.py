@@ -27,6 +27,10 @@ class MigrationWorkflowWidget(QWidget):
     
     # Signal emitted when configuration is loaded/pulled (dict format)
     configuration_loaded = pyqtSignal(object)  # Emits dict config
+    
+    # Signal emitted when connection state changes in any child widget
+    # Emits (api_client, tenant_name, source_type) where source_type is "pull" or "push"
+    connection_changed = pyqtSignal(object, str, str)
 
     def __init__(self, parent=None):
         """Initialize migration workflow widget."""
@@ -64,6 +68,10 @@ class MigrationWorkflowWidget(QWidget):
         self.pull_widget.pull_completed.connect(
             self._on_pull_completed,
             Qt.ConnectionType.QueuedConnection
+        )
+        # Propagate connection changes to parent
+        self.pull_widget.tenant_selector.connection_changed.connect(
+            lambda client, name: self._on_child_connection_changed(client, name, "pull")
         )
         self.tabs.addTab(self.pull_widget, "1️⃣ Pull from SCM")
 
@@ -108,6 +116,10 @@ class MigrationWorkflowWidget(QWidget):
         # Push tab
         self.push_widget = PushConfigWidget()
         self.push_widget.push_completed.connect(self._on_push_completed)
+        # Propagate connection changes to parent
+        self.push_widget.tenant_selector.connection_changed.connect(
+            lambda client, name: self._on_child_connection_changed(client, name, "push")
+        )
         self.tabs.addTab(self.push_widget, "4️⃣ Push to Target")
 
         layout.addWidget(self.tabs)
@@ -203,6 +215,11 @@ class MigrationWorkflowWidget(QWidget):
         self.connection_name = connection_name  # Store for use in save dialog
         self.pull_widget.set_api_client(api_client, connection_name)
         self.push_widget.set_api_client(api_client)
+    
+    def _on_child_connection_changed(self, api_client, tenant_name: str, source_type: str):
+        """Handle connection changes from child widgets (pull/push tenant selectors)."""
+        # Propagate to parent (main window)
+        self.connection_changed.emit(api_client, tenant_name, source_type)
 
     def _on_pull_completed(self, config):
         """Handle pull completion."""

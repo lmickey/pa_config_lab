@@ -359,6 +359,9 @@ class PrismaConfigMainWindow(QMainWindow):
         # Connect signal to update main window's current_config
         self.migration_workflow.configuration_loaded.connect(self._on_config_loaded_from_workflow)
         
+        # Connect signal to update connection status in sidebar
+        self.migration_workflow.connection_changed.connect(self._on_workflow_connection_changed)
+        
         layout.addWidget(self.migration_workflow)
 
         self.stacked_widget.addWidget(page)
@@ -480,6 +483,25 @@ class PrismaConfigMainWindow(QMainWindow):
                 "Connection Error",
                 f"Error during connection:\n\n{str(e)}\n\nPlease check the console for details."
             )
+    
+    def _on_workflow_connection_changed(self, api_client, tenant_name: str, source_type: str):
+        """Handle connection changes from workflow widgets (pull/push tenant selectors)."""
+        if api_client and tenant_name:
+            # Update connection status in sidebar
+            source_label = "Pull" if source_type == "pull" else "Push"
+            self.connection_status.setText(f"✓ {source_label}: {tenant_name}")
+            self.connection_status.setStyleSheet("color: green; padding: 5px;")
+            
+            # Update status bar
+            tsg_id = api_client.tsg_id if hasattr(api_client, 'tsg_id') else "Unknown"
+            self.statusBar().showMessage(f"{source_label} connected to {tenant_name} ({tsg_id})", 5000)
+            
+            # Log connection
+            self.logs_widget.log(f"{source_label} connected to {tenant_name}", "success")
+        else:
+            # Disconnected
+            self.connection_status.setText("Not Connected")
+            self.connection_status.setStyleSheet("color: gray; padding: 5px;")
 
     def _show_tenant_manager(self):
         """Show tenant manager dialog."""

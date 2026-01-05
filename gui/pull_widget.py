@@ -28,7 +28,7 @@ from gui.widgets import (
     SelectionTreeWidget,
     InfrastructureTreeWidget,
 )
-from gui.dialogs import AdvancedOptionsDialog
+from gui.dialogs import AdvancedOptionsDialog, FindApplicationsDialog
 
 
 class PullConfigWidget(QWidget):
@@ -63,6 +63,21 @@ class PullConfigWidget(QWidget):
         # Cached data
         self._snippets_cache: List[Dict[str, Any]] = []
         self._agent_profiles_cache: List[Dict[str, Any]] = []
+        
+        # Custom applications selected via Find Applications dialog
+        # Maps folder name -> list of application dicts
+        self._custom_applications: Dict[str, List[Dict[str, Any]]] = {}
+        
+        # Applications cache for Find Custom Applications dialog
+        # Session-only cache - cleared on tenant change
+        self._applications_cache: Dict[str, Any] = {
+            'loaded': False,           # Whether full load completed
+            'total': 0,                # Total apps from API
+            'loaded_count': 0,         # Progress for resume support
+            'all_apps': [],            # All apps during load (cleared after)
+            'custom_apps': [],         # Filtered custom apps only
+            'tenant_id': None,         # Track tenant for invalidation
+        }
         
         # Batch GUI updates to prevent segfaults from rapid updates
         self.pending_messages = []
@@ -143,6 +158,20 @@ class PullConfigWidget(QWidget):
         self.update_selection_btn.clicked.connect(self._update_selection)
         self.update_selection_btn.setEnabled(False)
         button_container.addWidget(self.update_selection_btn)
+        
+        # Load Custom Applications button - enabled when connected
+        self.find_apps_btn = QPushButton("📦 Load Custom Apps")
+        self.find_apps_btn.setMinimumWidth(180)
+        self.find_apps_btn.setFixedHeight(36)
+        self.find_apps_btn.setToolTip("Add custom applications to include in pull")
+        self.find_apps_btn.setStyleSheet(
+            "QPushButton { background-color: #2196F3; color: white; font-weight: bold; font-size: 13px; }"
+            "QPushButton:hover { background-color: #1976D2; }"
+            "QPushButton:disabled { background-color: #cccccc; color: #666666; }"
+        )
+        self.find_apps_btn.clicked.connect(self._open_find_applications)
+        self.find_apps_btn.setEnabled(False)
+        button_container.addWidget(self.find_apps_btn)
         
         tenant_row.addLayout(button_container)
         
@@ -243,14 +272,176 @@ class PullConfigWidget(QWidget):
         dialog = AdvancedOptionsDialog(self)
         dialog.exec()
 
+    def _open_find_applications(self):
+        """Open the Find Custom Applications dialog."""
+        if not self.api_client:
+            self.error_notification.show_error(
+                "Not Connected: Please connect to a source tenant first."
+            )
+            return
+        
+        # Pass cache by reference so dialog can update it
+        dialog = FindApplicationsDialog(self.api_client, self._applications_cache, self)
+        if dialog.exec() == FindApplicationsDialog.DialogCode.Accepted:
+            selected_apps = dialog.get_selected_applications()
+            if selected_apps:
+                self._add_custom_applications(selected_apps)
+    
+    def _add_custom_applications(self, apps_by_folder: Dict[str, List[Dict[str, Any]]]):
+        """
+        Add selected custom applications to the appropriate folder trees.
+        
+        Args:
+            apps_by_folder: Dict mapping folder name to list of application dicts
+        """
+        from PyQt6.QtGui import QColor
+        from PyQt6.QtWidgets import QTreeWidgetItem
+        
+        total_added = 0
+        
+        for folder_name, apps in apps_by_folder.items():
+            # Store in our cache
+            if folder_name not in self._custom_applications:
+                self._custom_applications[folder_name] = []
+            
+            # Add only new applications (avoid duplicates)
+            existing_ids = {a.get('id') for a in self._custom_applications[folder_name]}
+            for app in apps:
+                if app.get('id') not in existing_ids:
+                    self._custom_applications[folder_name].append(app)
+                    total_added += 1
+            
+            # Find the folder in the tree and add/update Applications section
+            self._update_folder_applications(folder_name, self._custom_applications[folder_name])
+        
+        if total_added > 0:
+            self.toast_manager.show_success(
+                f"Added {total_added} custom application{'s' if total_added != 1 else ''} to selection",
+                duration=3000
+            )
+            self.logger.info(f"Added {total_added} custom applications to selection")
+    
+    def _update_folder_applications(self, folder_name: str, apps: List[Dict[str, Any]]):
+        """
+        Update the Applications section in a folder's tree entry.
+        
+        Adds a "Custom Applications (N)" entry under the existing "Applications" section.
+        
+        Args:
+            folder_name: API name of the folder
+            apps: List of application dicts to add
+        """
+        from PyQt6.QtGui import QColor, QFont
+        from PyQt6.QtWidgets import QTreeWidgetItem
+        
+        # Find the folder item in the tree
+        folder_item = None
+        for i in range(self.folders_tree.tree.topLevelItemCount()):
+            item = self.folders_tree.tree.topLevelItem(i)
+            item_data = item.data(0, Qt.ItemDataRole.UserRole)
+            if item_data and item_data.get('name') == folder_name:
+                folder_item = item
+                break
+        
+        if not folder_item:
+            self.logger.warning(f"Could not find folder '{folder_name}' in tree")
+            return
+        
+        # Find the "Applications" section within the folder
+        apps_section = None
+        for i in range(folder_item.childCount()):
+            child = folder_item.child(i)
+            # Check if this is the Applications section (by text or data)
+            if child.text(0) == "Applications" or (
+                child.data(0, Qt.ItemDataRole.UserRole) and 
+                child.data(0, Qt.ItemDataRole.UserRole).get('type') == 'section' and
+                child.data(0, Qt.ItemDataRole.UserRole).get('section') == 'Applications'
+            ):
+                apps_section = child
+                break
+        
+        # If no Applications section exists, create one
+        if not apps_section:
+            apps_section = QTreeWidgetItem(["Applications", "section"])
+            apps_section.setFlags(apps_section.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            apps_section.setCheckState(0, Qt.CheckState.Checked)
+            apps_section.setData(0, Qt.ItemDataRole.UserRole, {
+                'type': 'section',
+                'section': 'Applications',
+                'parent': folder_name
+            })
+            
+            # Make section name bold
+            font = apps_section.font(0)
+            font.setBold(True)
+            apps_section.setFont(0, font)
+            
+            # Add to folder
+            folder_item.addChild(apps_section)
+        
+        # Find or create "Custom Applications" entry under Applications section
+        custom_apps_item = None
+        for i in range(apps_section.childCount()):
+            child = apps_section.child(i)
+            child_data = child.data(0, Qt.ItemDataRole.UserRole)
+            if child_data and child_data.get('type') == 'custom_applications':
+                custom_apps_item = child
+                break
+        
+        if not custom_apps_item:
+            # Create new Custom Applications entry with item_type from ApplicationObject
+            custom_apps_item = QTreeWidgetItem([f"Custom Applications ({len(apps)})", "application_object"])
+            custom_apps_item.setFlags(custom_apps_item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            custom_apps_item.setCheckState(0, Qt.CheckState.Checked)
+            # Make it non-interactive (locked)
+            custom_apps_item.setFlags(custom_apps_item.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)
+            custom_apps_item.setData(0, Qt.ItemDataRole.UserRole, {
+                'type': 'custom_applications',
+                'item_type': 'application_object',
+                'parent': folder_name,
+                'apps': apps
+            })
+            
+            # Grey out and use blue color to indicate it's locked but special
+            custom_apps_item.setForeground(0, QColor(33, 150, 243))  # Blue
+            
+            apps_section.addChild(custom_apps_item)
+        else:
+            # Update existing entry
+            existing_data = custom_apps_item.data(0, Qt.ItemDataRole.UserRole)
+            existing_apps = existing_data.get('apps', []) if existing_data else []
+            
+            # Merge apps (avoid duplicates by ID)
+            existing_ids = {a.get('id') for a in existing_apps}
+            for app in apps:
+                if app.get('id') not in existing_ids:
+                    existing_apps.append(app)
+            
+            # Update text and data
+            custom_apps_item.setText(0, f"Custom Applications ({len(existing_apps)})")
+            custom_apps_item.setData(0, Qt.ItemDataRole.UserRole, {
+                'type': 'custom_applications',
+                'item_type': 'application_object',
+                'parent': folder_name,
+                'apps': existing_apps
+            })
+        
+        # Expand folder and Applications section to show the entry
+        folder_item.setExpanded(True)
+        apps_section.setExpanded(True)
+        
+        # Scroll to make visible
+        self.folders_tree.tree.scrollToItem(custom_apps_item)
+
     def _show_selection_page(self):
         """Switch to selection page."""
         self.stacked_widget.setCurrentIndex(0)
         self.back_btn.setVisible(False)
         self.cancel_btn.setVisible(False)
-        # Re-enable pull button, disable update selection
+        # Re-enable pull button and find apps, disable update selection
         self.pull_btn.setEnabled(self.api_client is not None)
         self.update_selection_btn.setEnabled(False)
+        self.find_apps_btn.setEnabled(self.api_client is not None)
 
     def _show_results_page(self):
         """Switch to results page."""
@@ -258,9 +449,10 @@ class PullConfigWidget(QWidget):
         self.results_panel.clear()
         self.back_btn.setVisible(False)
         self.cancel_btn.setVisible(True)
-        # Disable pull button, enable update selection
+        # Disable pull button and find apps, enable update selection
         self.pull_btn.setEnabled(False)
         self.update_selection_btn.setEnabled(True)
+        self.find_apps_btn.setEnabled(False)
 
     def _update_selection(self):
         """Cancel pull if running and return to selection page."""
@@ -268,7 +460,9 @@ class PullConfigWidget(QWidget):
         if self.worker and self.worker.isRunning():
             self.logger.info("User requested to update selection - cancelling pull")
             self.worker.stop()
-            self.worker = None
+            # Wait for thread to finish (with timeout)
+            self.worker.wait(5000)  # 5 second timeout
+        self.worker = None
         
         # Return to selection page
         self._show_selection_page()
@@ -296,11 +490,26 @@ class PullConfigWidget(QWidget):
         
         connected = api_client is not None
         
+        # Clear applications cache if tenant changed
+        if self._applications_cache.get('tenant_id') != tenant_name:
+            self.logger.info(f"Tenant changed from '{self._applications_cache.get('tenant_id')}' to '{tenant_name}' - clearing applications cache")
+            self._applications_cache = {
+                'loaded': False,
+                'total': 0,
+                'loaded_count': 0,
+                'all_apps': [],
+                'custom_apps': [],
+                'tenant_id': tenant_name,
+            }
+            # Also clear selected custom applications since they're tenant-specific
+            self._custom_applications = {}
+        
         # Enable/disable UI elements
         self.folders_tree.set_enabled(connected)
         self.snippets_tree.set_enabled(connected)
         self.infrastructure_tree.set_enabled(connected)
         self.pull_btn.setEnabled(connected)
+        self.find_apps_btn.setEnabled(connected)
         
         if connected:
             self.progress_label.setText(f"Connected to {tenant_name} - Ready to pull")
@@ -472,6 +681,8 @@ class PullConfigWidget(QWidget):
             "include_service_connections": infrastructure_config.get('service_connections', False),
             "include_mobile_users": infrastructure_config.get('mobile_users', False),
             "infrastructure_config": infrastructure_config,
+            # Custom applications loaded via Find Applications dialog
+            "custom_applications": self._custom_applications,
         }
 
         self.logger.info(f"Starting pull with options: folders={len(selected_folders)}, "
@@ -546,6 +757,9 @@ class PullConfigWidget(QWidget):
             except Exception as e:
                 self.logger.error(f"Error getting config from worker: {e}")
             
+            # Wait for thread to fully finish before cleanup
+            if self.worker.isRunning():
+                self.worker.wait(1000)  # 1 second timeout
             self.worker = None
 
         self._set_ui_enabled(True)
@@ -553,9 +767,11 @@ class PullConfigWidget(QWidget):
         # Show back button, hide cancel button
         self.back_btn.setVisible(True)
         self.cancel_btn.setVisible(False)
-        # Re-enable pull, disable update selection (pull is done)
+        # Re-enable pull, disable update selection and find apps (pull is done)
+        # find_apps_btn stays disabled until "Update Selection" is clicked
         self.pull_btn.setEnabled(self.api_client is not None)
         self.update_selection_btn.setEnabled(False)
+        self.find_apps_btn.setEnabled(False)
 
         if success:
             self.progress_label.setText("✓ Pull completed successfully!")
@@ -582,15 +798,21 @@ class PullConfigWidget(QWidget):
         self.update_timer.stop()
         self._flush_pending_messages()
         
-        self.worker = None
+        # Wait for thread to fully finish before cleanup
+        if self.worker:
+            if self.worker.isRunning():
+                self.worker.wait(1000)  # 1 second timeout
+            self.worker = None
         self._set_ui_enabled(True)
         
         # Show back button, hide cancel button
         self.back_btn.setVisible(True)
         self.cancel_btn.setVisible(False)
-        # Re-enable pull, disable update selection (pull is done)
+        # Re-enable pull, disable update selection and find apps (pull is done)
+        # find_apps_btn stays disabled until "Update Selection" is clicked
         self.pull_btn.setEnabled(self.api_client is not None)
         self.update_selection_btn.setEnabled(False)
+        self.find_apps_btn.setEnabled(False)
         
         self.progress_label.setText(f"✗ Error: {error_message}")
         self.progress_label.setStyleSheet("color: red; font-size: 14px; font-weight: bold;")
@@ -606,6 +828,7 @@ class PullConfigWidget(QWidget):
         self.infrastructure_tree.set_enabled(enabled and self.api_client is not None)
         self.pull_btn.setEnabled(enabled and self.api_client is not None)
         self.advanced_btn.setEnabled(enabled)
+        self.find_apps_btn.setEnabled(enabled and self.api_client is not None)
 
     def get_pulled_config(self):
         """Get the most recently pulled configuration."""
