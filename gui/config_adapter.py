@@ -71,8 +71,8 @@ class ConfigAdapter:
         for snippet_name, snippet_config in config.snippets.items():
             result["snippets"][snippet_name] = ConfigAdapter._snippet_to_dict(snippet_config)
         
-        # Convert infrastructure
-        result["infrastructure"] = ConfigAdapter._infrastructure_to_dict(config.infrastructure)
+        # Convert infrastructure (pass config for raw data like bandwidth allocations)
+        result["infrastructure"] = ConfigAdapter._infrastructure_to_dict(config.infrastructure, config)
         
         # Add statistics
         all_items = config.get_all_items()
@@ -115,14 +115,25 @@ class ConfigAdapter:
         return result
     
     @staticmethod
-    def _infrastructure_to_dict(infrastructure_config) -> Dict[str, Any]:
-        """Convert InfrastructureConfig to dict."""
+    def _infrastructure_to_dict(infrastructure_config, config=None) -> Dict[str, Any]:
+        """
+        Convert InfrastructureConfig to dict.
+        
+        Args:
+            infrastructure_config: InfrastructureConfig object
+            config: Optional parent Configuration object (for raw data like bandwidth allocations)
+        """
         result = {}
         for item in infrastructure_config.items:
             item_type = item.item_type
             if item_type not in result:
                 result[item_type] = []
             result[item_type].append(item.to_dict())
+        
+        # Include bandwidth allocations if present (stored as raw data on Configuration)
+        if config and hasattr(config, '_bandwidth_allocations') and config._bandwidth_allocations:
+            result['bandwidth_allocation'] = config._bandwidth_allocations
+        
         return result
     
     @staticmethod

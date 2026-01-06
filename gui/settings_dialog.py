@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QSettings
 
-from config.logging_config import NORMAL, set_log_level, enable_debug_mode, disable_debug_mode
+from config.logging_config import NORMAL, DETAIL, set_log_level, enable_debug_mode, disable_debug_mode
 
 
 class SettingsDialog(QDialog):
@@ -243,10 +243,11 @@ class SettingsDialog(QDialog):
 
         # Log level dropdown
         self.log_level_combo = QComboBox()
-        self.log_level_combo.addItem("Error - Fewest entries", logging.ERROR)
-        self.log_level_combo.addItem("Warning - Recoverable issues", logging.WARNING)
-        self.log_level_combo.addItem("Normal - Summary operations", NORMAL)
-        self.log_level_combo.addItem("Info - Detailed steps", logging.INFO)
+        self.log_level_combo.addItem("Error - Failures only", logging.ERROR)
+        self.log_level_combo.addItem("Warning - Issues that need attention", logging.WARNING)
+        self.log_level_combo.addItem("Normal - High-level summaries", NORMAL)
+        self.log_level_combo.addItem("Info - Per-item processing", logging.INFO)
+        self.log_level_combo.addItem("Detail - API URLs, keys, values", DETAIL)
         self.log_level_combo.addItem("Debug - Everything (troubleshooting)", logging.DEBUG)
         self.log_level_combo.setCurrentIndex(2)  # Default to NORMAL
         log_layout.addRow("Log Level:", self.log_level_combo)

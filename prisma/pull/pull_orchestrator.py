@@ -85,6 +85,7 @@ class PullOrchestrator:
     }
     
     # Snippet-based types (must loop through all snippets)
+    # Should match FOLDER_TYPES for consistency - snippets can contain the same item types
     SNIPPET_TYPES = [
         'address_object',
         'address_group',
@@ -95,7 +96,22 @@ class PullOrchestrator:
         'application_group',
         'application_filter',
         'schedule',
+        'hip_object',
+        'hip_profile',
+        'external_dynamic_list',
+        'custom_url_category',
+        'anti_spyware_profile',
+        'vulnerability_profile',
+        'file_blocking_profile',
+        'wildfire_profile',
+        'dns_security_profile',
+        'decryption_profile',
         'http_header_profile',
+        'certificate_profile',
+        'security_rule',
+        'decryption_rule',
+        'authentication_rule',
+        'qos_policy_rule',
     ]
     
     # Infrastructure types (no folder parameter needed)
@@ -157,7 +173,7 @@ class PullOrchestrator:
             api_client: PrismaAccessAPIClient instance
             config: WorkflowConfig (uses defaults if not provided)
         """
-        logger.info("Initializing Pull Orchestrator")
+        logger.detail("Initializing Pull Orchestrator")
         logger.debug(f"API Client: {type(api_client).__name__}")
         
         self.api_client = api_client
@@ -338,7 +354,7 @@ class PullOrchestrator:
             'infrastructure_range': infra_range,
         }
         
-        logger.info("Pull Orchestrator initialized")
+        logger.detail("Pull Orchestrator initialized")
     
     def pull_all(
         self,
@@ -349,6 +365,8 @@ class PullOrchestrator:
         folder_list: Optional[List[str]] = None,
         snippet_list: Optional[List[str]] = None,
         folder_filter: Optional[Dict[str, List[str]]] = None,
+        snippet_filter: Optional[Dict[str, List[str]]] = None,
+        infrastructure_filter: Optional[Dict[str, Any]] = None,
     ) -> WorkflowResult:
         """
         Pull all configurations.
@@ -362,13 +380,22 @@ class PullOrchestrator:
             snippet_list: Optional list of specific snippet names to pull (None = all)
             folder_filter: Optional dict of {folder_name: [component_types]} to control storage
                           Empty list means all components. Missing folder means exclude.
-                          Only applies to folders - snippets/infrastructure query all items.
+            snippet_filter: Optional dict of {snippet_name: [component_types]} to control what's pulled/stored
+                          Empty list means all components. Missing snippet means exclude.
+            infrastructure_filter: Optional dict with keys like:
+                          - remote_networks: bool
+                          - service_connections: bool  
+                          - mobile_users: bool
+                          - rn_ipsec_tunnels, sc_ipsec_tunnels: bool (granular)
+                          - etc. Controls which infra types/folders to pull from
             
         Returns:
             WorkflowResult with complete pull results
         """
-        # Store folder filter for use during configuration building
+        # Store filters for use during configuration building
         self._folder_filter = folder_filter
+        self._snippet_filter = snippet_filter
+        self._infrastructure_filter = infrastructure_filter
         logger.normal("=" * 80)
         logger.normal("STARTING PULL OPERATION")
         logger.normal("=" * 80)
@@ -407,7 +434,7 @@ class PullOrchestrator:
                     state.start_operation('fetch_folders')
                     folders = self._get_folders()
                     logger.info(f"Found {len(folders)} folders")
-                    logger.debug(f"Folders: {folders}")
+                    logger.detail(f"Folders: {folders}")
                     state.complete_operation()
                 
                 state.store_result('folders', folders)
@@ -423,7 +450,7 @@ class PullOrchestrator:
                 state.start_operation('fetch_snippets')
                 snippets = self._get_snippets(snippet_list)
                 logger.info(f"Found {len(snippets)} snippets")
-                logger.debug(f"Snippets: {snippets}")
+                logger.detail(f"Snippets: {snippets}")
                 state.store_result('snippets', snippets)
                 state.complete_operation()
             else:
@@ -453,7 +480,7 @@ class PullOrchestrator:
             # Pull folder-based items
             if include_folders and folders:
                 self._emit_progress(f"Pulling folder configs from {len(folders)} folders...", progress_ranges['folders_start'])
-                logger.info(f"Pulling folder-based items from {len(folders)} folders...")
+                logger.normal(f"Pulling folder-based items from {len(folders)} folders...")
                 folder_items = self._pull_folder_items(folders, state, result, progress_ranges)
                 state.store_result('folder_items', folder_items)
                 logger.info(f"Pulled {len(folder_items)} folder-based items")
@@ -461,7 +488,7 @@ class PullOrchestrator:
             # Pull snippet-based items
             if include_snippets and snippets:
                 self._emit_progress(f"Pulling snippet configs from {len(snippets)} snippets...", progress_ranges['snippets_start'])
-                logger.info(f"Pulling snippet-based items from {len(snippets)} snippets...")
+                logger.normal(f"Pulling snippet-based items from {len(snippets)} snippets...")
                 snippet_items = self._pull_snippet_items(snippets, state, result, progress_ranges)
                 state.store_result('snippet_items', snippet_items)
                 logger.info(f"Pulled {len(snippet_items)} snippet-based items")
@@ -469,7 +496,7 @@ class PullOrchestrator:
             # Pull infrastructure items
             if include_infrastructure:
                 self._emit_progress("Pulling infrastructure configs...", progress_ranges['infrastructure_start'])
-                logger.info("Pulling infrastructure items...")
+                logger.normal("Pulling infrastructure items...")
                 infra_items = self._pull_infrastructure_items(state, result, progress_ranges)
                 state.store_result('infrastructure_items', infra_items)
                 logger.info(f"Pulled {len(infra_items)} infrastructure items")
@@ -495,39 +522,54 @@ class PullOrchestrator:
             # Add folder items
             folder_items_dict = state.get_result('folder_items') or {}
             
-            # Initialize core folder hierarchy (even if empty)
-            core_folders = ['All', 'Shared', 'Mobile Users Container']
-            for core_folder in core_folders:
-                if core_folder not in configuration.folders:
-                    configuration.folders[core_folder] = FolderConfig(name=core_folder)
+            # Build allowed folders set and per-folder component filters from folder_filter
+            # The folder_filter is a dict of {folder_name: [component_types]}
+            # We need to apply BOTH folder AND component filtering as a PAIR
+            allowed_folders = None
+            folder_component_map = {}  # {folder_name: set of allowed component types or None for all}
             
-            # Build a unified set of allowed component types across all selected folders
-            # This handles the inheritance model where items from parent folders appear in child queries
-            allowed_component_types = set()
             if self._folder_filter is not None:
-                for folder, components in self._folder_filter.items():
+                allowed_folders = set(self._folder_filter.keys())
+                for folder_name, components in self._folder_filter.items():
                     if components:
-                        allowed_component_types.update(components)
+                        folder_component_map[folder_name] = set(components)
                     else:
-                        # Empty list means all components - don't filter by type
-                        allowed_component_types = None
-                        break
-                logger.info(f"Folder filter active: allowed components = {allowed_component_types or 'ALL'}")
+                        # Empty list means all components for this folder
+                        folder_component_map[folder_name] = None
+                logger.detail(f"Folder filter active: allowed folders = {allowed_folders}")
+                logger.detail(f"Per-folder component filters: {folder_component_map}")
+            
+            # Only initialize folders that are in the allowed list (or all if no filter)
+            # Don't auto-create core folders if they weren't selected
+            if allowed_folders:
+                for folder_name in allowed_folders:
+                    if folder_name not in configuration.folders:
+                        configuration.folders[folder_name] = FolderConfig(name=folder_name)
             
             items_stored = 0
-            items_filtered = 0
+            items_filtered_by_type = 0
+            items_filtered_by_folder = 0
             for folder_name, item_types_dict in folder_items_dict.items():
                 for item_type, items_list in item_types_dict.items():
-                    # Apply component type filter if active
-                    if allowed_component_types is not None and item_type not in allowed_component_types:
-                        items_filtered += len(items_list)
-                        continue
-                    
                     for item in items_list:
                         # Use the item's actual folder from the API response
                         # Items can be in parent folders (All, Prisma Access, Mobile Users Container)
                         # when querying child folders (Mobile Users, Remote Networks, etc.)
                         item_folder = getattr(item, 'folder', folder_name)
+                        
+                        # Filter by allowed folders - only store items from selected folders
+                        # This prevents parent folder configs from appearing when only child folders are selected
+                        if allowed_folders is not None and item_folder not in allowed_folders:
+                            items_filtered_by_folder += 1
+                            continue
+                        
+                        # Apply per-folder component type filter
+                        # Check if this item_type is allowed for this specific folder
+                        if item_folder in folder_component_map:
+                            allowed_types = folder_component_map[item_folder]
+                            if allowed_types is not None and item_type not in allowed_types:
+                                items_filtered_by_type += 1
+                                continue
                         
                         # Create folder config if it doesn't exist
                         if item_folder not in configuration.folders:
@@ -548,7 +590,7 @@ class PullOrchestrator:
                         configuration.folders[item_folder].add_item(item)
                         items_stored += 1
             
-            logger.info(f"Folder items: {items_stored} stored, {items_filtered} filtered by component type")
+            logger.normal(f"Folder items: {items_stored} stored, {items_filtered_by_type} filtered by type, {items_filtered_by_folder} filtered by folder")
             
             # Add snippet items
             snippet_items_dict = state.get_result('snippet_items') or {}
@@ -559,6 +601,8 @@ class PullOrchestrator:
                 'predefined-snippet', 'dlp-predefined-snippet'
             }
             
+            snippet_items_stored = 0
+            snippet_items_filtered = 0
             for snippet_name, item_types_dict in snippet_items_dict.items():
                 for item_type, items_list in item_types_dict.items():
                     for item in items_list:
@@ -570,6 +614,7 @@ class PullOrchestrator:
                         if not self.config.include_defaults:
                             if item_snippet in DEFAULT_SNIPPET_NAMES or item_snippet.endswith('-default'):
                                 logger.debug(f"Skipping item from default snippet: {item_snippet}")
+                                snippet_items_filtered += 1
                                 continue
                         
                         # Create snippet config if it doesn't exist
@@ -589,17 +634,25 @@ class PullOrchestrator:
                             continue
                         
                         configuration.snippets[item_snippet].add_item(item)
+                        snippet_items_stored += 1
+            
+            logger.normal(f"Snippet items: {snippet_items_stored} stored, {snippet_items_filtered} filtered by defaults")
             
             # Add infrastructure items
             infra_items_dict = state.get_result('infrastructure_items') or {}
             # Flatten dictionary of lists into single list
+            # Note: bandwidth_allocation items are raw dicts, not ConfigItems
             for item_type, items_list in infra_items_dict.items():
-                for item in items_list:
-                    configuration.infrastructure.add_item(item)
+                if item_type == 'bandwidth_allocation':
+                    # Store bandwidth allocations as raw data (they don't have ConfigItem models)
+                    configuration._bandwidth_allocations = items_list
+                else:
+                    for item in items_list:
+                        configuration.infrastructure.add_item(item)
             
             # Attach configuration to result
             result.configuration = configuration
-            logger.info(f"Configuration object created with {len(configuration.get_all_items())} total items")
+            logger.normal(f"Configuration object created with {len(configuration.get_all_items())} total items")
             
             # Mark complete
             state.complete()
@@ -874,7 +927,7 @@ class PullOrchestrator:
                     from urllib.parse import quote
                     encoded_folder = quote(folder, safe='')
                     url = f"{model_class.api_endpoint}?folder={encoded_folder}"
-                    logger.debug(f"  Fetching from: {url}")
+                    logger.detail(f"  Fetching from: {url}")
                     
                     response = self.api_client._make_request("GET", url, item_type=item_type)
                     
@@ -882,16 +935,16 @@ class PullOrchestrator:
                     raw_items = []
                     if isinstance(response, dict) and 'data' in response:
                         raw_items = response['data']
-                        logger.debug(f"  Response contains 'data' with {len(raw_items)} items")
+                        logger.detail(f"  Response contains 'data' with {len(raw_items)} items")
                     elif isinstance(response, list):
                         raw_items = response
-                        logger.debug(f"  Response is list with {len(raw_items)} items")
+                        logger.detail(f"  Response is list with {len(raw_items)} items")
                     else:
-                        logger.debug(f"  Response format unexpected: {type(response)}")
+                        logger.detail(f"  Response format unexpected: {type(response)}")
                     
                     if raw_items:
                         logger.info(f"  {item_type}: {len(raw_items)} items retrieved")
-                        logger.debug(f"  First item keys: {list(raw_items[0].keys()) if raw_items else 'none'}")
+                        logger.detail(f"  First item keys: {list(raw_items[0].keys()) if raw_items else 'none'}")
                     
                     # Instantiate items
                     items = []
@@ -967,6 +1020,16 @@ class PullOrchestrator:
         logger.info(f"Pulling snippet-based items from {len(snippets)} snippets...")
         logger.debug(f"Snippet types: {self.SNIPPET_TYPES}")
         
+        # Build allowed component types for snippets (similar to folder filtering)
+        snippet_allowed_types = {}
+        if self._snippet_filter is not None:
+            for snippet_name, components in self._snippet_filter.items():
+                if components:  # Non-empty list = specific components
+                    snippet_allowed_types[snippet_name] = set(components)
+                else:  # Empty list = all components
+                    snippet_allowed_types[snippet_name] = None
+            logger.detail(f"Snippet filter active: {len(snippet_allowed_types)} snippets with component filters")
+        
         # Initialize structure: snippet -> type -> items
         snippet_items: Dict[str, Dict[str, List[ConfigItem]]] = {
             snippet: {} for snippet in snippets
@@ -988,8 +1051,19 @@ class PullOrchestrator:
             logger.normal(f"[{snippet_idx}/{len(snippets)}] Processing snippet: {snippet}")
             snippet_item_count = 0
             
+            # Determine which item types to pull for this snippet
+            allowed_types_for_snippet = None
+            if self._snippet_filter is not None:
+                allowed_types_for_snippet = snippet_allowed_types.get(snippet)
+                if allowed_types_for_snippet is not None:
+                    logger.info(f"  Filtering to selected components: {sorted(allowed_types_for_snippet)}")
+            
             # Process each item type for this snippet
             for type_idx, item_type in enumerate(self.SNIPPET_TYPES, 1):
+                # Skip item types not in the allowed list (if filtering is active)
+                if allowed_types_for_snippet is not None and item_type not in allowed_types_for_snippet:
+                    logger.debug(f"  Skipping {item_type} (not in selected components)")
+                    continue
                 # Update progress for each type within snippet
                 type_progress = self._calculate_progress(
                     snippet_progress,
@@ -1077,10 +1151,23 @@ class PullOrchestrator:
         progress_ranges: dict
     ) -> Dict[str, List[ConfigItem]]:
         """
-        Pull infrastructure items (no location, already optimized).
+        Pull infrastructure items with hierarchical progress reporting.
         
-        Note: Some infrastructure types (IKE/IPsec) exist in multiple folders
-        and need to be pulled from each folder separately.
+        Hierarchy matches the viewer/selection tree:
+        - Remote Networks (1 section with 5 sub-items)
+          - Remote Networks (items)
+          - IPSec Tunnels
+            - IKE Gateways
+              - IKE Crypto Profiles
+            - IPSec Crypto Profiles
+        - Service Connections (1 section with 5 sub-items)
+          - Service Connections (items)
+          - IPSec Tunnels
+            - IKE Gateways
+              - IKE Crypto Profiles
+            - IPSec Crypto Profiles
+        - Mobile Users (1 section with 1 sub-item)
+          - Agent Profiles
         
         Args:
             state: WorkflowState for tracking
@@ -1093,59 +1180,201 @@ class PullOrchestrator:
         state.start_operation('pull_infrastructure_items')
         logger.info("Pulling infrastructure items...")
         
+        # Build set of allowed folders based on infrastructure filter
+        allowed_folders = set()
+        if self._infrastructure_filter:
+            if self._infrastructure_filter.get('remote_networks', False):
+                allowed_folders.add('Remote Networks')
+            if self._infrastructure_filter.get('service_connections', False):
+                allowed_folders.add('Service Connections')
+            if self._infrastructure_filter.get('mobile_users', False):
+                allowed_folders.add('Mobile Users')
+            logger.detail(f"Infrastructure filter active: allowed folders = {allowed_folders}")
+        else:
+            # No filter - allow all
+            allowed_folders = {'Remote Networks', 'Service Connections', 'Mobile Users'}
+        
         infra_items: Dict[str, List[ConfigItem]] = {}
         
-        # Process each infrastructure type
-        for type_idx, item_type in enumerate(self.INFRASTRUCTURE_TYPES, 1):
-            try:
-                # Calculate progress for this infrastructure type
-                type_progress = self._calculate_progress(
-                    progress_ranges['infrastructure_start'],
-                    type_idx - 1,
-                    len(self.INFRASTRUCTURE_TYPES),
-                    progress_ranges['infrastructure_range']
+        # Calculate total sections for progress (only count enabled sections)
+        # Each main section (RN, SC, MU, Regions) counts as 1
+        total_sections = 0
+        if 'Remote Networks' in allowed_folders:
+            total_sections += 1
+        if 'Service Connections' in allowed_folders:
+            total_sections += 1
+        if 'Mobile Users' in allowed_folders:
+            total_sections += 1
+        
+        # Check if regions/bandwidth is enabled
+        include_regions = self._infrastructure_filter.get('regions', False) if self._infrastructure_filter else False
+        include_bandwidth = self._infrastructure_filter.get('bandwidth', False) if self._infrastructure_filter else False
+        if include_regions or include_bandwidth:
+            total_sections += 1
+        
+        if total_sections == 0:
+            logger.info("No infrastructure sections selected")
+            state.complete_operation()
+            return infra_items
+        
+        current_section = 0
+        
+        # IPSec-related types for RN and SC hierarchy
+        # Order: parent items, then IPSec tunnels, then IKE gateways, then crypto profiles
+        IPSEC_HIERARCHY = [
+            'ipsec_tunnel',
+            'ike_gateway',
+            'ike_crypto_profile',
+            'ipsec_crypto_profile',
+        ]
+        
+        # ========== Remote Networks Section ==========
+        if 'Remote Networks' in allowed_folders:
+            current_section += 1
+            section_base_pct = self._calculate_progress(
+                progress_ranges['infrastructure_start'],
+                current_section - 1,
+                total_sections,
+                progress_ranges['infrastructure_range']
+            )
+            section_range = progress_ranges['infrastructure_range'] // total_sections
+            
+            # 5 sub-items in RN: remote_network, ipsec_tunnel, ike_gateway, ike_crypto_profile, ipsec_crypto_profile
+            rn_sub_items = ['remote_network'] + IPSEC_HIERARCHY
+            
+            for sub_idx, item_type in enumerate(rn_sub_items, 1):
+                sub_progress = self._calculate_progress(section_base_pct, sub_idx - 1, len(rn_sub_items), section_range)
+                type_display = item_type.replace('_', ' ').title()
+                self._emit_progress(
+                    f"[{current_section}/{total_sections}] Remote Networks: {type_display} ({sub_idx}/{len(rn_sub_items)})...",
+                    sub_progress
                 )
                 
-                # Check if this type exists in multiple folders
-                if item_type in self.MULTI_FOLDER_INFRA_TYPES:
-                    # Pull from each folder
-                    folders = self.MULTI_FOLDER_INFRA_TYPES[item_type]
-                    
-                    type_display = item_type.replace('_', ' ').title()
-                    self._emit_progress(
-                        f"[{type_idx}/{len(self.INFRASTRUCTURE_TYPES)}] Infrastructure: {type_display} ({len(folders)} folders)...",
-                        type_progress
-                    )
-                    
-                    logger.info(f"Fetching {item_type} items from {len(folders)} folders...")
-                    
-                    all_items_for_type = []
-                    for folder in folders:
-                        folder_items = self._pull_infra_from_folder(item_type, folder, result)
-                        all_items_for_type.extend(folder_items)
-                        logger.info(f"  Fetched {len(folder_items)} {item_type} items from '{folder}'")
-                    
-                    infra_items[item_type] = all_items_for_type
-                    logger.info(f"  Total {item_type}: {len(all_items_for_type)} items")
-                else:
-                    # Single folder type - use global endpoint
-                    type_display = item_type.replace('_', ' ').title()
-                    self._emit_progress(
-                        f"[{type_idx}/{len(self.INFRASTRUCTURE_TYPES)}] Infrastructure: {type_display}...",
-                        type_progress
-                    )
-                    
-                    logger.info(f"Fetching {item_type} items...")
-                    items = self._pull_infra_global(item_type, result)
-                    infra_items[item_type] = items
-                    logger.info(f"  Fetched {len(items)} {item_type} items")
+                try:
+                    if item_type == 'remote_network':
+                        # Pull remote_network items globally (they're in Remote Networks folder)
+                        items = self._pull_infra_global(item_type, result)
+                        if items:
+                            infra_items[item_type] = infra_items.get(item_type, []) + items
+                        logger.info(f"  Fetched {len(items)} remote_network items")
+                    else:
+                        # Pull IPSec-related items from Remote Networks folder
+                        items = self._pull_infra_from_folder(item_type, 'Remote Networks', result)
+                        if items:
+                            infra_items[item_type] = infra_items.get(item_type, []) + items
+                        logger.info(f"  Fetched {len(items)} {item_type} items from 'Remote Networks'")
+                except Exception as e:
+                    logger.error(f"Error fetching {item_type} for Remote Networks: {e}")
+                    handle_workflow_error(e, None, f'fetch_{item_type}_rn', result, self.config)
+        
+        # ========== Service Connections Section ==========
+        if 'Service Connections' in allowed_folders:
+            current_section += 1
+            section_base_pct = self._calculate_progress(
+                progress_ranges['infrastructure_start'],
+                current_section - 1,
+                total_sections,
+                progress_ranges['infrastructure_range']
+            )
+            section_range = progress_ranges['infrastructure_range'] // total_sections
+            
+            # 5 sub-items in SC: service_connection, ipsec_tunnel, ike_gateway, ike_crypto_profile, ipsec_crypto_profile
+            sc_sub_items = ['service_connection'] + IPSEC_HIERARCHY
+            
+            for sub_idx, item_type in enumerate(sc_sub_items, 1):
+                sub_progress = self._calculate_progress(section_base_pct, sub_idx - 1, len(sc_sub_items), section_range)
+                type_display = item_type.replace('_', ' ').title()
+                self._emit_progress(
+                    f"[{current_section}/{total_sections}] Service Connections: {type_display} ({sub_idx}/{len(sc_sub_items)})...",
+                    sub_progress
+                )
                 
-            except Exception as e:
-                # Log error but continue with other infrastructure types
-                logger.error(f"Error fetching {item_type}: {e}")
-                handle_workflow_error(e, None, f'fetch_{item_type}', result, self.config)
-                # Continue with next type instead of failing
-                continue
+                try:
+                    if item_type == 'service_connection':
+                        # Pull service_connection items globally (they're in Service Connections folder)
+                        items = self._pull_infra_global(item_type, result)
+                        if items:
+                            infra_items[item_type] = infra_items.get(item_type, []) + items
+                        logger.info(f"  Fetched {len(items)} service_connection items")
+                    else:
+                        # Pull IPSec-related items from Service Connections folder
+                        items = self._pull_infra_from_folder(item_type, 'Service Connections', result)
+                        if items:
+                            infra_items[item_type] = infra_items.get(item_type, []) + items
+                        logger.info(f"  Fetched {len(items)} {item_type} items from 'Service Connections'")
+                except Exception as e:
+                    logger.error(f"Error fetching {item_type} for Service Connections: {e}")
+                    handle_workflow_error(e, None, f'fetch_{item_type}_sc', result, self.config)
+        
+        # ========== Mobile Users Section ==========
+        if 'Mobile Users' in allowed_folders:
+            current_section += 1
+            section_base_pct = self._calculate_progress(
+                progress_ranges['infrastructure_start'],
+                current_section - 1,
+                total_sections,
+                progress_ranges['infrastructure_range']
+            )
+            section_range = progress_ranges['infrastructure_range'] // total_sections
+            
+            # 1 sub-item in MU: agent_profile
+            mu_sub_items = ['agent_profile']
+            
+            for sub_idx, item_type in enumerate(mu_sub_items, 1):
+                sub_progress = self._calculate_progress(section_base_pct, sub_idx - 1, len(mu_sub_items), section_range)
+                type_display = item_type.replace('_', ' ').title()
+                self._emit_progress(
+                    f"[{current_section}/{total_sections}] Mobile Users: {type_display} ({sub_idx}/{len(mu_sub_items)})...",
+                    sub_progress
+                )
+                
+                try:
+                    # Pull agent_profile from Mobile Users folder
+                    items = self._pull_infra_from_folder(item_type, 'Mobile Users', result)
+                    if items:
+                        infra_items[item_type] = infra_items.get(item_type, []) + items
+                    logger.info(f"  Fetched {len(items)} agent_profile items from 'Mobile Users'")
+                except Exception as e:
+                    logger.error(f"Error fetching agent_profile for Mobile Users: {e}")
+                    handle_workflow_error(e, None, f'fetch_agent_profile_mu', result, self.config)
+        
+        # ========== Regions & Bandwidth Section ==========
+        include_regions = self._infrastructure_filter.get('regions', False) if self._infrastructure_filter else False
+        include_bandwidth = self._infrastructure_filter.get('bandwidth', False) if self._infrastructure_filter else False
+        
+        if include_regions or include_bandwidth:
+            current_section += 1
+            section_base_pct = self._calculate_progress(
+                progress_ranges['infrastructure_start'],
+                current_section - 1,
+                total_sections,
+                progress_ranges['infrastructure_range']
+            )
+            section_range = progress_ranges['infrastructure_range'] // total_sections
+            
+            # Count sub-items for this section
+            regions_sub_items = []
+            if include_bandwidth:
+                regions_sub_items.append('bandwidth_allocation')
+            
+            for sub_idx, item_type in enumerate(regions_sub_items, 1):
+                sub_progress = self._calculate_progress(section_base_pct, sub_idx - 1, len(regions_sub_items), section_range)
+                type_display = 'Bandwidth Allocations' if item_type == 'bandwidth_allocation' else item_type.replace('_', ' ').title()
+                self._emit_progress(
+                    f"[{current_section}/{total_sections}] Regions: {type_display} ({sub_idx}/{len(regions_sub_items)})...",
+                    sub_progress
+                )
+                
+                try:
+                    if item_type == 'bandwidth_allocation':
+                        # Pull bandwidth allocations directly from API
+                        allocations = self._pull_bandwidth_allocations(result)
+                        if allocations:
+                            infra_items['bandwidth_allocation'] = allocations
+                        logger.info(f"  Fetched {len(allocations)} bandwidth allocation items")
+                except Exception as e:
+                    logger.error(f"Error fetching {item_type}: {e}")
+                    handle_workflow_error(e, None, f'fetch_{item_type}', result, self.config)
         
         state.complete_operation()
         return infra_items
@@ -1299,6 +1528,43 @@ class PullOrchestrator:
             handle_workflow_error(e, None, f'fetch_{item_type}', result, self.config)
         
         return items
+    
+    def _pull_bandwidth_allocations(self, result: WorkflowResult) -> List[Dict[str, Any]]:
+        """
+        Pull bandwidth allocation configurations.
+        
+        Bandwidth allocations provide information about Prisma Access regional
+        deployments and allocated bandwidth per region.
+        
+        Args:
+            result: WorkflowResult for error tracking
+            
+        Returns:
+            List of bandwidth allocation dictionaries (raw data, not ConfigItem)
+        """
+        allocations = []
+        
+        try:
+            logger.info("Fetching bandwidth allocations...")
+            raw_allocations = self.api_client.get_all_bandwidth_allocations()
+            
+            for alloc in raw_allocations:
+                # Bandwidth allocations don't have a ConfigItem model yet,
+                # so we store them as raw dicts
+                allocations.append(alloc)
+                result.items_processed += 1
+            
+            logger.info(f"  Fetched {len(allocations)} bandwidth allocations")
+            
+        except Exception as e:
+            error_str = str(e).lower()
+            if "404" in error_str:
+                logger.info("  Bandwidth allocations endpoint not available - skipping")
+            else:
+                logger.error(f"Error fetching bandwidth allocations: {e}")
+                handle_workflow_error(e, None, 'fetch_bandwidth_allocations', result, self.config)
+        
+        return allocations
     
     def get_stats(self) -> Dict[str, Any]:
         """

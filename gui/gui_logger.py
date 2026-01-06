@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Optional
 from io import StringIO
 from PyQt6.QtCore import QObject, pyqtSignal
+from config.logging_config import NORMAL, DETAIL
 
 
 class LogSignalEmitter(QObject):
@@ -64,15 +65,22 @@ class GUILogHandler(logging.Handler):
             msg = self.format(record)
             
             # Map logging levels to GUI levels
+            # Custom levels: NORMAL=25, DETAIL=15
             level_map = {
-                logging.DEBUG: 'info',
+                logging.DEBUG: 'debug',
+                DETAIL: 'detail',  # 15
                 logging.INFO: 'info',
+                NORMAL: 'normal',  # 25
                 logging.WARNING: 'warning',
                 logging.ERROR: 'error',
                 logging.CRITICAL: 'error',
             }
             
             gui_level = level_map.get(record.levelno, 'info')
+            
+            # Prepend level name to message for activity log visibility
+            level_name = logging.getLevelName(record.levelno)
+            msg = f"[{level_name}] {msg}"
             
             # Send to GUI logs widget via SIGNAL (thread-safe)
             if self.logs_widget:
@@ -241,6 +249,7 @@ def setup_gui_logging(logs_widget):
     1. Redirects Python logging to GUI
     2. Redirects stdout/stderr to GUI
     3. Sets up error logger adapter
+    4. Respects saved log level from settings
     
     Args:
         logs_widget: LogsWidget instance
@@ -248,18 +257,31 @@ def setup_gui_logging(logs_widget):
     Returns:
         Tuple of (original_stdout, original_stderr) for restoration if needed
     """
+    from config.logging_config import set_log_level, enable_debug_mode, disable_debug_mode
+    
     # Save original stdout/stderr
     original_stdout = sys.stdout
     original_stderr = sys.stderr
     
-    # Set up logging handler
+    # Get saved log level from settings (default to NORMAL)
+    from PyQt6.QtCore import QSettings
+    settings = QSettings("PrismaAccess", "ConfigManager")
+    saved_level = settings.value("advanced/log_level", NORMAL, type=int)
+    
+    # Set up logging handler - handler accepts all levels, filtering happens at logger level
     gui_handler = GUILogHandler(logs_widget)
-    gui_handler.setLevel(logging.DEBUG)
+    gui_handler.setLevel(logging.DEBUG)  # Handler accepts everything, logger filters
     
     # Add handler to root logger
     root_logger = logging.getLogger()
     root_logger.addHandler(gui_handler)
-    root_logger.setLevel(logging.INFO)
+    
+    # Apply the saved log level (this also handles debug mode flag)
+    set_log_level(saved_level)
+    if saved_level == logging.DEBUG:
+        enable_debug_mode()
+    else:
+        disable_debug_mode()
     
     # Redirect stdout (print statements)
     sys.stdout = PrintRedirector(logs_widget, level='info')
@@ -270,7 +292,8 @@ def setup_gui_logging(logs_widget):
     # Set up error logger adapter
     ErrorLoggerGUIAdapter.set_logs_widget(logs_widget)
     
-    logs_widget.log("GUI logging system initialized", "success")
+    level_name = logging.getLevelName(saved_level)
+    logs_widget.log(f"GUI logging initialized (level: {level_name})", "success")
     
     return original_stdout, original_stderr
 

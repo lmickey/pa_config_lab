@@ -116,7 +116,7 @@ class TenantSelectorWidget(QWidget):
             tenant_name = tenant.get('name', 'Unknown')
             self.tenant_combo.addItem(tenant_name, tenant)
         
-        self.logger.info(f"Populated tenant selector with {len(tenants)} tenant(s)")
+        self.logger.detail(f"Populated tenant selector with {len(tenants)} tenant(s)")
     
     def _on_tenant_selected(self, index):
         """Handle tenant selection from dropdown."""
@@ -179,7 +179,7 @@ class TenantSelectorWidget(QWidget):
                     self.tenant_combo.setCurrentIndex(0)
                     return
                 
-                self.logger.info(f"Tenant loaded: {tenant_name}")
+                self.logger.detail(f"Tenant loaded: {tenant_name}")
                 
                 # Extract credentials
                 tsg_id = tenant.get('tsg_id')
@@ -216,7 +216,7 @@ class TenantSelectorWidget(QWidget):
                 
                 # Verify connection
                 if api_client.token:
-                    self.logger.info(f"✓ Successfully connected to: {tenant_name}")
+                    self.logger.normal(f"✓ Successfully connected to: {tenant_name}")
                     
                     # Update last used timestamp
                     manager.mark_used(tenant.get('id'))
@@ -255,7 +255,7 @@ class TenantSelectorWidget(QWidget):
         from gui.connection_dialog import ConnectionDialog
         
         try:
-            self.logger.info("Opening manual connection dialog")
+            self.logger.detail("Opening manual connection dialog")
             
             dialog = ConnectionDialog(self)
             result = dialog.exec()
@@ -266,7 +266,7 @@ class TenantSelectorWidget(QWidget):
                 # Get tenant name
                 tenant_name = dialog.connection_name if hasattr(dialog, 'connection_name') else "Manual Connection"
                 
-                self.logger.info(f"✓ Manual connection successful: {tenant_name}")
+                self.logger.normal(f"✓ Manual connection successful: {tenant_name}")
                 
                 # Set connection
                 self.set_connection(dialog.api_client, tenant_name)
@@ -288,7 +288,7 @@ class TenantSelectorWidget(QWidget):
                     self.tenant_combo.addItem(tenant_name, {"name": tenant_name})
                     self.tenant_combo.setCurrentIndex(self.tenant_combo.count() - 1)
             else:
-                self.logger.info("Manual connection cancelled or failed")
+                self.logger.warning("Manual connection cancelled or failed")
                 
         except Exception as e:
             self.logger.error(f"Error opening connection dialog: {e}")
@@ -315,12 +315,12 @@ class TenantSelectorWidget(QWidget):
             self.status_label.setStyleSheet(
                 "color: green; padding: 8px; margin-top: 5px; font-weight: bold;"
             )
-            self.logger.info(f"Connection set: {tenant_name}")
+            self.logger.detail(f"Connection set: {tenant_name}")
         else:
             # Update status - disconnected
             self.status_label.setText("No tenant connected")
             self.status_label.setStyleSheet("color: gray; padding: 8px; margin-top: 5px;")
-            self.logger.info("Connection cleared")
+            self.logger.detail("Connection cleared")
         
         # Emit signal
         self.connection_changed.emit(api_client, tenant_name or "")

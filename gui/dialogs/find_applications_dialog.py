@@ -511,7 +511,10 @@ class FindApplicationsDialog(QDialog):
     
     def _on_lookup_finished(self):
         """Handle lookup completion."""
-        self.worker = None
+        # Wait for worker thread to fully terminate before releasing reference
+        if self.worker:
+            self.worker.wait(2000)  # Wait up to 2 seconds
+            self.worker = None
         self.add_btn.setEnabled(True)
         self._update_button_states()
     
@@ -587,7 +590,18 @@ class FindApplicationsDialog(QDialog):
     
     def closeEvent(self, event):
         """Handle dialog close."""
-        if self.worker and self.worker.isRunning():
-            self.worker.stop()
-            self.worker.wait(2000)
+        self._cleanup_worker()
         super().closeEvent(event)
+    
+    def reject(self):
+        """Handle dialog rejection (cancel/close)."""
+        self._cleanup_worker()
+        super().reject()
+    
+    def _cleanup_worker(self):
+        """Clean up worker thread if running."""
+        if self.worker:
+            if self.worker.isRunning():
+                self.worker.stop()
+                self.worker.wait(3000)  # Wait up to 3 seconds
+            self.worker = None

@@ -28,10 +28,13 @@ class InfrastructureTreeWidget(QWidget):
     
     Hierarchy:
     - Remote Networks
-      └─ IPsec Tunnels
-           ├─ IKE Gateways
-           │   └─ IKE Crypto Profiles
-           └─ IPsec Crypto Profiles
+      ├─ IPsec Tunnels
+      │    ├─ IKE Gateways
+      │    │   └─ IKE Crypto Profiles
+      │    └─ IPsec Crypto Profiles
+      └─ Regions & Bandwidth
+           ├─ Enabled Regions
+           └─ Bandwidth Allocations
     
     - Service Connections
       └─ IPsec Tunnels
@@ -88,6 +91,20 @@ class InfrastructureTreeWidget(QWidget):
         # Remote Networks
         self.remote_networks_item = self._create_checked_item("Remote Networks", "infrastructure")
         self._add_ipsec_hierarchy(self.remote_networks_item, "remote_networks")
+        
+        # Regions & Bandwidth (under Remote Networks)
+        self.regions_item = self._create_checked_item("Regions & Bandwidth", "regions")
+        
+        regions_item = self._create_checked_item("Enabled Regions", "region")
+        regions_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'region'})
+        self.regions_item.addChild(regions_item)
+        
+        bandwidth_item = self._create_checked_item("Bandwidth Allocations", "bandwidth")
+        bandwidth_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'bandwidth'})
+        self.regions_item.addChild(bandwidth_item)
+        
+        self.remote_networks_item.addChild(self.regions_item)
+        
         self.tree.addTopLevelItem(self.remote_networks_item)
         
         # Service Connections
@@ -104,19 +121,6 @@ class InfrastructureTreeWidget(QWidget):
         self.mobile_users_item.addChild(self.agent_profiles_item)
         
         self.tree.addTopLevelItem(self.mobile_users_item)
-        
-        # Regions & Bandwidth
-        self.regions_item = self._create_checked_item("Regions & Bandwidth", "regions")
-        
-        regions_item = self._create_checked_item("Enabled Regions", "region")
-        regions_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'region'})
-        self.regions_item.addChild(regions_item)
-        
-        bandwidth_item = self._create_checked_item("Bandwidth Allocations", "bandwidth")
-        bandwidth_item.setData(0, Qt.ItemDataRole.UserRole, {'type': 'bandwidth'})
-        self.regions_item.addChild(bandwidth_item)
-        
-        self.tree.addTopLevelItem(self.regions_item)
         
         # Start collapsed (like folders/snippets)
         self.tree.collapseAll()

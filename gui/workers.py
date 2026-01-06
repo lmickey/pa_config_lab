@@ -122,18 +122,19 @@ class PullWorker(QThread):
                         snippet_names.append(s)
                         has_real_components = True
             
-            # Log the folder filter for debugging
-            logger.info(f"Folder filter being sent to orchestrator: {folder_filter}")
-            logger.info(f"Has real components to pull: {has_real_components}")
-            logger.info(f"Include infrastructure: {include_infrastructure}")
+            # Log the filters for debugging
+            logger.detail(f"Folder filter being sent to orchestrator: {folder_filter}")
+            logger.detail(f"Snippet filter being sent to orchestrator: {snippet_components}")
+            logger.detail(f"Has real components to pull: {has_real_components}")
+            logger.detail(f"Include infrastructure: {include_infrastructure}")
             
             # Check if we need to run the orchestrator at all
             custom_applications = self.options.get('custom_applications', {})
             has_custom_apps = bool(custom_applications and any(custom_applications.values()))
-            logger.info(f"Has custom apps: {has_custom_apps}, custom_applications keys: {list(custom_applications.keys())}")
+            logger.detail(f"Has custom apps: {has_custom_apps}, custom_applications keys: {list(custom_applications.keys())}")
             # Log the actual content
             for k, v in custom_applications.items():
-                logger.info(f"  custom_applications['{k}']: {len(v) if v else 0} apps, first app: {v[0].get('name') if v else 'N/A'}")
+                logger.detail(f"  custom_applications['{k}']: {len(v) if v else 0} apps, first app: {v[0].get('name') if v else 'N/A'}")
             
             if not has_real_components and not include_infrastructure:
                 # No real components selected - skip orchestrator entirely
@@ -218,11 +219,24 @@ class PullWorker(QThread):
                     if components:  # Has real component types selected
                         folders_to_query.append(folder_name)
                 
-                logger.info(f"Folders to query (with real components): {folders_to_query}")
+                logger.detail(f"Folders to query (with real components): {folders_to_query}")
                 
                 # If no specific folders with real components, don't query any folders
                 # (custom apps are handled separately)
                 include_folders_in_pull = bool(folders_to_query) and has_real_components
+                
+                # Build infrastructure filter from options
+                # Get full infrastructure config which includes regions/bandwidth selections
+                infra_config = self.options.get('infrastructure_config', {})
+                infrastructure_filter = {
+                    'remote_networks': self.options.get('include_remote_networks', False),
+                    'service_connections': self.options.get('include_service_connections', False),
+                    'mobile_users': self.options.get('include_mobile_users', False),
+                    # Include regions/bandwidth selections from infrastructure_config
+                    'regions': infra_config.get('regions', False),
+                    'bandwidth': infra_config.get('bandwidth', False),
+                }
+                logger.detail(f"Infrastructure filter: {infrastructure_filter}")
                 
                 result = orchestrator.pull_all(
                     include_folders=include_folders_in_pull,
@@ -232,6 +246,8 @@ class PullWorker(QThread):
                     folder_list=folders_to_query if folders_to_query else None,
                     snippet_list=snippet_names if snippet_names else None,
                     folder_filter=folder_filter,  # Controls what folder items get stored
+                    snippet_filter=snippet_components if snippet_components else None,  # Controls what snippet items get pulled/stored
+                    infrastructure_filter=infrastructure_filter,  # Controls which infra types/folders to pull
                 )
 
                 if not self._is_running:
@@ -266,7 +282,8 @@ class PullWorker(QThread):
                         for app_data in apps:
                             try:
                                 # Create ApplicationObject from the loaded app data
-                                app_obj = ApplicationObject.from_api_response(app_data)
+                                # ApplicationObject uses raw_config constructor, not from_api_response
+                                app_obj = ApplicationObject(raw_config=app_data)
                                 configuration.folders[folder_name].add_item(app_obj)
                                 custom_app_count += 1
                             except Exception as e:

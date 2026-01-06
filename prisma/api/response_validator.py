@@ -98,7 +98,9 @@ class ResponseValidator:
                     }
                 )
             else:
-                logger.warning(
+                # Use debug level - many responses legitimately don't have 'data' key
+                # (e.g., single-item responses, application lookups)
+                logger.debug(
                     f"Response validation issues for {expected_type}: "
                     f"{len(issues)} issues (first: {issues[0] if issues else 'none'})"
                 )

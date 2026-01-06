@@ -204,15 +204,15 @@ class ConfigViewerWidget(QWidget):
         # Build tree using ConfigTreeBuilder
         import logging
         logger = logging.getLogger(__name__)
-        logger.info("="*80)
-        logger.info("ConfigViewer._refresh_view - Building tree")
-        logger.info(f"self.current_config type: {type(self.current_config)}")
-        logger.info(f"self.current_config keys: {list(self.current_config.keys()) if isinstance(self.current_config, dict) else 'not a dict'}")
+        logger.detail("="*80)
+        logger.detail("ConfigViewer._refresh_view - Building tree")
+        logger.detail(f"self.current_config type: {type(self.current_config)}")
+        logger.detail(f"self.current_config keys: {list(self.current_config.keys()) if isinstance(self.current_config, dict) else 'not a dict'}")
         if isinstance(self.current_config, dict):
-            logger.info(f"  folders keys: {list(self.current_config.get('folders', {}).keys())}")
-            logger.info(f"  snippets keys: {list(self.current_config.get('snippets', {}).keys())}")
-            logger.info(f"  infrastructure keys: {list(self.current_config.get('infrastructure', {}).keys())}")
-        logger.info("="*80)
+            logger.detail(f"  folders keys: {list(self.current_config.get('folders', {}).keys())}")
+            logger.detail(f"  snippets keys: {list(self.current_config.get('snippets', {}).keys())}")
+            logger.detail(f"  infrastructure keys: {list(self.current_config.get('infrastructure', {}).keys())}")
+        logger.detail("="*80)
         
         builder = ConfigTreeBuilder(enable_checkboxes=False)
         builder.build_tree(self.tree, self.current_config)

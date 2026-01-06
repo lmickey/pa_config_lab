@@ -2,12 +2,20 @@
 Logging configuration for Prisma Access Configuration Lab.
 
 Provides centralized logging configuration with support for:
-- Multiple log levels (ERROR, WARNING, NORMAL, INFO, DEBUG)
+- 6 log levels: ERROR (40) > WARNING (30) > NORMAL (25) > INFO (20) > DETAIL (15) > DEBUG (10)
 - Debug mode for detailed diagnostics
 - Structured log formatting
 - Activity logging
 - Performance tracking
 - Log rotation and retention
+
+Log Level Guidelines:
+- ERROR: Failures that stop the operation
+- WARNING: Issues that don't stop operation but need attention
+- NORMAL: High-level tasks and responses (operation summaries, milestones)
+- INFO: Lower-level tasks/responses (per-item processing)
+- DETAIL: Verbose info like API URLs, specific keys/values, item counts
+- DEBUG: Developer-level debugging (stack traces, internal state)
 """
 
 import logging
@@ -18,9 +26,11 @@ from datetime import datetime, timedelta
 import shutil
 
 
-# Custom NORMAL log level (between WARNING and INFO)
-NORMAL = 25
+# Custom log levels (between standard levels)
+NORMAL = 25  # Between WARNING (30) and INFO (20) - high-level summaries
+DETAIL = 15  # Between INFO (20) and DEBUG (10) - verbose details
 logging.addLevelName(NORMAL, 'NORMAL')
+logging.addLevelName(DETAIL, 'DETAIL')
 
 # Default log level
 DEFAULT_LOG_LEVEL = NORMAL
@@ -35,12 +45,20 @@ SIMPLE_FORMAT = "%(levelname)s - %(message)s"
 
 
 def normal(self, message, *args, **kwargs):
-    """Log a message at NORMAL level."""
+    """Log a message at NORMAL level (high-level summaries)."""
     if self.isEnabledFor(NORMAL):
         self._log(NORMAL, message, args, **kwargs)
 
-# Add normal() method to Logger class
+
+def detail(self, message, *args, **kwargs):
+    """Log a message at DETAIL level (verbose details like URLs, keys, values)."""
+    if self.isEnabledFor(DETAIL):
+        self._log(DETAIL, message, args, **kwargs)
+
+
+# Add custom methods to Logger class
 logging.Logger.normal = normal
+logging.Logger.detail = detail
 
 
 class DebugModeFilter(logging.Filter):

@@ -109,9 +109,9 @@ class PrismaAccessAPIClient:
         Returns:
             True if successful, False otherwise
         """
-        logger.info(f"Authenticating with Prisma Access API (TSG: {self.tsg_id})")
-        logger.debug(f"Auth URL: {AUTH_URL}")
-        logger.debug(f"API User: {self.api_user[:10]}...")
+        logger.normal(f"Authenticating with Prisma Access API (TSG: {self.tsg_id})")
+        logger.detail(f"Auth URL: {AUTH_URL}")
+        logger.detail(f"API User: {self.api_user[:10]}...")
         
         try:
             scope = f"tsg_id:{self.tsg_id}"
@@ -148,7 +148,7 @@ class PrismaAccessAPIClient:
                     seconds=expires_in - 60
                 )  # Refresh 1 min early
                 
-                logger.info(f"Authentication successful (token expires in {expires_in}s)")
+                logger.normal(f"Authentication successful (token expires in {expires_in}s)")
                 logger.debug(f"Token: {self.token[:20]}...")
 
                 return True
@@ -209,7 +209,7 @@ class PrismaAccessAPIClient:
             NetworkError: If network/server error occurs
             ValidationError: If request validation fails
         """
-        logger.info(f"API {method} request to {url}")
+        logger.detail(f"API {method} request to {url}")
         logger.debug(f"Request params: {params}")
         if data:
             import json
@@ -220,10 +220,10 @@ class PrismaAccessAPIClient:
             cache_key = f"{method}:{url}:{params}"
             cached = self.cache.get(cache_key)
             if cached is not None:
-                logger.debug(f"Cache HIT for {cache_key[:100]}")
-                logger.debug(f"Cached data items: {len(cached.get('data', []))}")
+                logger.detail(f"Cache HIT for {cache_key[:100]}")
+                logger.detail(f"Cached data items: {len(cached.get('data', []))}")
                 return cached
-            logger.debug(f"Cache MISS for {cache_key[:100]}")
+            logger.detail(f"Cache MISS for {cache_key[:100]}")
 
         # Rate limiting
         logger.debug("Checking rate limit")
@@ -286,8 +286,8 @@ class PrismaAccessAPIClient:
             logger.debug(f"Response parsed successfully")
             
             if 'data' in result:
-                logger.info(f"Response contains {len(result['data'])} data items")
-                logger.debug(f"First data item keys: {list(result['data'][0].keys()) if result['data'] else 'none'}")
+                logger.detail(f"Response contains {len(result['data'])} data items")
+                logger.detail(f"First data item keys: {list(result['data'][0].keys()) if result['data'] else 'none'}")
             else:
                 logger.debug(f"Response keys: {list(result.keys())}")
             

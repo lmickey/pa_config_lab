@@ -128,9 +128,23 @@ class PullConfigWidget(QWidget):
         self.tenant_selector.connection_changed.connect(self._on_connection_changed)
         tenant_row.addWidget(self.tenant_selector, stretch=1)
         
-        # Button container for Pull and Update Selection (stacked vertically)
+        # Button container for Pull, Load Apps, and Update Selection (stacked vertically)
         button_container = QVBoxLayout()
         button_container.setSpacing(4)
+        
+        # Load Custom Applications button - enabled when connected (moved to top)
+        self.find_apps_btn = QPushButton("📦 Load Custom Apps")
+        self.find_apps_btn.setMinimumWidth(180)
+        self.find_apps_btn.setFixedHeight(36)
+        self.find_apps_btn.setToolTip("Add custom applications to include in pull")
+        self.find_apps_btn.setStyleSheet(
+            "QPushButton { background-color: #2196F3; color: white; font-weight: bold; font-size: 13px; }"
+            "QPushButton:hover { background-color: #1976D2; }"
+            "QPushButton:disabled { background-color: #cccccc; color: #666666; }"
+        )
+        self.find_apps_btn.clicked.connect(self._open_find_applications)
+        self.find_apps_btn.setEnabled(False)
+        button_container.addWidget(self.find_apps_btn)
         
         # Pull button - fixed height
         self.pull_btn = QPushButton("🔄 Pull Configuration")
@@ -145,33 +159,19 @@ class PullConfigWidget(QWidget):
         self.pull_btn.setEnabled(False)
         button_container.addWidget(self.pull_btn)
         
-        # Update Selection button - starts disabled, enabled during pull
+        # Update Selection button - starts hidden, shown after pull completes
         self.update_selection_btn = QPushButton("📝 Update Selection")
         self.update_selection_btn.setMinimumWidth(180)
         self.update_selection_btn.setFixedHeight(36)
-        self.update_selection_btn.setToolTip("Cancel pull and return to selection")
+        self.update_selection_btn.setToolTip("Return to selection to modify options")
         self.update_selection_btn.setStyleSheet(
             "QPushButton { background-color: #FF9800; color: white; font-weight: bold; font-size: 13px; }"
             "QPushButton:hover { background-color: #F57C00; }"
             "QPushButton:disabled { background-color: #cccccc; color: #666666; }"
         )
-        self.update_selection_btn.clicked.connect(self._update_selection)
-        self.update_selection_btn.setEnabled(False)
+        self.update_selection_btn.clicked.connect(self._show_selection_page)
+        self.update_selection_btn.setVisible(False)
         button_container.addWidget(self.update_selection_btn)
-        
-        # Load Custom Applications button - enabled when connected
-        self.find_apps_btn = QPushButton("📦 Load Custom Apps")
-        self.find_apps_btn.setMinimumWidth(180)
-        self.find_apps_btn.setFixedHeight(36)
-        self.find_apps_btn.setToolTip("Add custom applications to include in pull")
-        self.find_apps_btn.setStyleSheet(
-            "QPushButton { background-color: #2196F3; color: white; font-weight: bold; font-size: 13px; }"
-            "QPushButton:hover { background-color: #1976D2; }"
-            "QPushButton:disabled { background-color: #cccccc; color: #666666; }"
-        )
-        self.find_apps_btn.clicked.connect(self._open_find_applications)
-        self.find_apps_btn.setEnabled(False)
-        button_container.addWidget(self.find_apps_btn)
         
         tenant_row.addLayout(button_container)
         
@@ -227,13 +227,8 @@ class PullConfigWidget(QWidget):
         self.results_panel = ResultsPanel(parent=self, title="Pull Results")
         results_layout.addWidget(self.results_panel, stretch=1)
         
-        # Button row: Back (left) and Cancel (right)
+        # Button row: Cancel (right-aligned)
         button_layout = QHBoxLayout()
-        
-        self.back_btn = QPushButton("← Back to Selection")
-        self.back_btn.clicked.connect(self._show_selection_page)
-        self.back_btn.setVisible(False)  # Only show after pull completes
-        button_layout.addWidget(self.back_btn)
         
         button_layout.addStretch()
         
@@ -436,37 +431,22 @@ class PullConfigWidget(QWidget):
     def _show_selection_page(self):
         """Switch to selection page."""
         self.stacked_widget.setCurrentIndex(0)
-        self.back_btn.setVisible(False)
         self.cancel_btn.setVisible(False)
-        # Re-enable pull button and find apps, disable update selection
+        # Re-enable pull button and find apps, hide update selection
         self.pull_btn.setEnabled(self.api_client is not None)
-        self.update_selection_btn.setEnabled(False)
+        self.update_selection_btn.setVisible(False)
         self.find_apps_btn.setEnabled(self.api_client is not None)
+        self._set_ui_enabled(True)
 
     def _show_results_page(self):
         """Switch to results page."""
         self.stacked_widget.setCurrentIndex(1)
         self.results_panel.clear()
-        self.back_btn.setVisible(False)
         self.cancel_btn.setVisible(True)
-        # Disable pull button and find apps, enable update selection
+        # Disable pull button and find apps, hide update selection (shown after pull completes)
         self.pull_btn.setEnabled(False)
-        self.update_selection_btn.setEnabled(True)
+        self.update_selection_btn.setVisible(False)
         self.find_apps_btn.setEnabled(False)
-
-    def _update_selection(self):
-        """Cancel pull if running and return to selection page."""
-        # Cancel the pull if it's running
-        if self.worker and self.worker.isRunning():
-            self.logger.info("User requested to update selection - cancelling pull")
-            self.worker.stop()
-            # Wait for thread to finish (with timeout)
-            self.worker.wait(5000)  # 5 second timeout
-        self.worker = None
-        
-        # Return to selection page
-        self._show_selection_page()
-        self._set_ui_enabled(True)
 
     def _cancel_pull(self):
         """Cancel the current pull operation."""
@@ -685,8 +665,8 @@ class PullConfigWidget(QWidget):
             "custom_applications": self._custom_applications,
         }
 
-        self.logger.info(f"Starting pull with options: folders={len(selected_folders)}, "
-                        f"snippets={len(selected_snippets)}, filter_defaults={filter_defaults}")
+        self.logger.normal(f"Starting pull with options: folders={len(selected_folders)}, "
+                          f"snippets={len(selected_snippets)}, filter_defaults={filter_defaults}")
 
         # Disable UI during pull
         self._set_ui_enabled(False)
@@ -753,7 +733,7 @@ class PullConfigWidget(QWidget):
             try:
                 pulled_config = self.worker.config
                 if pulled_config:
-                    self.logger.info(f"Retrieved configuration from worker: {len(str(pulled_config))} bytes")
+                    self.logger.detail(f"Retrieved configuration from worker: {len(str(pulled_config))} bytes")
             except Exception as e:
                 self.logger.error(f"Error getting config from worker: {e}")
             
@@ -764,14 +744,11 @@ class PullConfigWidget(QWidget):
 
         self._set_ui_enabled(True)
         
-        # Show back button, hide cancel button
-        self.back_btn.setVisible(True)
+        # Hide cancel button, show update selection button
         self.cancel_btn.setVisible(False)
-        # Re-enable pull, disable update selection and find apps (pull is done)
-        # find_apps_btn stays disabled until "Update Selection" is clicked
+        self.update_selection_btn.setVisible(True)
+        # Re-enable pull button
         self.pull_btn.setEnabled(self.api_client is not None)
-        self.update_selection_btn.setEnabled(False)
-        self.find_apps_btn.setEnabled(False)
 
         if success:
             self.progress_label.setText("✓ Pull completed successfully!")
@@ -782,7 +759,7 @@ class PullConfigWidget(QWidget):
             
             if pulled_config:
                 self.pulled_config = pulled_config
-                self.logger.info(f"Emitting pull_completed signal with config: {len(str(pulled_config))} bytes")
+                self.logger.detail(f"Emitting pull_completed signal with config: {len(str(pulled_config))} bytes")
                 self.pull_completed.emit(pulled_config)
             else:
                 self.logger.warning("No pulled_config to emit!")
@@ -805,14 +782,11 @@ class PullConfigWidget(QWidget):
             self.worker = None
         self._set_ui_enabled(True)
         
-        # Show back button, hide cancel button
-        self.back_btn.setVisible(True)
+        # Hide cancel button, show update selection button
         self.cancel_btn.setVisible(False)
-        # Re-enable pull, disable update selection and find apps (pull is done)
-        # find_apps_btn stays disabled until "Update Selection" is clicked
+        self.update_selection_btn.setVisible(True)
+        # Re-enable pull button
         self.pull_btn.setEnabled(self.api_client is not None)
-        self.update_selection_btn.setEnabled(False)
-        self.find_apps_btn.setEnabled(False)
         
         self.progress_label.setText(f"✗ Error: {error_message}")
         self.progress_label.setStyleSheet("color: red; font-size: 14px; font-weight: bold;")
