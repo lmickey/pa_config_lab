@@ -1,8 +1,0 @@
-{
-  "name": "no-decrypt-profile",
-  "folder": "Mobile Users",
-  "ssl_protocol_settings": {
-    "min_version": "tls1-2",
-    "max_version": "max"
-  }
-}

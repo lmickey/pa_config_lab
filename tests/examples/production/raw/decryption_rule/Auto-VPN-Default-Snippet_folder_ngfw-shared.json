@@ -1,7 +1,0 @@
-{
-  "id": "805113f0-0cd9-4fad-831a-e9136f9cf0e5",
-  "name": "Auto-VPN-Default-Snippet",
-  "folder": "ngfw-shared",
-  "log_setting": "Cortex Data Lake",
-  "log_fail": true
-}

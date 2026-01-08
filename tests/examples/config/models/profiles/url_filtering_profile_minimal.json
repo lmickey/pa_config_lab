@@ -1,9 +1,0 @@
-{
-  "name": "strict-url-filtering",
-  "folder": "Mobile Users",
-  "action": {
-    "block": ["adult", "gambling", "malware"],
-    "alert": ["hacking", "proxy-avoidance"],
-    "allow": ["business-and-economy"]
-  }
-}

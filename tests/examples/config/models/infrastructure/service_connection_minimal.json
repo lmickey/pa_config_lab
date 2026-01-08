@@ -1,8 +1,0 @@
-{
-  "name": "branch-connection",
-  "folder": "Remote Networks",
-  "ipsec_tunnel": "branch-tunnel",
-  "subnets": ["10.20.0.0/16", "10.21.0.0/16"],
-  "region": "us-east-1",
-  "onboarding_type": "classic"
-}

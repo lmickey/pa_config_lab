@@ -1,8 +1,0 @@
-{
-  "id": "1680b489-95e0-482d-9129-c32b9e70650d",
-  "name": "office365",
-  "folder": "Shared",
-  "position": "pre",
-  "log_setting": "Cortex Data Lake",
-  "log_fail": true
-}

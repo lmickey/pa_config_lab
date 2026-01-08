@@ -1,9 +1,0 @@
-{
-  "name": "custom-web-app",
-  "folder": "Mobile Users",
-  "category": "general-internet",
-  "subcategory": "internet-utility",
-  "technology": "browser-based",
-  "risk": 3,
-  "description": "Custom web application"
-}

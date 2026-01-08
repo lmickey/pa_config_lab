@@ -1,6 +1,0 @@
-{
-  "name": "web-services",
-  "folder": "Mobile Users",
-  "members": ["tcp-80", "tcp-443", "tcp-8443"],
-  "description": "Web service group"
-}

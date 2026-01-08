@@ -1,9 +1,0 @@
-{
-  "id": "3c752e9b-4202-41bc-9394-8b4f391476e0",
-  "name": "Quic",
-  "folder": "Shared",
-  "members": [
-    "Quic-HTTP",
-    "Quic-HTTPS"
-  ]
-}

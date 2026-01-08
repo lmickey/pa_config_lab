@@ -1,7 +1,0 @@
-{
-  "id": "232f7156-ddd6-4da8-bb7b-70f15383cf21",
-  "name": "is-win-and-disk-encryption",
-  "snippet": "hip-default",
-  "match": "\"is-win\"  and \"is-disk-encryption-installed\" ",
-  "description": "Matches Windows endpoints that have disk encryption software installed"
-}

@@ -1,7 +1,0 @@
-{
-  "name": "production-server",
-  "folder": "Mobile Users",
-  "ip_netmask": "10.100.50.10/32",
-  "tag": ["production", "server", "datacenter"],
-  "description": "Production server with tags"
-}

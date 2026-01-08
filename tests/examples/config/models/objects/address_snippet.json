@@ -1,6 +1,0 @@
-{
-  "name": "web-servers",
-  "snippet": "production-snippet",
-  "ip_netmask": "172.16.10.0/24",
-  "description": "Web server subnet"
-}

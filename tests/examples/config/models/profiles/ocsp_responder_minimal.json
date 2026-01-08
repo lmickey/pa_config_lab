@@ -1,6 +1,0 @@
-{
-  "name": "ocsp-primary",
-  "folder": "Shared",
-  "host_name": "ocsp.example.com",
-  "description": "Primary OCSP responder"
-}

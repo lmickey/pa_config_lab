@@ -1,6 +1,0 @@
-{
-  "name": "internal-network",
-  "folder": "Mobile Users",
-  "ip_netmask": "192.168.1.0/24",
-  "description": "Internal network range"
-}

@@ -1,7 +1,0 @@
-{
-  "name": "high-risk-apps",
-  "folder": "Mobile Users",
-  "category": ["file-sharing", "peer-to-peer"],
-  "risk": [4, 5],
-  "description": "Filter for high-risk applications"
-}

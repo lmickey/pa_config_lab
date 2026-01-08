@@ -1,7 +1,0 @@
-{
-  "id": "225632cb-79dc-47cf-bddd-fc0dffa69a37",
-  "name": "is-win-and-disk-backup-1day",
-  "snippet": "hip-default",
-  "match": "\"is-win\"  and \"is-disk-backup-installed-1day\" ",
-  "description": "Matches Windows endpoints that have disk backup software installed and a Last Backup Time within 1 day"
-}

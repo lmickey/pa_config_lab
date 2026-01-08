@@ -1,8 +1,0 @@
-{
-  "id": "2a514310-d44e-401f-af58-699759f44d0e",
-  "name": "Web-Security-Default",
-  "folder": "All",
-  "policy_type": "Security",
-  "log_setting": "Cortex Data Lake",
-  "log_end": true
-}
