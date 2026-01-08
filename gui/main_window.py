@@ -276,6 +276,15 @@ class PrismaConfigMainWindow(QMainWindow):
 
         connect_btn = QPushButton("Connect to Prisma Access API")
         connect_btn.setMinimumSize(220, 50)
+        connect_btn.setStyleSheet(
+            "QPushButton { "
+            "  background-color: #2196F3; color: white; padding: 10px 20px; "
+            "  font-size: 14px; font-weight: bold; border-radius: 5px; "
+            "  border: 1px solid #1976D2; border-bottom: 3px solid #1565C0; "
+            "}"
+            "QPushButton:hover { background-color: #1E88E5; border-bottom: 3px solid #0D47A1; }"
+            "QPushButton:pressed { background-color: #1976D2; border-bottom: 1px solid #1565C0; }"
+        )
         connect_btn.clicked.connect(self._show_connection_dialog)
         actions_layout.addWidget(connect_btn)
 
@@ -362,6 +371,9 @@ class PrismaConfigMainWindow(QMainWindow):
         # Connect signal to update connection status in sidebar
         self.migration_workflow.connection_changed.connect(self._on_workflow_connection_changed)
         
+        # Connect signal to handle load file request from workflow
+        self.migration_workflow.load_file_requested.connect(self._load_configuration_file)
+        
         layout.addWidget(self.migration_workflow)
 
         self.stacked_widget.addWidget(page)
@@ -418,15 +430,21 @@ class PrismaConfigMainWindow(QMainWindow):
                 import logging
                 logging.getLogger(__name__).warning(f"Error clearing workflow state: {e}")
         
-        # Switch to new workflow
-        self.stacked_widget.setCurrentIndex(index)
-
         workflow_names = [
             "Home",
             "POV Configuration",
             "Configuration Migration",
             "Logs & Monitoring",
         ]
+        
+        # Log the workflow switch
+        import logging
+        logger = logging.getLogger(__name__)
+        if index < len(workflow_names):
+            logger.normal(f"[Navigation] Switched to: {workflow_names[index]}")
+        
+        # Switch to new workflow
+        self.stacked_widget.setCurrentIndex(index)
 
         if index < len(workflow_names):
             # Use statusBar() method instead of status_bar attribute
@@ -555,6 +573,8 @@ class PrismaConfigMainWindow(QMainWindow):
         import logging
         logger = logging.getLogger(__name__)
         
+        logger.normal("[Config] Opening configuration file dialog...")
+        
         dialog = LoadConfigDialog(self)
         if dialog.exec() == LoadConfigDialog.DialogCode.Accepted:
             config_data = dialog.get_config()
@@ -562,24 +582,58 @@ class PrismaConfigMainWindow(QMainWindow):
             
             if config_data:
                 try:
+                    config_name = metadata.get('name', 'Configuration') if metadata else 'Configuration'
+                    logger.normal(f"[Config] Loading configuration: {config_name}")
+                    
+                    # Log what's in the config
+                    folders_count = len(config_data.get('folders', {}))
+                    snippets_count = len(config_data.get('snippets', {}))
+                    infra_data = config_data.get('infrastructure', {})
+                    infra_count = len(infra_data.get('items', [])) if 'items' in infra_data else sum(
+                        len(v) for v in infra_data.values() if isinstance(v, list)
+                    )
+                    
+                    logger.normal(f"[Config] File contains: {folders_count} folders, {snippets_count} snippets, {infra_count} infrastructure items")
+                    
+                    # Convert to Configuration object
+                    logger.detail(f"[Config] Converting to Configuration object...")
                     config = self._convert_dict_to_configuration(config_data, logger)
                     self.current_config = config
                     
-                    config_name = metadata.get('name', 'Configuration') if metadata else 'Configuration'
+                    # Log detailed counts
+                    total_folder_items = sum(len(f.items) for f in config.folders.values())
+                    total_snippet_items = sum(len(s.items) for s in config.snippets.values())
+                    
+                    logger.normal(f"[Config] Loaded successfully:")
+                    logger.normal(f"[Config]   Folders: {len(config.folders)} ({total_folder_items} items)")
+                    for folder_name, folder in config.folders.items():
+                        if folder.items:
+                            logger.detail(f"[Config]     📁 {folder_name}: {len(folder.items)} items")
+                    
+                    logger.normal(f"[Config]   Snippets: {len(config.snippets)} ({total_snippet_items} items)")
+                    for snippet_name, snippet in config.snippets.items():
+                        if snippet.items:
+                            logger.detail(f"[Config]     📄 {snippet_name}: {len(snippet.items)} items")
+                    
+                    logger.normal(f"[Config]   Infrastructure: {len(config.infrastructure.items)} items")
+                    
                     self.status_bar.showMessage(f"Loaded: {config_name}")
                     
                     # Update the workflow with loaded config
+                    logger.detail(f"[Config] Updating workflow with loaded configuration...")
                     self._update_workflow_with_config(self.current_config)
                     
-                    logger.info(f"Loaded configuration: {config_name}")
+                    logger.normal(f"[Config] Configuration '{config_name}' ready for use")
                     
                 except Exception as e:
-                    logger.error(f"Failed to process loaded config: {e}", exc_info=True)
+                    logger.error(f"[Config] Failed to process loaded config: {e}", exc_info=True)
                     QMessageBox.critical(
                         self,
                         "Load Error",
                         f"Failed to process configuration:\n\n{str(e)}"
                     )
+        else:
+            logger.detail("[Config] Configuration load cancelled by user")
     
     def _convert_dict_to_configuration(self, config_data: dict, logger=None):
         """

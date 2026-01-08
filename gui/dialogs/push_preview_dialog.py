@@ -5,6 +5,7 @@ This dialog fetches destination configurations and shows real conflicts
 and new items that will be pushed.
 """
 
+import logging
 from typing import Dict, Any, List, Optional
 from PyQt6.QtWidgets import (
     QDialog,
@@ -22,67 +23,128 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
+# Get logger for validation messages
+logger = logging.getLogger(__name__)
+
 
 class ConfigFetchWorker(QThread):
     """Worker thread to fetch destination configurations."""
     
     progress = pyqtSignal(str, int)  # message, percentage
+    detail = pyqtSignal(str)  # detailed log message for results panel
     finished = pyqtSignal(object)  # destination_config
     error = pyqtSignal(str)  # error message
+    
+    # Folders that should be skipped during validation (system/blocked folders)
+    SKIP_FOLDERS = {
+        'colo connect', 'colo-connect',
+        'service connections', 'service-connections',
+        'ngfw-shared',
+        'remote networks', 'remote-networks',
+    }
+    
+    def _should_skip_folder(self, folder_name: str) -> bool:
+        """Check if a folder should be skipped during validation."""
+        if not folder_name:
+            return True
+        return folder_name.lower() in self.SKIP_FOLDERS
     
     def __init__(self, api_client, selected_items):
         super().__init__()
         self.api_client = api_client
         self.selected_items = selected_items
     
-    def _count_validation_items(self) -> int:
+    def _count_validation_steps(self) -> tuple:
         """
-        Count total items that need validation.
+        Count total validation steps for progress bar.
         
-        Returns accurate count for progress bar calculation.
-        Each category counts as 1 fetch operation for progress.
+        Intelligently skips steps when all items go to new snippets.
+        
+        Returns:
+            tuple: (total_steps, step_descriptions)
         """
-        count = 0
+        steps = []
         
-        # Count folders
         folders = self.selected_items.get('folders', [])
-        if folders:
-            count += 1  # 1 fetch for all folders
-            
-            # Count objects in folders
+        snippets = self.selected_items.get('snippets', [])
+        
+        # Check if ALL items are going to new snippets
+        all_items_to_new_snippets = True
+        
+        for snippet in snippets:
+            dest_info = snippet.get('_destination', {})
+            if not dest_info.get('is_new_snippet') and not dest_info.get('is_rename_snippet'):
+                all_items_to_new_snippets = False
+                break
+        
+        if all_items_to_new_snippets:
             for folder in folders:
-                objects = folder.get('objects', {})
-                for obj_type, obj_list in objects.items():
-                    if obj_list:
-                        count += 1  # 1 fetch per object type
-                
-                # Count profiles in folders
-                profiles = folder.get('profiles', {})
-                for prof_type, prof_list in profiles.items():
-                    if prof_list:
-                        count += 1  # 1 fetch per profile type
-                
-                # Count HIP in folders
-                hip = folder.get('hip', {})
-                for hip_type, hip_list in hip.items():
-                    if hip_list:
-                        count += 1  # 1 fetch per HIP type
-                
-                # Count security rules
-                if folder.get('security_rules'):
-                    count += 1  # 1 fetch for rules
+                dest_info = folder.get('_destination', {})
+                if not dest_info.get('is_new_snippet') and not dest_info.get('is_rename_snippet'):
+                    all_items_to_new_snippets = False
+                    break
         
-        # Count snippets
-        if self.selected_items.get('snippets'):
-            count += 1  # 1 fetch for snippets
+        # If no folders or snippets, can't be "all to new snippets"
+        if not folders and not snippets:
+            all_items_to_new_snippets = False
         
-        # Count infrastructure
-        infrastructure = self.selected_items.get('infrastructure', {})
-        for infra_type, infra_list in infrastructure.items():
-            if infra_list:
-                count += 1  # 1 fetch per infrastructure type
+        # Snippets list fetch - always needed to check for name conflicts
+        if snippets or self._has_new_snippets():
+            steps.append("Fetching destination snippets")
         
-        return max(count, 1)  # Ensure at least 1 for division
+        # Folders list fetch - only if we have folders NOT going to new snippets
+        if folders and not all_items_to_new_snippets:
+            needs_folders = any(
+                not f.get('_destination', {}).get('is_new_snippet') and 
+                not f.get('_destination', {}).get('is_rename_snippet')
+                for f in folders
+            )
+            if needs_folders:
+                steps.append("Fetching destination folders")
+        
+        # Object types - skip if all to new snippets
+        if not all_items_to_new_snippets:
+            obj_types = set()
+            for folder in folders:
+                dest_info = folder.get('_destination', {})
+                if not dest_info.get('is_new_snippet') and not dest_info.get('is_rename_snippet'):
+                    for obj_type in folder.get('objects', {}).keys():
+                        obj_types.add(obj_type)
+            for snippet in snippets:
+                dest_info = snippet.get('_destination', {})
+                if not dest_info.get('is_new_snippet') and not dest_info.get('is_rename_snippet'):
+                    for obj_type in snippet.get('objects', {}).keys():
+                        obj_types.add(obj_type)
+            
+            for obj_type in obj_types:
+                steps.append(f"Checking {obj_type} objects")
+        
+        # Security rules - skip if all to new snippets
+        if not all_items_to_new_snippets:
+            has_rules = any(f.get('security_rules') for f in folders) or \
+                       any(s.get('security_rules') for s in snippets)
+            if has_rules:
+                steps.append("Fetching all security rules (global uniqueness check)")
+        
+        # Infrastructure
+        infra = self.selected_items.get('infrastructure', {})
+        for infra_type in infra.keys():
+            if infra.get(infra_type):
+                steps.append(f"Checking {infra_type} infrastructure")
+        
+        return len(steps) if steps else 1, steps
+    
+    def _has_new_snippets(self) -> bool:
+        """Check if any items are going to new snippets."""
+        for snippet in self.selected_items.get('snippets', []):
+            dest_info = snippet.get('_destination', {})
+            if dest_info.get('is_new_snippet') or dest_info.get('is_rename_snippet'):
+                return True
+        for folder in self.selected_items.get('folders', []):
+            dest_info = folder.get('_destination', {})
+            if dest_info.get('is_new_snippet') or dest_info.get('is_rename_snippet'):
+                return True
+        return False
     
     def run(self):
         """Fetch configurations from destination tenant."""
@@ -120,210 +182,368 @@ class ConfigFetchWorker(QThread):
                 'folders': {},
                 'snippets': {},
                 'objects': {},
-                'infrastructure': {}
+                'infrastructure': {},
+                'all_rule_names': {},  # Global rule name tracking
+                'new_snippets': set(),  # Track snippets being created
             }
             
-            # Count total items accurately for progress calculation
-            total_items = self._count_validation_items()
+            # Count steps for accurate progress
+            total_steps, step_descriptions = self._count_validation_steps()
+            current_step = 0
             
-            # DISABLED: print(f"Total items to check: {total_items}")
-            current = 0
+            def emit_progress(message: str, detail: str = None):
+                """Emit progress update with optional detail message."""
+                nonlocal current_step
+                current_step += 1
+                percentage = int((current_step / max(total_steps, 1)) * 100)
+                self.progress.emit(f"[{percentage}%] {message}", min(percentage, 99))
+                # Log to activity log
+                logger.normal(f"[Validation] {message}")
+                if detail:
+                    self.detail.emit(detail)
+                    if detail.strip():  # Don't log empty lines
+                        logger.normal(f"[Validation] {detail}")
             
-            # Fetch folders and their contents
+            def emit_detail(message: str, level: str = "normal"):
+                """Emit detail message only (no progress increment).
+                
+                Args:
+                    message: The message to emit
+                    level: Log level - "normal", "warning", or "error"
+                """
+                self.detail.emit(message)
+                # Log to activity log (skip separator lines and empty lines)
+                if message.strip() and not message.startswith("="):
+                    if level == "warning":
+                        logger.warning(f"[Validation] {message}")
+                    elif level == "error":
+                        logger.error(f"[Validation] {message}")
+                    else:
+                        logger.normal(f"[Validation] {message}")
+            
+            # Log start
+            emit_detail("=" * 60)
+            emit_detail("VALIDATION STARTED")
+            emit_detail("=" * 60)
+            emit_detail("")
+            
+            # Analyze selection to determine what validation is needed
             folders = self.selected_items.get('folders', [])
-            if folders:
-                self.progress.emit(f"Checking folders...", int((current / max(total_items, 1)) * 100))
+            snippets = self.selected_items.get('snippets', [])
+            
+            # Identify new snippets being created (for validation skip logic)
+            new_snippet_names = []
+            all_items_to_new_snippets = True  # Track if ALL items go to new snippets
+            
+            for snippet in snippets:
+                dest_info = snippet.get('_destination', {})
+                if dest_info.get('is_new_snippet') or dest_info.get('is_rename_snippet'):
+                    new_name = dest_info.get('new_snippet_name', '')
+                    if new_name:
+                        dest_config['new_snippets'].add(new_name)
+                        new_snippet_names.append(new_name)
+                else:
+                    # This snippet is NOT going to a new snippet
+                    all_items_to_new_snippets = False
+            
+            # Also check folders for new snippet destinations
+            for folder in folders:
+                dest_info = folder.get('_destination', {})
+                if dest_info.get('is_new_snippet') or dest_info.get('is_rename_snippet'):
+                    new_name = dest_info.get('new_snippet_name', '')
+                    if new_name and new_name not in dest_config['new_snippets']:
+                        dest_config['new_snippets'].add(new_name)
+                        new_snippet_names.append(new_name)
+                else:
+                    # This folder is NOT going to a new snippet
+                    all_items_to_new_snippets = False
+            
+            # If no folders or snippets selected, nothing to validate
+            if not folders and not snippets:
+                all_items_to_new_snippets = False
+            
+            if new_snippet_names:
+                emit_detail(f"📝 New snippets to create: {', '.join(new_snippet_names)}")
+                if all_items_to_new_snippets:
+                    emit_detail(f"   ✓ All items destined for new snippets - minimal validation needed")
+                emit_detail("")
+            
+            # Determine if we need folder validation
+            # Only fetch folders if we have folder items that are NOT going to new snippets
+            needs_folder_validation = False
+            for folder in folders:
+                dest_info = folder.get('_destination', {})
+                if not dest_info.get('is_new_snippet') and not dest_info.get('is_rename_snippet'):
+                    needs_folder_validation = True
+                    break
+            
+            if needs_folder_validation:
+                emit_progress("Folders - Fetching destination folder list", 
+                             f"📁 Fetching folders from destination tenant...")
                 try:
-                    # DISABLED-THREAD: print(f"  Fetching folders using get_security_policy_folders()")
                     existing_folders = self.api_client.get_security_policy_folders()
-                    # DISABLED-THREAD: print(f"    Found {len(existing_folders)} existing folders")
+                    folder_names = [f.get('name', '') for f in existing_folders if f.get('name')]
+                    emit_detail(f"   Found {len(folder_names)} folders in destination")
+                    
                     for folder in existing_folders:
                         folder_name = folder.get('name')
                         if folder_name:
                             dest_config['folders'][folder_name] = folder
-                            if len(dest_config['folders']) <= 5:
-                                pass
-                                # DISABLED-THREAD: print(f"      - {folder_name}")
-                    
-                    if len(dest_config['folders']) > 5:
-                        pass
-                        # DISABLED-THREAD: print(f"      ... and {len(dest_config['folders']) - 5} more")
-                    
-                    # Also fetch objects/rules/profiles from folders for conflict checking
-                    # DISABLED-THREAD: print(f"  Fetching folder contents for conflict checking...")
-                    for folder in folders:
-                        folder_name = folder.get('name', 'Unknown')
-                        # DISABLED-THREAD: print(f"    Folder: {folder_name}")
-                        
-                        # Fetch objects from this folder
-                        folder_objects = folder.get('objects', {})
-                        if folder_objects:
-                            # DISABLED-THREAD: print(f"      Fetching objects from folder: {list(folder_objects.keys())}")
-                            for obj_type in folder_objects.keys():
-                                if obj_type not in dest_config['objects']:
-                                    dest_config['objects'][obj_type] = {}
-                                # We'll fetch these in the objects section below
-                        
-                        # Note: Rules are folder-specific, so we don't fetch them globally
-                        folder_rules = folder.get('security_rules', [])
-                        if folder_rules:
-                            pass
-                            # DISABLED-THREAD: print(f"      Rules: {len(folder_rules)} items (folder-specific)")
-                        
-                        # Note: Profiles are folder-specific
-                        folder_profiles = folder.get('profiles', {})
-                        if folder_profiles:
-                            pass
-                            # DISABLED-THREAD: print(f"      Profiles: {list(folder_profiles.keys())} (folder-specific)")
-                        
-                        # Note: HIP is folder-specific
-                        folder_hip = folder.get('hip', {})
-                        if folder_hip:
-                            pass
-                            # DISABLED-THREAD: print(f"      HIP: {list(folder_hip.keys())} (folder-specific)")
                     
                 except Exception as e:
-                    # DISABLED-THREAD: print(f"    ERROR fetching folders: {e}")
-                    import traceback
-                    # DISABLED-THREAD: traceback.print_exc()
-                current += 1  # Increment by 1 for folder fetch operation
+                    emit_detail(f"   ⚠️ Error fetching folders: {e}", level="warning")
+            elif folders:
+                emit_detail(f"📁 Skipping folder list fetch - all folder items going to new snippets")
+                emit_detail("")
             
-            # Fetch snippets
-            snippets = self.selected_items.get('snippets', [])
-            if snippets:
-                self.progress.emit(f"Checking snippets...", int((current / max(total_items, 1)) * 100))
+            # Fetch snippets - ALWAYS fetch if we have snippet items or new snippets to create
+            # This is needed to check for name conflicts
+            if snippets or new_snippet_names:
+                emit_progress("Snippets - Fetching destination snippet list",
+                             f"📄 Fetching snippets from destination tenant...")
                 try:
-                    # DISABLED-THREAD: print(f"  Fetching snippets using get_security_policy_snippets()")
                     existing_snippets = self.api_client.get_security_policy_snippets()
-                    # DISABLED-THREAD: print(f"    Found {len(existing_snippets)} existing snippets")
+                    
+                    # Count custom vs system snippets
+                    custom_count = 0
                     for snippet in existing_snippets:
                         snippet_name = snippet.get('name')
+                        snippet_type = snippet.get('type', '')
                         if snippet_name:
                             dest_config['snippets'][snippet_name] = snippet
-                            # DISABLED-THREAD: print(f"      - {snippet_name}")
+                            if snippet_type not in ('predefined', 'readonly'):
+                                custom_count += 1
+                    
+                    emit_detail(f"   Found {len(existing_snippets)} snippets ({custom_count} custom)")
+                    
+                    # Check which of our new snippet names conflict
+                    for new_name in new_snippet_names:
+                        if new_name in dest_config['snippets']:
+                            emit_detail(f"   ⚠️  '{new_name}' already exists - will use conflict strategy", level="warning")
+                        else:
+                            emit_detail(f"   ✓ '{new_name}' - name available, will be created")
+                    
+                    # Check snippet items that are NOT going to new snippets
+                    for snippet in snippets:
+                        dest_info = snippet.get('_destination', {})
+                        is_new = dest_info.get('is_new_snippet') or dest_info.get('is_rename_snippet')
+                        if not is_new:
+                            snippet_name = snippet.get('name', '')
+                            if snippet_name in dest_config['snippets']:
+                                emit_detail(f"   • '{snippet_name}' exists in destination - will update")
+                            else:
+                                emit_detail(f"   + '{snippet_name}' not found - will be created")
+                    
+                    emit_detail("")
                 except Exception as e:
-                    # DISABLED-THREAD: print(f"    ERROR fetching snippets: {e}")
-                    import traceback
-                    # DISABLED-THREAD: traceback.print_exc()
-                current += 1  # Increment by 1 for snippet fetch operation
+                    emit_detail(f"   ❌ Error fetching snippets: {e}", level="error")
             
-            # Fetch objects (both top-level and from folders)
-            objects = self.selected_items.get('objects', {})
-            
-            # Also collect object types and folders from folder selections
-            folders = self.selected_items.get('folders', [])
-            object_folders = {}  # Track which folders contain which object types
-            
-            for folder in folders:
-                folder_name = folder.get('name')
-                folder_objects = folder.get('objects', {})
-                for obj_type, obj_list in folder_objects.items():
-                    if obj_type not in objects:
-                        objects[obj_type] = []
-                    # Track which folders have this object type
-                    if obj_type not in object_folders:
-                        object_folders[obj_type] = set()
-                    if folder_name:
-                        object_folders[obj_type].add(folder_name)
-            
-            if objects:
-                self.progress.emit(f"Checking objects...", int((current / max(total_items, 1)) * 100))
+            # Skip object validation if ALL items are going to new snippets
+            # (no conflicts possible in a new snippet)
+            if all_items_to_new_snippets:
+                emit_detail("📦 Skipping object conflict checks - all items going to new snippets")
+                emit_detail("")
+            else:
+                # Fetch objects (both top-level and from folders)
+                objects = self.selected_items.get('objects', {})
                 
-                # Map object types to API client methods
-                object_method_map = {
-                    'address_objects': 'get_all_addresses',
-                    'address_groups': 'get_all_address_groups',
-                    'service_objects': 'get_all_services',
-                    'service_groups': 'get_all_service_groups',
-                    'applications': 'get_all_applications',
-                    'application_groups': 'get_all_application_groups',
-                    'application_filters': 'get_all_application_filters',
-                    'external_dynamic_lists': 'get_all_external_dynamic_lists',
-                    'fqdn_objects': 'get_all_fqdn_objects',
-                    'url_filtering_categories': 'get_all_url_categories',
-                }
+                # Also collect object types and DESTINATION folders/snippets from selections
+                # IMPORTANT: Use the DESTINATION location, not the source location
+                object_folders = {}  # Track which destination folders to check
+                object_snippets = {}  # Track which destination snippets to check
                 
-                for obj_type, obj_list in objects.items():
-                    if not isinstance(obj_list, list):
-                        # DISABLED-THREAD: print(f"  Skipping {obj_type} - not a list (type: {type(obj_list)})")
+                for folder in folders:
+                    folder_name = folder.get('name')
+                    dest_info = folder.get('_destination', {})
+                    
+                    # Skip if this folder is going to a new snippet (no conflicts possible)
+                    if dest_info.get('is_new_snippet') or dest_info.get('is_rename_snippet'):
                         continue
                     
-                    # DISABLED-THREAD: print(f"  Checking {obj_type}: {len(obj_list)} items")
-                    method_name = object_method_map.get(obj_type)
-                    if method_name and hasattr(self.api_client, method_name):
-                        try:
-                            # Determine which folders to query for this object type
-                            folders_to_check = object_folders.get(obj_type, set())
-                            # DISABLED-THREAD: print(f"    Folders to check: {list(folders_to_check) if folders_to_check else 'all'}")
-                            
-                            # Fetch from each folder
-                            all_existing_objects = []
-                            method = getattr(self.api_client, method_name)
-                            
-                            if folders_to_check:
-                                # Query each folder separately
-                                for folder in folders_to_check:
-                                    # DISABLED-THREAD: print(f"    Calling API method: {method_name}(folder='{folder}')")
-                                    try:
-                                        folder_objects = method(folder=folder)
-                                        if isinstance(folder_objects, list):
-                                            all_existing_objects.extend(folder_objects)
-                                    except Exception as folder_err:
-                                        pass
-                                        # DISABLED-THREAD: print(f"      ERROR for folder '{folder}': {folder_err}")
-                            else:
-                                # No folder specified, try without folder parameter
-                                # DISABLED-THREAD: print(f"    Calling API method: {method_name}()")
-                                all_existing_objects = method()
-                            
-                            existing_objects = all_existing_objects
-                            
-                            if not isinstance(existing_objects, list):
-                                # DISABLED-THREAD: print(f"    WARNING: Expected list, got {type(existing_objects)}")
-                                existing_objects = []
-                            
-                            # DISABLED-THREAD: print(f"    Found {len(existing_objects)} existing items")
-                            
-                            if obj_type not in dest_config['objects']:
-                                dest_config['objects'][obj_type] = {}
-                            
-                            for obj in existing_objects:
-                                if not isinstance(obj, dict):
-                                    # DISABLED-THREAD: print(f"      WARNING: Object is not a dict: {type(obj)}")
-                                    continue
-                                obj_name = obj.get('name')
-                                if obj_name:
-                                    dest_config['objects'][obj_type][obj_name] = obj
-                                    if len(dest_config['objects'][obj_type]) <= 5:  # Only print first 5
-                                        pass
-                                        # DISABLED-THREAD: print(f"      - {obj_name}")
-                            
-                            if len(dest_config['objects'][obj_type]) > 5:
-                                pass
-                                # DISABLED-THREAD: print(f"      ... and {len(dest_config['objects'][obj_type]) - 5} more")
-                                
-                        except AttributeError as e:
-                            pass
-                            # DISABLED-THREAD: print(f"    ERROR: Method {method_name} not found: {e}")
-                        except TypeError as e:
-                            # DISABLED-THREAD: print(f"    ERROR: Type error calling {method_name}: {e}")
-                            import traceback
-                            # DISABLED-THREAD: traceback.print_exc()
-                        except Exception as e:
-                            # DISABLED-THREAD: print(f"    ERROR fetching {obj_type}: {type(e).__name__}: {e}")
-                            import traceback
-                            # DISABLED-THREAD: traceback.print_exc()
-                    else:
-                        pass
-                        # DISABLED-THREAD: print(f"    ⚠️  WARNING: No API method for {obj_type} (mapped to: {method_name})")
+                    # Determine the actual destination - could be folder, existing snippet, or inherit
+                    dest_location = dest_info.get('folder', folder_name)  # Default to source folder name
+                    is_existing_snippet = dest_info.get('is_existing_snippet', False)
                     
-                    current += 1  # Increment by 1 for each object type fetch
+                    # Also check if destination folder name is in the existing snippets list
+                    if not is_existing_snippet and dest_location in dest_config.get('snippets', {}):
+                        is_existing_snippet = True
+                    
+                    folder_objects = folder.get('objects', {})
+                    for obj_type, obj_list in folder_objects.items():
+                        if obj_type not in objects:
+                            objects[obj_type] = []
+                        
+                        if is_existing_snippet:
+                            # Destination is an existing snippet
+                            if obj_type not in object_snippets:
+                                object_snippets[obj_type] = set()
+                            if dest_location:
+                                object_snippets[obj_type].add(dest_location)
+                        else:
+                            # Destination is a folder
+                            if obj_type not in object_folders:
+                                object_folders[obj_type] = set()
+                            if dest_location:
+                                object_folders[obj_type].add(dest_location)
+                
+                for snippet in snippets:
+                    snippet_name = snippet.get('name')
+                    dest_info = snippet.get('_destination', {})
+                    
+                    # Skip if this snippet is going to a new snippet (no conflicts possible)
+                    if dest_info.get('is_new_snippet') or dest_info.get('is_rename_snippet'):
+                        continue
+                    
+                    # For snippet sources, destination is typically the same snippet or another snippet
+                    # Use folder if set and non-empty, otherwise default to the source snippet name
+                    dest_location = dest_info.get('folder') or snippet_name
+                    
+                    # Also check is_existing_snippet flag
+                    is_existing_snippet = dest_info.get('is_existing_snippet', False)
+                    # If destination matches an existing snippet, it's an existing snippet destination
+                    if not is_existing_snippet and dest_location in dest_config.get('snippets', {}):
+                        is_existing_snippet = True
+                    
+                    snippet_objects = snippet.get('objects', {})
+                    for obj_type, obj_list in snippet_objects.items():
+                        if obj_type not in objects:
+                            objects[obj_type] = []
+                        if obj_type not in object_snippets:
+                            object_snippets[obj_type] = set()
+                        if dest_location:
+                            object_snippets[obj_type].add(dest_location)
+                
+                if objects:
+                    emit_detail("📦 Checking objects in destination...")
+                    
+                    # Map object types to API client methods
+                    # Handle both singular and plural forms
+                    object_method_map = {
+                        'address_objects': 'get_all_addresses',
+                        'address_object': 'get_all_addresses',
+                        'address_groups': 'get_all_address_groups',
+                        'address_group': 'get_all_address_groups',
+                        'service_objects': 'get_all_services',
+                        'service_object': 'get_all_services',
+                        'service_groups': 'get_all_service_groups',
+                        'service_group': 'get_all_service_groups',
+                        'applications': 'get_all_applications',
+                        'application': 'get_all_applications',
+                        'application_groups': 'get_all_application_groups',
+                        'application_group': 'get_all_application_groups',
+                        'application_filters': 'get_all_application_filters',
+                        'application_filter': 'get_all_application_filters',
+                        'external_dynamic_lists': 'get_all_external_dynamic_lists',
+                        'external_dynamic_list': 'get_all_external_dynamic_lists',
+                        'fqdn_objects': 'get_all_fqdn_objects',
+                        'fqdn_object': 'get_all_fqdn_objects',
+                        'url_filtering_categories': 'get_all_url_categories',
+                        'url_filtering_category': 'get_all_url_categories',
+                        'url_category': 'get_all_url_categories',
+                    }
+                    
+                    # Friendly names for object types
+                    type_display_names = {
+                        'address_objects': 'Address Objects',
+                        'address_object': 'Address Objects',
+                        'address_groups': 'Address Groups',
+                        'address_group': 'Address Groups',
+                        'service_objects': 'Service Objects',
+                        'service_object': 'Service Objects',
+                        'service_groups': 'Service Groups',
+                        'service_group': 'Service Groups',
+                        'applications': 'Applications',
+                        'application': 'Applications',
+                        'application_groups': 'Application Groups',
+                        'application_group': 'Application Groups',
+                        'application_filters': 'Application Filters',
+                        'application_filter': 'Application Filters',
+                        'external_dynamic_lists': 'External Dynamic Lists',
+                        'external_dynamic_list': 'External Dynamic Lists',
+                        'fqdn_objects': 'FQDN Objects',
+                        'fqdn_object': 'FQDN Objects',
+                        'url_filtering_categories': 'URL Categories',
+                        'url_filtering_category': 'URL Categories',
+                        'url_category': 'URL Categories',
+                    }
+                    
+                    for obj_type, obj_list in objects.items():
+                        if not isinstance(obj_list, list):
+                            continue
+                        
+                        display_name = type_display_names.get(obj_type, obj_type)
+                        method_name = object_method_map.get(obj_type)
+                        
+                        if method_name and hasattr(self.api_client, method_name):
+                            emit_progress(f"Objects - Checking {display_name}",
+                                         f"   Fetching {display_name}...")
+                            try:
+                                # Determine which folders/snippets to query for this object type
+                                folders_to_check = object_folders.get(obj_type, set())
+                                snippets_to_check = object_snippets.get(obj_type, set())
+                                
+                                # Fetch from each folder/snippet
+                                all_existing_objects = []
+                                method = getattr(self.api_client, method_name)
+                                
+                                if folders_to_check:
+                                    for folder in folders_to_check:
+                                        try:
+                                            folder_objects = method(folder=folder)
+                                            if isinstance(folder_objects, list):
+                                                all_existing_objects.extend(folder_objects)
+                                        except Exception:
+                                            pass  # Silently skip folders that error
+                                
+                                if snippets_to_check:
+                                    emit_detail(f"   Checking snippets: {list(snippets_to_check)}")
+                                    for snippet_name in snippets_to_check:
+                                        try:
+                                            snippet_objects = method(snippet=snippet_name)
+                                            if isinstance(snippet_objects, list):
+                                                all_existing_objects.extend(snippet_objects)
+                                                emit_detail(f"   Found {len(snippet_objects)} in snippet '{snippet_name}'")
+                                        except Exception as e:
+                                            emit_detail(f"   Error checking snippet '{snippet_name}': {e}", level='warning')
+                                
+                                if not folders_to_check and not snippets_to_check:
+                                    # No specific location, try without folder/snippet parameter
+                                    all_existing_objects = method()
+                                
+                                existing_objects = all_existing_objects
+                                
+                                if not isinstance(existing_objects, list):
+                                    existing_objects = []
+                            
+                                if obj_type not in dest_config['objects']:
+                                    dest_config['objects'][obj_type] = {}
+                                
+                                for obj in existing_objects:
+                                    if not isinstance(obj, dict):
+                                        continue
+                                    obj_name = obj.get('name')
+                                    if obj_name:
+                                        dest_config['objects'][obj_type][obj_name] = obj
+                                
+                                # Report what we found
+                                found_count = len(dest_config['objects'][obj_type])
+                                emit_detail(f"   Found {found_count} {display_name} in destination")
+                                    
+                            except AttributeError as e:
+                                emit_detail(f"   ⚠️  Could not check {display_name}: API method not available", level="warning")
+                            except TypeError as e:
+                                emit_detail(f"   ⚠️  Could not check {display_name}: {e}", level="warning")
+                            except Exception as e:
+                                emit_detail(f"   ⚠️  Error checking {display_name}: {e}", level="warning")
+                        else:
+                            emit_detail(f"   ⚠️  No API method for {display_name}", level="warning")
+                    
+                    emit_detail("")
             
             # Fetch infrastructure components
             infrastructure = self.selected_items.get('infrastructure', {})
-            # DISABLED: print(f"\nInfrastructure to check: {list(infrastructure.keys()) if infrastructure else 'None'}")
             if infrastructure:
-                self.progress.emit(f"Checking infrastructure...", int((current / max(total_items, 1)) * 100))
+                # Will emit per-type progress below
                 
                 # Map infrastructure types to API client methods
                 infra_method_map = {
@@ -444,9 +664,8 @@ class ConfigFetchWorker(QThread):
                             # DISABLED-THREAD: traceback.print_exc()
                     else:
                         pass
-                        # DISABLED-THREAD: print(f"    ⚠️  WARNING: No API method for {infra_type} (mapped to: {method_name})")
                     
-                    current += 1  # Increment by 1 for each infrastructure type fetch
+                    emit_progress(f"Checking {infra_type} infrastructure...")
             
             # Fetch profiles from folders
             # Profiles are folder-specific and need to be fetched per folder
@@ -473,7 +692,7 @@ class ConfigFetchWorker(QThread):
                         profile_folders[profile_type].add(folder_name)
             
             if profile_folders:
-                self.progress.emit(f"Checking profiles...", int((current / max(total_items, 1)) * 100))
+                # Will emit per-type progress below
                 # DISABLED-THREAD: print(f"  Profile types to check: {list(profile_folders.keys())}")
                 
                 # Map profile types to API methods
@@ -530,9 +749,8 @@ class ConfigFetchWorker(QThread):
                             # DISABLED-THREAD: traceback.print_exc()
                     else:
                         pass
-                        # DISABLED-THREAD: print(f"    ⚠️  WARNING: No API method for {profile_type} (mapped to: {method_name})")
                     
-                    current += 1  # Increment by 1 for each profile type fetch
+                    emit_progress(f"Checking {profile_type} profiles...")
             
             # Fetch HIP items from folders
             hip_folders = {}  # Track which folders contain which HIP types
@@ -556,42 +774,118 @@ class ConfigFetchWorker(QThread):
                 # Skip ALL HIP processing - commented out to prevent crashes
                 # The entire HIP section is disabled below
             
-            # Fetch security rules from folders
-            rule_folders = set()  # Track which folders have rules
+            # Fetch ALL security rules from tenant
+            # IMPORTANT: Security rule names must be GLOBALLY UNIQUE across all folders/snippets
+            # We must check all rules in the entire tenant, not just the target folder
+            has_rules_to_push = False
             for folder in self.selected_items.get('folders', []):
-                folder_name = folder.get('name')
-                folder_rules = folder.get('security_rules', [])
-                if folder_rules and folder_name:
-                    rule_folders.add(folder_name)
+                if folder.get('security_rules'):
+                    has_rules_to_push = True
+                    break
+            for snippet in self.selected_items.get('snippets', []):
+                if snippet.get('security_rules'):
+                    has_rules_to_push = True
+                    break
             
-            if rule_folders:
-                self.progress.emit(f"Checking security rules...", int((current / max(total_items, 1)) * 100))
-                # DISABLED-THREAD: print(f"  Checking security rules in folders: {list(rule_folders)}")
-                
-                if 'security_rules' not in dest_config:
-                    dest_config['security_rules'] = {}
-                
-                for folder_name in rule_folders:
-                    # DISABLED-THREAD: print(f"    Calling API method: get_all_security_rules(folder='{folder_name}')")
+            if has_rules_to_push:
+                # Skip security rule checks if ALL items are going to new snippets
+                # (no conflicts possible - new snippet = empty namespace)
+                if all_items_to_new_snippets:
+                    emit_detail("🔒 Skipping security rule conflict checks - all items going to new snippets")
+                    emit_detail("   (New snippets have no existing rules to conflict with)")
+                    emit_detail("")
+                else:
+                    emit_progress("Security Rules - Checking global uniqueness",
+                                 "")
+                    emit_detail("🔒 Security Rules - Checking for name conflicts...")
+                    emit_detail("   (Security rules must be globally unique across all folders/snippets)")
+                    emit_detail("")
+                    
+                    if 'security_rules' not in dest_config:
+                        dest_config['security_rules'] = {}
+                    
+                    # Fetch rules from ALL folders (not just target folders)
+                    # Skip system/blocked folders that will always error
                     try:
-                        rules = self.api_client.get_all_security_rules(folder=folder_name)
-                        if isinstance(rules, list):
-                            # Store rules by folder
-                            if folder_name not in dest_config['security_rules']:
-                                dest_config['security_rules'][folder_name] = {}
-                            for rule in rules:
-                                if isinstance(rule, dict):
-                                    rule_name = rule.get('name')
-                                    if rule_name:
-                                        dest_config['security_rules'][folder_name][rule_name] = rule
-                            # DISABLED-THREAD: print(f"      Found {len(dest_config['security_rules'][folder_name])} rules in '{folder_name}'")
+                        all_folders = self.api_client.get_security_policy_folders()
+                        valid_folders = [f for f in all_folders if not self._should_skip_folder(f.get('name', ''))]
+                        emit_detail(f"   Checking {len(valid_folders)} folders for existing rules...")
+                        
+                        folder_rule_count = 0
+                        for i, folder in enumerate(valid_folders):
+                            folder_name = folder.get('name', '')
+                            try:
+                                rules = self.api_client.get_all_security_rules(folder=folder_name)
+                                if isinstance(rules, list):
+                                    if folder_name not in dest_config['security_rules']:
+                                        dest_config['security_rules'][folder_name] = {}
+                                    for rule in rules:
+                                        if isinstance(rule, dict):
+                                            rule_name = rule.get('name')
+                                            if rule_name:
+                                                dest_config['security_rules'][folder_name][rule_name] = rule
+                                                dest_config['all_rule_names'][rule_name] = {
+                                                    'folder': folder_name,
+                                                    'snippet': None
+                                                }
+                                                folder_rule_count += 1
+                                # Update progress periodically
+                                if (i + 1) % 3 == 0 or i == len(valid_folders) - 1:
+                                    emit_detail(f"   📁 Checked {i + 1}/{len(valid_folders)} folders ({folder_rule_count} rules found)")
+                            except Exception as e:
+                                pass  # Silently skip folders that error
                     except Exception as e:
-                        pass
-                        # DISABLED-THREAD: print(f"      ERROR fetching rules from '{folder_name}': {e}")
+                        emit_detail(f"   ⚠️  Error enumerating folders: {e}", level="warning")
+                    
+                    # Also fetch rules from snippets
+                    try:
+                        all_snippets = self.api_client.get_security_policy_snippets()
+                        # Filter to editable snippets only
+                        editable_snippets = [s for s in all_snippets 
+                                            if s.get('type', '') not in ('predefined', 'readonly')]
+                        emit_detail(f"   Checking {len(editable_snippets)} snippets for existing rules...")
+                        
+                        snippet_rule_count = 0
+                        for i, snippet in enumerate(editable_snippets):
+                            snippet_name = snippet.get('name', '')
+                            if not snippet_name:
+                                continue
+                            try:
+                                rules = self.api_client.get_all_security_rules(snippet=snippet_name)
+                                if isinstance(rules, list):
+                                    for rule in rules:
+                                        if isinstance(rule, dict):
+                                            rule_name = rule.get('name')
+                                            if rule_name:
+                                                dest_config['all_rule_names'][rule_name] = {
+                                                    'folder': None,
+                                                    'snippet': snippet_name
+                                                }
+                                                snippet_rule_count += 1
+                                # Update progress periodically
+                                if (i + 1) % 5 == 0 or i == len(editable_snippets) - 1:
+                                    emit_detail(f"   📄 Checked {i + 1}/{len(editable_snippets)} snippets ({snippet_rule_count} rules found)")
+                            except Exception as e:
+                                pass  # Silently skip snippets that error
+                    except Exception as e:
+                        emit_detail(f"   ⚠️  Error enumerating snippets: {e}", level="warning")
+                    
+                    total_rules = len(dest_config['all_rule_names'])
+                    emit_detail(f"   ✓ Found {total_rules} total security rules in destination")
+                    emit_detail("")
                 
-                current += 1  # Increment by 1 for security rules fetch
+            # Final summary
+            emit_detail("=" * 60)
+            emit_detail("VALIDATION FETCH COMPLETE")
+            emit_detail("=" * 60)
+            emit_detail(f"Folders: {len(dest_config['folders'])}")
+            emit_detail(f"Snippets: {len(dest_config['snippets'])}")
+            emit_detail(f"Object types: {len(dest_config['objects'])}")
+            emit_detail(f"Security rules: {len(dest_config['all_rule_names'])}")
+            emit_detail(f"New snippets to create: {len(dest_config['new_snippets'])}")
+            emit_detail("")
             
-            self.progress.emit("Analysis complete", 100)
+            self.progress.emit("[100%] Validation complete", 100)
             # Don't print from background thread - causes segfaults
             self.finished.emit(dest_config)
             
@@ -707,9 +1001,13 @@ class PushPreviewDialog(QDialog):
         self.ok_button.setText("✓ Proceed with Push")
         self.ok_button.setEnabled(False)  # Disabled until analysis complete
         self.ok_button.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; padding: 8px 16px; font-weight: bold; }"
-            "QPushButton:hover { background-color: #45a049; }"
-            "QPushButton:disabled { background-color: #cccccc; }"
+            "QPushButton { "
+            "  background-color: #4CAF50; color: white; padding: 8px 16px; font-weight: bold; "
+            "  border-radius: 5px; border: 1px solid #388E3C; border-bottom: 3px solid #2E7D32; "
+            "}"
+            "QPushButton:hover { background-color: #45a049; border-bottom: 3px solid #1B5E20; }"
+            "QPushButton:pressed { background-color: #388E3C; border-bottom: 1px solid #2E7D32; }"
+            "QPushButton:disabled { background-color: #BDBDBD; border: 1px solid #9E9E9E; border-bottom: 3px solid #757575; }"
         )
         
         cancel_button = self.button_box.button(QDialogButtonBox.StandardButton.Cancel)

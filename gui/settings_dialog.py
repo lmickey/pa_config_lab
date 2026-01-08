@@ -252,11 +252,9 @@ class SettingsDialog(QDialog):
         self.log_level_combo.setCurrentIndex(2)  # Default to NORMAL
         log_layout.addRow("Log Level:", self.log_level_combo)
 
-        self.max_logs_spin = QSpinBox()
-        self.max_logs_spin.setRange(100, 10000)
-        self.max_logs_spin.setValue(1000)
-        self.max_logs_spin.setSuffix(" entries")
-        log_layout.addRow("Max Log Entries:", self.max_logs_spin)
+        # Note: Max log entries setting removed - logs are unlimited in memory
+        # since they're already rotated per session and retained based on
+        # rotation count and age settings below.
 
         # Log retention
         log_retention_label = QLabel("<b>Log Retention:</b>")
@@ -361,9 +359,6 @@ class SettingsDialog(QDialog):
                 self.log_level_combo.setCurrentIndex(i)
                 break
         
-        self.max_logs_spin.setValue(
-            self.settings.value("advanced/max_logs", 1000, type=int)
-        )
         self.log_rotation_spin.setValue(
             self.settings.value("advanced/log_rotation", 7, type=int)
         )
@@ -420,7 +415,6 @@ class SettingsDialog(QDialog):
         # Advanced - Logging
         log_level = self.log_level_combo.currentData()
         self.settings.setValue("advanced/log_level", log_level)
-        self.settings.setValue("advanced/max_logs", self.max_logs_spin.value())
         self.settings.setValue("advanced/log_rotation", self.log_rotation_spin.value())
         self.settings.setValue("advanced/log_age", self.log_age_spin.value())
         self.settings.setValue(

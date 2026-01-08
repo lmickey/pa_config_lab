@@ -6,6 +6,9 @@ from gui.widgets.tenant_selector import TenantSelectorWidget
 from gui.widgets.results_panel import ResultsPanel
 from gui.widgets.selection_tree import SelectionTreeWidget, COMPONENT_TYPES
 from gui.widgets.infrastructure_tree import InfrastructureTreeWidget
+from gui.widgets.selection_row import SelectionRow
+from gui.widgets.selection_list import SelectionListWidget
+from gui.widgets.no_scroll_combo import NoScrollComboBox
 
 __all__ = [
     'TenantSelectorWidget',
@@ -13,4 +16,7 @@ __all__ = [
     'SelectionTreeWidget',
     'COMPONENT_TYPES',
     'InfrastructureTreeWidget',
+    'SelectionRow',
+    'SelectionListWidget',
+    'NoScrollComboBox',
 ]

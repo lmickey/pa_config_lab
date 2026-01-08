@@ -29,7 +29,8 @@ class LogsWidget(QWidget):
         """Initialize the logs widget."""
         super().__init__(parent)
 
-        self.max_log_entries = 1000
+        # No limit on log entries - logs are already rotated per session
+        # and retained based on settings (rotation count and age)
         self.log_entries = []
         
         # Search state
@@ -170,10 +171,6 @@ class LogsWidget(QWidget):
             }
 
             self.log_entries.append(entry)
-
-            # Limit log entries
-            if len(self.log_entries) > self.max_log_entries:
-                self.log_entries.pop(0)
 
             # Format and display
             self._display_entry(entry)

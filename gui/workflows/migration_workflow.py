@@ -20,6 +20,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from gui.pull_widget import PullConfigWidget
 from gui.config_viewer import ConfigViewerWidget
 from gui.push_widget import PushConfigWidget
+from gui.toast_notification import ToastManager
 
 
 class MigrationWorkflowWidget(QWidget):
@@ -31,6 +32,9 @@ class MigrationWorkflowWidget(QWidget):
     # Signal emitted when connection state changes in any child widget
     # Emits (api_client, tenant_name, source_type) where source_type is "pull" or "push"
     connection_changed = pyqtSignal(object, str, str)
+    
+    # Signal to request main window to open load file dialog
+    load_file_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         """Initialize migration workflow widget."""
@@ -38,6 +42,9 @@ class MigrationWorkflowWidget(QWidget):
 
         self.api_client = None
         self.current_config = None
+        
+        # Toast notification manager for non-intrusive messages
+        self.toast_manager = ToastManager(self)
 
         self._init_ui()
 
@@ -73,39 +80,16 @@ class MigrationWorkflowWidget(QWidget):
         self.pull_widget.tenant_selector.connection_changed.connect(
             lambda client, name: self._on_child_connection_changed(client, name, "pull")
         )
+        # Handle load file request from pull widget
+        self.pull_widget.load_file_requested.connect(self._request_load_file)
         self.tabs.addTab(self.pull_widget, "1️⃣ Pull from SCM")
 
-        # View tab - with save button
-        viewer_container = QWidget()
-        viewer_layout = QVBoxLayout(viewer_container)
+        # View tab - config viewer with integrated buttons
+        self.config_viewer = ConfigViewerWidget(show_action_buttons=True)
+        self.config_viewer.save_requested.connect(self._save_current_config)
+        self.config_viewer.select_requested.connect(lambda: self.tabs.setCurrentIndex(2))  # Go to selection tab
         
-        self.config_viewer = ConfigViewerWidget()
-        viewer_layout.addWidget(self.config_viewer)
-        
-        # Add buttons to viewer tab
-        buttons_layout = QHBoxLayout()
-        buttons_layout.addStretch()
-        
-        save_viewer_btn = QPushButton("💾 Save Current Config")
-        save_viewer_btn.setStyleSheet(
-            "QPushButton { background-color: #FF9800; color: white; padding: 10px 20px; font-weight: bold; }"
-            "QPushButton:hover { background-color: #F57C00; }"
-        )
-        save_viewer_btn.clicked.connect(self._save_current_config)
-        buttons_layout.addWidget(save_viewer_btn)
-        
-        # Add "Next" button to go to selection tab
-        next_btn = QPushButton("➡️ Select Config to Push")
-        next_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; padding: 10px 20px; font-weight: bold; }"
-            "QPushButton:hover { background-color: #45a049; }"
-        )
-        next_btn.clicked.connect(lambda: self.tabs.setCurrentIndex(2))  # Go to selection tab
-        buttons_layout.addWidget(next_btn)
-        
-        viewer_layout.addLayout(buttons_layout)
-        
-        self.tabs.addTab(viewer_container, "2️⃣ Review Configuration")
+        self.tabs.addTab(self.config_viewer, "2️⃣ Review Configuration")
 
         # Selection tab (Phase 3)
         from gui.selection_widget import SelectionWidget
@@ -116,10 +100,9 @@ class MigrationWorkflowWidget(QWidget):
         # Push tab
         self.push_widget = PushConfigWidget()
         self.push_widget.push_completed.connect(self._on_push_completed)
-        # Propagate connection changes to parent
-        self.push_widget.tenant_selector.connection_changed.connect(
-            lambda client, name: self._on_child_connection_changed(client, name, "push")
-        )
+        self.push_widget.return_to_selection_requested.connect(self._on_return_to_selection)
+        self.push_widget.add_dependencies_requested.connect(self._on_add_dependencies_requested)
+        # Note: Push widget no longer has tenant_selector - destination is set from selection widget
         self.tabs.addTab(self.push_widget, "4️⃣ Push to Target")
 
         layout.addWidget(self.tabs)
@@ -138,6 +121,10 @@ class MigrationWorkflowWidget(QWidget):
             # Populate pull widget source dropdown
             if hasattr(self.pull_widget, 'populate_source_tenants'):
                 self.pull_widget.populate_source_tenants(tenants)
+            
+            # Populate selection widget destination dropdown
+            if hasattr(self.selection_widget, 'populate_destination_tenants'):
+                self.selection_widget.populate_destination_tenants(tenants)
             
             # Populate push widget destination dropdown
             if hasattr(self.push_widget, 'populate_destination_tenants'):
@@ -225,30 +212,26 @@ class MigrationWorkflowWidget(QWidget):
         """Handle pull completion."""
         import logging
         logger = logging.getLogger(__name__)
-        logger.info("=== _on_pull_completed called ===")
-        logger.info(f"Config parameter type: {type(config)}")
-        logger.info(f"Config parameter value: {config is not None}")
         
         # Get config from pull_widget instead of signal parameter to avoid memory issues
         # The signal parameter is now None to prevent memory corruption
         config_from_widget = self.pull_widget.get_pulled_config()
-        logger.info(f"Config from widget: {config_from_widget is not None}")
         
         if config:
-            logger.info(f"Using config from signal parameter (size: {len(str(config))} bytes)")
+            logger.detail("[Migration] Using config from signal parameter")
             self.current_config = config
             self.config_viewer.set_config(config)
             self.push_widget.set_config(config)
-            self.selection_widget.set_config(config)  # Phase 3: Update selection widget
+            self.selection_widget.set_config(config)
             
             # Notify main window that config is loaded
             self.configuration_loaded.emit(config)
 
             # Move to view tab
-            logger.info("Switching to view tab (index 1)")
+            logger.normal("[Migration] Pull complete - switching to Review Configuration tab")
             self.tabs.setCurrentIndex(1)
         elif config_from_widget:
-            logger.info(f"Using config from widget (size: {len(str(config_from_widget))} bytes)")
+            logger.detail("[Migration] Using config from widget")
             self.current_config = config_from_widget
             self.config_viewer.set_config(config_from_widget)
             self.push_widget.set_config(config_from_widget)
@@ -258,15 +241,31 @@ class MigrationWorkflowWidget(QWidget):
             self.configuration_loaded.emit(config_from_widget)
 
             # Move to view tab
-            logger.info("Switching to view tab (index 1)")
+            logger.normal("[Migration] Pull complete - switching to Review Configuration tab")
             self.tabs.setCurrentIndex(1)
         else:
-            logger.error("No config available from either signal or widget!")
+            logger.error("[Migration] No config available from either signal or widget!")
 
     def _on_push_completed(self, result):
         """Handle push completion."""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.normal("[Migration] Push operation completed")
         # Status is already shown in push_widget banner, no popup needed
-        pass
+    
+    def _on_return_to_selection(self):
+        """Handle request to return to selection screen from push widget."""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.normal("[Migration] Returning to Select Components tab")
+        # Switch to selection tab (index 2)
+        self.tabs.setCurrentIndex(2)
+    
+    def _request_load_file(self):
+        """Handle request to load config from file (from pull widget)."""
+        # Emit signal to main window to open load dialog
+        # Main window will call load_configuration_from_main after loading
+        self.load_file_requested.emit()
 
     def _save_current_config(self):
         """Save the current configuration using the save dialog."""
@@ -380,13 +379,15 @@ class MigrationWorkflowWidget(QWidget):
                 default_name = f"TSG-{config_obj.source_tsg}"
             
             dialog = SaveConfigDialog(config_obj, self, default_name=default_name)
-            if dialog.exec():
-                logger.info("Configuration saved successfully via save dialog")
-                QMessageBox.information(
-                    self,
-                    "Save Successful",
-                    "Configuration saved successfully!"
+            
+            # Connect to save_success signal for toast notification
+            dialog.save_success.connect(
+                lambda filename, name: self.toast_manager.show_success(
+                    f"✓ Configuration '{name}' saved successfully!", 5000
                 )
+            )
+            
+            dialog.exec()  # Toast shows via signal, no popup needed
         except Exception as e:
             logger.error(f"Error opening save dialog: {e}")
             QMessageBox.warning(
@@ -402,6 +403,11 @@ class MigrationWorkflowWidget(QWidget):
         Args:
             config: Configuration object from main window
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.normal("[Migration] Loading configuration from file into workflow...")
+        
         # Store Configuration object
         self.current_config = config
         
@@ -409,13 +415,22 @@ class MigrationWorkflowWidget(QWidget):
         from gui.config_adapter import ConfigAdapter
         config_dict = ConfigAdapter.to_dict(config)
         
+        # Log what's being loaded
+        folders_count = len(config_dict.get('folders', {}))
+        snippets_count = len(config_dict.get('snippets', {}))
+        
+        logger.normal(f"[Migration] Configuration loaded: {folders_count} folders, {snippets_count} snippets")
+        
         # Load into all widgets
+        logger.detail("[Migration] Setting config in viewer, push, and selection widgets")
         self.config_viewer.set_config(config_dict)
         self.push_widget.set_config(config_dict)
         self.selection_widget.set_config(config_dict)
         
-        # Switch to review tab to show loaded config
-        self.tabs.setCurrentIndex(1)
+        # For saved configs, skip directly to push selection (tab index 2)
+        # User has likely already reviewed the config before saving
+        logger.normal("[Migration] Switching to Select Components tab")
+        self.tabs.setCurrentIndex(2)
 
     def _auto_save_pulled_config(self, config: Dict[str, Any]):
         """Automatically prompt to save pulled configuration."""
@@ -463,8 +478,68 @@ class MigrationWorkflowWidget(QWidget):
     
     def _on_selection_ready(self, selected_items):
         """Handle when selection is ready from selection widget."""
-        # Set the selection in push widget (config already set)
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Count what's selected
+        folders_count = len(selected_items.get('folders', []))
+        snippets_count = len(selected_items.get('snippets', []))
+        infra_count = len(selected_items.get('infrastructure', {}))
+        
+        logger.normal(f"[Migration] Selection ready: {folders_count} folders, {snippets_count} snippets, {infra_count} infrastructure categories")
+        
+        # Set the selection in push widget
         self.push_widget.set_selected_items(selected_items)
         
+        # Also pass the full config for dependency resolution
+        if hasattr(self.selection_widget, 'full_config') and self.selection_widget.full_config:
+            self.push_widget.loaded_config = self.selection_widget.full_config
+        
+        # Pass the destination client from selection widget to push widget
+        dest_client = self.selection_widget.get_destination_api_client()
+        dest_name = self.selection_widget.get_destination_name()
+        if dest_client:
+            logger.normal(f"[Migration] Destination tenant: {dest_name}")
+            self.push_widget.set_destination_client(dest_client, dest_name)
+        
         # Switch to push tab
+        logger.normal("[Migration] Switching to Push to Target tab")
         self.tabs.setCurrentIndex(3)  # Push is now tab 3 (0-indexed)
+    
+    def _on_add_dependencies_requested(self, missing_deps: list):
+        """Handle request to add missing dependencies and revalidate."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            logger.normal(f"[Migration] Adding {len(missing_deps)} missing dependencies to selection")
+            
+            # Log the items being added
+            for dep in missing_deps:
+                logger.normal(f"[Migration]   → {dep.get('type', '?')}: {dep.get('name', '?')}")
+            
+            # Tell the selection widget to add these items
+            if hasattr(self.selection_widget, 'add_items_to_selection'):
+                self.selection_widget.add_items_to_selection(missing_deps)
+            else:
+                logger.warning("[Migration] selection_widget has no add_items_to_selection method")
+            
+            # Re-collect the selection
+            if hasattr(self.selection_widget, 'selection_list'):
+                logger.normal("[Migration] Re-collecting selection with added dependencies")
+                selection = self.selection_widget.selection_list.get_selected_items()
+                
+                # Update push widget with new selection
+                self.push_widget.set_selected_items(selection)
+                self.push_widget.loaded_config = self.selection_widget.full_config
+                
+                # Explicitly trigger validation since we're already on the push tab
+                logger.normal("[Migration] Triggering revalidation")
+                self.push_widget._start_validation()
+            else:
+                logger.warning("[Migration] selection_widget has no selection_list attribute")
+                
+        except Exception as e:
+            import traceback
+            logger.error(f"[Migration] Error adding dependencies: {e}")
+            traceback.print_exc()
