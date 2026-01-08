@@ -173,9 +173,13 @@ class FolderSelectionDialog(QDialog):
         self.ok_btn.setEnabled(False)
         self.ok_btn.clicked.connect(self.accept)
         self.ok_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; padding: 8px; }"
-            "QPushButton:hover { background-color: #45a049; }"
-            "QPushButton:disabled { background-color: #cccccc; }"
+            "QPushButton { "
+            "  background-color: #4CAF50; color: white; padding: 8px; "
+            "  border-radius: 5px; border: 1px solid #388E3C; border-bottom: 3px solid #2E7D32; "
+            "}"
+            "QPushButton:hover { background-color: #45a049; border-bottom: 3px solid #1B5E20; }"
+            "QPushButton:pressed { background-color: #388E3C; border-bottom: 1px solid #2E7D32; }"
+            "QPushButton:disabled { background-color: #BDBDBD; border: 1px solid #9E9E9E; border-bottom: 3px solid #757575; }"
         )
         button_layout.addWidget(self.ok_btn)
         

@@ -207,9 +207,13 @@ class FindApplicationsDialog(QDialog):
         self.add_btn.setToolTip("Add application to list")
         self.add_btn.clicked.connect(self._add_application)
         self.add_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; font-weight: bold; font-size: 16px; }"
-            "QPushButton:hover { background-color: #45a049; }"
-            "QPushButton:disabled { background-color: #cccccc; color: #666666; }"
+            "QPushButton { "
+            "  background-color: #4CAF50; color: white; font-weight: bold; font-size: 16px; "
+            "  border-radius: 4px; border: 1px solid #388E3C; border-bottom: 3px solid #2E7D32; "
+            "}"
+            "QPushButton:hover { background-color: #45a049; border-bottom: 3px solid #1B5E20; }"
+            "QPushButton:pressed { background-color: #388E3C; border-bottom: 1px solid #2E7D32; }"
+            "QPushButton:disabled { background-color: #BDBDBD; color: #666666; border: 1px solid #9E9E9E; border-bottom: 3px solid #757575; }"
         )
         add_layout.addWidget(self.add_btn)
         
@@ -267,9 +271,13 @@ class FindApplicationsDialog(QDialog):
         
         self.save_btn = QPushButton("✓ Save Application Selections")
         self.save_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; font-weight: bold; padding: 8px 16px; }"
-            "QPushButton:hover { background-color: #45a049; }"
-            "QPushButton:disabled { background-color: #cccccc; color: #666666; }"
+            "QPushButton { "
+            "  background-color: #4CAF50; color: white; font-weight: bold; padding: 8px 16px; "
+            "  border-radius: 5px; border: 1px solid #388E3C; border-bottom: 3px solid #2E7D32; "
+            "}"
+            "QPushButton:hover { background-color: #45a049; border-bottom: 3px solid #1B5E20; }"
+            "QPushButton:pressed { background-color: #388E3C; border-bottom: 1px solid #2E7D32; }"
+            "QPushButton:disabled { background-color: #BDBDBD; color: #666666; border: 1px solid #9E9E9E; border-bottom: 3px solid #757575; }"
         )
         self.save_btn.clicked.connect(self._save_selections)
         self.save_btn.setEnabled(False)

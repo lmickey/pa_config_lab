@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
+.pytest_cache/
 env/
 venv/
 ENV/
@@ -11,12 +12,14 @@ build/
 develop-eggs/
 dist/
 downloads/
+planning/
 eggs/
 .eggs/
 lib/
 lib64/
 parts/
 sdist/
+saved/
 var/
 wheels/
 *.egg-info/
@@ -44,6 +47,7 @@ Thumbs.db
 *-fwdata.bin
 *-config.json.encrypted
 *.key
+*.pac
 
 # Temporary files
 *.tmp

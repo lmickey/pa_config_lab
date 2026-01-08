@@ -79,9 +79,22 @@ class ResultsPanel(QWidget):
         buttons_layout = QHBoxLayout()
         buttons_layout.addStretch()
         
+        # Small grey button style for utility buttons
+        small_grey_style = (
+            "QPushButton { "
+            "  background-color: #757575; color: white; padding: 4px 10px; "
+            "  font-size: 11px; border-radius: 3px; "
+            "  border: 1px solid #616161; border-bottom: 2px solid #424242; "
+            "}"
+            "QPushButton:hover { background-color: #616161; border-bottom: 2px solid #212121; }"
+            "QPushButton:pressed { background-color: #616161; border-bottom: 1px solid #424242; }"
+            "QPushButton:disabled { background-color: #BDBDBD; color: #9E9E9E; border: 1px solid #9E9E9E; border-bottom: 2px solid #757575; }"
+        )
+        
         # Copy results button
         self.copy_results_btn = QPushButton("📋 Copy Results")
         self.copy_results_btn.setToolTip("Copy all results to clipboard")
+        self.copy_results_btn.setStyleSheet(small_grey_style)
         self.copy_results_btn.clicked.connect(self._copy_results)
         self.copy_results_btn.setEnabled(False)
         buttons_layout.addWidget(self.copy_results_btn)
@@ -89,6 +102,7 @@ class ResultsPanel(QWidget):
         # View details button
         self.view_details_btn = QPushButton("📄 View Full Details")
         self.view_details_btn.setToolTip("Open detailed log viewer")
+        self.view_details_btn.setStyleSheet(small_grey_style)
         self.view_details_btn.clicked.connect(self._view_full_details)
         self.view_details_btn.setEnabled(False)
         buttons_layout.addWidget(self.view_details_btn)
@@ -193,49 +207,60 @@ class ResultsPanel(QWidget):
             QMessageBox.warning(self, "Copy Failed", f"Failed to copy results: {e}")
     
     def _view_full_details(self):
-        """Open a dialog to view full activity log details."""
+        """Open a dialog to view full activity log details with search/filter."""
         try:
+            from gui.logs_widget import LogsWidget
+            
             dialog = QDialog(self)
-            dialog.setWindowTitle(f"{self.title} - Full Details")
-            dialog.resize(1000, 700)
+            dialog.setWindowTitle(f"{self.title} - Activity Log")
+            dialog.resize(1100, 750)
             
             layout = QVBoxLayout(dialog)
+            layout.setContentsMargins(8, 8, 8, 8)
             
-            # Add header
-            header = QLabel(f"<h3>Complete Activity Log</h3>")
-            layout.addWidget(header)
+            # Use the full-featured LogsWidget with search and filter
+            logs_widget = LogsWidget(dialog)
             
-            # Text area with full log
-            log_text = QTextEdit()
-            log_text.setReadOnly(True)
-            log_text.setStyleSheet("font-family: monospace; font-size: 10pt;")
-            
-            # Read activity log
+            # Load log entries from file
             try:
                 with open(self.log_file, 'r') as f:
-                    # Get last 500 lines to avoid overwhelming the viewer
-                    lines = f.readlines()
-                    log_content = ''.join(lines[-500:])
-                    log_text.setPlainText(log_content)
-                    
-                    # Scroll to bottom
-                    log_text.verticalScrollBar().setValue(log_text.verticalScrollBar().maximum())
+                    for line in f.readlines()[-1000:]:  # Last 1000 lines
+                        line = line.strip()
+                        if line:
+                            # Try to parse log level from line
+                            level = "info"
+                            if " - DEBUG - " in line:
+                                level = "debug"
+                            elif " - WARNING - " in line:
+                                level = "warning"
+                            elif " - ERROR - " in line:
+                                level = "error"
+                            elif " - CRITICAL - " in line:
+                                level = "error"
+                            
+                            logs_widget.log(line, level)
             except Exception as read_err:
                 self.logger.error(f"Error reading {self.log_file}: {read_err}")
-                log_text.setPlainText(f"Error reading {self.log_file}: {read_err}")
+                logs_widget.log(f"Error reading {self.log_file}: {read_err}", "error")
             
-            layout.addWidget(log_text)
+            layout.addWidget(logs_widget)
             
-            # Close button
+            # Close button at bottom
             button_layout = QHBoxLayout()
             button_layout.addStretch()
             
-            copy_log_btn = QPushButton("📋 Copy Full Log")
-            copy_log_btn.clicked.connect(lambda: QApplication.clipboard().setText(log_text.toPlainText()))
-            button_layout.addWidget(copy_log_btn)
-            
             close_btn = QPushButton("Close")
+            close_btn.setMinimumWidth(100)
             close_btn.clicked.connect(dialog.close)
+            close_btn.setStyleSheet(
+                "QPushButton { "
+                "  background-color: #757575; color: white; padding: 8px 16px; "
+                "  font-size: 12px; border-radius: 4px; "
+                "  border: 1px solid #616161; border-bottom: 2px solid #424242; "
+                "}"
+                "QPushButton:hover { background-color: #616161; border-bottom: 2px solid #212121; }"
+                "QPushButton:pressed { background-color: #616161; border-bottom: 1px solid #424242; }"
+            )
             button_layout.addWidget(close_btn)
             
             layout.addLayout(button_layout)

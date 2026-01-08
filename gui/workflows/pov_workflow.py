@@ -356,8 +356,12 @@ class POVWorkflowWidget(QWidget):
         save_config_btn.setMinimumWidth(120)
         save_config_btn.setMinimumHeight(40)
         save_config_btn.setStyleSheet(
-            "QPushButton { background-color: #FF9800; color: white; padding: 10px; font-weight: bold; }"
-            "QPushButton:hover { background-color: #F57C00; }"
+            "QPushButton { "
+            "  background-color: #FF9800; color: white; padding: 10px; font-weight: bold; "
+            "  border-radius: 5px; border: 1px solid #F57C00; border-bottom: 3px solid #E65100; "
+            "}"
+            "QPushButton:hover { background-color: #FB8C00; border-bottom: 3px solid #BF360C; }"
+            "QPushButton:pressed { background-color: #F57C00; border-bottom: 1px solid #E65100; }"
         )
         save_config_btn.clicked.connect(self._save_current_config)
         bottom_layout.addWidget(save_config_btn)
@@ -367,8 +371,12 @@ class POVWorkflowWidget(QWidget):
         self.load_config_btn.setMinimumWidth(200)
         self.load_config_btn.setMinimumHeight(40)
         self.load_config_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; padding: 10px; font-weight: bold; font-size: 13px; }"
-            "QPushButton:hover { background-color: #45a049; }"
+            "QPushButton { "
+            "  background-color: #4CAF50; color: white; padding: 10px; font-weight: bold; font-size: 13px; "
+            "  border-radius: 5px; border: 1px solid #388E3C; border-bottom: 3px solid #2E7D32; "
+            "}"
+            "QPushButton:hover { background-color: #45a049; border-bottom: 3px solid #1B5E20; }"
+            "QPushButton:pressed { background-color: #388E3C; border-bottom: 1px solid #2E7D32; }"
         )
         self.load_config_btn.clicked.connect(self._load_and_merge_config)
         bottom_layout.addWidget(self.load_config_btn)
@@ -468,8 +476,12 @@ class POVWorkflowWidget(QWidget):
 
         apply_fw_btn = QPushButton("Apply Selected Defaults")
         apply_fw_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; padding: 8px 15px; }"
-            "QPushButton:hover { background-color: #45a049; }"
+            "QPushButton { "
+            "  background-color: #4CAF50; color: white; padding: 8px 15px; "
+            "  border-radius: 5px; border: 1px solid #388E3C; border-bottom: 3px solid #2E7D32; "
+            "}"
+            "QPushButton:hover { background-color: #45a049; border-bottom: 3px solid #1B5E20; }"
+            "QPushButton:pressed { background-color: #388E3C; border-bottom: 1px solid #2E7D32; }"
         )
         apply_fw_btn.clicked.connect(self._apply_firewall_defaults)
         actions_layout.addWidget(apply_fw_btn)
@@ -601,8 +613,12 @@ class POVWorkflowWidget(QWidget):
 
         apply_pa_btn = QPushButton("Apply Selected Defaults")
         apply_pa_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; padding: 8px 15px; }"
-            "QPushButton:hover { background-color: #45a049; }"
+            "QPushButton { "
+            "  background-color: #4CAF50; color: white; padding: 8px 15px; "
+            "  border-radius: 5px; border: 1px solid #388E3C; border-bottom: 3px solid #2E7D32; "
+            "}"
+            "QPushButton:hover { background-color: #45a049; border-bottom: 3px solid #1B5E20; }"
+            "QPushButton:pressed { background-color: #388E3C; border-bottom: 1px solid #2E7D32; }"
         )
         apply_pa_btn.clicked.connect(self._apply_prisma_defaults)
         actions_layout.addWidget(apply_pa_btn)
@@ -764,9 +780,13 @@ class POVWorkflowWidget(QWidget):
         self.configure_fw_btn.setMinimumWidth(180)
         self.configure_fw_btn.setEnabled(False)
         self.configure_fw_btn.setStyleSheet(
-            "QPushButton { background-color: #FF9800; color: white; padding: 10px; }"
-            "QPushButton:hover { background-color: #F57C00; }"
-            "QPushButton:disabled { background-color: #cccccc; }"
+            "QPushButton { "
+            "  background-color: #FF9800; color: white; padding: 10px; "
+            "  border-radius: 5px; border: 1px solid #F57C00; border-bottom: 3px solid #E65100; "
+            "}"
+            "QPushButton:hover { background-color: #FB8C00; border-bottom: 3px solid #BF360C; }"
+            "QPushButton:pressed { background-color: #F57C00; border-bottom: 1px solid #E65100; }"
+            "QPushButton:disabled { background-color: #BDBDBD; border: 1px solid #9E9E9E; border-bottom: 3px solid #757575; }"
         )
         self.configure_fw_btn.clicked.connect(self._configure_firewall)
         btn_layout.addWidget(self.configure_fw_btn)
@@ -897,9 +917,13 @@ class POVWorkflowWidget(QWidget):
         self.complete_btn.setMinimumWidth(180)
         self.complete_btn.setEnabled(False)
         self.complete_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; padding: 10px; font-weight: bold; }"
-            "QPushButton:hover { background-color: #45a049; }"
-            "QPushButton:disabled { background-color: #cccccc; }"
+            "QPushButton { "
+            "  background-color: #4CAF50; color: white; padding: 10px; font-weight: bold; "
+            "  border-radius: 5px; border: 1px solid #388E3C; border-bottom: 3px solid #2E7D32; "
+            "}"
+            "QPushButton:hover { background-color: #45a049; border-bottom: 3px solid #1B5E20; }"
+            "QPushButton:pressed { background-color: #388E3C; border-bottom: 1px solid #2E7D32; }"
+            "QPushButton:disabled { background-color: #BDBDBD; border: 1px solid #9E9E9E; border-bottom: 3px solid #757575; }"
         )
         self.complete_btn.clicked.connect(self._complete_pov_setup)
         complete_layout.addWidget(self.complete_btn)

@@ -228,6 +228,11 @@ class LoadConfigDialog(QDialog):
                 logger.warning(f"Error reading file {file_path}: {e}")
         
         logger.info(f"Loaded {len(files)} configuration files")
+        
+        # Auto-select the first row if there are files
+        if self.file_table.rowCount() > 0:
+            self.file_table.selectRow(0)
+            self.file_table.setFocus()
     
     def _format_size(self, size: int) -> str:
         """Format file size for display."""

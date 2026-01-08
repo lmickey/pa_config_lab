@@ -28,14 +28,17 @@ class TenantSelectorWidget(QWidget):
     Provides:
     - Dropdown for saved tenants
     - "Connect to Tenant..." button for manual entry
+    - Optional "Load from File" button
     - Connection status display
     - Automatic connection to selected tenant
     
     Signals:
         connection_changed: Emitted when connection state changes (api_client, tenant_name)
+        load_file_requested: Emitted when "Load from File" button is clicked
     """
     
     connection_changed = pyqtSignal(object, str)  # (api_client, tenant_name)
+    load_file_requested = pyqtSignal()  # Emitted when load from file button clicked
     
     def __init__(
         self,
@@ -43,7 +46,8 @@ class TenantSelectorWidget(QWidget):
         title: str = "Tenant",
         label: str = "Select:",
         show_success_toast: Optional[Callable] = None,
-        show_error_banner: Optional[Callable] = None
+        show_error_banner: Optional[Callable] = None,
+        show_load_button: bool = False
     ):
         """
         Initialize the tenant selector widget.
@@ -54,6 +58,7 @@ class TenantSelectorWidget(QWidget):
             label: Label for the dropdown (e.g., "Pull from:", "Push to:")
             show_success_toast: Optional callback for showing success toasts (message, duration)
             show_error_banner: Optional callback for showing error messages (message)
+            show_load_button: Whether to show "Load from File" button (default False)
         """
         super().__init__(parent)
         
@@ -62,6 +67,7 @@ class TenantSelectorWidget(QWidget):
         self.connection_name = None
         self.show_success_toast = show_success_toast
         self.show_error_banner = show_error_banner
+        self._show_load_button = show_load_button
         
         self._title = title
         self._label = label
@@ -87,10 +93,41 @@ class TenantSelectorWidget(QWidget):
         select_layout.addWidget(self.tenant_combo, 1)
         
         self.connect_btn = QPushButton("Connect to Tenant...")
+        self.connect_btn.setFixedSize(160, 36)
+        self.connect_btn.setStyleSheet(
+            "QPushButton { "
+            "  background-color: #2196F3; color: white; padding: 8px 16px; "
+            "  font-weight: bold; border-radius: 5px; "
+            "  border: 1px solid #1976D2; border-bottom: 3px solid #1565C0; "
+            "}"
+            "QPushButton:hover { background-color: #1E88E5; border-bottom: 3px solid #0D47A1; }"
+            "QPushButton:pressed { background-color: #1976D2; border-bottom: 1px solid #1565C0; }"
+        )
         self.connect_btn.clicked.connect(self._connect_manual)
         select_layout.addWidget(self.connect_btn)
         
         group_layout.addLayout(select_layout)
+        
+        # Optional "Load from File" button row
+        if self._show_load_button:
+            load_row = QHBoxLayout()
+            load_row.addStretch()
+            
+            self.load_btn = QPushButton("📂 Load from File...")
+            self.load_btn.setFixedSize(160, 36)
+            self.load_btn.setStyleSheet(
+                "QPushButton { "
+                "  background-color: #FF9800; color: white; padding: 8px 16px; "
+                "  font-weight: bold; border-radius: 5px; "
+                "  border: 1px solid #F57C00; border-bottom: 3px solid #E65100; "
+                "}"
+                "QPushButton:hover { background-color: #FB8C00; border-bottom: 3px solid #BF360C; }"
+                "QPushButton:pressed { background-color: #F57C00; border-bottom: 1px solid #E65100; }"
+            )
+            self.load_btn.clicked.connect(self._on_load_clicked)
+            load_row.addWidget(self.load_btn)
+            
+            group_layout.addLayout(load_row)
         
         # Connection status
         self.status_label = QLabel("No tenant connected")
@@ -99,6 +136,10 @@ class TenantSelectorWidget(QWidget):
         
         self.group_box.setLayout(group_layout)
         layout.addWidget(self.group_box)
+    
+    def _on_load_clicked(self):
+        """Handle click on 'Load from File' button."""
+        self.load_file_requested.emit()
     
     def populate_tenants(self, tenants: list):
         """

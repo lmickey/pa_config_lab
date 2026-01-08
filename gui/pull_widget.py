@@ -36,6 +36,9 @@ class PullConfigWidget(QWidget):
 
     # Signal emitted when pull completes successfully
     pull_completed = pyqtSignal(object)  # config
+    
+    # Signal to request loading config from file (handled by parent workflow)
+    load_file_requested = pyqtSignal()
 
     # Prisma Access folders - complete hierarchy
     PRISMA_ACCESS_FOLDERS = [
@@ -101,6 +104,15 @@ class PullConfigWidget(QWidget):
         
         self.advanced_btn = QPushButton("⚙ Advanced Options")
         self.advanced_btn.setMaximumWidth(150)
+        self.advanced_btn.setStyleSheet(
+            "QPushButton { "
+            "  background-color: #757575; color: white; padding: 6px 12px; "
+            "  font-size: 12px; border-radius: 4px; "
+            "  border: 1px solid #616161; border-bottom: 2px solid #424242; "
+            "}"
+            "QPushButton:hover { background-color: #616161; border-bottom: 2px solid #212121; }"
+            "QPushButton:pressed { background-color: #616161; border-bottom: 1px solid #424242; }"
+        )
         self.advanced_btn.clicked.connect(self._open_advanced_options)
         header_layout.addWidget(self.advanced_btn)
         
@@ -117,15 +129,17 @@ class PullConfigWidget(QWidget):
         # === Source Tenant + Pull Button Row ===
         tenant_row = QHBoxLayout()
         
-        # Tenant selector (left half)
+        # Tenant selector (left half) with Load from File option
         self.tenant_selector = TenantSelectorWidget(
             parent=self,
             title="Source Tenant",
             label="Pull from:",
             show_success_toast=lambda msg, dur: self.toast_manager.show_success(msg, dur),
-            show_error_banner=lambda msg: self.error_notification.show_error(msg)
+            show_error_banner=lambda msg: self.error_notification.show_error(msg),
+            show_load_button=True  # Enable "Load from File" button for pull
         )
         self.tenant_selector.connection_changed.connect(self._on_connection_changed)
+        self.tenant_selector.load_file_requested.connect(self._on_load_file_requested)
         tenant_row.addWidget(self.tenant_selector, stretch=1)
         
         # Button container for Pull, Load Apps, and Update Selection (stacked vertically)
@@ -138,9 +152,14 @@ class PullConfigWidget(QWidget):
         self.find_apps_btn.setFixedHeight(36)
         self.find_apps_btn.setToolTip("Add custom applications to include in pull")
         self.find_apps_btn.setStyleSheet(
-            "QPushButton { background-color: #2196F3; color: white; font-weight: bold; font-size: 13px; }"
-            "QPushButton:hover { background-color: #1976D2; }"
-            "QPushButton:disabled { background-color: #cccccc; color: #666666; }"
+            "QPushButton { "
+            "  background-color: #4CAF50; color: white; padding: 10px 20px; "
+            "  font-size: 13px; font-weight: bold; border-radius: 5px; "
+            "  border: 1px solid #388E3C; border-bottom: 3px solid #2E7D32; "
+            "}"
+            "QPushButton:hover { background-color: #45a049; border-bottom: 3px solid #1B5E20; }"
+            "QPushButton:pressed { background-color: #388E3C; border-bottom: 1px solid #2E7D32; }"
+            "QPushButton:disabled { background-color: #BDBDBD; color: #666666; border: 1px solid #9E9E9E; border-bottom: 3px solid #757575; }"
         )
         self.find_apps_btn.clicked.connect(self._open_find_applications)
         self.find_apps_btn.setEnabled(False)
@@ -151,23 +170,43 @@ class PullConfigWidget(QWidget):
         self.pull_btn.setMinimumWidth(180)
         self.pull_btn.setFixedHeight(36)
         self.pull_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; font-weight: bold; font-size: 13px; }"
-            "QPushButton:hover { background-color: #45a049; }"
-            "QPushButton:disabled { background-color: #cccccc; color: #666666; }"
+            "QPushButton { "
+            "  background-color: #4CAF50; color: white; padding: 10px 20px; "
+            "  font-size: 13px; font-weight: bold; border-radius: 5px; "
+            "  border: 1px solid #388E3C; "
+            "  border-bottom: 3px solid #2E7D32; "
+            "}"
+            "QPushButton:hover { "
+            "  background-color: #45a049; "
+            "  border-bottom: 3px solid #1B5E20; "
+            "}"
+            "QPushButton:pressed { "
+            "  background-color: #388E3C; "
+            "  border-bottom: 1px solid #2E7D32; "
+            "}"
+            "QPushButton:disabled { "
+            "  background-color: #BDBDBD; color: #666666; "
+            "  border: 1px solid #9E9E9E; "
+            "  border-bottom: 3px solid #757575; "
+            "}"
         )
         self.pull_btn.clicked.connect(self._start_pull)
         self.pull_btn.setEnabled(False)
         button_container.addWidget(self.pull_btn)
         
         # Update Selection button - starts hidden, shown after pull completes
-        self.update_selection_btn = QPushButton("📝 Update Selection")
+        self.update_selection_btn = QPushButton("↩ Return to Selection")
         self.update_selection_btn.setMinimumWidth(180)
         self.update_selection_btn.setFixedHeight(36)
         self.update_selection_btn.setToolTip("Return to selection to modify options")
         self.update_selection_btn.setStyleSheet(
-            "QPushButton { background-color: #FF9800; color: white; font-weight: bold; font-size: 13px; }"
-            "QPushButton:hover { background-color: #F57C00; }"
-            "QPushButton:disabled { background-color: #cccccc; color: #666666; }"
+            "QPushButton { "
+            "  background-color: #2196F3; color: white; font-weight: bold; font-size: 13px; "
+            "  border-radius: 5px; border: 1px solid #1976D2; border-bottom: 3px solid #1565C0; "
+            "}"
+            "QPushButton:hover { background-color: #1E88E5; border-bottom: 3px solid #0D47A1; }"
+            "QPushButton:pressed { background-color: #1976D2; border-bottom: 1px solid #1565C0; }"
+            "QPushButton:disabled { background-color: #BDBDBD; color: #666666; border: 1px solid #9E9E9E; border-bottom: 3px solid #757575; }"
         )
         self.update_selection_btn.clicked.connect(self._show_selection_page)
         self.update_selection_btn.setVisible(False)
@@ -463,6 +502,11 @@ class PullConfigWidget(QWidget):
             self.cancel_btn.setVisible(False)
         self.progress_bar.setValue(0)
 
+    def _on_load_file_requested(self):
+        """Handle request to load config from file."""
+        # Emit signal to be handled by parent workflow
+        self.load_file_requested.emit()
+    
     def _on_connection_changed(self, api_client, tenant_name: str):
         """Handle connection state changes."""
         self.api_client = api_client
@@ -524,14 +568,8 @@ class PullConfigWidget(QWidget):
                     snippet_name = snippet.get('name', '')
                     snippet_type = snippet.get('type', '')
                     
-                    # Filter out predefined/readonly snippets
+                    # Filter out predefined/readonly snippets by type field only
                     if snippet_type in ('predefined', 'readonly'):
-                        continue
-                    
-                    # Filter out known system snippet patterns
-                    if snippet_name.startswith('predefined-') or snippet_name.endswith('-default'):
-                        continue
-                    if 'Default' in snippet_name and 'Snippet' in snippet_name:
                         continue
                     
                     snippets.append({

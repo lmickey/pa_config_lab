@@ -606,13 +606,11 @@ class SelectivePushWorker(QThread):
     def run(self):
         """Run the selective push operation."""
         try:
-            from prisma.push.selective_push_orchestrator import SelectivePushOrchestrator
+            # Use the new V2 orchestrator
+            from prisma.push.push_orchestrator_v2 import PushOrchestratorV2
 
             # Create orchestrator
-            orchestrator = SelectivePushOrchestrator(
-                self.api_client,
-                self.conflict_resolution
-            )
+            orchestrator = PushOrchestratorV2(self.api_client)
 
             # Set progress callback with error handling
             def progress_callback(message: str, current: int, total: int):

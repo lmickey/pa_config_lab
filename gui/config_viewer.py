@@ -29,12 +29,23 @@ from gui.config_tree_builder import ConfigTreeBuilder
 
 class ConfigViewerWidget(QWidget):
     """Widget for viewing and browsing configuration data."""
+    
+    # Signals for external button handling
+    save_requested = pyqtSignal()
+    select_requested = pyqtSignal()
 
-    def __init__(self, parent=None):
-        """Initialize the config viewer widget."""
+    def __init__(self, parent=None, show_action_buttons=True):
+        """
+        Initialize the config viewer widget.
+        
+        Args:
+            parent: Parent widget
+            show_action_buttons: Whether to show Save/Select buttons (default True)
+        """
         super().__init__(parent)
 
         self.current_config = None
+        self._show_action_buttons = show_action_buttons
 
         self._init_ui()
 
@@ -42,24 +53,67 @@ class ConfigViewerWidget(QWidget):
         """Initialize the user interface."""
         layout = QVBoxLayout(self)
 
-        # Title
+        # Title row with action buttons
+        title_row = QHBoxLayout()
+        
         title = QLabel("<h2>Configuration Viewer</h2>")
-        layout.addWidget(title)
-
-        # Info bar
-        info_layout = QHBoxLayout()
-
+        title_row.addWidget(title)
+        
+        # Info label (moved to title row)
         self.info_label = QLabel("No configuration loaded")
-        self.info_label.setStyleSheet("color: gray;")
-        info_layout.addWidget(self.info_label)
+        self.info_label.setStyleSheet("color: gray; margin-left: 20px;")
+        title_row.addWidget(self.info_label)
 
-        info_layout.addStretch()
-
+        title_row.addStretch()
+        
+        # Stats label
         self.stats_label = QLabel("")
-        self.stats_label.setStyleSheet("color: gray; font-size: 11px;")
-        info_layout.addWidget(self.stats_label)
+        self.stats_label.setStyleSheet("color: gray; font-size: 11px; margin-right: 10px;")
+        title_row.addWidget(self.stats_label)
+        
+        # Action buttons (right side of title)
+        if self._show_action_buttons:
+            self.save_btn = QPushButton("💾 Save Config")
+            self.save_btn.setStyleSheet(
+                "QPushButton { "
+                "  background-color: #FF9800; color: white; padding: 8px 16px; "
+                "  font-weight: bold; border-radius: 5px; "
+                "  border: 1px solid #F57C00; "
+                "  border-bottom: 3px solid #E65100; "
+                "}"
+                "QPushButton:hover { "
+                "  background-color: #FB8C00; "
+                "  border-bottom: 3px solid #BF360C; "
+                "}"
+                "QPushButton:pressed { "
+                "  background-color: #F57C00; "
+                "  border-bottom: 1px solid #E65100; "
+                "}"
+            )
+            self.save_btn.clicked.connect(lambda: self.save_requested.emit())
+            title_row.addWidget(self.save_btn)
+            
+            self.select_btn = QPushButton("➡️ Select to Push")
+            self.select_btn.setStyleSheet(
+                "QPushButton { "
+                "  background-color: #4CAF50; color: white; padding: 8px 16px; "
+                "  font-weight: bold; border-radius: 5px; "
+                "  border: 1px solid #388E3C; "
+                "  border-bottom: 3px solid #2E7D32; "
+                "}"
+                "QPushButton:hover { "
+                "  background-color: #45a049; "
+                "  border-bottom: 3px solid #1B5E20; "
+                "}"
+                "QPushButton:pressed { "
+                "  background-color: #388E3C; "
+                "  border-bottom: 1px solid #2E7D32; "
+                "}"
+            )
+            self.select_btn.clicked.connect(lambda: self.select_requested.emit())
+            title_row.addWidget(self.select_btn)
 
-        layout.addLayout(info_layout)
+        layout.addLayout(title_row)
 
         # Search and filter
         search_layout = QHBoxLayout()
@@ -92,6 +146,16 @@ class ConfigViewerWidget(QWidget):
         search_layout.addWidget(self.filter_combo)
 
         clear_btn = QPushButton("Clear")
+        clear_btn.setFixedWidth(60)
+        clear_btn.setStyleSheet(
+            "QPushButton { "
+            "  background-color: #757575; color: white; padding: 4px 8px; "
+            "  font-size: 11px; border-radius: 3px; "
+            "  border: 1px solid #616161; border-bottom: 2px solid #424242; "
+            "}"
+            "QPushButton:hover { background-color: #616161; border-bottom: 2px solid #212121; }"
+            "QPushButton:pressed { background-color: #616161; border-bottom: 1px solid #424242; }"
+        )
         clear_btn.clicked.connect(self._clear_search)
         search_layout.addWidget(clear_btn)
 

@@ -78,8 +78,12 @@ class DependencyConfirmationDialog(QDialog):
         ok_button = button_box.button(QDialogButtonBox.StandardButton.Ok)
         ok_button.setText("✓ Add Dependencies")
         ok_button.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; padding: 8px 16px; font-weight: bold; }"
-            "QPushButton:hover { background-color: #45a049; }"
+            "QPushButton { "
+            "  background-color: #4CAF50; color: white; padding: 8px 16px; font-weight: bold; "
+            "  border-radius: 5px; border: 1px solid #388E3C; border-bottom: 3px solid #2E7D32; "
+            "}"
+            "QPushButton:hover { background-color: #45a049; border-bottom: 3px solid #1B5E20; }"
+            "QPushButton:pressed { background-color: #388E3C; border-bottom: 1px solid #2E7D32; }"
         )
         
         cancel_button = button_box.button(QDialogButtonBox.StandardButton.Cancel)

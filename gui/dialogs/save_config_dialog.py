@@ -22,8 +22,9 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QMessageBox,
     QProgressBar,
+    QCheckBox,
 )
-from PyQt6.QtCore import QSettings, Qt
+from PyQt6.QtCore import QSettings, Qt, pyqtSignal
 
 from config.utils.encryption import (
     PasswordValidator,
@@ -39,6 +40,9 @@ logger = logging.getLogger(__name__)
 
 class SaveConfigDialog(QDialog):
     """Dialog for saving configuration with encryption."""
+    
+    # Signal emitted when save is successful (filename, display_name)
+    save_success = pyqtSignal(str, str)
     
     SAVED_FOLDER = "saved"
     
@@ -367,13 +371,8 @@ class SaveConfigDialog(QDialog):
             # Add to recent configurations
             self._add_to_recent(file_path, name)
             
-            QMessageBox.information(
-                self,
-                "Configuration Saved",
-                f"Configuration saved successfully!\n\n"
-                f"Name: {name}\n"
-                f"File: {filename}"
-            )
+            # Emit success signal for toast notification (no dialog popup)
+            self.save_success.emit(filename, name)
             
             self.accept()
             

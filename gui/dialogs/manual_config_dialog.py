@@ -87,8 +87,12 @@ class ManualConfigDialog(QDialog):
 
         save_btn = QPushButton("Save Configuration")
         save_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; padding: 8px 15px; }"
-            "QPushButton:hover { background-color: #45a049; }"
+            "QPushButton { "
+            "  background-color: #4CAF50; color: white; padding: 8px 15px; "
+            "  border-radius: 5px; border: 1px solid #388E3C; border-bottom: 3px solid #2E7D32; "
+            "}"
+            "QPushButton:hover { background-color: #45a049; border-bottom: 3px solid #1B5E20; }"
+            "QPushButton:pressed { background-color: #388E3C; border-bottom: 1px solid #2E7D32; }"
         )
         save_btn.clicked.connect(self._validate_and_accept)
         button_layout.addWidget(save_btn)
