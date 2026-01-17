@@ -19,6 +19,77 @@ SASE_BASE_URL = "https://api.sase.paloaltonetworks.com/sse/config/v1"
 AUTH_URL = "https://auth.apps.paloaltonetworks.com/oauth2/access_token"
 
 
+# Folder restrictions for API endpoints
+# Some endpoints don't support certain folders (will return 400 errors)
+# Format: endpoint_type -> list of EXCLUDED folders (folders that DON'T work)
+FOLDER_EXCLUSIONS = {
+    # These endpoints explicitly exclude "Service Connections" folder
+    'http_header_profile': ['Service Connections'],
+    'profile_group': ['Service Connections'],
+    'security_rule': ['Service Connections'],
+    'decryption_rule': ['Service Connections'],
+    'authentication_rule': ['Service Connections'],
+
+    # QoS-related items are ONLY allowed in specific folders
+    # (handled via FOLDER_ONLY restrictions below)
+}
+
+# Folder-only restrictions - endpoints that ONLY work in specific folders
+# Format: endpoint_type -> list of ALLOWED folders (only these work)
+FOLDER_ONLY = {
+    'qos_profile': ['Remote Networks', 'Service Connections'],
+    'qos_policy_rule': ['Remote Networks', 'Service Connections'],
+    'ike_crypto_profile': ['Remote Networks', 'Service Connections'],
+    'ipsec_crypto_profile': ['Remote Networks', 'Service Connections'],
+    'ike_gateway': ['Remote Networks', 'Service Connections'],
+    'ipsec_tunnel': ['Remote Networks', 'Service Connections'],
+    'agent_profile': ['Mobile Users'],
+}
+
+# Snippet restrictions - endpoints that don't support snippets at all
+# These will return 400 errors if queried with a snippet parameter
+SNIPPET_EXCLUSIONS = [
+    # Currently no known exclusions - all tested endpoints support snippets
+]
+
+
+def is_folder_allowed(item_type: str, folder: str) -> bool:
+    """
+    Check if a folder is allowed for a given item type.
+
+    Args:
+        item_type: The type of item (e.g., 'security_rule', 'qos_profile')
+        folder: The folder name to check
+
+    Returns:
+        True if the folder is allowed, False otherwise
+    """
+    # Check exclusions first
+    if item_type in FOLDER_EXCLUSIONS:
+        if folder in FOLDER_EXCLUSIONS[item_type]:
+            return False
+
+    # Check folder-only restrictions
+    if item_type in FOLDER_ONLY:
+        if folder not in FOLDER_ONLY[item_type]:
+            return False
+
+    return True
+
+
+def is_snippet_allowed(item_type: str) -> bool:
+    """
+    Check if snippets are supported for a given item type.
+
+    Args:
+        item_type: The type of item (e.g., 'http_header_profile')
+
+    Returns:
+        True if snippets are supported, False otherwise
+    """
+    return item_type not in SNIPPET_EXCLUSIONS
+
+
 class APIEndpoints:
     """Centralized API endpoint definitions."""
 
@@ -139,6 +210,14 @@ class APIEndpoints:
         """Get endpoint for specific external dynamic list."""
         return f"{APIEndpoints.EXTERNAL_DYNAMIC_LISTS}/{list_id}"
 
+    # Objects - Schedules (SASE API)
+    SCHEDULES = f"{SASE_BASE_URL}/schedules"
+
+    @staticmethod
+    def schedule(schedule_id: str) -> str:
+        """Get endpoint for specific schedule."""
+        return f"{APIEndpoints.SCHEDULES}/{schedule_id}"
+
     # Objects - FQDN (SASE API)
     FQDN = f"{SASE_BASE_URL}/fqdn"
 
@@ -154,6 +233,60 @@ class APIEndpoints:
     def authentication_profile(profile_id: str) -> str:
         """Get endpoint for specific authentication profile."""
         return f"{APIEndpoints.AUTHENTICATION_PROFILES}/{profile_id}"
+    
+    # Rules - Authentication Rules (SASE API)
+    AUTHENTICATION_RULES = f"{SASE_BASE_URL}/authentication-rules"
+    
+    @staticmethod
+    def authentication_rule(rule_id: str) -> str:
+        """Get endpoint for specific authentication rule."""
+        return f"{APIEndpoints.AUTHENTICATION_RULES}/{rule_id}"
+    
+    # Rules - Decryption Rules (SASE API)
+    DECRYPTION_RULES = f"{SASE_BASE_URL}/decryption-rules"
+
+    @staticmethod
+    def decryption_rule(rule_id: str) -> str:
+        """Get endpoint for specific decryption rule."""
+        return f"{APIEndpoints.DECRYPTION_RULES}/{rule_id}"
+
+    # Rules - QoS Policy Rules (SASE API)
+    QOS_POLICY_RULES = f"{SASE_BASE_URL}/qos-policy-rules"
+
+    @staticmethod
+    def qos_policy_rule(rule_id: str) -> str:
+        """Get endpoint for specific QoS policy rule."""
+        return f"{APIEndpoints.QOS_POLICY_RULES}/{rule_id}"
+
+    # Objects - Tags (SASE API)
+    TAGS = f"{SASE_BASE_URL}/tags"
+
+    @staticmethod
+    def tag(tag_id: str) -> str:
+        """Get endpoint for specific tag."""
+        return f"{APIEndpoints.TAGS}/{tag_id}"
+
+    # Objects - Regions (Address Regions) (SASE API)
+    REGIONS = f"{SASE_BASE_URL}/regions"
+
+    @staticmethod
+    def region(region_id: str) -> str:
+        """Get endpoint for specific region."""
+        return f"{APIEndpoints.REGIONS}/{region_id}"
+
+    # Local Users and Groups (SASE API)
+    LOCAL_USERS = f"{SASE_BASE_URL}/local-users"
+    LOCAL_USER_GROUPS = f"{SASE_BASE_URL}/local-user-groups"
+
+    @staticmethod
+    def local_user(user_id: str) -> str:
+        """Get endpoint for specific local user."""
+        return f"{APIEndpoints.LOCAL_USERS}/{user_id}"
+
+    @staticmethod
+    def local_user_group(group_id: str) -> str:
+        """Get endpoint for specific local user group."""
+        return f"{APIEndpoints.LOCAL_USER_GROUPS}/{group_id}"
 
     # Profiles - Security Profiles (SASE API)
     # Note: These endpoints use the format /{profile-type}-profiles (not /security-profiles/{type})
@@ -170,7 +303,18 @@ class APIEndpoints:
 
     # Profiles - Decryption Profiles (SASE API)
     DECRYPTION_PROFILES = f"{SASE_BASE_URL}/decryption-profiles"
-    
+
+    # Profiles - Certificate Profiles (SASE API)
+    CERTIFICATE_PROFILES = f"{SASE_BASE_URL}/certificate-profiles"
+
+    # Profiles - QoS Profiles (SASE API)
+    QOS_PROFILES = f"{SASE_BASE_URL}/qos-profiles"
+
+    @staticmethod
+    def qos_profile(profile_id: str) -> str:
+        """Get endpoint for specific QoS profile."""
+        return f"{APIEndpoints.QOS_PROFILES}/{profile_id}"
+
     # Profiles - Profile Groups (SASE API)
     PROFILE_GROUPS = f"{SASE_BASE_URL}/profile-groups"
 
@@ -282,6 +426,14 @@ class APIEndpoints:
         """Get endpoint for specific HIP profile."""
         return f"{APIEndpoints.HIP_PROFILES}/{profile_id}"
 
+    # Auto Tag Actions (Infrastructure - no folder parameter)
+    AUTO_TAG_ACTIONS = f"{SASE_BASE_URL}/auto-tag-actions"
+
+    @staticmethod
+    def auto_tag_action(action_id: str) -> str:
+        """Get endpoint for specific auto tag action."""
+        return f"{APIEndpoints.AUTO_TAG_ACTIONS}/{action_id}"
+
     # Regions and Bandwidth Allocations (SASE API)
     BANDWIDTH_ALLOCATIONS = f"{SASE_BASE_URL}/bandwidth-allocations"
     LOCATIONS = f"{SASE_BASE_URL}/locations"
@@ -317,6 +469,23 @@ def build_folder_query(folder: str) -> str:
     # Use quote() instead of quote_plus() to get %20 instead of + for spaces
     encoded_folder = quote(folder, safe="")
     return f"?folder={encoded_folder}"
+
+
+def build_snippet_query(snippet: str) -> str:
+    """
+    Build query string for snippet parameter with proper URL encoding.
+
+    Args:
+        snippet: Snippet name (e.g., "Shared Internet" -> "Shared%20Internet")
+
+    Returns:
+        Query string with URL-encoded snippet name (uses %20 for spaces)
+    """
+    from urllib.parse import quote
+
+    # Use quote() instead of quote_plus() to get %20 instead of + for spaces
+    encoded_snippet = quote(snippet, safe="")
+    return f"?snippet={encoded_snippet}"
 
 
 def build_pagination_query(limit: int = 100, offset: int = 0) -> str:

@@ -105,6 +105,7 @@ class WorkflowResult:
     """
     
     success: bool = True
+    cancelled: bool = False  # Whether operation was cancelled by user
     operation: str = ''
     items_processed: int = 0
     items_created: int = 0

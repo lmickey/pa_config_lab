@@ -596,9 +596,76 @@ class Gateway(ConfigItem):
     def _validate_specific(self) -> List[str]:
         """Validate gateway"""
         errors = []
-        
+
         # Must have folder (infrastructure requirement)
         if not self.folder:
             errors.append("Gateway must have folder set")
-        
+
+        return errors
+
+
+class AutoTagAction(ConfigItem):
+    """
+    Represents an auto-tag action.
+
+    API Endpoint: /sse/config/v1/auto-tag-actions
+
+    Auto-tag actions automatically apply tags to traffic based on
+    specified criteria. This is a global infrastructure setting
+    that doesn't require folder or snippet parameters.
+    """
+
+    api_endpoint = "https://api.sase.paloaltonetworks.com/sse/config/v1/auto-tag-actions"
+    item_type = "auto_tag_action"
+
+    def __init__(self, raw_config: Dict[str, Any]):
+        """
+        Initialize auto-tag action.
+
+        Auto-tag actions are global infrastructure settings and may not
+        have folder/snippet - we need to handle this specially.
+        """
+        self.raw_config = raw_config.copy()
+        self.name = raw_config.get('name', '')
+        self.id = raw_config.get('id')
+
+        # Auto-tag actions may not have folder/snippet - set defaults
+        self.folder = raw_config.get('folder', 'Shared')
+        self.snippet = raw_config.get('snippet')
+
+        self.is_default = raw_config.get('is_default', False)
+        self.push_strategy = 'create'
+        self.metadata = raw_config.get('metadata', {})
+        if not self.metadata:
+            self.metadata = self._extract_metadata(raw_config)
+
+        self.deleted = False
+        self.delete_success: Optional[bool] = None
+        self._dependencies_cache: Optional[List[tuple]] = None
+        self._parent_cache = None
+        self._children_cache = None
+
+    @property
+    def actions(self) -> List[Dict[str, Any]]:
+        """Get list of tag actions"""
+        return self.raw_config.get('actions', [])
+
+    @property
+    def filter(self) -> Optional[str]:
+        """Get filter expression"""
+        return self.raw_config.get('filter')
+
+    @property
+    def log_type(self) -> Optional[str]:
+        """Get log type for auto-tagging"""
+        return self.raw_config.get('log_type')
+
+    @property
+    def quarantine(self) -> bool:
+        """Check if quarantine is enabled"""
+        return self.raw_config.get('quarantine', False)
+
+    def _validate_specific(self) -> List[str]:
+        """Validate auto-tag action"""
+        errors = []
         return errors

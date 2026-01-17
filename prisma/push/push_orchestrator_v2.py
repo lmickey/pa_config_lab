@@ -28,6 +28,28 @@ class PushStrategy(Enum):
     RENAME = "rename"
 
 
+# Default/system profile names that cannot be modified
+# These are created by Palo Alto and should always be skipped during push
+DEFAULT_PROFILE_NAMES = {
+    'best-practice',
+    'default',
+    'strict',
+    'Strict',
+}
+
+# Profile types that may have default names
+PROFILE_ITEM_TYPES = {
+    'wildfire_profile', 'wildfire_antivirus_profile',
+    'anti_spyware_profile',
+    'vulnerability_profile', 'vulnerability_protection_profile',
+    'url_filtering_profile',
+    'file_blocking_profile',
+    'dns_security_profile',
+    'decryption_profile',
+    'security_profile_group', 'profile_group',
+}
+
+
 class LocationType(Enum):
     """Type of destination location."""
     FOLDER = "folder"
@@ -158,6 +180,7 @@ class PushSummary:
     total: int = 0
     created: int = 0
     updated: int = 0
+    deleted: int = 0
     skipped: int = 0
     failed: int = 0
     renamed: int = 0
@@ -211,10 +234,13 @@ class PushOrchestratorV2:
     """
     
     # Item types and their API method mappings
+    # Includes aliases for different naming conventions from config sources
     OBJECT_TYPES = {
         'address': 'address',
+        'address_object': 'address',  # Alias
         'address_group': 'address_group',
         'service': 'service',
+        'service_object': 'service',  # Alias
         'service_group': 'service_group',
         'application': 'application',
         'application_group': 'application_group',
@@ -222,6 +248,7 @@ class PushOrchestratorV2:
         'external_dynamic_list': 'external_dynamic_list',
         'url_category': 'url_category',
         'tag': 'tag',
+        'schedule': 'schedule',
     }
     
     PROFILE_TYPES = {
@@ -231,13 +258,18 @@ class PushOrchestratorV2:
         'url_filtering_profile': 'url_filtering_profile',
         'file_blocking_profile': 'file_blocking_profile',
         'wildfire_antivirus_profile': 'wildfire_antivirus_profile',
+        'wildfire_profile': 'wildfire_antivirus_profile',  # Alias
         'decryption_profile': 'decryption_profile',
         'dns_security_profile': 'dns_security_profile',
+        'hip_object': 'hip_object',
+        'hip_profile': 'hip_profile',
     }
     
     RULE_TYPES = {
         'security_rule': 'security_rule',
         'rule': 'security_rule',  # Alias
+        'authentication_rule': 'authentication_rule',
+        'decryption_rule': 'decryption_rule',
     }
     
     def __init__(self, api_client):
@@ -280,6 +312,8 @@ class PushOrchestratorV2:
                 self.summary.created += 1
             elif result.action == 'updated':
                 self.summary.updated += 1
+            elif result.action == 'deleted':
+                self.summary.deleted += 1
             elif result.action == 'skipped':
                 self.summary.skipped += 1
             elif result.action == 'renamed':
@@ -288,6 +322,10 @@ class PushOrchestratorV2:
             self.summary.failed += 1
             if result.error:
                 self.summary.errors.append(f"{result.item_type}/{result.item_name}: {result.error}")
+    
+    def _is_default_profile(self, item: 'PushItem') -> bool:
+        """Check if an item is a default/system profile that should be skipped."""
+        return item.item_type in PROFILE_ITEM_TYPES and item.name in DEFAULT_PROFILE_NAMES
     
     # =========================================================================
     # MAIN ENTRY POINT
@@ -301,6 +339,10 @@ class PushOrchestratorV2:
         """
         Push selected configuration items to destination tenant.
         
+        Uses a two-phase approach for OVERWRITE strategy:
+        1. PHASE 1 (DELETE): Delete existing items in reverse dependency order (parents first)
+        2. PHASE 2 (CREATE): Create items in dependency order (children first)
+        
         Args:
             selected_items: Dictionary from selection list with folders, snippets, infrastructure
             destination_config: Optional destination config for conflict detection
@@ -311,6 +353,8 @@ class PushOrchestratorV2:
         self.summary = PushSummary(start_time=datetime.now())
         self._created_snippets = set()
         self._name_mappings = {}
+        self._failed_deletes: Set[str] = set()  # Track failed delete item keys
+        self._skipped_due_to_dependency: Set[str] = set()  # Track items skipped due to dep failure
         
         logger.info("=" * 80)
         logger.info("PUSH ORCHESTRATOR V2 - STARTING PUSH OPERATION")
@@ -346,14 +390,123 @@ class PushOrchestratorV2:
                     if items_to_skip > 0:
                         logger.warning(f"[Push] {items_to_skip} item(s) will be skipped due to failed snippet creation")
             
-            # Step 3: Sort items by dependency order
-            # For now, simple ordering: objects -> profiles -> rules
+            # Step 3: Identify items that need OVERWRITE (delete + create)
+            logger.info(f"[Push] Checking {len(items)} items for OVERWRITE strategy...")
+            logger.debug(f"[Push] destination_config keys: {list(destination_config.keys()) if destination_config else 'None'}")
+            if destination_config:
+                logger.debug(f"[Push] snippet_objects keys: {list(destination_config.get('snippet_objects', {}).keys())}")
+                logger.debug(f"[Push] objects keys: {list(destination_config.get('objects', {}).keys())}")
+            
+            overwrite_items = []
+            skipped_default_profiles = []
+            for item in items:
+                # Skip default profiles entirely - remove from push
+                if self._is_default_profile(item):
+                    skipped_default_profiles.append(item)
+                    logger.info(f"[Push] Skipping default profile: {item.item_type}/{item.name}")
+                    continue
+                
+                is_overwrite = item.destination.strategy == PushStrategy.OVERWRITE
+                exists = self._item_exists_in_dest(item, destination_config) if is_overwrite else False
+                logger.info(f"[Push] Item {item.item_type}/{item.name}: strategy={item.destination.strategy}, "
+                           f"location_type={item.destination.location_type}, location={item.destination.location_name}, "
+                           f"is_overwrite={is_overwrite}, exists={exists}")
+                if is_overwrite and exists:
+                    overwrite_items.append(item)
+            
+            # Record skipped default profiles
+            for item in skipped_default_profiles:
+                self._add_result(PushResult(
+                    item_name=item.name,
+                    item_type=item.item_type,
+                    destination=item.destination.location_name,
+                    action='skipped',
+                    success=True,
+                    message='Default/system profile - cannot be modified'
+                ))
+            
+            logger.info(f"[Push] Found {len(overwrite_items)} items requiring DELETE before CREATE")
+            
+            # Step 4: PHASE 1 - DELETE existing items (reverse dependency order: parents/groups first)
+            if overwrite_items:
+                logger.info(f"[Push] Phase 1: Deleting {len(overwrite_items)} existing items for OVERWRITE")
+                self._report_progress(f"Phase 1: Deleting {len(overwrite_items)} existing items...", 0, total_items)
+                
+                # Sort for delete: reverse dependency order (delete parents/groups first, then children)
+                delete_order = self._sort_for_delete(overwrite_items)
+                
+                for idx, item in enumerate(delete_order):
+                    item_key = f"{item.item_type}:{item.name}"
+                    
+                    # Check if this item depends on a failed delete
+                    if self._should_skip_due_to_dep_failure(item):
+                        self._skipped_due_to_dependency.add(item_key)
+                        self._report_progress(
+                            f"  ⊘ Skipping delete: {item.name} (dependency delete failed)",
+                            idx + 1,
+                            len(delete_order)
+                        )
+                        continue
+                    
+                    self._report_progress(
+                        f"  Deleting {item.item_type}: {item.name}...",
+                        idx + 1,
+                        len(delete_order)
+                    )
+                    
+                    success = self._delete_item_for_overwrite(item, destination_config)
+                    
+                    if success:
+                        self._report_progress(
+                            f"  ✓ Deleted: {item.name}",
+                            idx + 1,
+                            len(delete_order)
+                        )
+                        # Record successful delete
+                        self._add_result(PushResult(
+                            item_name=item.name,
+                            item_type=item.item_type,
+                            destination=self._get_item_destination(item),
+                            action='deleted',
+                            success=True,
+                            message=f"Deleted for overwrite"
+                        ))
+                    else:
+                        self._failed_deletes.add(item_key)
+                        self._report_progress(
+                            f"  ⚠️ Delete failed: {item.name}",
+                            idx + 1,
+                            len(delete_order)
+                        )
+                        # Record as failure
+                        self._add_result(PushResult(
+                            item_name=item.name,
+                            item_type=item.item_type,
+                            destination=self._get_item_destination(item),
+                            action='failed',
+                            success=False,
+                            message=f"Could not delete existing {item.item_type} for overwrite",
+                            error="Delete failed"
+                        ))
+                
+                if self._failed_deletes:
+                    logger.warning(f"[Push] {len(self._failed_deletes)} items failed to delete")
+            
+            # Step 5: Sort items for CREATE (dependency order: children/primitives first)
             sorted_items = self._sort_by_dependencies(items)
             
-            # Step 4: Push each item
+            # Step 6: PHASE 2 - CREATE items
+            phase2_label = "Phase 2: " if overwrite_items else ""
+            logger.info(f"[Push] {phase2_label}Creating {len(sorted_items)} items")
+            
             current = 0
             for item in sorted_items:
                 current += 1
+                item_key = f"{item.item_type}:{item.name}"
+                
+                # Skip default profiles - already recorded in Step 3
+                if self._is_default_profile(item):
+                    continue
                 
                 # Check if this item targets a failed snippet - skip it
                 if failed_snippets and item.destination.location_type == LocationType.NEW_SNIPPET:
@@ -377,8 +530,38 @@ class PushOrchestratorV2:
                         self.summary.total += 1
                         continue
                 
+                # Check if this item's delete failed - skip create
+                if item_key in self._failed_deletes:
+                    self._report_progress(
+                        f"  ⊘ Skipped create: {item.name} (delete failed, cannot recreate)",
+                        current,
+                        total_items
+                    )
+                    # Don't add result - already added during delete failure
+                    # Just increment skip counter
+                    self.summary.skipped += 1
+                    self.summary.total += 1
+                    continue
+                
+                # Check if this item should be skipped due to dependency failure
+                if item_key in self._skipped_due_to_dependency or self._should_skip_due_to_dep_failure(item):
+                    self._report_progress(
+                        f"  ⊘ Skipping: {item.name} (dependency delete failed)",
+                        current,
+                        total_items
+                    )
+                    self._add_result(PushResult(
+                        item_name=item.name,
+                        item_type=item.item_type,
+                        destination=self._get_item_destination(item),
+                        action='skipped',
+                        success=True,
+                        message="Skipped due to dependency failure"
+                    ))
+                    continue
+                
                 self._report_progress(
-                    f"Pushing {item.item_type}: {item.name}...",
+                    f"{phase2_label}Pushing {item.item_type}: {item.name}...",
                     current,
                     total_items
                 )
@@ -566,22 +749,31 @@ class PushOrchestratorV2:
         logger.debug(f"  Source: folder={folder}, snippet={snippet}")
         logger.debug(f"  _destination: {dest_data}")
         
-        # Check if we have destination data with actual settings
-        # 'is_inherited' means user selected "Inherit from Parent" in dropdown
-        has_explicit_dest = dest_data and (
-            dest_data.get('is_new_snippet') or 
+        # Check if we have destination data with explicit location settings
+        # 'is_inherited' means user selected "Inherit from Parent" in dropdown for LOCATION
+        # But they may still have set a different STRATEGY (skip, overwrite, rename)
+        has_explicit_location = dest_data and (
+            dest_data.get('is_new_snippet') or
             dest_data.get('is_rename_snippet') or
-            not dest_data.get('is_inherited', True)  # Not inherited = explicit
+            dest_data.get('is_existing_snippet') or
+            (dest_data.get('folder') and not dest_data.get('is_inherited', True))
         )
-        
-        if not dest_data or not has_explicit_dest:
-            # Use original location (inherit behavior)
+
+        # Get the strategy from destination data, falling back to default
+        item_strategy_str = dest_data.get('strategy', default_strategy) if dest_data else default_strategy
+        try:
+            item_strategy = PushStrategy(item_strategy_str.lower() if item_strategy_str else default_strategy)
+        except ValueError:
+            item_strategy = PushStrategy(default_strategy)
+
+        if not dest_data or not has_explicit_location:
+            # Use original location (inherit behavior) but honor the item's strategy
             dest = PushDestination(
                 location_type=LocationType.SNIPPET if snippet else LocationType.FOLDER,
                 location_name=snippet or folder or 'Shared',
-                strategy=PushStrategy(default_strategy),
+                strategy=item_strategy,
             )
-            logger.debug(f"  -> Using original location: {dest.location_name}")
+            logger.debug(f"  -> Using original location: {dest.location_name}, strategy: {item_strategy.value}")
         else:
             # Parse explicit destination from UI settings
             dest = PushDestination.from_dict(dest_data)
@@ -721,24 +913,34 @@ class PushOrchestratorV2:
         
         Detailed ordering:
         1. Tags (can be referenced by many objects)
-        2. Base objects (addresses, services)
-        3. Object groups (address_groups, service_groups) - depend on base objects
-        4. Application filters (must exist before app groups that reference them)
-        5. Application groups (depend on application_filters)
-        6. Other objects (external_dynamic_list, url_category)
-        7. Profiles
-        8. Infrastructure
-        9. Rules (depend on objects and profiles)
+        2. Schedules (can be referenced by rules)
+        3. Base objects (addresses, services)
+        4. Object groups (address_groups, service_groups) - depend on base objects
+        5. Application filters (must exist before app groups that reference them)
+        6. Application groups (depend on application_filters)
+        7. Other objects (external_dynamic_list, url_category)
+        8. HIP objects (must exist before HIP profiles)
+        9. HIP profiles (depend on HIP objects)
+        10. Security profiles (anti-spyware, vulnerability, wildfire, etc.)
+        11. Security profile groups (depend on individual profiles)
+        12. Infrastructure
+        13. Rules (depend on objects and profiles) - security rules last
         """
         tags = []
+        schedules = []
         base_objects = []  # addresses, services
         object_groups = []  # address_groups, service_groups
         app_filters = []  # application_filter - must be before app_groups
         app_groups = []  # application_group - depends on app_filters
         other_objects = []  # EDLs, url_category, etc.
-        profiles = []
-        rules = []
+        hip_objects = []  # HIP objects before HIP profiles
+        hip_profiles = []  # HIP profiles depend on HIP objects
+        security_profiles = []  # Individual security profiles
+        profile_groups = []  # Security profile groups depend on individual profiles
         infrastructure = []
+        auth_rules = []  # Authentication rules
+        decryption_rules = []  # Decryption rules
+        security_rules = []  # Security rules last (depend on most things)
         other = []
         
         for item in items:
@@ -746,7 +948,9 @@ class PushOrchestratorV2:
             
             if item_type == 'tag':
                 tags.append(item)
-            elif item_type in ('address', 'service'):
+            elif item_type == 'schedule':
+                schedules.append(item)
+            elif item_type in ('address', 'address_object', 'service', 'service_object'):
                 base_objects.append(item)
             elif item_type in ('address_group', 'service_group'):
                 object_groups.append(item)
@@ -754,12 +958,22 @@ class PushOrchestratorV2:
                 app_filters.append(item)
             elif item_type == 'application_group':
                 app_groups.append(item)
+            elif item_type == 'hip_object':
+                hip_objects.append(item)
+            elif item_type == 'hip_profile':
+                hip_profiles.append(item)
+            elif item_type in ('security_profile_group', 'profile_group'):
+                profile_groups.append(item)
+            elif item_type in self.PROFILE_TYPES:
+                security_profiles.append(item)
+            elif item_type in ('security_rule', 'rule'):
+                security_rules.append(item)
+            elif item_type == 'authentication_rule':
+                auth_rules.append(item)
+            elif item_type == 'decryption_rule':
+                decryption_rules.append(item)
             elif item_type in self.OBJECT_TYPES:
                 other_objects.append(item)
-            elif item_type in self.PROFILE_TYPES:
-                profiles.append(item)
-            elif item_type in self.RULE_TYPES:
-                rules.append(item)
             elif item_type in ('remote_network', 'service_connection', 'ipsec_tunnel',
                                 'ike_gateway', 'ike_crypto_profile', 'ipsec_crypto_profile'):
                 infrastructure.append(item)
@@ -767,9 +981,12 @@ class PushOrchestratorV2:
                 other.append(item)
         
         # Return in dependency order
-        # Tags -> Base Objects -> Object Groups -> App Filters -> App Groups -> Other Objects -> Profiles -> Infra -> Rules
-        return (tags + base_objects + object_groups + app_filters + app_groups + 
-                other_objects + profiles + infrastructure + rules + other)
+        # Tags -> Schedules -> Base Objects -> Object Groups -> App Filters -> App Groups -> 
+        # Other Objects -> HIP Objects -> HIP Profiles -> Security Profiles -> Profile Groups ->
+        # Infra -> Auth Rules -> Decryption Rules -> Security Rules -> Other
+        return (tags + schedules + base_objects + object_groups + app_filters + app_groups + 
+                other_objects + hip_objects + hip_profiles + security_profiles + profile_groups +
+                infrastructure + auth_rules + decryption_rules + security_rules + other)
     
     # =========================================================================
     # ITEM PUSHING
@@ -796,8 +1013,28 @@ class PushOrchestratorV2:
         
         logger.debug(f"Pushing {item.item_type}/{item.name} to {'snippet' if is_snippet else 'folder'}: {dest_location}")
         
+        # Skip default/system profiles - they cannot be modified
+        if item.item_type in PROFILE_ITEM_TYPES and item.name in DEFAULT_PROFILE_NAMES:
+            logger.info(f"Skipping default profile: {item.item_type}/{item.name}")
+            self._add_result(PushResult(
+                item_name=item.name,
+                item_type=item.item_type,
+                destination=dest_location,
+                action='skipped',
+                success=True,
+                message='Default/system profile - cannot be modified'
+            ))
+            return
+        
         # Check if item exists (for conflict resolution)
-        exists = self._item_exists(item, dest_location, is_snippet, destination_config)
+        # IMPORTANT: For NEW snippets, items CANNOT exist (the snippet doesn't exist yet)
+        # This is especially important for security rules which have global name uniqueness
+        # We warn about global conflicts during validation, but allow the push to proceed
+        if dest.location_type == LocationType.NEW_SNIPPET:
+            logger.debug(f"_item_exists: {item.item_type}/{item.name} -> NEW SNIPPET '{dest_location}', skipping existence check")
+            exists = False
+        else:
+            exists = self._item_exists(item, dest_location, is_snippet, destination_config)
         
         # Apply conflict resolution
         if exists:
@@ -820,19 +1057,11 @@ class PushOrchestratorV2:
                 logger.info(f"Renaming {item.name} -> {new_name}")
             
             elif dest.strategy == PushStrategy.OVERWRITE:
-                # Delete existing item first
-                deleted = self._delete_existing_item(item, dest_location, is_snippet, destination_config)
-                if not deleted:
-                    self._add_result(PushResult(
-                        item_name=item.name,
-                        item_type=item.item_type,
-                        destination=dest_location,
-                        action='failed',
-                        success=False,
-                        message='Could not delete existing item for overwrite',
-                        error='Delete failed'
-                    ))
-                    return
+                # In Phase 2, delete was already done in Phase 1
+                # If delete succeeded, item no longer exists - proceed to create
+                # If delete failed, this item would have been skipped before reaching here
+                # So we can proceed directly to create
+                pass
         
         # Create the item
         try:
@@ -879,9 +1108,68 @@ class PushOrchestratorV2:
         is_snippet: bool,
         destination_config: Optional[Dict[str, Any]]
     ) -> bool:
-        """Check if an item exists in the destination."""
-        # For now, rely on API errors for conflict detection
-        # TODO: Implement proper existence checking using destination_config
+        """Check if an item exists in the destination.
+
+        For snippet destinations, only checks if the item exists in that specific snippet.
+        For folder destinations, checks global objects.
+        Security rules are handled specially based on destination type.
+        """
+        if not destination_config:
+            logger.debug(f"_item_exists: No destination_config for {item.item_type}/{item.name}")
+            return False
+
+        item_type = item.item_type
+        item_name = item.name
+
+        # SECURITY RULES - check based on destination type
+        # Snippets are isolated until associated with a folder
+        if item_type in ('security_rule', 'rule'):
+            all_rule_names = destination_config.get('all_rule_names', {})
+
+            if is_snippet:
+                # For snippet destination, only check if rule exists in THIS specific snippet
+                rule_info = all_rule_names.get(item_name, {})
+                if isinstance(rule_info, dict):
+                    exists = rule_info.get('snippet') == location
+                else:
+                    exists = False
+                logger.debug(f"_item_exists: Checking snippet '{location}' for {item_type}/{item_name}: {exists}")
+            else:
+                # For folder destination, check if rule exists in any folder
+                exists = item_name in all_rule_names
+                logger.debug(f"_item_exists: Checking all_rule_names for {item_type}/{item_name}: {exists} (total rules: {len(all_rule_names)})")
+            return exists
+
+        # For snippet destinations, ONLY check snippet_objects for that specific snippet
+        # Do NOT check global objects - items in folders don't prevent creation in snippets
+        if is_snippet:
+            snippet_objects = destination_config.get('snippet_objects', {}).get(location, {})
+            type_objects = snippet_objects.get(item_type, {})
+            exists = item_name in type_objects
+            logger.debug(f"_item_exists: Checking snippet '{location}' for {item_type}/{item_name}: {exists}")
+            # Also check plural forms for snippet
+            if not exists:
+                plural_type = f"{item_type}s" if not item_type.endswith('s') else item_type
+                type_objects_plural = snippet_objects.get(plural_type, {})
+                exists = item_name in type_objects_plural
+                if exists:
+                    logger.debug(f"_item_exists: Found {item_type}/{item_name} in snippet plural key '{plural_type}'")
+            return exists
+
+        # For folder destinations, check global objects
+        objects = destination_config.get('objects', {}).get(item_type, {})
+        exists = item_name in objects
+        logger.debug(f"_item_exists: Checking global objects for {item_type}/{item_name}: {exists}")
+        if exists:
+            return True
+
+        # Also check plural forms (e.g., 'application_filters' vs 'application_filter')
+        plural_type = f"{item_type}s" if not item_type.endswith('s') else item_type
+        objects_plural = destination_config.get('objects', {}).get(plural_type, {})
+        if item_name in objects_plural:
+            logger.debug(f"_item_exists: Found {item_type}/{item_name} in plural key '{plural_type}'")
+            return True
+
         return False
     
     def _delete_existing_item(
@@ -891,11 +1179,321 @@ class PushOrchestratorV2:
         is_snippet: bool,
         destination_config: Optional[Dict[str, Any]]
     ) -> bool:
-        """Delete an existing item for OVERWRITE mode."""
-        # TODO: Implement delete logic
-        # For Phase 1, we'll skip overwrite and just let creates fail
-        logger.warning(f"Delete not implemented for {item.item_type}/{item.name}")
+        """Delete an existing item for OVERWRITE mode (legacy - use _delete_item_for_overwrite)."""
+        return self._delete_item_for_overwrite(item, destination_config)
+    
+    def _item_exists_in_dest(
+        self,
+        item: PushItem,
+        destination_config: Optional[Dict[str, Any]]
+    ) -> bool:
+        """Check if item exists in destination for OVERWRITE detection."""
+        if not destination_config:
+            return False
+        
+        dest = item.destination
+        
+        # Resolve location
+        if dest.location_type == LocationType.NEW_SNIPPET:
+            # New snippets can't have existing items
+            return False
+        elif dest.location_type == LocationType.SNIPPET:
+            location = dest.location_name
+            is_snippet = True
+        else:
+            location = dest.location_name
+            is_snippet = False
+        
+        return self._item_exists(item, location, is_snippet, destination_config)
+    
+    def _get_item_destination(self, item: PushItem) -> str:
+        """Get the destination location string for an item."""
+        dest = item.destination
+        if dest.location_type == LocationType.NEW_SNIPPET:
+            return dest.new_snippet_name or dest.location_name
+        return dest.location_name
+    
+    def _sort_for_delete(self, items: List[PushItem]) -> List[PushItem]:
+        """
+        Sort items for DELETE phase (reverse dependency order).
+        
+        Delete order: Items that REFERENCE others must be deleted FIRST.
+        - Rules reference objects (addresses, services, profiles)
+        - Groups reference their members
+        - Profile groups reference individual profiles
+        
+        So: Rules -> Profile Groups -> Groups -> Profiles -> Base Objects -> Tags
+        """
+        # Define delete priority (higher = delete first)
+        # RULES must be deleted first - they reference everything else
+        delete_priority = {
+            # Rules (delete first - they reference objects)
+            'security_rule': 100,
+            'rule': 100,
+            'authentication_rule': 100,
+            'decryption_rule': 100,
+            
+            # Profile groups (reference individual profiles)
+            'security_profile_group': 90,
+            'profile_group': 90,
+            
+            # Groups (reference their members)
+            'application_group': 80,
+            'address_group': 80,
+            'service_group': 80,
+            
+            # Individual profiles (may be referenced by profile groups and rules)
+            'hip_profile': 70,
+            'wildfire_profile': 70,
+            'wildfire_antivirus_profile': 70,
+            'anti_spyware_profile': 70,
+            'vulnerability_profile': 70,
+            'vulnerability_protection_profile': 70,
+            'url_filtering_profile': 70,
+            'file_blocking_profile': 70,
+            'decryption_profile': 70,
+            'dns_security_profile': 70,
+            
+            # Application filters (may be in groups)
+            'application_filter': 65,
+            
+            # HIP objects (referenced by HIP profiles)
+            'hip_object': 60,
+            
+            # Base objects (referenced by rules and groups)
+            'address': 50,
+            'address_object': 50,
+            'service': 50,
+            'service_object': 50,
+            'schedule': 50,
+            
+            # Tags and categories (may be on any object)
+            'tag': 40,
+            'url_category': 40,
+            'external_dynamic_list': 40,
+        }
+        
+        def get_delete_order(item: PushItem) -> int:
+            return -delete_priority.get(item.item_type, 0)  # Negative for descending
+        
+        return sorted(items, key=get_delete_order)
+    
+    def _should_skip_due_to_dep_failure(self, item: PushItem) -> bool:
+        """
+        Check if an item should be skipped because a dependency failed to delete.
+        
+        For example:
+        - If application_group delete failed, skip its application_filters
+        - If address_group delete failed, skip its addresses
+        """
+        item_type = item.item_type
+        
+        # Check based on item type and its potential parents
+        if item_type == 'application_filter':
+            # Check if any application_group failed (they reference filters)
+            for failed in self._failed_deletes:
+                if failed.startswith('application_group:'):
+                    # Check if this filter is referenced by the failed group
+                    # For now, be conservative and skip all filters if any group failed
+                    return True
+        
+        elif item_type == 'address':
+            # Check if any address_group failed
+            for failed in self._failed_deletes:
+                if failed.startswith('address_group:'):
+                    return True
+        
+        elif item_type == 'service':
+            # Check if any service_group failed
+            for failed in self._failed_deletes:
+                if failed.startswith('service_group:'):
+                    return True
+        
         return False
+    
+    def _delete_item_for_overwrite(
+        self,
+        item: PushItem,
+        destination_config: Optional[Dict[str, Any]]
+    ) -> bool:
+        """
+        Delete an existing item for OVERWRITE mode.
+        
+        Returns True if delete succeeded, False otherwise.
+        """
+        item_type = item.item_type
+        item_name = item.name
+        
+        # Get item ID from destination config
+        item_id = self._get_item_id_from_dest(item, destination_config)
+        
+        if not item_id:
+            logger.warning(f"Cannot delete {item_type}/{item_name}: ID not found in destination config")
+            return False
+        
+        try:
+            logger.info(f"Deleting {item_type}/{item_name} (ID: {item_id})")
+            
+            # Route to appropriate delete method
+            # Address objects
+            if item_type in ('address', 'address_object'):
+                self.api_client.delete_address(item_id)
+            elif item_type == 'address_group':
+                self.api_client.delete_address_group(item_id)
+            
+            # Service objects
+            elif item_type in ('service', 'service_object'):
+                self.api_client.delete_service(item_id)
+            elif item_type == 'service_group':
+                self.api_client.delete_service_group(item_id)
+            
+            # Application objects
+            elif item_type == 'application_filter':
+                self.api_client.delete_application_filter(item_id)
+            elif item_type == 'application_group':
+                self.api_client.delete_application_group(item_id)
+            
+            # Rules
+            elif item_type in ('security_rule', 'rule'):
+                self.api_client.delete_security_rule(item_id)
+            elif item_type == 'authentication_rule':
+                self.api_client.delete_authentication_rule(item_id)
+            elif item_type == 'decryption_rule':
+                self.api_client.delete_decryption_rule(item_id)
+            
+            # Security profiles
+            elif item_type in ('wildfire_profile', 'wildfire_antivirus_profile'):
+                self.api_client.delete_wildfire_profile(item_id)
+            elif item_type == 'anti_spyware_profile':
+                self.api_client.delete_anti_spyware_profile(item_id)
+            elif item_type in ('vulnerability_profile', 'vulnerability_protection_profile'):
+                self.api_client.delete_vulnerability_profile(item_id)
+            elif item_type == 'url_filtering_profile':
+                self.api_client.delete_url_filtering_profile(item_id)
+            elif item_type == 'file_blocking_profile':
+                self.api_client.delete_file_blocking_profile(item_id)
+            elif item_type == 'dns_security_profile':
+                self.api_client.delete_dns_security_profile(item_id)
+            elif item_type == 'decryption_profile':
+                self.api_client.delete_decryption_profile(item_id)
+            elif item_type in ('security_profile_group', 'profile_group'):
+                self.api_client.delete_profile_group(item_id)
+            
+            # HIP objects
+            elif item_type == 'hip_profile':
+                self.api_client.delete_hip_profile(item_id)
+            elif item_type == 'hip_object':
+                self.api_client.delete_hip_object(item_id)
+            
+            # Schedules
+            elif item_type == 'schedule':
+                self.api_client.delete_schedule(item_id)
+            
+            # Tags
+            elif item_type == 'tag':
+                self.api_client.delete_tag(item_id)
+            
+            # Types that don't support delete - skip gracefully
+            elif item_type == 'url_category':
+                logger.warning(f"Delete not implemented for url_category (system object)")
+                return True  # Treat as success to continue
+            elif item_type == 'external_dynamic_list':
+                self.api_client.delete_external_dynamic_list(item_id)
+            
+            else:
+                logger.warning(f"Delete not implemented for {item_type}")
+                return False
+            
+            logger.info(f"Successfully deleted {item_type}/{item_name}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to delete {item_type}/{item_name}: {e}")
+            return False
+    
+    def _get_item_id_from_dest(
+        self,
+        item: PushItem,
+        destination_config: Optional[Dict[str, Any]]
+    ) -> Optional[str]:
+        """Get item ID from destination config for deletion."""
+        if not destination_config:
+            return None
+        
+        dest = item.destination
+        item_type = item.item_type
+        item_name = item.name
+        
+        # SECURITY RULES are stored differently - check all_rule_names or security_rules
+        if item_type in ('security_rule', 'rule'):
+            # First check all_rule_names (has location info but may not have ID)
+            all_rule_names = destination_config.get('all_rule_names', {})
+            if item_name in all_rule_names:
+                rule_info = all_rule_names[item_name]
+                if isinstance(rule_info, dict) and rule_info.get('id'):
+                    return rule_info.get('id')
+            
+            # Check security_rules dict which has full rule data by folder
+            security_rules = destination_config.get('security_rules', {})
+            for folder_name, folder_rules in security_rules.items():
+                if isinstance(folder_rules, dict) and item_name in folder_rules:
+                    rule_data = folder_rules[item_name]
+                    if isinstance(rule_data, dict) and rule_data.get('id'):
+                        return rule_data.get('id')
+            
+            # Check all_dest_rules which may have full rule data
+            all_dest_rules = destination_config.get('all_dest_rules', {})
+            if item_name in all_dest_rules:
+                rule_data = all_dest_rules[item_name]
+                if isinstance(rule_data, dict) and rule_data.get('id'):
+                    return rule_data.get('id')
+        
+        # AUTHENTICATION RULES and DECRYPTION RULES - may be stored similarly
+        if item_type in ('authentication_rule', 'decryption_rule'):
+            # Check in objects with type key
+            auth_rules = destination_config.get('objects', {}).get(item_type, {})
+            if item_name in auth_rules:
+                obj = auth_rules[item_name]
+                if isinstance(obj, dict):
+                    return obj.get('id')
+        
+        # Check snippet_objects for snippet destinations
+        if dest.location_type == LocationType.SNIPPET:
+            snippet_name = dest.location_name
+            snippet_objects = destination_config.get('snippet_objects', {}).get(snippet_name, {})
+            type_objects = snippet_objects.get(item_type, {})
+            if item_name in type_objects:
+                obj = type_objects[item_name]
+                if isinstance(obj, dict):
+                    return obj.get('id')
+        
+        # Check global objects
+        objects = destination_config.get('objects', {}).get(item_type, {})
+        if item_name in objects:
+            obj = objects[item_name]
+            if isinstance(obj, dict):
+                return obj.get('id')
+        
+        # Also check if we have the full objects list with plural/alias forms
+        all_objects = destination_config.get('objects', {})
+        type_aliases = {
+            'address_object': ['address', 'address_object', 'addresses'],
+            'service_object': ['service', 'service_object', 'services'],
+            'wildfire_profile': ['wildfire_profile', 'wildfire_profiles', 'wildfire_antivirus_profile'],
+            'authentication_rule': ['authentication_rule', 'authentication_rules'],
+            'hip_profile': ['hip_profile', 'hip_profiles'],
+            'hip_object': ['hip_object', 'hip_objects'],
+        }
+        
+        check_keys = type_aliases.get(item_type, [item_type, f"{item_type}s"])
+        for type_key in check_keys:
+            type_objs = all_objects.get(type_key, {})
+            if isinstance(type_objs, dict) and item_name in type_objs:
+                obj = type_objs[item_name]
+                if isinstance(obj, dict):
+                    return obj.get('id')
+        
+        return None
     
     def _create_item(self, item: PushItem, location: str, is_snippet: bool):
         """Create an item using the appropriate API method."""
@@ -903,11 +1501,12 @@ class PushOrchestratorV2:
         data = item.data
         
         # Route to appropriate create method based on item type
-        if item_type == 'address':
+        # Objects
+        if item_type in ('address', 'address_object'):
             self._create_address(data, location, is_snippet)
         elif item_type == 'address_group':
             self._create_address_group(data, location, is_snippet)
-        elif item_type == 'service':
+        elif item_type in ('service', 'service_object'):
             self._create_service(data, location, is_snippet)
         elif item_type == 'service_group':
             self._create_service_group(data, location, is_snippet)
@@ -915,16 +1514,56 @@ class PushOrchestratorV2:
             self._create_application_filter(data, location, is_snippet)
         elif item_type == 'application_group':
             self._create_application_group(data, location, is_snippet)
-        elif item_type in ('security_rule', 'rule'):
-            self._create_security_rule(data, location, is_snippet)
         elif item_type == 'tag':
             self._create_tag(data, location, is_snippet)
         elif item_type == 'url_category':
             self._create_url_category(data, location, is_snippet)
         elif item_type == 'external_dynamic_list':
             self._create_edl(data, location, is_snippet)
+        elif item_type == 'schedule':
+            self._create_schedule(data, location, is_snippet)
+        # HIP
+        elif item_type == 'hip_object':
+            self._create_hip_object(data, location, is_snippet)
+        elif item_type == 'hip_profile':
+            self._create_hip_profile(data, location, is_snippet)
+        # Security Profiles
         elif item_type == 'security_profile_group':
             self._create_profile_group(data, location, is_snippet)
+        elif item_type == 'anti_spyware_profile':
+            self._create_anti_spyware_profile(data, location, is_snippet)
+        elif item_type in ('vulnerability_protection_profile', 'vulnerability_profile'):
+            self._create_vulnerability_profile(data, location, is_snippet)
+        elif item_type == 'url_filtering_profile':
+            self._create_url_filtering_profile(data, location, is_snippet)
+        elif item_type == 'file_blocking_profile':
+            self._create_file_blocking_profile(data, location, is_snippet)
+        elif item_type in ('wildfire_antivirus_profile', 'wildfire_profile'):
+            self._create_wildfire_profile(data, location, is_snippet)
+        elif item_type == 'decryption_profile':
+            self._create_decryption_profile(data, location, is_snippet)
+        elif item_type == 'dns_security_profile':
+            self._create_dns_security_profile(data, location, is_snippet)
+        elif item_type == 'http_header_profile':
+            self._create_http_header_profile(data, location, is_snippet)
+        elif item_type == 'certificate_profile':
+            self._create_certificate_profile(data, location, is_snippet)
+        # Rules
+        elif item_type in ('security_rule', 'rule'):
+            self._create_security_rule(data, location, is_snippet)
+        elif item_type == 'authentication_rule':
+            self._create_authentication_rule(data, location, is_snippet)
+        elif item_type == 'decryption_rule':
+            self._create_decryption_rule(data, location, is_snippet)
+        # Infrastructure
+        elif item_type == 'ike_crypto_profile':
+            self._create_ike_crypto_profile(data, location)
+        elif item_type == 'ipsec_crypto_profile':
+            self._create_ipsec_crypto_profile(data, location)
+        elif item_type == 'ike_gateway':
+            self._create_ike_gateway(data, location)
+        elif item_type == 'ipsec_tunnel':
+            self._create_ipsec_tunnel(data, location)
         else:
             raise ValueError(f"Unsupported item type: {item_type}")
     
@@ -1057,3 +1696,195 @@ class PushOrchestratorV2:
             self.api_client._make_request("POST", url, data=data, use_cache=False)
         else:
             self.api_client.create_profile_group(data, location)
+    
+    def _create_schedule(self, data: Dict, location: str, is_snippet: bool):
+        """Create a schedule object."""
+        from prisma.api_endpoints import build_folder_query, APIEndpoints
+        from urllib.parse import quote
+        encoded_loc = quote(location, safe="")
+        if is_snippet:
+            url = f"{APIEndpoints.SCHEDULES}?snippet={encoded_loc}"
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+        else:
+            url = APIEndpoints.SCHEDULES + build_folder_query(location)
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+    
+    def _create_hip_object(self, data: Dict, location: str, is_snippet: bool):
+        """Create a HIP object."""
+        from prisma.api_endpoints import build_folder_query, APIEndpoints
+        from urllib.parse import quote
+        encoded_loc = quote(location, safe="")
+        if is_snippet:
+            url = f"{APIEndpoints.HIP_OBJECTS}?snippet={encoded_loc}"
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+        else:
+            url = APIEndpoints.HIP_OBJECTS + build_folder_query(location)
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+    
+    def _create_hip_profile(self, data: Dict, location: str, is_snippet: bool):
+        """Create a HIP profile."""
+        from prisma.api_endpoints import build_folder_query, APIEndpoints
+        from urllib.parse import quote
+        encoded_loc = quote(location, safe="")
+        if is_snippet:
+            url = f"{APIEndpoints.HIP_PROFILES}?snippet={encoded_loc}"
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+        else:
+            url = APIEndpoints.HIP_PROFILES + build_folder_query(location)
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+    
+    def _create_anti_spyware_profile(self, data: Dict, location: str, is_snippet: bool):
+        """Create an anti-spyware profile."""
+        from prisma.api_endpoints import build_folder_query, APIEndpoints
+        from urllib.parse import quote
+        encoded_loc = quote(location, safe="")
+        if is_snippet:
+            url = f"{APIEndpoints.ANTI_SPYWARE_PROFILES}?snippet={encoded_loc}"
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+        else:
+            url = APIEndpoints.ANTI_SPYWARE_PROFILES + build_folder_query(location)
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+    
+    def _create_vulnerability_profile(self, data: Dict, location: str, is_snippet: bool):
+        """Create a vulnerability protection profile."""
+        from prisma.api_endpoints import build_folder_query, APIEndpoints
+        from urllib.parse import quote
+        encoded_loc = quote(location, safe="")
+        if is_snippet:
+            url = f"{APIEndpoints.VULNERABILITY_PROTECTION_PROFILES}?snippet={encoded_loc}"
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+        else:
+            url = APIEndpoints.VULNERABILITY_PROTECTION_PROFILES + build_folder_query(location)
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+    
+    def _create_url_filtering_profile(self, data: Dict, location: str, is_snippet: bool):
+        """Create a URL filtering profile."""
+        from prisma.api_endpoints import build_folder_query, APIEndpoints
+        from urllib.parse import quote
+        encoded_loc = quote(location, safe="")
+        if is_snippet:
+            url = f"{APIEndpoints.URL_ACCESS_PROFILES}?snippet={encoded_loc}"
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+        else:
+            url = APIEndpoints.URL_ACCESS_PROFILES + build_folder_query(location)
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+    
+    def _create_file_blocking_profile(self, data: Dict, location: str, is_snippet: bool):
+        """Create a file blocking profile."""
+        from prisma.api_endpoints import build_folder_query, APIEndpoints
+        from urllib.parse import quote
+        encoded_loc = quote(location, safe="")
+        if is_snippet:
+            url = f"{APIEndpoints.FILE_BLOCKING_PROFILES}?snippet={encoded_loc}"
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+        else:
+            url = APIEndpoints.FILE_BLOCKING_PROFILES + build_folder_query(location)
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+    
+    def _create_wildfire_profile(self, data: Dict, location: str, is_snippet: bool):
+        """Create a WildFire antivirus profile."""
+        from prisma.api_endpoints import build_folder_query, APIEndpoints
+        from urllib.parse import quote
+        encoded_loc = quote(location, safe="")
+        if is_snippet:
+            url = f"{APIEndpoints.WILDFIRE_ANTI_VIRUS_PROFILES}?snippet={encoded_loc}"
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+        else:
+            url = APIEndpoints.WILDFIRE_ANTI_VIRUS_PROFILES + build_folder_query(location)
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+    
+    def _create_decryption_profile(self, data: Dict, location: str, is_snippet: bool):
+        """Create a decryption profile."""
+        from prisma.api_endpoints import build_folder_query, APIEndpoints
+        from urllib.parse import quote
+        encoded_loc = quote(location, safe="")
+        if is_snippet:
+            url = f"{APIEndpoints.DECRYPTION_PROFILES}?snippet={encoded_loc}"
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+        else:
+            url = APIEndpoints.DECRYPTION_PROFILES + build_folder_query(location)
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+    
+    def _create_dns_security_profile(self, data: Dict, location: str, is_snippet: bool):
+        """Create a DNS security profile."""
+        from prisma.api_endpoints import build_folder_query, APIEndpoints
+        from urllib.parse import quote
+        encoded_loc = quote(location, safe="")
+        if is_snippet:
+            url = f"{APIEndpoints.DNS_SECURITY_PROFILES}?snippet={encoded_loc}"
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+        else:
+            url = APIEndpoints.DNS_SECURITY_PROFILES + build_folder_query(location)
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+
+    def _create_http_header_profile(self, data: Dict, location: str, is_snippet: bool):
+        """Create an HTTP header profile."""
+        from prisma.api_endpoints import build_folder_query, APIEndpoints
+        from urllib.parse import quote
+        encoded_loc = quote(location, safe="")
+        if is_snippet:
+            url = f"{APIEndpoints.HTTP_HEADER_PROFILES}?snippet={encoded_loc}"
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+        else:
+            url = APIEndpoints.HTTP_HEADER_PROFILES + build_folder_query(location)
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+
+    def _create_certificate_profile(self, data: Dict, location: str, is_snippet: bool):
+        """Create a certificate profile."""
+        from prisma.api_endpoints import build_folder_query, APIEndpoints
+        from urllib.parse import quote
+        encoded_loc = quote(location, safe="")
+        if is_snippet:
+            url = f"{APIEndpoints.CERTIFICATE_PROFILES}?snippet={encoded_loc}"
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+        else:
+            url = APIEndpoints.CERTIFICATE_PROFILES + build_folder_query(location)
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+
+    def _create_authentication_rule(self, data: Dict, location: str, is_snippet: bool):
+        """Create an authentication rule."""
+        from prisma.api_endpoints import build_folder_query, SASE_BASE_URL
+        from urllib.parse import quote
+        encoded_loc = quote(location, safe="")
+        # Authentication rules endpoint
+        endpoint = f"{SASE_BASE_URL}/authentication-rules"
+        if is_snippet:
+            url = f"{endpoint}?snippet={encoded_loc}"
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+        else:
+            url = endpoint + build_folder_query(location)
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+    
+    def _create_decryption_rule(self, data: Dict, location: str, is_snippet: bool):
+        """Create a decryption rule."""
+        from prisma.api_endpoints import build_folder_query, SASE_BASE_URL
+        from urllib.parse import quote
+        encoded_loc = quote(location, safe="")
+        # Decryption rules endpoint
+        endpoint = f"{SASE_BASE_URL}/decryption-rules"
+        if is_snippet:
+            url = f"{endpoint}?snippet={encoded_loc}"
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+        else:
+            url = endpoint + build_folder_query(location)
+            self.api_client._make_request("POST", url, data=data, use_cache=False)
+
+    # =========================================================================
+    # INFRASTRUCTURE CREATE WRAPPERS
+    # =========================================================================
+
+    def _create_ike_crypto_profile(self, data: Dict, location: str):
+        """Create an IKE crypto profile (folder only, no snippet support)."""
+        self.api_client.create_ike_crypto_profile(data, location)
+
+    def _create_ipsec_crypto_profile(self, data: Dict, location: str):
+        """Create an IPSec crypto profile (folder only, no snippet support)."""
+        self.api_client.create_ipsec_crypto_profile(data, location)
+
+    def _create_ike_gateway(self, data: Dict, location: str):
+        """Create an IKE gateway (folder only, no snippet support)."""
+        self.api_client.create_ike_gateway(data, location)
+
+    def _create_ipsec_tunnel(self, data: Dict, location: str):
+        """Create an IPSec tunnel (folder only, no snippet support)."""
+        self.api_client.create_ipsec_tunnel(data, location)

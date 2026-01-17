@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QApplication,
 )
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QTimer, pyqtSignal
 from PyQt6.QtGui import QTextCursor
 import logging
 
@@ -28,16 +28,20 @@ class ResultsPanel(QWidget):
     Features:
     - Text area for displaying results
     - Copy to clipboard button
-    - View full details button (opens activity log)
+    - View activity log button (can open dialog or emit signal for embedded viewer)
     - Consistent styling and behavior
     """
+    
+    # Signal emitted when "View Activity Log" is clicked (for embedded viewer mode)
+    view_activity_log_requested = pyqtSignal()
     
     def __init__(
         self,
         parent=None,
         title: str = "Results",
         log_file: str = "logs/activity.log",
-        placeholder: str = "Operation results will appear here..."
+        placeholder: str = "Operation results will appear here...",
+        use_embedded_log_viewer: bool = False
     ):
         """
         Initialize the results panel.
@@ -47,11 +51,13 @@ class ResultsPanel(QWidget):
             title: Title for the full details dialog
             log_file: Path to activity log file
             placeholder: Placeholder text for results area
+            use_embedded_log_viewer: If True, emit signal instead of opening dialog
         """
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
         self.title = title
         self.log_file = log_file
+        self.use_embedded_log_viewer = use_embedded_log_viewer
         
         self._init_ui(placeholder)
     
@@ -99,11 +105,11 @@ class ResultsPanel(QWidget):
         self.copy_results_btn.setEnabled(False)
         buttons_layout.addWidget(self.copy_results_btn)
         
-        # View details button
-        self.view_details_btn = QPushButton("📄 View Full Details")
-        self.view_details_btn.setToolTip("Open detailed log viewer")
+        # View activity log button
+        self.view_details_btn = QPushButton("📄 View Activity Log")
+        self.view_details_btn.setToolTip("View detailed activity log")
         self.view_details_btn.setStyleSheet(small_grey_style)
-        self.view_details_btn.clicked.connect(self._view_full_details)
+        self.view_details_btn.clicked.connect(self._on_view_activity_log_clicked)
         self.view_details_btn.setEnabled(False)
         buttons_layout.addWidget(self.view_details_btn)
         
@@ -206,49 +212,109 @@ class ResultsPanel(QWidget):
             self.logger.error(f"Failed to copy results: {e}")
             QMessageBox.warning(self, "Copy Failed", f"Failed to copy results: {e}")
     
-    def _view_full_details(self):
-        """Open a dialog to view full activity log details with search/filter."""
+    def _on_view_activity_log_clicked(self):
+        """Handle view activity log button click."""
+        if self.use_embedded_log_viewer:
+            # Emit signal for parent to handle with embedded viewer
+            self.view_activity_log_requested.emit()
+        else:
+            # Open dialog (fallback behavior)
+            self._open_activity_log_dialog()
+    
+    def _open_activity_log_dialog(self):
+        """Open a dialog to view full activity log details with search/filter and live refresh."""
         try:
             from gui.logs_widget import LogsWidget
-            
+            from PyQt6.QtCore import QTimer
+            import os
+
             dialog = QDialog(self)
-            dialog.setWindowTitle(f"{self.title} - Activity Log")
+            dialog.setWindowTitle(f"{self.title} - Activity Log (Live)")
             dialog.resize(1100, 750)
-            
+
             layout = QVBoxLayout(dialog)
             layout.setContentsMargins(8, 8, 8, 8)
-            
+
             # Use the full-featured LogsWidget with search and filter
             logs_widget = LogsWidget(dialog)
-            
-            # Load log entries from file
-            try:
-                with open(self.log_file, 'r') as f:
-                    for line in f.readlines()[-1000:]:  # Last 1000 lines
-                        line = line.strip()
-                        if line:
-                            # Try to parse log level from line
-                            level = "info"
-                            if " - DEBUG - " in line:
-                                level = "debug"
-                            elif " - WARNING - " in line:
-                                level = "warning"
-                            elif " - ERROR - " in line:
-                                level = "error"
-                            elif " - CRITICAL - " in line:
-                                level = "error"
-                            
-                            logs_widget.log(line, level)
-            except Exception as read_err:
-                self.logger.error(f"Error reading {self.log_file}: {read_err}")
-                logs_widget.log(f"Error reading {self.log_file}: {read_err}", "error")
-            
+
+            # Track file position for incremental reads
+            last_position = [0]  # Use list to allow modification in nested function
+            last_line_count = [0]
+
+            def parse_log_level(line):
+                """Parse log level from line."""
+                if " - DEBUG - " in line:
+                    return "debug"
+                elif " - WARNING - " in line:
+                    return "warning"
+                elif " - ERROR - " in line or " - CRITICAL - " in line:
+                    return "error"
+                elif " - DETAIL - " in line:
+                    return "detail"
+                return "info"
+
+            def load_initial_logs():
+                """Load initial log entries from file."""
+                try:
+                    if os.path.exists(self.log_file):
+                        with open(self.log_file, 'r') as f:
+                            lines = f.readlines()
+                            # Load last 500 lines initially
+                            start_idx = max(0, len(lines) - 500)
+                            for line in lines[start_idx:]:
+                                line = line.strip()
+                                if line:
+                                    logs_widget.log(line, parse_log_level(line))
+                            last_line_count[0] = len(lines)
+                            f.seek(0, 2)  # Seek to end
+                            last_position[0] = f.tell()
+                except Exception as e:
+                    self.logger.error(f"Error loading initial logs: {e}")
+
+            def refresh_logs():
+                """Check for new log entries and append them."""
+                try:
+                    if not os.path.exists(self.log_file):
+                        return
+
+                    current_size = os.path.getsize(self.log_file)
+
+                    # If file was truncated/rotated, reload from beginning
+                    if current_size < last_position[0]:
+                        last_position[0] = 0
+                        last_line_count[0] = 0
+
+                    if current_size > last_position[0]:
+                        with open(self.log_file, 'r') as f:
+                            f.seek(last_position[0])
+                            new_content = f.read()
+                            last_position[0] = f.tell()
+
+                            for line in new_content.splitlines():
+                                line = line.strip()
+                                if line:
+                                    logs_widget.log(line, parse_log_level(line))
+
+                            # Auto-scroll to bottom if user hasn't scrolled up
+                            scrollbar = logs_widget.log_text.verticalScrollBar()
+                            if scrollbar.value() >= scrollbar.maximum() - 50:
+                                scrollbar.setValue(scrollbar.maximum())
+                except Exception as e:
+                    pass  # Silently ignore refresh errors
+
+            # Load initial content
+            load_initial_logs()
+
             layout.addWidget(logs_widget)
-            
-            # Close button at bottom
-            button_layout = QHBoxLayout()
-            button_layout.addStretch()
-            
+
+            # Status bar showing live refresh
+            status_layout = QHBoxLayout()
+            status_label = QLabel("🔄 Live refresh enabled (1 second interval)")
+            status_label.setStyleSheet("color: #666; font-size: 11px;")
+            status_layout.addWidget(status_label)
+            status_layout.addStretch()
+
             close_btn = QPushButton("Close")
             close_btn.setMinimumWidth(100)
             close_btn.clicked.connect(dialog.close)
@@ -261,10 +327,18 @@ class ResultsPanel(QWidget):
                 "QPushButton:hover { background-color: #616161; border-bottom: 2px solid #212121; }"
                 "QPushButton:pressed { background-color: #616161; border-bottom: 1px solid #424242; }"
             )
-            button_layout.addWidget(close_btn)
-            
-            layout.addLayout(button_layout)
-            
+            status_layout.addWidget(close_btn)
+
+            layout.addLayout(status_layout)
+
+            # Set up refresh timer (1 second interval)
+            refresh_timer = QTimer(dialog)
+            refresh_timer.timeout.connect(refresh_logs)
+            refresh_timer.start(1000)  # Refresh every 1 second
+
+            # Stop timer when dialog closes
+            dialog.finished.connect(refresh_timer.stop)
+
             dialog.exec()
         except Exception as e:
             self.logger.error(f"Failed to open details viewer: {e}")

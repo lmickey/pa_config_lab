@@ -28,6 +28,7 @@ COMPONENT_SECTIONS: Dict[str, List[Tuple[str, str]]] = {
     'Addresses': [
         ('address_object', 'Address Objects'),
         ('address_group', 'Address Groups'),
+        ('region', 'Address Regions'),
     ],
     'Services': [
         ('service_object', 'Service Objects'),
@@ -52,14 +53,20 @@ COMPONENT_SECTIONS: Dict[str, List[Tuple[str, str]]] = {
         ('wildfire_profile', 'WildFire Profiles'),
         ('dns_security_profile', 'DNS Security Profiles'),
         ('decryption_profile', 'Decryption Profiles'),
+        ('profile_group', 'Profile Groups'),
     ],
     'Other Profiles': [
         ('http_header_profile', 'HTTP Header Profiles'),
         ('certificate_profile', 'Certificate Profiles'),
+        ('qos_profile', 'QoS Profiles'),
     ],
     'HIP': [
         ('hip_object', 'HIP Objects'),
         ('hip_profile', 'HIP Profiles'),
+    ],
+    'Authentication': [
+        ('local_user', 'Local Users'),
+        ('local_user_group', 'Local User Groups'),
     ],
     'Security Policy': [
         ('security_rule', 'Security Rules'),

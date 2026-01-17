@@ -562,16 +562,37 @@ class PullConfigWidget(QWidget):
                 item_type='snippet'
             )
             
+            # System/default snippet names to exclude
+            EXCLUDED_SNIPPET_NAMES = {
+                'predefined-snippet',
+                'Web Security Global',
+                'PA_predefined_embargo_rule',
+                'best-practice',
+                'decrypt-bypass',
+                'Block-brute-force',
+                'default',
+                'hip-default',
+                'optional-default',
+            }
+
             snippets = []
             if isinstance(response, dict) and 'data' in response:
                 for snippet in response['data']:
                     snippet_name = snippet.get('name', '')
                     snippet_type = snippet.get('type', '')
-                    
-                    # Filter out predefined/readonly snippets by type field only
+
+                    # Filter out predefined/readonly snippets by type
                     if snippet_type in ('predefined', 'readonly'):
                         continue
-                    
+
+                    # Filter out known system snippet names
+                    if snippet_name in EXCLUDED_SNIPPET_NAMES:
+                        continue
+
+                    # Filter out snippets ending in -default (system pattern)
+                    if snippet_name.endswith('-default') or snippet_name.endswith('-Default'):
+                        continue
+
                     snippets.append({
                         'name': snippet_name,
                         'id': snippet.get('id', ''),

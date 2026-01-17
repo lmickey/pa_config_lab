@@ -218,8 +218,57 @@ class PullWorker(QThread):
                 for folder_name, components in folder_filter.items():
                     if components:  # Has real component types selected
                         folders_to_query.append(folder_name)
-                
+
                 logger.detail(f"Folders to query (with real components): {folders_to_query}")
+
+                # IMPORTANT: Optimize folder list to only query "leaf" folders
+                # Prisma Access folder hierarchy (when querying a child, parent config is included as inherited):
+                #   All (Global) -> Shared (Prisma Access) -> Mobile Users Container -> Mobile Users
+                #                                          -> Mobile Users Container -> Mobile Users Explicit Proxy
+                #                                          -> Remote Networks
+                # If a parent and its child are both selected, only query the child (it includes parent config)
+                FOLDER_CHILDREN = {
+                    'All': ['Shared'],
+                    'Shared': ['Mobile Users Container', 'Remote Networks'],
+                    'Mobile Users Container': ['Mobile Users', 'Mobile Users Explicit Proxy'],
+                }
+
+                # Display name mapping (API name -> Display name)
+                FOLDER_DISPLAY_NAMES = {
+                    'All': 'Global',
+                    'Shared': 'Prisma Access',
+                    'Mobile Users Container': 'Mobile Users Container',
+                    'Mobile Users': 'Mobile Users',
+                    'Mobile Users Explicit Proxy': 'Mobile Users Explicit Proxy',
+                    'Remote Networks': 'Remote Networks',
+                }
+
+                def get_all_descendants(folder):
+                    """Get all descendants of a folder (children, grandchildren, etc.)."""
+                    descendants = set()
+                    children = FOLDER_CHILDREN.get(folder, [])
+                    for child in children:
+                        descendants.add(child)
+                        descendants.update(get_all_descendants(child))
+                    return descendants
+
+                def optimize_folder_list(selected_folders):
+                    """Remove parent folders if any of their descendants are also selected."""
+                    optimized = set(selected_folders)
+                    for folder in list(optimized):
+                        descendants = get_all_descendants(folder)
+                        # If any descendant is in the list, remove this parent folder
+                        if descendants & optimized:
+                            optimized.discard(folder)
+                            logger.detail(f"Removing '{FOLDER_DISPLAY_NAMES.get(folder, folder)}' from query - descendants are selected")
+                    return list(optimized)
+
+                if folders_to_query:
+                    original_count = len(folders_to_query)
+                    folders_to_query = optimize_folder_list(folders_to_query)
+                    if len(folders_to_query) != original_count:
+                        display_names = [FOLDER_DISPLAY_NAMES.get(f, f) for f in folders_to_query]
+                        logger.normal(f"Optimized folder list: pulling from {len(folders_to_query)} leaf folder(s): {', '.join(display_names)}")
                 
                 # If no specific folders with real components, don't query any folders
                 # (custom apps are handled separately)
@@ -250,16 +299,43 @@ class PullWorker(QThread):
                     infrastructure_filter=infrastructure_filter,  # Controls which infra types/folders to pull
                 )
 
-                if not self._is_running:
+                # Check for cancellation - either via flag or result
+                if not self._is_running or (result and result.cancelled):
+                    logger.info("Pull operation cancelled")
+                    self.progress.emit("Pull cancelled by user", 0)
+                    self.finished.emit(False, "Pull cancelled by user", None)
                     return
 
                 # Extract Configuration object from result
                 configuration = result.configuration
-                
-                if not configuration:
-                    raise Exception("Pull operation returned no configuration")
 
-            self.progress.emit("Finalizing configuration...", 80)
+                if not configuration:
+                    # Empty configuration is valid (e.g., empty snippet)
+                    # Create a Configuration object with the snippet containers (even if empty)
+                    from config.models.containers import Configuration, SnippetConfig
+                    from datetime import datetime
+
+                    logger.warning("Pull returned no configuration - creating configuration with empty snippet containers")
+                    self.progress.emit("⚠️ No items found in snippet (snippet exists but is empty)", 85)
+
+                    configuration = Configuration(
+                        source_tsg=self.api_client.tsg_id if self.api_client else None,
+                        load_type='From Pull',
+                        saved_credentials_ref=self.connection_name
+                    )
+                    configuration.source_tenant = self.connection_name
+                    configuration.created_at = datetime.now().isoformat()
+                    configuration.modified_at = datetime.now().isoformat()
+                    configuration.config_version = 1
+
+                    # Add the snippet containers that were requested (even if empty)
+                    if snippet_names:
+                        for snippet_name in snippet_names:
+                            snippet_config = SnippetConfig(name=snippet_name)
+                            configuration.add_snippet(snippet_config)
+                            logger.info(f"Added empty snippet container: {snippet_name}")
+
+            self.progress.emit("Finalizing configuration...", 90)
             
             # Add custom applications that were loaded via Find Applications dialog
             # (only if we went through the orchestrator path - custom apps only path handles this above)

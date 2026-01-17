@@ -8,6 +8,7 @@ __pycache__/
 env/
 venv/
 ENV/
+archive/
 build/
 develop-eggs/
 dist/
@@ -20,6 +21,7 @@ lib64/
 parts/
 sdist/
 saved/
+tests/
 var/
 wheels/
 *.egg-info/
@@ -38,6 +40,7 @@ api_errors.log
 *.swp
 *.swo
 *~
+CLAUDE.md
 
 # OS
 .DS_Store

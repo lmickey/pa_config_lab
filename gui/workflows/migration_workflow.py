@@ -43,6 +43,13 @@ class MigrationWorkflowWidget(QWidget):
         self.api_client = None
         self.current_config = None
         
+        # Centralized connection state for source and destination tenants
+        # This allows any tab to query the current connection status
+        self._source_client = None
+        self._source_tenant_name = None
+        self._destination_client = None
+        self._destination_tenant_name = None
+        
         # Toast notification manager for non-intrusive messages
         self.toast_manager = ToastManager(self)
 
@@ -95,6 +102,10 @@ class MigrationWorkflowWidget(QWidget):
         from gui.selection_widget import SelectionWidget
         self.selection_widget = SelectionWidget()
         self.selection_widget.selection_ready.connect(self._on_selection_ready)
+        # Sync destination connection to push widget when it changes
+        self.selection_widget.selection_list.destination_connection_changed.connect(
+            self._on_destination_connection_changed
+        )
         self.tabs.addTab(self.selection_widget, "3️⃣ Select Components")
 
         # Push tab
@@ -106,6 +117,9 @@ class MigrationWorkflowWidget(QWidget):
         self.tabs.addTab(self.push_widget, "4️⃣ Push to Target")
 
         layout.addWidget(self.tabs)
+        
+        # Connect tab change to sync connection state
+        self.tabs.currentChanged.connect(self._on_tab_changed)
         
         # Populate tenant dropdowns from saved tenants
         self._populate_tenant_dropdowns()
@@ -205,8 +219,54 @@ class MigrationWorkflowWidget(QWidget):
     
     def _on_child_connection_changed(self, api_client, tenant_name: str, source_type: str):
         """Handle connection changes from child widgets (pull/push tenant selectors)."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Store source connection centrally
+        if source_type == "pull":
+            self._source_client = api_client
+            self._source_tenant_name = tenant_name
+            logger.detail(f"[Migration] Source connection updated: {tenant_name}")
+        
         # Propagate to parent (main window)
         self.connection_changed.emit(api_client, tenant_name, source_type)
+    
+    def _on_destination_connection_changed(self, api_client, tenant_name: str):
+        """Handle destination connection changes from selection widget."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Store destination connection centrally
+        self._destination_client = api_client
+        self._destination_tenant_name = tenant_name
+        
+        # Sync to push widget
+        if api_client and tenant_name:
+            logger.detail(f"[Migration] Destination connected: {tenant_name}")
+            self.push_widget.set_destination_client(api_client, tenant_name)
+        else:
+            logger.detail("[Migration] Destination disconnected")
+            self.push_widget.set_destination_client(None, None)
+    
+    def _on_tab_changed(self, index: int):
+        """Handle tab changes to sync connection state."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Tab indices: 0=Pull, 1=Review, 2=Selection, 3=Push
+        if index == 3:  # Push tab
+            # Ensure push widget has the current destination connection
+            if self._destination_client and self._destination_tenant_name:
+                logger.detail(f"[Migration] Syncing destination to push tab: {self._destination_tenant_name}")
+                self.push_widget.set_destination_client(self._destination_client, self._destination_tenant_name)
+        
+        elif index == 2:  # Selection tab
+            # If source is connected but destination is not, auto-connect destination to same tenant
+            if self._source_client and self._source_tenant_name and not self._destination_client:
+                logger.detail(f"[Migration] Auto-connecting destination to source tenant: {self._source_tenant_name}")
+                self.selection_widget.selection_list.set_destination_from_source(
+                    self._source_client, self._source_tenant_name
+                )
 
     def _on_pull_completed(self, config):
         """Handle pull completion."""
@@ -224,6 +284,20 @@ class MigrationWorkflowWidget(QWidget):
             self.push_widget.set_config(config)
             self.selection_widget.set_config(config)
             
+            # Auto-connect destination to same tenant as source
+            source_api, source_name = self.pull_widget.tenant_selector.get_connection()
+            if source_api and source_name:
+                logger.detail(f"[Migration] Auto-setting destination to source tenant: {source_name}")
+                # Store centrally
+                self._source_client = source_api
+                self._source_tenant_name = source_name
+                self._destination_client = source_api
+                self._destination_tenant_name = source_name
+                # Set in selection widget
+                self.selection_widget.selection_list.set_destination_from_source(source_api, source_name)
+                # Also sync to push widget
+                self.push_widget.set_destination_client(source_api, source_name)
+            
             # Notify main window that config is loaded
             self.configuration_loaded.emit(config)
 
@@ -236,6 +310,20 @@ class MigrationWorkflowWidget(QWidget):
             self.config_viewer.set_config(config_from_widget)
             self.push_widget.set_config(config_from_widget)
             self.selection_widget.set_config(config_from_widget)
+            
+            # Auto-connect destination to same tenant as source
+            source_api, source_name = self.pull_widget.tenant_selector.get_connection()
+            if source_api and source_name:
+                logger.detail(f"[Migration] Auto-setting destination to source tenant: {source_name}")
+                # Store centrally
+                self._source_client = source_api
+                self._source_tenant_name = source_name
+                self._destination_client = source_api
+                self._destination_tenant_name = source_name
+                # Set in selection widget
+                self.selection_widget.selection_list.set_destination_from_source(source_api, source_name)
+                # Also sync to push widget
+                self.push_widget.set_destination_client(source_api, source_name)
             
             # Notify main window that config is loaded
             self.configuration_loaded.emit(config_from_widget)

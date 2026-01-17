@@ -172,8 +172,9 @@ class LogsWidget(QWidget):
 
             self.log_entries.append(entry)
 
-            # Format and display
-            self._display_entry(entry)
+            # Only display if entry passes current filter
+            if self._should_display_entry(entry):
+                self._display_entry(entry)
 
             # Update stats
             self._update_stats()
@@ -183,6 +184,34 @@ class LogsWidget(QWidget):
         except Exception:
             # Any other error - silently ignore to prevent crashes
             pass
+
+    def _should_display_entry(self, entry: dict) -> bool:
+        """
+        Check if an entry should be displayed based on current filter.
+
+        Args:
+            entry: Log entry dict with 'level' key
+
+        Returns:
+            True if entry passes current filter threshold
+        """
+        filter_lower = self.filter_combo.currentText().lower()
+
+        # Level hierarchy (lower value = more severe)
+        level_hierarchy = {
+            'error': 1,
+            'warning': 2,
+            'normal': 3,
+            'success': 3,  # Success is same priority as Normal
+            'info': 4,
+            'detail': 5,
+            'debug': 6,
+        }
+
+        filter_threshold = level_hierarchy.get(filter_lower, 6)
+        entry_level = level_hierarchy.get(entry["level"], 6)
+
+        return entry_level <= filter_threshold
 
     def _display_entry(self, entry: dict):
         """Display a log entry with appropriate formatting."""

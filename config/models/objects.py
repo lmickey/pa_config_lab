@@ -557,5 +557,88 @@ class Schedule(ObjectItem):
         
         if sched_type == 'non_recurring' and not self.non_recurring_config:
             errors.append("Non-recurring schedule must have date range list")
-        
+
+        return errors
+
+
+class Region(ObjectItem):
+    """
+    Represents an address region.
+
+    API Endpoint: /sse/config/v1/regions
+
+    Regions define geographic areas using latitude/longitude coordinates
+    for location-based policy decisions.
+    """
+
+    api_endpoint = "https://api.sase.paloaltonetworks.com/sse/config/v1/regions"
+    item_type = "region"
+
+    @property
+    def geo_location(self) -> Optional[Dict[str, Any]]:
+        """Get geographic location configuration"""
+        return self.raw_config.get('geo_location')
+
+    @property
+    def address(self) -> Optional[List[str]]:
+        """Get list of addresses in this region"""
+        return self.raw_config.get('address', [])
+
+    def _validate_specific(self) -> List[str]:
+        """Validate region object"""
+        errors = []
+        # Regions may have various configuration options
+        return errors
+
+
+class LocalUser(ObjectItem):
+    """
+    Represents a local user.
+
+    API Endpoint: /sse/config/v1/local-users
+
+    Local users are used for local authentication without external identity providers.
+    """
+
+    api_endpoint = "https://api.sase.paloaltonetworks.com/sse/config/v1/local-users"
+    item_type = "local_user"
+
+    @property
+    def disabled(self) -> bool:
+        """Check if user is disabled"""
+        return self.raw_config.get('disabled', False)
+
+    def _validate_specific(self) -> List[str]:
+        """Validate local user"""
+        errors = []
+        return errors
+
+
+class LocalUserGroup(ObjectItem):
+    """
+    Represents a local user group.
+
+    API Endpoint: /sse/config/v1/local-user-groups
+
+    Local user groups organize local users for authentication rules.
+    """
+
+    api_endpoint = "https://api.sase.paloaltonetworks.com/sse/config/v1/local-user-groups"
+    item_type = "local_user_group"
+
+    @property
+    def members(self) -> List[str]:
+        """Get list of member users"""
+        return self.raw_config.get('members', [])
+
+    def _compute_dependencies(self) -> List[tuple]:
+        """Local user groups depend on their member users"""
+        deps = []
+        for member in self.members:
+            deps.append(('local_user', member))
+        return deps
+
+    def _validate_specific(self) -> List[str]:
+        """Validate local user group"""
+        errors = []
         return errors

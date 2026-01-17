@@ -17,6 +17,7 @@ from datetime import datetime
 import logging
 
 from ..api_client import PrismaAccessAPIClient
+from ..api_endpoints import is_folder_allowed, FOLDER_EXCLUSIONS, FOLDER_ONLY
 from config.workflows import WorkflowConfig, WorkflowResult, WorkflowState, DefaultManager
 from config.workflows.workflow_utils import (
     validate_configuration,
@@ -48,11 +49,28 @@ class PullOrchestrator:
         'Remote Networks',
         'Mobile Users Explicit Proxy',
     ]
+
+    # Display name mapping (API name -> User-friendly display name)
+    # IMPORTANT: Always use display names in logs, progress messages, and UI
+    FOLDER_DISPLAY_NAMES = {
+        'All': 'Global',
+        'Shared': 'Prisma Access',
+        'Mobile Users Container': 'Mobile Users Container',
+        'Mobile Users': 'Mobile Users',
+        'Mobile Users Explicit Proxy': 'Mobile Users Explicit Proxy',
+        'Remote Networks': 'Remote Networks',
+    }
+
+    @classmethod
+    def get_display_name(cls, api_name: str) -> str:
+        """Convert API folder name to user-friendly display name."""
+        return cls.FOLDER_DISPLAY_NAMES.get(api_name, api_name)
     
     # Configuration item types to capture (folder-based)
     FOLDER_TYPES = [
         'address_object',
         'address_group',
+        'region',  # Address regions
         'service_object',
         'service_group',
         'tag',
@@ -72,23 +90,26 @@ class PullOrchestrator:
         'decryption_profile',
         'http_header_profile',
         'certificate_profile',
+        'profile_group',
         # Note: qos_profile has folder restrictions - handled separately
+        'local_user',
+        'local_user_group',
         'security_rule',
         'decryption_rule',
         'authentication_rule',
         'qos_policy_rule',
     ]
     
-    # Types that only work in specific folders
-    FOLDER_RESTRICTED_TYPES = {
-        'qos_profile': ['Remote Networks', 'Service Connections'],
-    }
+    # Types that only work in specific folders - now uses centralized FOLDER_ONLY from api_endpoints
+    # This is kept for backwards compatibility but the actual check uses is_folder_allowed()
+    FOLDER_RESTRICTED_TYPES = FOLDER_ONLY
     
     # Snippet-based types (must loop through all snippets)
     # Should match FOLDER_TYPES for consistency - snippets can contain the same item types
     SNIPPET_TYPES = [
         'address_object',
         'address_group',
+        'region',  # Address regions
         'service_object',
         'service_group',
         'tag',
@@ -108,6 +129,9 @@ class PullOrchestrator:
         'decryption_profile',
         'http_header_profile',
         'certificate_profile',
+        'profile_group',
+        'local_user',
+        'local_user_group',
         'security_rule',
         'decryption_rule',
         'authentication_rule',
@@ -131,6 +155,7 @@ class PullOrchestrator:
         'ipsec_crypto_profile',
         'service_connection',
         'agent_profile',
+        'auto_tag_action',  # General infrastructure - no folder parameter
         # 'portal',   # Not available via SCM API (404)
         # 'gateway',  # Not available via SCM API (404)
     ]
@@ -159,6 +184,64 @@ class PullOrchestrator:
         'default',           # General system defaults (crypto profiles, tags, addresses)
         'hip-default',       # HIP-specific defaults (HIP objects and profiles)
         'optional-default',  # Optional pre-built defaults
+        # Named default snippets from Prisma Access
+        'Web Security Global',
+        'PA_predefined_embargo_rule',
+        'best-practice',
+        'decrypt-bypass',
+        'Block-brute-force',
+    }
+
+    # Default item names by type - these are system-provided items that should be
+    # filtered when include_defaults=False, regardless of which snippet they're in
+    DEFAULT_ITEM_NAMES = {
+        'address_object': {
+            'Palo Alto Networks Sinkhole',
+        },
+        'application_filter': {
+            'general-browsing',
+            'All New apps',
+            'DLP App Exclusion',
+        },
+        'service_object': {
+            'service-http',
+            'service-https',
+        },
+        'tag': {
+            'Sanctioned',
+            'Tolerated',
+            'empty',
+        },
+        'external_dynamic_list': {
+            'Palo Alto Networks - Authentication Portal Exclude List',
+        },
+        'profile_group': {
+            'best-practice',
+            'Explicit Proxy - Unknown Users',
+        },
+        'anti_spyware_profile': {
+            'best-practice',
+        },
+        'vulnerability_profile': {
+            'best-practice',
+        },
+        'wildfire_profile': {
+            'best-practice',
+        },
+        'dns_security_profile': {
+            'best-practice',
+        },
+        'url_access_profile': {
+            'best-practice',
+            'Explicit Proxy - Unknown Users',
+        },
+        'file_blocking_profile': {
+            'best-practice',
+        },
+        'decryption_profile': {
+            'best-practice',
+            'web-security-default',
+        },
     }
     
     def __init__(
@@ -241,37 +324,42 @@ class PullOrchestrator:
             return base_pct
         return base_pct + int((current / total) * range_pct)
     
-    def _is_default_item(self, item_data: dict) -> bool:
+    def _is_default_item(self, item_data: dict, item_type: str = None) -> bool:
         """
-        Determine if an item is a system default based on its snippet field.
-        
+        Determine if an item is a system default based on its snippet field or name.
+
         The snippet field in the API response is the authoritative source for
-        determining if an item is a system default vs user-created.
-        
+        determining if an item is a system default vs user-created. Additionally,
+        certain items are filtered by name (e.g., "best-practice" profiles).
+
         Default snippets include:
         - 'default': General system defaults (crypto profiles, tags, etc.)
         - 'hip-default': HIP-specific defaults (HIP objects/profiles)
         - 'optional-default': Optional pre-built defaults
         - Any snippet ending in '-default'
-        
+        - Named default snippets like 'Web Security Global', 'best-practice', etc.
+
         Args:
             item_data: Raw item data dictionary from API response
-            
+            item_type: Optional item type to check for default item names
+
         Returns:
             True if item is a system default, False if custom/user-created
         """
         snippet = item_data.get('snippet', '')
-        
-        # No snippet means user-created item
-        if not snippet:
-            return False
-        
+        item_name = item_data.get('name', '')
+
+        # Check if item name is in the default names list for this type
+        if item_type and item_type in self.DEFAULT_ITEM_NAMES:
+            if item_name in self.DEFAULT_ITEM_NAMES[item_type]:
+                return True
+
         # Check known default snippet values
-        if snippet in self.DEFAULT_SNIPPETS:
+        if snippet and snippet in self.DEFAULT_SNIPPETS:
             return True
-        
+
         # Check for any snippet ending in -default (catch future patterns)
-        if snippet.endswith('-default'):
+        if snippet and snippet.endswith('-default'):
             return True
         
         return False
@@ -422,19 +510,22 @@ class PullOrchestrator:
                 if folder_list:
                     # Use specific folders provided by user
                     folders = folder_list
-                    logger.info(f"Using user-selected folders: {folders}")
+                    display_names = [self.get_display_name(f) for f in folders]
+                    logger.info(f"Using user-selected folders: {display_names}")
                 elif use_bottom_folders:
                     # Prisma Access optimization: query bottom folders only
                     folders = self.PRISMA_ACCESS_BOTTOM_FOLDERS
-                    logger.info(f"Using bottom-level folders (Prisma Access optimized): {folders}")
+                    display_names = [self.get_display_name(f) for f in folders]
+                    logger.info(f"Using bottom-level folders (Prisma Access optimized): {display_names}")
                     logger.debug(f"Bottom folders capture inherited configs from parents")
                 else:
                     # Get all folders from API
                     logger.info("Fetching all folders from API...")
                     state.start_operation('fetch_folders')
                     folders = self._get_folders()
+                    display_names = [self.get_display_name(f) for f in folders]
                     logger.info(f"Found {len(folders)} folders")
-                    logger.detail(f"Folders: {folders}")
+                    logger.detail(f"Folders: {display_names}")
                     state.complete_operation()
                 
                 state.store_result('folders', folders)
@@ -484,7 +575,14 @@ class PullOrchestrator:
                 folder_items = self._pull_folder_items(folders, state, result, progress_ranges)
                 state.store_result('folder_items', folder_items)
                 logger.info(f"Pulled {len(folder_items)} folder-based items")
-            
+
+            # Check for cancellation after folders
+            if self._cancelled:
+                logger.info("Pull cancelled by user after folder phase")
+                self._emit_progress("Pull cancelled", 0)
+                result.cancelled = True
+                return result
+
             # Pull snippet-based items
             if include_snippets and snippets:
                 self._emit_progress(f"Pulling snippet configs from {len(snippets)} snippets...", progress_ranges['snippets_start'])
@@ -492,7 +590,14 @@ class PullOrchestrator:
                 snippet_items = self._pull_snippet_items(snippets, state, result, progress_ranges)
                 state.store_result('snippet_items', snippet_items)
                 logger.info(f"Pulled {len(snippet_items)} snippet-based items")
-            
+
+            # Check for cancellation after snippets
+            if self._cancelled:
+                logger.info("Pull cancelled by user after snippet phase")
+                self._emit_progress("Pull cancelled", 0)
+                result.cancelled = True
+                return result
+
             # Pull infrastructure items
             if include_infrastructure:
                 self._emit_progress("Pulling infrastructure configs...", progress_ranges['infrastructure_start'])
@@ -500,7 +605,14 @@ class PullOrchestrator:
                 infra_items = self._pull_infrastructure_items(state, result, progress_ranges)
                 state.store_result('infrastructure_items', infra_items)
                 logger.info(f"Pulled {len(infra_items)} infrastructure items")
-            
+
+            # Check for cancellation after infrastructure
+            if self._cancelled:
+                logger.info("Pull cancelled by user after infrastructure phase")
+                self._emit_progress("Pull cancelled", 0)
+                result.cancelled = True
+                return result
+
             # Build Configuration object from pulled items
             self._emit_progress("Building configuration object...", 90)
             logger.info("Building Configuration object...")
@@ -769,14 +881,15 @@ class PullOrchestrator:
                         continue
                     
                     # For unknown/missing type, check if it looks like a system snippet
-                    # System snippets often have specific naming patterns
+                    # System snippets often have specific naming patterns or are in our known defaults list
                     is_likely_system = any([
                         snippet_name.startswith('predefined-'),
                         snippet_name.endswith('-default'),
                         snippet_name.endswith('-Default'),
                         'Default' in snippet_name and 'Snippet' in snippet_name,
+                        snippet_name in self.DEFAULT_SNIPPETS,  # Check named default snippets
                     ])
-                    
+
                     if is_likely_system:
                         logger.info(f"  ✗ SKIPPING likely system snippet: '{snippet_name}' (type={snippet_type or 'none'})")
                     else:
@@ -837,7 +950,8 @@ class PullOrchestrator:
         """
         state.start_operation('pull_folder_items')
         logger.info(f"Pulling folder-based items from {len(folders)} folders...")
-        logger.info(f"Folders: {folders}")
+        display_names = [self.get_display_name(f) for f in folders]
+        logger.info(f"Folders: {display_names}")
         logger.debug(f"Item types to pull: {len(self.FOLDER_TYPES)} types")
         
         # Initialize structure: folder -> type -> items
@@ -862,9 +976,10 @@ class PullOrchestrator:
                 len(folders),
                 progress_ranges['folders_range']
             )
-            self._emit_progress(f"[{folder_idx}/{len(folders)}] Pulling from folder: {folder}...", folder_progress)
-            
-            logger.normal(f"[{folder_idx}/{len(folders)}] Processing folder: {folder}")
+            display_name = self.get_display_name(folder)
+            self._emit_progress(f"[{folder_idx}/{len(folders)}] Pulling from folder: {display_name}...", folder_progress)
+
+            logger.normal(f"[{folder_idx}/{len(folders)}] Processing folder: {display_name}")
             logger.debug(f"Folder item types: {self.FOLDER_TYPES}")
             
             folder_item_count = 0
@@ -905,13 +1020,10 @@ class PullOrchestrator:
                 logger.debug(f"  [{type_idx}/{len(types_to_query)}] Processing {item_type}")
                 
                 try:
-                    # Check if this type is restricted to specific folders
-                    if item_type in self.FOLDER_RESTRICTED_TYPES:
-                        allowed_folders = self.FOLDER_RESTRICTED_TYPES[item_type]
-                        if folder not in allowed_folders:
-                            logger.debug(f"  Skipping {item_type} (restricted to: {allowed_folders})")
-                            continue
-                        logger.debug(f"  {item_type} allowed in folder '{folder}'")
+                    # Check if this type is allowed in this folder (uses centralized restrictions)
+                    if not is_folder_allowed(item_type, folder):
+                        logger.debug(f"  Skipping {item_type} in folder '{folder}' (API restriction)")
+                        continue
                     
                     # Get model class for this type
                     logger.debug(f"  Getting model class for {item_type}")
@@ -958,7 +1070,7 @@ class PullOrchestrator:
                         try:
                             # Check defaults BEFORE creating ConfigItem (more efficient)
                             # Use snippet field from raw API response
-                            if not self.config.include_defaults and self._is_default_item(raw_item):
+                            if not self.config.include_defaults and self._is_default_item(raw_item, item_type):
                                 snippet_val = raw_item.get('snippet', '')
                                 logger.debug(f"    Skipping '{item_name}' (default item, snippet='{snippet_val}')")
                                 result.items_skipped += 1
@@ -1109,7 +1221,7 @@ class PullOrchestrator:
                         try:
                             # Check defaults BEFORE creating ConfigItem (more efficient)
                             # Use snippet field from raw API response
-                            if not self.config.include_defaults and self._is_default_item(raw_item):
+                            if not self.config.include_defaults and self._is_default_item(raw_item, item_type):
                                 snippet_val = raw_item.get('snippet', '')
                                 logger.debug(f"    Skipping '{item_name}' (default item, snippet='{snippet_val}')")
                                 result.items_skipped += 1
@@ -1227,7 +1339,10 @@ class PullOrchestrator:
             'ike_crypto_profile',
             'ipsec_crypto_profile',
         ]
-        
+
+        # QoS types available in RN and SC folders
+        QOS_TYPES = ['qos_profile']
+
         # ========== Remote Networks Section ==========
         if 'Remote Networks' in allowed_folders:
             current_section += 1
@@ -1238,9 +1353,9 @@ class PullOrchestrator:
                 progress_ranges['infrastructure_range']
             )
             section_range = progress_ranges['infrastructure_range'] // total_sections
-            
-            # 5 sub-items in RN: remote_network, ipsec_tunnel, ike_gateway, ike_crypto_profile, ipsec_crypto_profile
-            rn_sub_items = ['remote_network'] + IPSEC_HIERARCHY
+
+            # 6 sub-items in RN: remote_network, ipsec_tunnel, ike_gateway, ike_crypto_profile, ipsec_crypto_profile, qos_profile
+            rn_sub_items = ['remote_network'] + IPSEC_HIERARCHY + QOS_TYPES
             
             for sub_idx, item_type in enumerate(rn_sub_items, 1):
                 sub_progress = self._calculate_progress(section_base_pct, sub_idx - 1, len(rn_sub_items), section_range)
@@ -1278,8 +1393,8 @@ class PullOrchestrator:
             )
             section_range = progress_ranges['infrastructure_range'] // total_sections
             
-            # 5 sub-items in SC: service_connection, ipsec_tunnel, ike_gateway, ike_crypto_profile, ipsec_crypto_profile
-            sc_sub_items = ['service_connection'] + IPSEC_HIERARCHY
+            # 6 sub-items in SC: service_connection, ipsec_tunnel, ike_gateway, ike_crypto_profile, ipsec_crypto_profile, qos_profile
+            sc_sub_items = ['service_connection'] + IPSEC_HIERARCHY + QOS_TYPES
             
             for sub_idx, item_type in enumerate(sc_sub_items, 1):
                 sub_progress = self._calculate_progress(section_base_pct, sub_idx - 1, len(sc_sub_items), section_range)
@@ -1431,7 +1546,7 @@ class PullOrchestrator:
                     
                     # Check defaults BEFORE creating ConfigItem (more efficient)
                     # Use snippet field from raw API response
-                    if not self.config.include_defaults and self._is_default_item(raw_item):
+                    if not self.config.include_defaults and self._is_default_item(raw_item, item_type):
                         snippet_val = raw_item.get('snippet', '')
                         logger.debug(f"  Skipping '{item_name}' (default item, snippet='{snippet_val}')")
                         result.items_skipped += 1
@@ -1507,7 +1622,7 @@ class PullOrchestrator:
                     
                     # Check defaults BEFORE creating ConfigItem (more efficient)
                     # Use snippet field from raw API response
-                    if not self.config.include_defaults and self._is_default_item(raw_item):
+                    if not self.config.include_defaults and self._is_default_item(raw_item, item_type):
                         snippet_val = raw_item.get('snippet', '')
                         logger.debug(f"  Skipping '{item_name}' (default item, snippet='{snippet_val}')")
                         result.items_skipped += 1

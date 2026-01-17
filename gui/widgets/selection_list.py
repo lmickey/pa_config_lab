@@ -22,12 +22,99 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QSizePolicy,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QThread
 
 from gui.widgets.selection_row import SelectionRow
 from gui.widgets.tenant_selector import TenantSelectorWidget
+from gui.widgets.selection_tree import COMPONENT_SECTIONS
 
 logger = logging.getLogger(__name__)
+
+# Build reverse mapping from item_type to section name
+ITEM_TYPE_TO_SECTION: Dict[str, str] = {}
+for section_name, components in COMPONENT_SECTIONS.items():
+    for item_type, display_name in components:
+        ITEM_TYPE_TO_SECTION[item_type] = section_name
+
+
+class DestinationFetchWorker(QThread):
+    """Background worker to fetch folders and snippets from destination tenant."""
+    
+    # Signals
+    finished = pyqtSignal(list, list, str)  # (folders, snippets, tenant_name)
+    error = pyqtSignal(str)  # error_message
+    
+    def __init__(self, api_client, tenant_name: str):
+        super().__init__()
+        self.api_client = api_client
+        self.tenant_name = tenant_name
+    
+    def run(self):
+        """Fetch folders and snippets in background."""
+        try:
+            folder_names = []
+            snippet_names = []
+            
+            # Fetch folders
+            try:
+                folders_response = self.api_client.get_security_policy_folders()
+                if isinstance(folders_response, list):
+                    folder_names = [f.get('name', '') for f in folders_response if f.get('name')]
+                elif isinstance(folders_response, dict):
+                    folders_data = folders_response.get('data', [])
+                    folder_names = [f.get('name', '') for f in folders_data if f.get('name')]
+                
+                logger.info(f"Fetched {len(folder_names)} folders from destination tenant '{self.tenant_name}'")
+                logger.debug(f"Raw folder names from API: {folder_names}")
+            except Exception as e:
+                logger.warning(f"Could not fetch folders from destination: {e}")
+                # Try fallback method
+                try:
+                    folders_response = self.api_client.get_folders()
+                    if isinstance(folders_response, list):
+                        folder_names = [f.get('name', '') for f in folders_response if f.get('name')]
+                    elif isinstance(folders_response, dict):
+                        folders_data = folders_response.get('data', [])
+                        folder_names = [f.get('name', '') for f in folders_data if f.get('name')]
+                except Exception as e2:
+                    logger.warning(f"Fallback folder fetch also failed: {e2}")
+            
+            # Fetch snippets
+            try:
+                snippets_response = self.api_client.get_security_policy_snippets()
+                all_snippets = []
+                if isinstance(snippets_response, list):
+                    all_snippets = snippets_response
+                elif isinstance(snippets_response, dict):
+                    all_snippets = snippets_response.get('data', [])
+                
+                # Filter out predefined/readonly snippets
+                editable_snippets = []
+                for s in all_snippets:
+                    snippet_name = s.get('name', '')
+                    snippet_type = s.get('type', '')
+                    
+                    if not snippet_name:
+                        continue
+                    
+                    if snippet_type in ('predefined', 'readonly'):
+                        continue
+                    
+                    if len(s) <= 2:
+                        continue
+                    
+                    editable_snippets.append(snippet_name)
+                
+                snippet_names = editable_snippets
+                logger.info(f"Fetched {len(all_snippets)} snippets, {len(snippet_names)} are editable")
+            except Exception as e:
+                logger.warning(f"Could not fetch snippets from destination: {e}")
+            
+            self.finished.emit(folder_names, snippet_names, self.tenant_name)
+            
+        except Exception as e:
+            logger.error(f"Error fetching destination data: {e}")
+            self.error.emit(str(e))
 
 
 class SelectionListWidget(QWidget):
@@ -47,6 +134,9 @@ class SelectionListWidget(QWidget):
     
     # Signal to request destination tenant connection
     destination_tenant_requested = pyqtSignal()
+    
+    # Signal emitted when destination connection changes
+    destination_connection_changed = pyqtSignal(object, str)  # (api_client, tenant_name)
     
     def __init__(self, parent: Optional[QWidget] = None):
         """Initialize the selection list widget."""
@@ -356,6 +446,19 @@ class SelectionListWidget(QWidget):
         """Get the destination tenant name."""
         return self.tenant_selector.connection_name
     
+    def set_destination_from_source(self, api_client, tenant_name: str):
+        """
+        Set the destination connection from the source tenant.
+        
+        This is used to auto-connect to the same tenant that was used for pull.
+        
+        Args:
+            api_client: API client from source connection
+            tenant_name: Name of the source tenant
+        """
+        if api_client and tenant_name:
+            self.tenant_selector.set_connection(api_client, tenant_name)
+    
     def _clear_list(self):
         """Clear all rows from the list."""
         for row in self._all_rows:
@@ -486,15 +589,10 @@ class SelectionListWidget(QWidget):
         # === Snippets Section ===
         snippets_dict = self.current_config.get('snippets', {})
         snippets_list = self.current_config.get('security_policies', {}).get('snippets', [])
-        
-        # Filter out empty snippets
-        non_empty_snippets = {}
-        if snippets_dict:
-            for snippet_name, snippet_data in snippets_dict.items():
-                if self._has_actual_items(snippet_data):
-                    non_empty_snippets[snippet_name] = snippet_data
-        
-        if non_empty_snippets or snippets_list:
+
+        # Include ALL snippets (including empty ones) so user can see what was pulled
+        # Empty snippets will be shown with "(empty)" suffix
+        if snippets_dict or snippets_list:
             snippets_row = self._create_row(
                 "Snippets",
                 "container",
@@ -502,25 +600,35 @@ class SelectionListWidget(QWidget):
                 has_children=True
             )
             self._add_top_row(snippets_row)
-            
-            if non_empty_snippets:
+
+            if snippets_dict:
                 # New format: dict keyed by snippet name
-                for snippet_name, snippet_data in non_empty_snippets.items():
+                for snippet_name, snippet_data in snippets_dict.items():
                     snippet_info = {'name': snippet_name, 'snippet': snippet_name}
                     snippet_info.update(snippet_data)
-                    
-                    has_children = bool(snippet_data)
+
+                    has_items = self._has_actual_items(snippet_data)
+                    has_children = bool(snippet_data) and has_items
+
+                    # Show "(empty)" suffix for snippets with no items
+                    display_name = snippet_name if has_items else f"{snippet_name} (empty)"
+
                     snippet_row = self._create_row(
-                        snippet_name,
+                        display_name,
                         "snippet",
                         data=snippet_info,
                         level=1,
                         has_children=has_children
                     )
                     snippets_row.add_child(snippet_row)
-                    
+
+                    # Disable checkbox for empty snippets - nothing to push
+                    if not has_items:
+                        snippet_row.checkbox.setEnabled(False)
+                        snippet_row.checkbox.setToolTip("Empty snippet - no items to push")
+
                     # Add snippet contents if any
-                    if snippet_data:
+                    if snippet_data and has_items:
                         self._add_folder_contents_new_format(snippet_row, snippet_data, snippet_name, level=2, is_snippet=True)
             else:
                 # Legacy format: list
@@ -777,11 +885,13 @@ class SelectionListWidget(QWidget):
     
     def _add_folder_contents_new_format(self, parent_row: SelectionRow, items_dict: Dict, container_name: str, level: int, is_snippet: bool = False):
         """
-        Add folder/snippet contents from new config format.
-        
-        New format has items organized as: { item_type: [items], ... }
-        e.g., { "security_rule": [...], "address": [...], ... }
-        
+        Add folder/snippet contents from new config format with section groupings.
+
+        Creates a hierarchy matching COMPONENT_SECTIONS:
+        - Section (e.g., "Addresses")
+          - Type (e.g., "Address Objects")
+            - Item (e.g., "my-address")
+
         Args:
             parent_row: The parent row to add items to
             items_dict: Dictionary of {item_type: [items]}
@@ -789,11 +899,87 @@ class SelectionListWidget(QWidget):
             level: Indentation level
             is_snippet: True if parent is a snippet (sets 'snippet' key), False for folder
         """
+        # Group items by section
+        items_by_section: Dict[str, Dict[str, List]] = {}
+        ungrouped_items: Dict[str, List] = {}
+
         for item_type, items in items_dict.items():
             if not items or not isinstance(items, list):
                 continue
-            
-            # Create a container for this item type
+
+            section = ITEM_TYPE_TO_SECTION.get(item_type)
+            if section:
+                if section not in items_by_section:
+                    items_by_section[section] = {}
+                items_by_section[section][item_type] = items
+            else:
+                # Items not in any section (e.g., profiles dict, hip dict)
+                ungrouped_items[item_type] = items
+
+        # Add sections in COMPONENT_SECTIONS order
+        for section_name, section_components in COMPONENT_SECTIONS.items():
+            if section_name not in items_by_section:
+                continue
+
+            section_items = items_by_section[section_name]
+
+            # Create section container
+            section_row = self._create_row(
+                section_name,
+                "section_container",
+                level=level,
+                has_children=True
+            )
+            parent_row.add_child(section_row)
+
+            # Add item types within section (in COMPONENT_SECTIONS order)
+            for item_type, type_display in section_components:
+                if item_type not in section_items:
+                    continue
+
+                items = section_items[item_type]
+
+                # Create type container
+                type_row = self._create_row(
+                    type_display,
+                    f"{item_type}_container",
+                    level=level + 1,
+                    has_children=True
+                )
+                section_row.add_child(type_row)
+
+                # Add individual items
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+
+                    item_name = item.get('name', 'Unknown')
+                    # Add folder/snippet info to item data for destination defaults
+                    item_data = item.copy()
+                    if is_snippet:
+                        # Item is from a snippet - set snippet key
+                        item_data['snippet'] = item.get('snippet', container_name)
+                        # Clear folder if it was set to the snippet name
+                        if item_data.get('folder') == container_name:
+                            item_data.pop('folder', None)
+                    else:
+                        # Item is from a folder
+                        item_data['folder'] = item.get('folder', container_name)
+
+                    item_row = self._create_row(
+                        item_name,
+                        item_type,
+                        data=item_data,
+                        level=level + 2,
+                        has_children=False
+                    )
+                    type_row.add_child(item_row)
+
+        # Handle ungrouped items (profiles dict, hip dict, etc.)
+        for item_type, items in ungrouped_items.items():
+            if not items:
+                continue
+
             type_display = item_type.replace('_', ' ').title()
             type_row = self._create_row(
                 type_display,
@@ -802,25 +988,20 @@ class SelectionListWidget(QWidget):
                 has_children=True
             )
             parent_row.add_child(type_row)
-            
-            # Add individual items
+
             for item in items:
                 if not isinstance(item, dict):
                     continue
-                
+
                 item_name = item.get('name', 'Unknown')
-                # Add folder/snippet info to item data for destination defaults
                 item_data = item.copy()
                 if is_snippet:
-                    # Item is from a snippet - set snippet key
                     item_data['snippet'] = item.get('snippet', container_name)
-                    # Clear folder if it was set to the snippet name
                     if item_data.get('folder') == container_name:
                         item_data.pop('folder', None)
                 else:
-                    # Item is from a folder
                     item_data['folder'] = item.get('folder', container_name)
-                
+
                 item_row = self._create_row(
                     item_name,
                     item_type,
@@ -1108,13 +1289,14 @@ class SelectionListWidget(QWidget):
             row.update_default_strategy(strategy_lower)
     
     # Folders that cannot be pushed to (read-only or special)
+    # These are specifically folders under "Prisma Access" that are not directly editable
     # Include variations (space vs hyphen) and exact names as they appear
     NON_EDITABLE_FOLDERS = {
         'ngfw-shared',
-        'colo-connect', 'colo connect',  # Both variations
-        'service-connections', 'service connections',  # Both variations
-        'remote-networks', 'remote networks',  # System folder
+        'colo-connect', 'colo connect',  # Under Prisma Access - not editable
+        'service-connections', 'service connections',  # Under Prisma Access - not editable
         'predefined', 'default',
+        # Note: Remote Networks IS a valid Security Policy folder and should NOT be filtered
     }
     
     # Note: Snippets are now filtered by type='Custom' in _on_destination_connection_changed
@@ -1124,6 +1306,7 @@ class SelectionListWidget(QWidget):
     def _filter_editable_folders(self, folders: list) -> list:
         """Filter out non-editable folders."""
         result = []
+        blocked_folders = []
         for f in folders:
             if not f:
                 continue
@@ -1135,100 +1318,117 @@ class SelectionListWidget(QWidget):
                 blocked_normalized = blocked.lower().replace('-', ' ')
                 if normalized == blocked_normalized:
                     is_blocked = True
+                    blocked_folders.append(f"'{f}' (matched '{blocked}')")
                     break
             if not is_blocked:
                 result.append(f)
+        
+        if blocked_folders:
+            logger.debug(f"Blocked folders: {blocked_folders}")
+        
         return result
     
     def _on_destination_connection_changed(self, api_client, tenant_name: str):
         """Handle destination tenant connection change."""
+        # Check if destination is same as source - just note it, don't block
+        source_tenant = self.config_metadata.get('source_tenant', '')
+        self._dest_is_same_as_source = False
+        if api_client and tenant_name and source_tenant:
+            # Normalize names for comparison (strip whitespace, case-insensitive)
+            source_normalized = source_tenant.strip().lower()
+            dest_normalized = tenant_name.strip().lower()
+            
+            if source_normalized == dest_normalized:
+                self._dest_is_same_as_source = True
+                logger.info(f"Destination tenant is same as source: {tenant_name}")
+        
         self.destination_api_client = api_client
+        self._pending_dest_tenant_name = tenant_name
         
         if api_client:
-            # Connected - try to fetch available folders and snippets from destination
-            folder_names = []
-            snippet_names = []
+            # Connected - fetch folders and snippets in background to avoid UI freeze
+            logger.info(f"Starting background fetch for destination tenant '{tenant_name}'")
             
-            # Fetch folders
-            try:
-                # Try security policy folders first (more comprehensive)
-                folders_response = api_client.get_security_policy_folders()
-                if isinstance(folders_response, list):
-                    folder_names = [f.get('name', '') for f in folders_response if f.get('name')]
-                elif isinstance(folders_response, dict):
-                    folders_data = folders_response.get('data', [])
-                    folder_names = [f.get('name', '') for f in folders_data if f.get('name')]
-                
-                logger.info(f"Fetched {len(folder_names)} folders from destination tenant '{tenant_name}'")
-            except Exception as e:
-                logger.warning(f"Could not fetch folders from destination: {e}")
-                # Try fallback method
-                try:
-                    folders_response = api_client.get_folders()
-                    if isinstance(folders_response, list):
-                        folder_names = [f.get('name', '') for f in folders_response if f.get('name')]
-                    elif isinstance(folders_response, dict):
-                        folders_data = folders_response.get('data', [])
-                        folder_names = [f.get('name', '') for f in folders_data if f.get('name')]
-                except Exception as e2:
-                    logger.warning(f"Fallback folder fetch also failed: {e2}")
+            # Show loading state
+            self.tenant_selector.status_label.setText(f"⏳ Loading folders from {tenant_name}...")
+            self.tenant_selector.status_label.setStyleSheet(
+                "color: #1565C0; padding: 8px; margin-top: 5px; font-style: italic;"
+            )
             
-            # Fetch snippets - filter by type field only (predefined/readonly are not editable)
-            try:
-                snippets_response = api_client.get_security_policy_snippets()
-                all_snippets = []
-                if isinstance(snippets_response, list):
-                    all_snippets = snippets_response
-                elif isinstance(snippets_response, dict):
-                    all_snippets = snippets_response.get('data', [])
-                
-                # Filter out predefined/readonly snippets by type field
-                # User-created snippets have no type field or empty type
-                editable_snippets = []
-                filtered_out = []
-                for s in all_snippets:
-                    snippet_name = s.get('name', '')
-                    snippet_type = s.get('type', '')
-                    
-                    if not snippet_name:
-                        continue
-                    
-                    # Only skip if type is explicitly predefined or readonly
-                    if snippet_type in ('predefined', 'readonly'):
-                        filtered_out.append(snippet_name)
-                        continue
-                    
-                    # Skip "predefined-snippet" placeholder - it only has id and name fields
-                    # Valid custom snippets have more than 2 fields
-                    if len(s) <= 2:
-                        filtered_out.append(f"{snippet_name} (minimal fields)")
-                        continue
-                    
-                    editable_snippets.append(snippet_name)
-                
-                snippet_names = editable_snippets
-                
-                logger.info(f"Fetched {len(all_snippets)} snippets, {len(snippet_names)} are editable (user-created)")
-                
-                if filtered_out:
-                    logger.debug(f"Filtered out {len(filtered_out)} system snippets: {filtered_out[:5]}{'...' if len(filtered_out) > 5 else ''}")
-            except Exception as e:
-                logger.warning(f"Could not fetch snippets from destination: {e}")
-            
-            # Filter out non-editable folders (snippets already filtered by type above)
-            filtered_folders = self._filter_editable_folders(folder_names)
-            filtered_snippets = snippet_names  # Already filtered by type
-            
-            logger.info(f"After filtering: {len(filtered_folders)} editable folders, {len(filtered_snippets)} editable snippets")
-            logger.debug(f"Filtered out folders: {set(folder_names) - set(filtered_folders)}")
-            
-            self.set_destination_connected(True, folders=filtered_folders, snippets=filtered_snippets)
-            logger.info(f"Connected to destination tenant '{tenant_name}' with {len(filtered_folders)} folders and {len(filtered_snippets)} snippets")
+            # Start background worker
+            self._dest_fetch_worker = DestinationFetchWorker(api_client, tenant_name)
+            self._dest_fetch_worker.finished.connect(self._on_destination_fetch_finished)
+            self._dest_fetch_worker.error.connect(self._on_destination_fetch_error)
+            self._dest_fetch_worker.start()
         else:
             self.set_destination_connected(False)
+            # Emit signal so other widgets (like push_widget) can sync
+            self.destination_connection_changed.emit(api_client, tenant_name if tenant_name else "")
+            # Update continue button state
+            self._update_summary()
+    
+    def _on_destination_fetch_finished(self, folder_names: list, snippet_names: list, tenant_name: str):
+        """Handle completion of background folder/snippet fetch."""
+        logger.debug(f"Received folders from worker: {folder_names}")
+        
+        # Filter out non-editable folders
+        filtered_folders = self._filter_editable_folders(folder_names)
+        filtered_snippets = snippet_names  # Already filtered by type in worker
+        
+        logger.info(f"After filtering: {len(filtered_folders)} editable folders, {len(filtered_snippets)} editable snippets")
+        logger.debug(f"Filtered folders result: {filtered_folders}")
+        logger.debug(f"Filtered out folders: {set(folder_names) - set(filtered_folders)}")
+        
+        self.set_destination_connected(True, folders=filtered_folders, snippets=filtered_snippets)
+        logger.info(f"Connected to destination tenant '{tenant_name}' with {len(filtered_folders)} folders and {len(filtered_snippets)} snippets")
+        
+        # Update status to connected
+        if getattr(self, '_dest_is_same_as_source', False):
+            self.tenant_selector.status_label.setText(f"✓ Connected to {tenant_name} (same as source)")
+            self.tenant_selector.status_label.setStyleSheet(
+                "color: #1565C0; padding: 8px; margin-top: 5px; font-weight: bold;"
+            )
+        else:
+            self.tenant_selector.status_label.setText(f"✓ Connected to {tenant_name}")
+            self.tenant_selector.status_label.setStyleSheet(
+                "color: #2e7d32; padding: 8px; margin-top: 5px; font-weight: bold;"
+            )
+        
+        # Emit signal so other widgets (like push_widget) can sync
+        self.destination_connection_changed.emit(self.destination_api_client, tenant_name if tenant_name else "")
         
         # Update continue button state
         self._update_summary()
+        
+        # Cleanup worker
+        if hasattr(self, '_dest_fetch_worker') and self._dest_fetch_worker:
+            self._dest_fetch_worker.deleteLater()
+            self._dest_fetch_worker = None
+    
+    def _on_destination_fetch_error(self, error_message: str):
+        """Handle error during background folder/snippet fetch."""
+        tenant_name = getattr(self, '_pending_dest_tenant_name', 'Unknown')
+        logger.error(f"Error fetching destination data for {tenant_name}: {error_message}")
+        
+        # Still mark as connected, just with empty folders/snippets
+        self.set_destination_connected(True, folders=[], snippets=[])
+        
+        # Update status
+        self.tenant_selector.status_label.setText(f"✓ Connected to {tenant_name} (folder fetch failed)")
+        self.tenant_selector.status_label.setStyleSheet(
+            "color: #F57F17; padding: 8px; margin-top: 5px; font-weight: bold;"
+        )
+        
+        # Emit signal so other widgets (like push_widget) can sync
+        self.destination_connection_changed.emit(self.destination_api_client, tenant_name if tenant_name else "")
+        
+        # Update continue button state
+        self._update_summary()
+        
+        # Cleanup worker
+        if hasattr(self, '_dest_fetch_worker') and self._dest_fetch_worker:
+            self._dest_fetch_worker.deleteLater()
+            self._dest_fetch_worker = None
     
     def _expand_all(self):
         """Expand all rows."""
@@ -1337,6 +1537,15 @@ class SelectionListWidget(QWidget):
                 dest = row.get_destination_settings()
                 container_destinations[source_name] = dest
                 logger.debug(f"Container destination for '{source_name}': {dest}")
+                
+                # Also store by API name (from row data) if different from display name
+                # This handles folder name mappings like 'Shared' -> 'Prisma Access'
+                row_data = row.get_data()
+                if row_data:
+                    api_name = row_data.get('name', '')
+                    if api_name and api_name != source_name:
+                        container_destinations[api_name] = dest
+                        logger.debug(f"Container destination for '{api_name}' (API name): {dest}")
             
             for child in row.get_children():
                 collect_container_destinations(child)
@@ -1351,9 +1560,16 @@ class SelectionListWidget(QWidget):
                 data = row.get_data()
                 if not data:
                     return
-                    
-                dest = row.get_destination_settings()
+
                 item_type = row.item_type
+
+                # Skip container types (folder, snippet) that are empty
+                # These are just container markers, not actual pushable items
+                if item_type in ('folder', 'snippet', 'container'):
+                    logger.debug(f"Skipping empty container '{row.label_text}' (type: {item_type})")
+                    return
+
+                dest = row.get_destination_settings()
                 
                 # Merge destination settings into data
                 item_data = data.copy()

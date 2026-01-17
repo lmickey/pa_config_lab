@@ -71,11 +71,11 @@ class SelectionRow(QFrame):
     # Use lowercase for case-insensitive matching
     # Folders that cannot be pushed to (read-only or special)
     # Include variations (space vs hyphen) and exact names as they appear
+    # Note: "Remote Networks" IS a valid Security Policy folder and should NOT be filtered
     NON_EDITABLE_FOLDERS = {
         'ngfw-shared',
         'colo-connect', 'colo connect',
         'service-connections', 'service connections',
-        'remote-networks', 'remote networks',
         'predefined', 'default',
     }
     
@@ -386,6 +386,7 @@ class SelectionRow(QFrame):
         name_row = QHBoxLayout()
         name_row.addWidget(QLabel("Name:"))
         self.dest_name_edit = QLineEdit(self.data.get('name', self.label_text))
+        self.dest_name_edit.setMaxLength(55)  # Prisma Access name limit
         self.dest_name_edit.textChanged.connect(self._on_destination_changed)
         
         # Disable name editing for containers that can't be renamed
@@ -626,7 +627,18 @@ class SelectionRow(QFrame):
         
         # Track if destination is an existing snippet (not folder)
         # Snippets in dropdown have 📄 prefix in display text
-        self._dest_is_existing_snippet = location_text.startswith("📄 ") if location_text else False
+        # BUT exclude special values and "original" which is the source, not destination
+        is_original = "(original)" in location_text if location_text else False
+        is_special = location_value in ("inherit", "new_snippet", "rename_snippet")
+        self._dest_is_existing_snippet = (
+            location_text.startswith("📄 ") and 
+            not is_original and 
+            not is_special and
+            location_value in self.available_snippets
+        ) if location_text else False
+        
+        logger.debug(f"_on_location_changed for '{self.label_text}': value='{location_value}', "
+                    f"is_existing_snippet={self._dest_is_existing_snippet}")
         
         # Show snippet name field for "new_snippet" but NOT for snippet containers (rename)
         # Snippet containers use the original name + "-copy" automatically
@@ -1327,12 +1339,12 @@ class SelectionRow(QFrame):
         is_rename = self._destination_folder == "rename_snippet"
         is_new = self._destination_folder == "new_snippet"
         
-        # Debug logging for containers
-        if self.has_children and self.item_type in ('folder', 'snippet'):
-            logger.debug(f"get_destination_settings for container '{self.label_text}':")
-            logger.debug(f"  _destination_folder: '{self._destination_folder}'")
-            logger.debug(f"  effective_folder: '{effective_folder}'")
-            logger.debug(f"  is_rename: {is_rename}, is_new: {is_new}")
+        # Debug logging for all items (not just containers)
+        is_existing_snippet_attr = getattr(self, '_dest_is_existing_snippet', False)
+        logger.debug(f"get_destination_settings for '{self.label_text}' (type={self.item_type}):")
+        logger.debug(f"  _destination_folder: '{self._destination_folder}'")
+        logger.debug(f"  effective_folder: '{effective_folder}'")
+        logger.debug(f"  _dest_is_existing_snippet: {is_existing_snippet_attr}")
         
         # Also check if parent propagated new_snippet flag (for children of renamed/new snippets)
         is_dest_new_snippet = getattr(self, '_is_dest_new_snippet', False)
@@ -1463,9 +1475,26 @@ class SelectionRow(QFrame):
                     break
     
     def update_default_strategy(self, strategy: str):
-        """Update the default push strategy."""
+        """Update the default push strategy.
+        
+        This updates the UI display and internal tracking but does NOT mark
+        items as customized if they were using the default.
+        """
+        old_default = self.default_push_strategy
         self.default_push_strategy = strategy
-        # Only update if user hasn't changed it
-        if self.strategy_combo.currentText().lower() == self._push_strategy:
+        
+        # Check if this item was using the old default (not customized)
+        was_using_default = self._push_strategy == old_default
+        
+        if was_using_default:
+            # Item was using default - update to new default without marking as customized
+            self.strategy_combo.blockSignals(True)
             self.strategy_combo.setCurrentText(strategy.capitalize())
             self._push_strategy = strategy
+            # Also update the "original" strategy so it doesn't appear customized
+            self._original_strategy = strategy
+            self.strategy_combo.blockSignals(False)
+        
+        # Recursively update children
+        for child in self._children:
+            child.update_default_strategy(strategy)

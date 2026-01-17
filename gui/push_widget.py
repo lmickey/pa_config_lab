@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from gui.workers import PushWorker
-from gui.widgets import TenantSelectorWidget, ResultsPanel
+from gui.widgets import TenantSelectorWidget, ResultsPanel, LiveLogViewer, WorkflowLockManager
 from gui.toast_notification import ToastManager, DismissibleErrorNotification
 
 
@@ -61,6 +61,12 @@ class PushConfigWidget(QWidget):
         # Toast and error notification managers
         self.toast_manager = ToastManager(self)
         self.error_notification = DismissibleErrorNotification(self)
+        
+        # Workflow lock manager for preventing navigation during operations
+        self.workflow_lock = WorkflowLockManager.instance()
+        
+        # Live log viewer reference (created on demand)
+        self._live_log_viewer = None
 
         self._init_ui()
 
@@ -141,7 +147,24 @@ class PushConfigWidget(QWidget):
         )
         self.push_btn.clicked.connect(self._start_push)
         button_layout.addWidget(self.push_btn)
-        
+
+        # Validation return button (shown when nothing to push)
+        self.validation_return_btn = QPushButton("↩ Return to Selection")
+        self.validation_return_btn.setMinimumWidth(180)
+        self.validation_return_btn.setMinimumHeight(40)
+        self.validation_return_btn.setStyleSheet(
+            "QPushButton { "
+            "  background-color: #2196F3; color: white; padding: 10px 20px; "
+            "  font-size: 14px; font-weight: bold; border-radius: 5px; "
+            "  border: 1px solid #1976D2; border-bottom: 3px solid #1565C0; "
+            "}"
+            "QPushButton:hover { background-color: #1E88E5; border-bottom: 3px solid #0D47A1; }"
+            "QPushButton:pressed { background-color: #1976D2; border-bottom: 1px solid #1565C0; }"
+        )
+        self.validation_return_btn.clicked.connect(self._return_to_selection)
+        self.validation_return_btn.setVisible(False)
+        button_layout.addWidget(self.validation_return_btn)
+
         # Cancel button (hidden by default, shown during push)
         self.cancel_btn = QPushButton("Cancel Push")
         self.cancel_btn.setMinimumWidth(150)
@@ -236,10 +259,33 @@ class PushConfigWidget(QWidget):
             parent=self,
             title="Push Operation",
             log_file="logs/activity.log",
-            placeholder="Push results will appear here..."
+            placeholder="Push results will appear here...",
+            use_embedded_log_viewer=False  # Use dialog instead of embedded viewer
         )
         self.results_panel.results_text.setMaximumHeight(150)
+        self.results_panel.view_details_btn.setText("📄 View Details")
         results_layout.addWidget(self.results_panel)
+        
+        # Live Log Viewer (initially hidden, shown when "View Activity Log" is clicked)
+        self.live_log_container = QWidget()
+        live_log_layout = QVBoxLayout(self.live_log_container)
+        live_log_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.live_log_viewer = LiveLogViewer(
+            parent=self,
+            log_file="logs/activity.log",
+            title="Activity Log",
+            show_close_button=True,
+            poll_interval_ms=300,
+            compact=True
+        )
+        self.live_log_viewer.close_requested.connect(self._hide_live_log_viewer)
+        self.live_log_viewer.setMinimumHeight(250)
+        self.live_log_viewer.setMaximumHeight(350)
+        live_log_layout.addWidget(self.live_log_viewer)
+        
+        self.live_log_container.setVisible(False)
+        results_layout.addWidget(self.live_log_container)
         
         # Return to Selection button (shown after push completes)
         return_btn_layout = QHBoxLayout()
@@ -339,6 +385,30 @@ class PushConfigWidget(QWidget):
             self.validation_status.setStyleSheet("padding: 8px; color: #F57F17;")
             self.validation_details.setPlainText("Please select a destination tenant in the 'Select Components' tab.")
             return
+
+        # Early validation: Check name lengths before any API calls
+        name_errors = self._validate_name_lengths(self.selected_items)
+        if name_errors:
+            self.validation_group.setVisible(True)
+            self.validation_status.setText("❌ Name length validation failed")
+            self.validation_status.setStyleSheet("padding: 8px; color: #c62828; background-color: #ffebee; border-radius: 4px;")
+            error_text = "The following names exceed the 55 character limit:\n\n"
+            for err in name_errors:
+                error_text += f"  • {err}\n"
+            error_text += "\nPlease shorten the names and try again."
+            self.validation_details.setPlainText(error_text)
+            self.push_btn.setEnabled(False)
+            self.push_btn.setVisible(False)
+            self.dry_run_check.setVisible(False)
+            self.validation_return_btn.setVisible(True)
+            return
+
+        # Acquire workflow lock to prevent navigation during validation
+        self.workflow_lock.acquire_lock(
+            owner=self,
+            operation_name="Validation",
+            cancel_callback=self._cancel_validation
+        )
         
         # Disable push controls during validation
         self.push_btn.setEnabled(False)
@@ -374,6 +444,23 @@ class PushConfigWidget(QWidget):
         self.validation_worker.error.connect(self._on_validation_error)
         self.validation_worker.start()
     
+    def _cancel_validation(self) -> bool:
+        """
+        Cancel the current validation operation.
+        
+        Returns:
+            True if cancellation was successful, False otherwise
+        """
+        if hasattr(self, 'validation_worker') and self.validation_worker and self.validation_worker.isRunning():
+            # Try to stop the worker (it may not support cancellation)
+            try:
+                self.validation_worker.terminate()
+                self.validation_worker.wait(1000)  # Wait up to 1 second
+                return not self.validation_worker.isRunning()
+            except Exception:
+                return False
+        return True  # No validation running
+    
     def _on_validation_progress(self, message: str, percentage: int):
         """Handle validation progress updates."""
         # Update the progress section
@@ -394,6 +481,9 @@ class PushConfigWidget(QWidget):
     
     def _on_validation_error(self, error: str):
         """Handle validation errors."""
+        # Release workflow lock
+        self.workflow_lock.release_lock(self)
+        
         # Update progress section
         self.progress_label.setText("❌ Validation failed")
         self.progress_label.setStyleSheet("color: red;")
@@ -409,114 +499,222 @@ class PushConfigWidget(QWidget):
         # Hide progress/results sections
         self.progress_group.setVisible(False)
         self.results_group.setVisible(False)
-        
+
         # Show validation section with error
         self.validation_group.setVisible(True)
         self.validation_status.setText("❌ Validation failed")
         self.validation_status.setStyleSheet("padding: 8px; color: #c62828; background-color: #ffebee; border-radius: 4px;")
         self.validation_details.setPlainText(f"Error during validation:\n\n{error}")
-        
-        # Keep push disabled
+
+        # Keep push disabled, but show return to selection button
         self.push_btn.setEnabled(False)
+        self.push_btn.setVisible(False)
         self.dry_run_check.setEnabled(False)
+        self.dry_run_check.setVisible(False)
+        self.validation_return_btn.setVisible(True)
     
     def _on_validation_finished(self, destination_config):
         """Handle validation completion."""
-        # Update progress section to show complete
-        self.progress_label.setText("✓ Validation complete")
-        self.progress_label.setStyleSheet("color: #2e7d32; font-weight: bold;")
-        self.progress_bar.setValue(100)
+        import logging
+        logger = logging.getLogger(__name__)
         
-        # Store destination config for push
-        self._destination_config = destination_config
-        
-        # Run comprehensive validation
-        validation_results = self._validate_items(destination_config)
-        
-        # Store validation results for display
-        self._validation_results = validation_results
-        
-        # Show validation details in results panel (temporarily)
-        self._show_validation_details_in_results(validation_results)
-        
-        # After 2 seconds, hide progress/results and show validation section
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(2000, lambda: self._finalize_validation(validation_results))
+        try:
+            # Update progress section to show complete
+            self.progress_label.setText("✓ Validation complete")
+            self.progress_label.setStyleSheet("color: #2e7d32; font-weight: bold;")
+            self.progress_bar.setValue(100)
+            
+            # Store destination config for push
+            self._destination_config = destination_config
+            
+            # Debug: Log destination_config keys and all_rule_names count
+            all_rule_names = destination_config.get('all_rule_names', {})
+            logger.debug(f"[Validation] destination_config keys: {list(destination_config.keys())}")
+            logger.debug(f"[Validation] all_rule_names count: {len(all_rule_names)}")
+            if all_rule_names:
+                sample_rules = list(all_rule_names.keys())[:5]
+                logger.debug(f"[Validation] Sample rule names: {sample_rules}")
+            
+            # Run comprehensive validation
+            logger.debug("[Validation] Running _validate_items...")
+            validation_results = self._validate_items(destination_config)
+            logger.debug(f"[Validation] _validate_items returned: {len(validation_results.get('item_details', []))} items")
+            
+            # Store validation results for display
+            self._validation_results = validation_results
+            
+            # Show validation details in results panel (temporarily)
+            self._show_validation_details_in_results(validation_results)
+            
+            # After 2 seconds, hide progress/results and show validation section
+            from PyQt6.QtCore import QTimer
+            logger.debug("[Validation] Scheduling _finalize_validation in 2 seconds...")
+            QTimer.singleShot(2000, lambda: self._finalize_validation(validation_results))
+        except Exception as e:
+            import traceback
+            logger.error(f"[Validation] Error in _on_validation_finished: {e}")
+            traceback.print_exc()
+            self._on_validation_error(str(e))
     
     def _finalize_validation(self, validation_results):
         """Finalize validation UI - hide progress/results, show validation section."""
-        errors = validation_results.get('errors', [])
-        warnings = validation_results.get('warnings', [])
-        new_items = validation_results.get('new_items', 0)
-        conflicts = validation_results.get('conflicts', 0)
-        total_items = validation_results.get('total_items', 0)
-        missing_dependencies = validation_results.get('missing_dependencies', [])
+        import logging
+        logger = logging.getLogger(__name__)
         
-        # Store missing dependencies for the "Add and Revalidate" action
-        self._pending_missing_dependencies = missing_dependencies
+        # Release workflow lock - validation is complete
+        self.workflow_lock.release_lock(self)
         
-        # Hide progress and results sections
-        self.progress_group.setVisible(False)
-        self.results_group.setVisible(False)
-        
-        # Show validation results section
-        self.validation_group.setVisible(True)
-        
-        # Set summary status based on validation outcome
-        if errors:
-            # Hard errors - can't push
-            self.validation_status.setText(
-                f"❌ Validation failed - {len(errors)} error(s), {len(warnings)} warning(s)"
-            )
+        try:
+            logger.debug("[Validation] _finalize_validation called")
+            errors = validation_results.get('errors', [])
+            warnings = validation_results.get('warnings', [])
+            new_items = validation_results.get('new_items', 0)
+            conflicts = validation_results.get('conflicts', 0)
+            total_items = validation_results.get('total_items', 0)
+            missing_dependencies = validation_results.get('missing_dependencies', [])
+            skipped_items = validation_results.get('skipped_items', 0)
+            reference_conflicts = validation_results.get('reference_conflicts', [])
+            
+            # Store missing dependencies for the "Add and Revalidate" action
+            self._pending_missing_dependencies = missing_dependencies
+            
+            # Store reference conflicts for handling
+            self._pending_reference_conflicts = reference_conflicts
+            
+            # Filter reference conflicts to only those with OVERWRITE strategy
+            # (SKIP doesn't need to delete, so no reference conflict)
+            # Check item strategies from item_details
+            overwrite_objects = set()
+            for item in validation_results.get('item_details', []):
+                if item.get('strategy') == 'overwrite' and item.get('exists'):
+                    overwrite_objects.add(f"{item.get('type')}:{item.get('name')}")
+            
+            logger.debug(f"[Validation] overwrite_objects: {overwrite_objects}")
+            logger.debug(f"[Validation] reference_conflicts from destination: {len(reference_conflicts)}")
+            
+            # Filter reference conflicts to only overwrite items
+            active_reference_conflicts = [
+                rc for rc in reference_conflicts
+                if f"{rc['referenced_type']}:{rc['referenced_object']}" in overwrite_objects
+            ]
+            
+            logger.debug(f"[Validation] active_reference_conflicts: {len(active_reference_conflicts)}")
+            
+            # Hide progress and results sections
+            self.progress_group.setVisible(False)
+            self.results_group.setVisible(False)
+            
+            # Show validation results section
+            self.validation_group.setVisible(True)
+
+            # Check if there's nothing to push by examining item_details
+            # Items will be pushed if: exists=False (new) OR exists=True with non-skip strategy
+            items_to_push = 0
+            for item in validation_results.get('item_details', []):
+                if not item.get('exists', False):
+                    # New item - will be created
+                    items_to_push += 1
+                elif item.get('strategy', 'skip') != 'skip':
+                    # Exists but will be overwritten/renamed
+                    items_to_push += 1
+            nothing_to_push = total_items > 0 and items_to_push == 0
+            
+            # Set summary status based on validation outcome
+            if errors:
+                # Hard errors - can't push
+                self.validation_status.setText(
+                    f"❌ Validation failed - {len(errors)} error(s), {len(warnings)} warning(s)"
+                )
+                self.validation_status.setStyleSheet(
+                    "padding: 8px; color: #c62828; background-color: #ffebee; border-radius: 4px;"
+                )
+                self.push_btn.setEnabled(False)
+                self.push_btn.setText("Push Config")
+                self.dry_run_check.setEnabled(False)
+            elif active_reference_conflicts:
+                # Reference conflicts - rules reference objects we're trying to overwrite
+                # Group by referenced object
+                ref_objects = set()
+                ref_rules = set()
+                for rc in active_reference_conflicts:
+                    ref_objects.add(rc['referenced_object'])
+                    ref_rules.add(rc['rule_name'])
+                
+                self.validation_status.setText(
+                    f"🔗 Reference conflict - {len(ref_rules)} rule(s) reference {len(ref_objects)} object(s) being overwritten"
+                )
+                self.validation_status.setStyleSheet(
+                    "padding: 8px; color: #c62828; background-color: #ffebee; border-radius: 4px;"
+                )
+                self.push_btn.setEnabled(False)
+                self.push_btn.setText("Resolve Conflicts First")
+                self.dry_run_check.setEnabled(False)
+            elif nothing_to_push:
+                # All items already exist and will be skipped - nothing to push
+                self.validation_status.setText(
+                    f"ℹ️ Nothing to push - All {total_items} item(s) already exist with SKIP strategy"
+                )
+                self.validation_status.setStyleSheet(
+                    "padding: 8px; color: #1565C0; background-color: #E3F2FD; border-radius: 4px;"
+                )
+                # Hide push button, show validation return button (in button bar)
+                self.push_btn.setVisible(False)
+                self.dry_run_check.setVisible(False)
+                self.validation_return_btn.setVisible(True)
+            elif missing_dependencies:
+                # Missing dependencies - need to add them first
+                dep_count = len(missing_dependencies)
+                self.validation_status.setText(
+                    f"⚠️ {dep_count} missing dependenc{'y' if dep_count == 1 else 'ies'} - Add required items to continue"
+                )
+                self.validation_status.setStyleSheet(
+                    "padding: 8px; color: #E65100; background-color: #FFF3E0; border-radius: 4px;"
+                )
+                self.push_btn.setEnabled(True)
+                self.push_btn.setText("Add Dependencies and Revalidate")
+                self.dry_run_check.setEnabled(False)
+            elif warnings:
+                self.validation_status.setText(
+                    f"⚠️ {total_items} items: {new_items} new, {conflicts} conflicts, {len(warnings)} warning(s)"
+                )
+                self.validation_status.setStyleSheet(
+                    "padding: 8px; color: #F57F17; background-color: #FFF9C4; border-radius: 4px;"
+                )
+                self.push_btn.setEnabled(True)
+                self.push_btn.setText("Push Config")
+                self.dry_run_check.setEnabled(True)
+            elif conflicts > 0:
+                self.validation_status.setText(
+                    f"⚠️ {total_items} items: {new_items} new, {conflicts} conflicts - Review strategies"
+                )
+                self.validation_status.setStyleSheet(
+                    "padding: 8px; color: #F57F17; background-color: #FFF9C4; border-radius: 4px;"
+                )
+                self.push_btn.setEnabled(True)
+                self.push_btn.setText("Push Config")
+                self.dry_run_check.setEnabled(True)
+            else:
+                self.validation_status.setText(f"✅ Validation passed - {new_items} new items, no conflicts")
+                self.validation_status.setStyleSheet(
+                    "padding: 8px; color: #2e7d32; background-color: #e8f5e9; border-radius: 4px;"
+                )
+                self.push_btn.setEnabled(True)
+                self.push_btn.setText("Push Config")
+                self.dry_run_check.setEnabled(True)
+            
+            # Show detailed validation results in the text area
+            self._show_detailed_validation_table(validation_results)
+            logger.debug("[Validation] _finalize_validation complete")
+            
+        except Exception as e:
+            import traceback
+            logger.error(f"[Validation] Error in _finalize_validation: {e}")
+            traceback.print_exc()
+            self.validation_status.setText(f"❌ Validation error: {e}")
             self.validation_status.setStyleSheet(
                 "padding: 8px; color: #c62828; background-color: #ffebee; border-radius: 4px;"
             )
             self.push_btn.setEnabled(False)
-            self.push_btn.setText("Push Config")
-            self.dry_run_check.setEnabled(False)
-        elif missing_dependencies:
-            # Missing dependencies - need to add them first
-            dep_count = len(missing_dependencies)
-            self.validation_status.setText(
-                f"⚠️ {dep_count} missing dependenc{'y' if dep_count == 1 else 'ies'} - Add required items to continue"
-            )
-            self.validation_status.setStyleSheet(
-                "padding: 8px; color: #E65100; background-color: #FFF3E0; border-radius: 4px;"
-            )
-            self.push_btn.setEnabled(True)
-            self.push_btn.setText("Add Dependencies and Revalidate")
-            self.dry_run_check.setEnabled(False)
-        elif warnings:
-            self.validation_status.setText(
-                f"⚠️ {total_items} items: {new_items} new, {conflicts} conflicts, {len(warnings)} warning(s)"
-            )
-            self.validation_status.setStyleSheet(
-                "padding: 8px; color: #F57F17; background-color: #FFF9C4; border-radius: 4px;"
-            )
-            self.push_btn.setEnabled(True)
-            self.push_btn.setText("Push Config")
-            self.dry_run_check.setEnabled(True)
-        elif conflicts > 0:
-            self.validation_status.setText(
-                f"⚠️ {total_items} items: {new_items} new, {conflicts} conflicts - Review strategies"
-            )
-            self.validation_status.setStyleSheet(
-                "padding: 8px; color: #F57F17; background-color: #FFF9C4; border-radius: 4px;"
-            )
-            self.push_btn.setEnabled(True)
-            self.push_btn.setText("Push Config")
-            self.dry_run_check.setEnabled(True)
-        else:
-            self.validation_status.setText(f"✅ Validation passed - {new_items} new items, no conflicts")
-            self.validation_status.setStyleSheet(
-                "padding: 8px; color: #2e7d32; background-color: #e8f5e9; border-radius: 4px;"
-            )
-            self.push_btn.setEnabled(True)
-            self.push_btn.setText("Push Config")
-            self.dry_run_check.setEnabled(True)
-        
-        # Show detailed validation results in the text area
-        self._show_detailed_validation_table(validation_results)
     
     def _show_validation_details_in_results(self, validation_results):
         """Show validation details in results panel during validation."""
@@ -532,22 +730,33 @@ class PushConfigWidget(QWidget):
     
     def _show_detailed_validation_table(self, validation_results):
         """Show detailed validation results as a table in the validation details area."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
         lines = []
         
+        # Get default strategy for comparison
+        default_strategy = self.selected_items.get('default_strategy', 'skip') if self.selected_items else 'skip'
+        
         # Header
-        lines.append("=" * 100)
+        lines.append("=" * 115)
         lines.append("VALIDATION RESULTS - ITEM DETAILS")
-        lines.append("=" * 100)
+        lines.append("=" * 115)
         lines.append("")
         
-        # Table header - include DESTINATION column
-        lines.append(f"{'TYPE':<20} {'NAME':<25} {'DESTINATION':<25} {'STATUS':<10} {'ACTION'}")
-        lines.append("-" * 100)
+        # Log validation results header to activity log
+        logger.normal("[Validation] " + "=" * 60)
+        logger.normal("[Validation] VALIDATION RESULTS SUMMARY")
+        logger.normal("[Validation] " + "=" * 60)
+        
+        # Table header - include DESTINATION and STRATEGY columns
+        lines.append(f"{'TYPE':<20} {'NAME':<22} {'DESTINATION':<22} {'STRATEGY':<12} {'STATUS':<10} {'ACTION'}")
+        lines.append("-" * 115)
         
         # Show each item
         for item in validation_results.get('item_details', []):
             item_type = item.get('type', 'unknown')[:18]
-            item_name = item.get('name', 'unknown')[:23]
+            item_name = item.get('name', 'unknown')[:20]
             exists = item.get('exists', False)
             strategy = item.get('strategy', 'skip')
             existing_loc = item.get('existing_location', '')
@@ -558,22 +767,35 @@ class PushConfigWidget(QWidget):
             
             # Format destination with type indicator
             if dest_type == 'snippet':
-                dest_display = f"📄 {dest_location}"[:23] if dest_location else "📄 (inherit)"
+                dest_display = f"📄 {dest_location}"[:20] if dest_location else "📄 (inherit)"
             elif dest_type == 'folder':
-                dest_display = f"📁 {dest_location}"[:23] if dest_location else "📁 (inherit)"
+                dest_display = f"📁 {dest_location}"[:20] if dest_location else "📁 (inherit)"
             elif dest_location:
-                dest_display = dest_location[:23]
+                dest_display = dest_location[:20]
             else:
                 dest_display = "(inherit)"
+            
+            # Format strategy - show "default" if matches default, otherwise show actual
+            if strategy == default_strategy:
+                strategy_display = f"(default)"
+            else:
+                strategy_display = strategy.upper()
             
             if exists:
                 status = "EXISTS"
                 # For security rules, show where the conflict is
                 loc_info = f" in '{existing_loc}'" if existing_loc else ""
                 if strategy == 'skip':
-                    action = f"→ SKIP (exists{loc_info})"
+                    action = f"→ SKIP{loc_info}"
                 elif strategy == 'overwrite':
-                    action = f"→ OVERWRITE{loc_info}"
+                    # For overwrite, clarify what will happen:
+                    # - If existing_loc differs from destination, show both delete location and create destination
+                    # - If same location, just show "DELETE then CREATE"
+                    if existing_loc and dest_location and existing_loc != dest_location:
+                        # Rule exists elsewhere - will delete from there and create in destination
+                        action = f"→ DELETE from '{existing_loc}', CREATE in dest"
+                    else:
+                        action = f"→ DELETE then CREATE"
                 elif strategy == 'rename':
                     action = f"→ RENAME (add -copy){loc_info}"
                 else:
@@ -582,31 +804,98 @@ class PushConfigWidget(QWidget):
                 status = "NEW"
                 action = "→ CREATE"
             
-            lines.append(f"{item_type:<20} {item_name:<25} {dest_display:<25} {status:<10} {action}")
+            lines.append(f"{item_type:<20} {item_name:<22} {dest_display:<22} {strategy_display:<12} {status:<10} {action}")
+            
+            # Log each item to activity log
+            logger.normal(f"[Validation] {item_type}/{item_name}: {status} -> {action} (dest={dest_location}, strategy={strategy})")
             
             # Show existing location detail for security rules with global conflicts
-            if exists and existing_loc and item_type == 'security_rule':
+            # Only show warning for SKIP strategy - for OVERWRITE the conflict is expected and handled
+            if exists and existing_loc and item_type == 'security_rule' and strategy == 'skip':
                 lines.append(f"{'':20} ⚠️ Rule name already exists in: {existing_loc}")
+                logger.warning(f"[Validation]   ⚠️ Rule name conflict: '{item_name}' exists in {existing_loc}")
             
             # Show errors/warnings for this item
             if item.get('error'):
                 lines.append(f"{'':20} ❌ ERROR: {item['error']}")
+                logger.error(f"[Validation]   ❌ {item['error']}")
             if item.get('warning'):
                 lines.append(f"{'':20} ⚠️ WARNING: {item['warning']}")
+                logger.warning(f"[Validation]   ⚠️ {item['warning']}")
             
             # Show missing dependencies
             if item.get('missing_deps'):
                 deps_str = ', '.join(item['missing_deps'])
                 lines.append(f"{'':20} ⚠️ Missing deps: {deps_str}")
+                logger.warning(f"[Validation]   ⚠️ Missing deps: {deps_str}")
         
-        lines.append("-" * 100)
+        lines.append("-" * 115)
         lines.append("")
+        
+        # Log summary counts to activity log
+        logger.normal(f"[Validation] " + "-" * 40)
+        logger.normal(f"[Validation] Total: {validation_results['total_items']}, New: {validation_results['new_items']}, Conflicts: {validation_results['conflicts']}")
+        if validation_results.get('errors'):
+            logger.error(f"[Validation] Errors: {len(validation_results['errors'])}")
+        if validation_results.get('warnings'):
+            logger.warning(f"[Validation] Warnings: {len(validation_results['warnings'])}")
+        
+        # Reference conflicts section (rules that reference objects being overwritten)
+        reference_conflicts = validation_results.get('reference_conflicts', [])
+        
+        # Filter to only OVERWRITE items that exist
+        overwrite_objects = set()
+        for item in validation_results.get('item_details', []):
+            if item.get('strategy') == 'overwrite' and item.get('exists'):
+                overwrite_objects.add(f"{item.get('type')}:{item.get('name')}")
+        
+        active_ref_conflicts = [
+            rc for rc in reference_conflicts
+            if f"{rc['referenced_type']}:{rc['referenced_object']}" in overwrite_objects
+        ]
+        
+        if active_ref_conflicts:
+            lines.append("=" * 115)
+            lines.append("🔗 REFERENCE CONFLICTS - Rules referencing objects being overwritten")
+            lines.append("=" * 115)
+            lines.append("")
+            lines.append("The following destination rules reference objects you are trying to OVERWRITE.")
+            lines.append("These objects cannot be deleted while rules reference them.")
+            lines.append("")
+            
+            # Group by referenced object
+            refs_by_object = {}
+            for rc in active_ref_conflicts:
+                obj_key = f"{rc['referenced_type']}:{rc['referenced_object']}"
+                if obj_key not in refs_by_object:
+                    refs_by_object[obj_key] = []
+                refs_by_object[obj_key].append(rc)
+            
+            for obj_key, conflicts in refs_by_object.items():
+                obj_type, obj_name = obj_key.split(':', 1)
+                lines.append(f"  📦 {obj_type}: {obj_name}")
+                lines.append(f"     Referenced by:")
+                for rc in conflicts:
+                    loc_type = "📄" if rc['rule_location_type'] == 'snippet' else "📁"
+                    lines.append(f"       - Rule '{rc['rule_name']}' ({loc_type} {rc['rule_location']}) in field: {rc['reference_field']}")
+                lines.append("")
+            
+            lines.append("OPTIONS TO RESOLVE:")
+            lines.append("  A) Change items to SKIP strategy (don't overwrite)")
+            lines.append("  B) Delete/recreate the referencing rules (add them to push with OVERWRITE)")
+            lines.append("  C) Manually remove the object references from rules before push")
+            lines.append("")
+            lines.append("-" * 115)
+            lines.append("")
         
         # Summary section
         lines.append("SUMMARY:")
         lines.append(f"  Total Items: {validation_results['total_items']}")
         lines.append(f"  New Items: {validation_results['new_items']}")
         lines.append(f"  Conflicts: {validation_results['conflicts']}")
+        
+        if active_ref_conflicts:
+            lines.append(f"  Reference Conflicts: {len(active_ref_conflicts)} (blocking push)")
         
         if validation_results['errors']:
             lines.append("")
@@ -640,6 +929,9 @@ class PushConfigWidget(QWidget):
         Returns:
             Dict with errors, warnings, item_details, counts, missing_dependencies
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         MAX_NAME_LENGTH = 55
         COPY_SUFFIX = "-copy"
         
@@ -649,6 +941,7 @@ class PushConfigWidget(QWidget):
         new_items = 0
         conflicts = 0
         total_items = 0
+        skipped_items = 0  # Track items that will be skipped (exists + skip strategy)
         missing_dependencies = []  # Track missing dependencies for "Add Missing" feature
         
         default_strategy = self.selected_items.get('default_strategy', 'skip')
@@ -865,6 +1158,33 @@ class PushConfigWidget(QWidget):
         new_snippets = destination_config.get('new_snippets', set())
         existing_snippets = set(destination_config.get('snippets', {}).keys())
         
+        # Folder display name mapping (API name -> User-friendly name)
+        FOLDER_DISPLAY_NAMES = {
+            'All': 'Global',
+            'Shared': 'Prisma Access',
+        }
+        
+        def get_display_name(name: str) -> str:
+            """Get display name for a folder (e.g., 'Shared' -> 'Prisma Access')."""
+            return FOLDER_DISPLAY_NAMES.get(name, name)
+        
+        # Default/system profile names that cannot be modified
+        DEFAULT_PROFILE_NAMES = {'best-practice', 'default', 'strict', 'Strict'}
+        PROFILE_ITEM_TYPES = {
+            'wildfire_profile', 'wildfire_antivirus_profile',
+            'anti_spyware_profile',
+            'vulnerability_profile', 'vulnerability_protection_profile',
+            'url_filtering_profile',
+            'file_blocking_profile',
+            'dns_security_profile',
+            'decryption_profile',
+            'security_profile_group', 'profile_group',
+        }
+        
+        def is_default_profile(item_type: str, item_name: str) -> bool:
+            """Check if an item is a default/system profile that should be skipped."""
+            return item_type in PROFILE_ITEM_TYPES and item_name in DEFAULT_PROFILE_NAMES
+        
         def check_name_length(name: str, item_type: str, strategy: str) -> tuple:
             """Check name length, returns (error, warning) messages."""
             if not name:
@@ -888,7 +1208,27 @@ class PushConfigWidget(QWidget):
             """Get the effective strategy for an item."""
             dest = item_data.get('_destination', {})
             return dest.get('strategy', default_strategy)
-        
+
+        def get_destination_name(source_name: str, strategy: str, item_data: Dict = None) -> str:
+            """Get the destination name based on strategy and user input.
+
+            For 'rename' strategy:
+              - If user specified a custom name in _destination.name, use it
+              - Otherwise, append COPY_SUFFIX to the source name
+            For other strategies, returns the source name unchanged.
+            """
+            if strategy == 'rename':
+                # Check if user specified a custom destination name
+                if item_data:
+                    dest = item_data.get('_destination', {})
+                    custom_name = dest.get('name', '')
+                    # Use custom name if it's set and different from source
+                    if custom_name and custom_name != source_name:
+                        return custom_name
+                # Default: append -copy suffix
+                return f"{source_name}{COPY_SUFFIX}"
+            return source_name
+
         def get_item_destination(item_data: Dict) -> tuple:
             """Get destination info for an item.
             
@@ -918,9 +1258,12 @@ class PushConfigWidget(QWidget):
             return dest_name in new_snippets
         
         # Check folders
+        # Note: Folders themselves are NOT counted as items - they are built-in in Prisma Access
+        # Only their contents (objects, profiles, etc.) are counted and validated
+        # Exception: If creating a NEW snippet, that snippet creation IS counted
         for folder_data in self.selected_items.get('folders', []):
             folder_name = folder_data.get('name', '')
-            total_items += 1
+            folder_display_name = get_display_name(folder_name)  # User-friendly name
             strategy = get_item_strategy(folder_data)
             
             # Check destination type
@@ -940,7 +1283,8 @@ class PushConfigWidget(QWidget):
                 # This folder's contents are going to a new snippet
                 # Check if snippet already exists!
                 snippet_exists = new_snippet_name in existing_snippets
-                
+                total_items += 1  # Count the new snippet as an item
+
                 if snippet_exists:
                     # Snippet name conflict - this is an error/conflict
                     conflicts += 1
@@ -994,33 +1338,10 @@ class PushConfigWidget(QWidget):
                 # Don't count the folder itself as a new item - it's a container operation
             else:
                 # Regular folder push (to a folder destination)
-                # Check for conflicts
-                dest_folders = destination_config.get('folders', {})
-                exists = folder_name in dest_folders
-                
-                if exists:
-                    conflicts += 1
-                    action = f"Will {strategy}"
-                else:
-                    new_items += 1
-                    action = "Will create"
-                
-                # Check name length
-                err, warn = check_name_length(folder_name, 'folder', strategy)
-                if err:
-                    errors.append(err)
-                if warn:
-                    warnings.append(warn)
-                
-                item_details.append({
-                    'type': 'folder',
-                    'name': folder_name,
-                    'exists': exists,
-                    'strategy': strategy,
-                    'action': action,
-                    'error': err,
-                    'warning': warn,
-                })
+                # Folders are built-in in Prisma Access - they cannot be created/deleted
+                # Only the contents within folders are pushed, not the folder container itself
+                # So we don't add the folder to item_details - only its contents will be validated
+                pass
             
             # Check objects within folder
             # If the container is going to a new snippet, all children auto-pass
@@ -1028,6 +1349,12 @@ class PushConfigWidget(QWidget):
             # If going to existing snippet, need to check snippet-scoped conflicts
             container_is_existing_snippet = is_to_existing_snippet
             target_snippet_name = dest_folder if is_to_existing_snippet else new_snippet_name
+            
+            # Debug: Log container destination settings
+            logger.debug(f"[Validation] Folder '{folder_name}' destination settings:")
+            logger.debug(f"  is_to_new_snippet={is_to_new_snippet}, is_to_existing_snippet={is_to_existing_snippet}")
+            logger.debug(f"  container_is_new_snippet={container_is_new_snippet}, container_is_existing_snippet={container_is_existing_snippet}")
+            logger.debug(f"  target_snippet_name={target_snippet_name}, dest_folder={dest_folder}")
             
             for obj_type, obj_list in folder_data.get('objects', {}).items():
                 if not isinstance(obj_list, list):
@@ -1038,45 +1365,103 @@ class PushConfigWidget(QWidget):
                     obj_name = obj.get('name', '')
                     total_items += 1
                     obj_strategy = get_item_strategy(obj)
-                    
+                    obj_dest_name = get_destination_name(obj_name, obj_strategy, obj)
+
+                    # Get per-item destination (overrides container destination if set)
+                    item_dest_name, item_is_new_snippet, item_is_snippet = get_item_destination(obj)
+
+                    # Use item destination if set, otherwise fall back to container destination
+                    if item_dest_name:
+                        # Item has its own destination
+                        if item_is_new_snippet:
+                            obj_is_new_snippet = True
+                            obj_is_existing_snippet = False
+                            obj_target_name = item_dest_name
+                        elif item_is_snippet:
+                            obj_is_new_snippet = False
+                            obj_is_existing_snippet = True
+                            obj_target_name = item_dest_name
+                        else:
+                            # Going to a folder
+                            obj_is_new_snippet = False
+                            obj_is_existing_snippet = False
+                            obj_target_name = item_dest_name
+                    else:
+                        # Use container destination
+                        obj_is_new_snippet = container_is_new_snippet
+                        obj_is_existing_snippet = container_is_existing_snippet
+                        obj_target_name = target_snippet_name if (container_is_new_snippet or container_is_existing_snippet) else folder_display_name
+
+                    # Determine destination type
+                    if obj_is_new_snippet or obj_is_existing_snippet:
+                        dest_type = 'snippet'
+                    else:
+                        dest_type = 'folder'
+
+                    # Check if this is a default/system profile - always skip
+                    if is_default_profile(obj_type, obj_name):
+                        skipped_items += 1
+                        action = "Will SKIP (default/system profile)"
+                        item_details.append({
+                            'type': obj_type,
+                            'name': obj_name,
+                            'location': obj_target_name,
+                            'dest_type': dest_type,
+                            'exists': True,
+                            'strategy': 'skip',
+                            'action': action,
+                            'warning': 'Default profile - cannot be modified',
+                        })
+                        continue
+
                     # Determine destination and conflict check
-                    if container_is_new_snippet or is_destination_new_snippet(obj):
+                    if obj_is_new_snippet:
                         # Going to NEW snippet - auto-pass (no conflicts possible)
                         exists = False
-                        action = f"Will create in new snippet '{target_snippet_name}'"
-                        dest_location = target_snippet_name
-                    elif container_is_existing_snippet:
+                        action = f"Will create in new snippet '{obj_target_name}'"
+                        dest_location = obj_target_name
+                    elif obj_is_existing_snippet:
                         # Going to EXISTING snippet - check snippet-scoped conflicts
-                        # Objects in snippets are scoped to the snippet
-                        snippet_objects = destination_config.get('snippet_objects', {}).get(target_snippet_name, {}).get(obj_type, {})
+                        snippet_objects = destination_config.get('snippet_objects', {}).get(obj_target_name, {}).get(obj_type, {})
                         exists = obj_name in snippet_objects
-                        dest_location = target_snippet_name
+                        dest_location = obj_target_name
                         if exists:
-                            action = f"Will {obj_strategy} in snippet '{target_snippet_name}'"
+                            action = f"Will {obj_strategy} in snippet '{obj_target_name}'"
                         else:
-                            action = f"Will create in snippet '{target_snippet_name}'"
+                            action = f"Will create in snippet '{obj_target_name}'"
                     else:
                         # Regular folder destination - global object check
                         exists = obj_name in dest_objects
-                        dest_location = folder_name
-                    
+                        dest_location = obj_target_name
+
                     if exists:
-                        conflicts += 1
-                        if not container_is_existing_snippet:
-                            action = f"Will {obj_strategy}"
+                        if obj_strategy == 'skip':
+                            skipped_items += 1
+                            if not obj_is_existing_snippet:
+                                action = "Will SKIP (already exists)"
+                        else:
+                            conflicts += 1
+                            if not obj_is_existing_snippet:
+                                action = f"Will {obj_strategy}"
                     else:
                         new_items += 1
-                        if not container_is_new_snippet and not container_is_existing_snippet:
+                        if not obj_is_new_snippet and not obj_is_existing_snippet:
                             action = "Will create"
                     
-                    err, warn = check_name_length(obj_name, obj_type, obj_strategy)
+                    # Validate destination name length (use 'skip' strategy since we already have the dest name)
+                    err, warn = check_name_length(obj_dest_name, obj_type, 'skip')
                     if err:
                         errors.append(err)
                     if warn:
                         warnings.append(warn)
-                    
-                    # Check dependencies - pass container info to find deps in same container
-                    obj_missing_deps = check_dependencies(obj, obj_type, obj_name, 'folder', folder_name)
+
+                    # Only check dependencies if item will actually be pushed
+                    # If item exists and strategy is SKIP, no need to check dependencies
+                    obj_missing_deps = []
+                    if not (exists and obj_strategy == 'skip'):
+                        # Check dependencies - pass container info to find deps in same container
+                        obj_missing_deps = check_dependencies(obj, obj_type, obj_name, 'folder', folder_name)
+
                     if obj_missing_deps:
                         for dep in obj_missing_deps:
                             # Add target destination info to the dependency
@@ -1084,24 +1469,18 @@ class PushConfigWidget(QWidget):
                             dep['target_destination'] = {
                                 'folder': dest_location,
                                 'dest_type': dest_type,
-                                'is_existing_snippet': container_is_existing_snippet,
-                                'is_new_snippet': container_is_new_snippet,
+                                'is_existing_snippet': obj_is_existing_snippet,
+                                'is_new_snippet': obj_is_new_snippet,
                             }
                             if dep not in missing_dependencies:
                                 missing_dependencies.append(dep)
                         dep_names = [d['name'] for d in obj_missing_deps]
                         dep_warning = f"Missing dependencies: {', '.join(dep_names)}"
-                        warnings.append(f"{obj_name}: {dep_warning}")
-                    
-                    # Determine destination type
-                    if container_is_new_snippet or container_is_existing_snippet:
-                        dest_type = 'snippet'
-                    else:
-                        dest_type = 'folder'
-                    
+                        warnings.append(f"{obj_dest_name}: {dep_warning}")
+
                     item_details.append({
                         'type': obj_type,
-                        'name': obj_name,
+                        'name': obj_dest_name,
                         'location': dest_location,
                         'dest_type': dest_type,
                         'exists': exists,
@@ -1112,72 +1491,350 @@ class PushConfigWidget(QWidget):
                         'missing_deps': [d['name'] for d in obj_missing_deps] if obj_missing_deps else None,
                     })
             
+            # Check PROFILES within folder (wildfire_profile, anti_spyware_profile, etc.)
+            for prof_type, prof_list in folder_data.get('profiles', {}).items():
+                if not isinstance(prof_list, list):
+                    continue
+                dest_profiles = destination_config.get('objects', {}).get(prof_type, {})
+                
+                for prof in prof_list:
+                    prof_name = prof.get('name', '')
+                    total_items += 1
+                    prof_strategy = get_item_strategy(prof)
+                    prof_dest_name = get_destination_name(prof_name, prof_strategy, prof)
+
+                    # Get per-item destination (overrides container destination if set)
+                    item_dest_name, item_is_new_snippet, item_is_snippet = get_item_destination(prof)
+
+                    # Use item destination if set, otherwise fall back to container destination
+                    if item_dest_name:
+                        if item_is_new_snippet:
+                            prof_is_new_snippet = True
+                            prof_is_existing_snippet = False
+                            prof_target_name = item_dest_name
+                        elif item_is_snippet:
+                            prof_is_new_snippet = False
+                            prof_is_existing_snippet = True
+                            prof_target_name = item_dest_name
+                        else:
+                            prof_is_new_snippet = False
+                            prof_is_existing_snippet = False
+                            prof_target_name = item_dest_name
+                    else:
+                        prof_is_new_snippet = container_is_new_snippet
+                        prof_is_existing_snippet = container_is_existing_snippet
+                        prof_target_name = target_snippet_name if (container_is_new_snippet or container_is_existing_snippet) else folder_display_name
+
+                    # Determine destination type
+                    if prof_is_new_snippet or prof_is_existing_snippet:
+                        dest_type = 'snippet'
+                    else:
+                        dest_type = 'folder'
+
+                    # Check if this is a default/system profile - always skip
+                    if is_default_profile(prof_type, prof_name):
+                        skipped_items += 1
+                        action = "Will SKIP (default/system profile)"
+                        item_details.append({
+                            'type': prof_type,
+                            'name': prof_name,
+                            'location': prof_target_name,
+                            'dest_type': dest_type,
+                            'exists': True,  # Mark as exists to prevent push
+                            'strategy': 'skip',
+                            'action': action,
+                            'warning': 'Default profile - cannot be modified',
+                        })
+                        continue
+
+                    if prof_is_new_snippet:
+                        exists = False
+                        action = f"Will create in new snippet '{prof_target_name}'"
+                        dest_location = prof_target_name
+                    elif prof_is_existing_snippet:
+                        snippet_profs = destination_config.get('snippet_objects', {}).get(prof_target_name, {}).get(prof_type, {})
+                        exists = prof_name in snippet_profs
+                        dest_location = prof_target_name
+                        if exists:
+                            action = f"Will {prof_strategy} in snippet '{prof_target_name}'"
+                        else:
+                            action = f"Will create in snippet '{prof_target_name}'"
+                    else:
+                        exists = prof_name in dest_profiles
+                        dest_location = prof_target_name
+
+                    if exists:
+                        if prof_strategy == 'skip':
+                            skipped_items += 1
+                            if not prof_is_existing_snippet:
+                                action = "Will SKIP (already exists)"
+                        else:
+                            conflicts += 1
+                            if not prof_is_existing_snippet:
+                                action = f"Will {prof_strategy}"
+                    else:
+                        new_items += 1
+                        if not prof_is_new_snippet and not prof_is_existing_snippet:
+                            action = "Will create"
+                    
+                    # Validate destination name length
+                    err, warn = check_name_length(prof_dest_name, prof_type, 'skip')
+                    if err:
+                        errors.append(err)
+                    if warn:
+                        warnings.append(warn)
+
+                    # Special warning for certificate_profile - certificates need manual upload
+                    cert_warning = None
+                    if prof_type == 'certificate_profile' and not exists:
+                        cert_warning = "⚠️ Certificate profile will be created but referenced certificates may need to be uploaded manually"
+                        warnings.append(f"{prof_dest_name}: Certificates may need manual configuration")
+
+                    item_details.append({
+                        'type': prof_type,
+                        'name': prof_dest_name,
+                        'location': dest_location,
+                        'dest_type': dest_type,
+                        'exists': exists,
+                        'strategy': prof_strategy,
+                        'action': action,
+                        'error': err,
+                        'warning': cert_warning or warn,
+                    })
+            
+            # Check HIP items within folder (hip_object, hip_profile)
+            for hip_type, hip_list in folder_data.get('hip', {}).items():
+                if not isinstance(hip_list, list):
+                    continue
+                dest_hip = destination_config.get('objects', {}).get(hip_type, {})
+
+                for hip in hip_list:
+                    hip_name = hip.get('name', '')
+                    total_items += 1
+                    hip_strategy = get_item_strategy(hip)
+                    hip_dest_name = get_destination_name(hip_name, hip_strategy, hip)
+
+                    # Get per-item destination (overrides container destination if set)
+                    item_dest_name, item_is_new_snippet, item_is_snippet = get_item_destination(hip)
+
+                    # Use item destination if set, otherwise fall back to container destination
+                    if item_dest_name:
+                        if item_is_new_snippet:
+                            hip_is_new_snippet = True
+                            hip_is_existing_snippet = False
+                            hip_target_name = item_dest_name
+                        elif item_is_snippet:
+                            hip_is_new_snippet = False
+                            hip_is_existing_snippet = True
+                            hip_target_name = item_dest_name
+                        else:
+                            hip_is_new_snippet = False
+                            hip_is_existing_snippet = False
+                            hip_target_name = item_dest_name
+                    else:
+                        hip_is_new_snippet = container_is_new_snippet
+                        hip_is_existing_snippet = container_is_existing_snippet
+                        hip_target_name = target_snippet_name if (container_is_new_snippet or container_is_existing_snippet) else folder_display_name
+
+                    # Determine destination type
+                    if hip_is_new_snippet or hip_is_existing_snippet:
+                        dest_type = 'snippet'
+                    else:
+                        dest_type = 'folder'
+
+                    if hip_is_new_snippet:
+                        exists = False
+                        action = f"Will create in new snippet '{hip_target_name}'"
+                        dest_location = hip_target_name
+                    elif hip_is_existing_snippet:
+                        snippet_hip = destination_config.get('snippet_objects', {}).get(hip_target_name, {}).get(hip_type, {})
+                        exists = hip_name in snippet_hip
+                        dest_location = hip_target_name
+                        if exists:
+                            action = f"Will {hip_strategy} in snippet '{hip_target_name}'"
+                        else:
+                            action = f"Will create in snippet '{hip_target_name}'"
+                    else:
+                        exists = hip_name in dest_hip
+                        dest_location = hip_target_name
+
+                    if exists:
+                        if hip_strategy == 'skip':
+                            skipped_items += 1
+                            if not hip_is_existing_snippet:
+                                action = "Will SKIP (already exists)"
+                        else:
+                            conflicts += 1
+                            if not hip_is_existing_snippet:
+                                action = f"Will {hip_strategy}"
+                    else:
+                        new_items += 1
+                        if not hip_is_new_snippet and not hip_is_existing_snippet:
+                            action = "Will create"
+                    
+                    # Validate destination name length
+                    err, warn = check_name_length(hip_dest_name, hip_type, 'skip')
+                    if err:
+                        errors.append(err)
+                    if warn:
+                        warnings.append(warn)
+
+                    item_details.append({
+                        'type': hip_type,
+                        'name': hip_dest_name,
+                        'location': dest_location,
+                        'dest_type': dest_type,
+                        'exists': exists,
+                        'strategy': hip_strategy,
+                        'action': action,
+                        'error': err,
+                        'warning': warn,
+                    })
+            
             # Check rules within folder
             # Check security rules within folder
             # IMPORTANT: Security rules must be GLOBALLY unique across the entire tenant
             # UNLESS the destination is a NEW snippet (then auto-pass)
             # OR going to an existing snippet (rules scoped to snippet)
-            for rule in folder_data.get('security_rules', []):
+            rules_in_folder = folder_data.get('security_rules', [])
+            if rules_in_folder:
+                logger.debug(f"[Validation] Processing {len(rules_in_folder)} security rules for folder '{folder_name}'")
+                logger.debug(f"[Validation] container_is_existing_snippet={container_is_existing_snippet}, target_snippet_name={target_snippet_name}")
+            
+            for rule in rules_in_folder:
                 if not isinstance(rule, dict):
                     continue
                 rule_name = rule.get('name', '')
                 total_items += 1
                 rule_strategy = get_item_strategy(rule)
-                
-                # Determine destination and conflict check
-                if container_is_new_snippet or is_destination_new_snippet(rule):
-                    # Going to NEW snippet - auto-pass (no conflict possible)
-                    exists = False
-                    existing_location = {}
-                    new_items += 1
-                    action = f"Will create in new snippet '{target_snippet_name}'"
-                    display_location = target_snippet_name
-                elif container_is_existing_snippet:
-                    # Going to EXISTING snippet - check global rule uniqueness
-                    # Security rules are GLOBALLY unique even in snippets
-                    all_rule_names = destination_config.get('all_rule_names', {})
-                    exists = rule_name in all_rule_names
-                    existing_location = all_rule_names.get(rule_name, {})
-                    display_location = target_snippet_name
-                    
-                    if exists:
-                        conflicts += 1
-                        conflict_loc = existing_location.get('folder') or existing_location.get('snippet') or 'unknown'
-                        action = f"Will {rule_strategy} in snippet '{target_snippet_name}' (exists in {conflict_loc})"
+                rule_dest_name = get_destination_name(rule_name, rule_strategy, rule)
+
+                # Get per-item destination (overrides container destination if set)
+                item_dest_name, item_is_new_snippet, item_is_snippet = get_item_destination(rule)
+
+                # Use item destination if set, otherwise fall back to container destination
+                if item_dest_name:
+                    if item_is_new_snippet:
+                        rule_is_new_snippet = True
+                        rule_is_existing_snippet = False
+                        rule_target_name = item_dest_name
+                    elif item_is_snippet:
+                        rule_is_new_snippet = False
+                        rule_is_existing_snippet = True
+                        rule_target_name = item_dest_name
                     else:
-                        new_items += 1
-                        action = f"Will create in snippet '{target_snippet_name}'"
+                        rule_is_new_snippet = False
+                        rule_is_existing_snippet = False
+                        rule_target_name = item_dest_name
                 else:
-                    # Regular folder destination - check GLOBAL uniqueness
+                    rule_is_new_snippet = container_is_new_snippet
+                    rule_is_existing_snippet = container_is_existing_snippet
+                    rule_target_name = target_snippet_name if (container_is_new_snippet or container_is_existing_snippet) else folder_display_name
+
+                # Determine destination and conflict check
+                name_conflict_warn = None  # Track global name conflict warning separately
+
+                if rule_is_new_snippet:
+                    # Going to NEW snippet - still check global uniqueness for warnings
+                    # The push can proceed, but user should know if rule names will conflict
+                    # when the snippet is eventually associated with a folder
                     all_rule_names = destination_config.get('all_rule_names', {})
-                    exists = rule_name in all_rule_names
+                    global_exists = rule_name in all_rule_names
                     existing_location = all_rule_names.get(rule_name, {})
-                    display_location = folder_name
-                    
-                    if exists:
-                        conflicts += 1
+                    display_location = rule_target_name
+
+                    # For NEW snippets, mark as NEW (not EXISTS) but add warning if name conflicts
+                    exists = False  # Don't block - new snippet has no local conflicts
+                    new_items += 1
+
+                    if global_exists:
                         conflict_loc = existing_location.get('folder') or existing_location.get('snippet') or 'unknown'
-                        action = f"Will {rule_strategy} (exists in {conflict_loc})"
+                        action = f"Will create in new snippet '{rule_target_name}'"
+                        # Add warning about name conflict - store separately so it's shown in item details
+                        name_conflict_warn = f"⚠️ Name conflict with '{conflict_loc}' - will need renaming before snippet association"
+                        warnings.append(f"Rule '{rule_name}' name conflicts with existing rule in '{conflict_loc}'")
                     else:
+                        action = f"Will create in new snippet '{rule_target_name}'"
+                elif rule_is_existing_snippet:
+                    # Going to EXISTING snippet - only check if rule exists in THIS snippet
+                    # Snippets are isolated until associated with a folder
+                    all_rule_names = destination_config.get('all_rule_names', {})
+                    display_location = rule_target_name
+
+                    # Check if rule exists in THIS specific snippet
+                    rule_info = all_rule_names.get(rule_name, {})
+                    rule_in_this_snippet = (
+                        rule_info.get('snippet') == rule_target_name
+                    )
+
+                    if rule_in_this_snippet:
+                        exists = True
+                        existing_location = rule_info
+                        conflicts += 1
+                        action = f"Will {rule_strategy} in snippet '{rule_target_name}'"
+                    else:
+                        exists = False
+                        existing_location = {}
+                        new_items += 1
+                        action = f"Will create in snippet '{rule_target_name}'"
+                else:
+                    # Regular folder destination - check if rule exists in ANY folder
+                    # Folder rules are globally unique across all folders
+                    all_rule_names = destination_config.get('all_rule_names', {})
+                    display_location = folder_display_name  # Use display name
+                    
+                    # Debug: Log what we're checking
+                    logger.debug(f"[Validation] Checking rule '{rule_name}' against all_rule_names ({len(all_rule_names)} rules)")
+                    
+                    # Check if rule exists in ANY folder (not snippets)
+                    rule_info = all_rule_names.get(rule_name, {})
+                    rule_in_folder = rule_info.get('folder') is not None
+                    
+                    # Debug: Log lookup result
+                    if rule_info:
+                        logger.debug(f"[Validation] Found rule '{rule_name}' in all_rule_names: folder={rule_info.get('folder')}, snippet={rule_info.get('snippet')}")
+                    else:
+                        logger.debug(f"[Validation] Rule '{rule_name}' NOT found in all_rule_names")
+                    
+                    if rule_in_folder:
+                        exists = True
+                        existing_location = rule_info
+                        conflicts += 1
+                        conflict_loc = existing_location.get('folder', 'unknown')
+                        action = f"Will {rule_strategy} (exists in folder '{conflict_loc}')"
+                    else:
+                        exists = False
+                        existing_location = {}
                         new_items += 1
                         action = "Will create"
                 
-                err, warn = check_name_length(rule_name, 'security_rule', rule_strategy)
+                # Validate destination name length
+                err, length_warn = check_name_length(rule_dest_name, 'security_rule', 'skip')
                 if err:
                     errors.append(err)
-                if warn:
-                    warnings.append(warn)
-                
+                if length_warn:
+                    warnings.append(length_warn)
+
+                # Combine warnings - name conflict warning takes precedence for item display
+                item_warn = name_conflict_warn or length_warn
+
+                # Determine dest_type based on per-item destination
+                if rule_is_new_snippet or rule_is_existing_snippet:
+                    dest_type = 'snippet'
+                else:
+                    dest_type = 'folder'
+
                 item_details.append({
                     'type': 'security_rule',
-                    'name': rule_name,
+                    'name': rule_dest_name,
                     'location': display_location,
+                    'dest_type': dest_type,
                     'exists': exists,
-                    'existing_location': f"{existing_location.get('folder') or existing_location.get('snippet')}" if exists else None,
+                    'existing_location': existing_location.get('folder') or existing_location.get('snippet') if exists else None,
                     'strategy': rule_strategy,
                     'action': action,
                     'error': err,
-                    'warning': warn,
+                    'warning': item_warn,
                 })
         
         # Check snippets
@@ -1341,7 +1998,8 @@ class PushConfigWidget(QWidget):
                     obj_name = obj.get('name', '')
                     total_items += 1
                     obj_strategy = get_item_strategy(obj)
-                    
+                    obj_dest_name = get_destination_name(obj_name, obj_strategy, obj)
+
                     # Check item-level destination (may override container destination)
                     obj_dest_info = obj.get('_destination', {})
                     obj_dest_folder = obj_dest_info.get('folder', '') or dest_folder
@@ -1349,10 +2007,24 @@ class PushConfigWidget(QWidget):
                     obj_is_new_snippet = obj_dest_info.get('is_new_snippet', False) or snippet_is_new
                     obj_new_snippet_name = obj_dest_info.get('new_snippet_name', '') or new_snippet_name
                     
+                    # DEBUG: Log destination resolution for each item
+                    logger.debug(f"[Validation] Item '{obj_name}' ({obj_type}) destination: "
+                                f"obj_dest_info={obj_dest_info}, "
+                                f"obj_dest_folder={obj_dest_folder}, "
+                                f"obj_is_existing_snippet={obj_is_existing_snippet}")
+                    
                     # Re-check if destination is an existing snippet based on item's destination
                     if not obj_is_existing_snippet and not obj_is_new_snippet:
                         if obj_dest_folder and obj_dest_folder in existing_snippets:
                             obj_is_existing_snippet = True
+                        # Also check source snippet name for inherit case
+                        elif not obj_dest_folder and snippet_name in existing_snippets:
+                            obj_is_existing_snippet = True
+                            obj_dest_folder = snippet_name  # Use source snippet as destination
+                    
+                    # If dest_folder is empty but we're going to existing snippet, use snippet_name
+                    if obj_is_existing_snippet and not obj_dest_folder:
+                        obj_dest_folder = snippet_name
                     
                     # If parent snippet is new OR item is going to a new snippet, auto-pass
                     if obj_is_new_snippet or is_destination_new_snippet(obj):
@@ -1365,34 +2037,53 @@ class PushConfigWidget(QWidget):
                         snippet_objects = destination_config.get('snippet_objects', {}).get(target_snippet, {}).get(obj_type, {})
                         exists = obj_name in snippet_objects
                         if exists:
-                            conflicts += 1
-                            action = f"Will {obj_strategy} in snippet '{target_snippet}'"
+                            if obj_strategy == 'skip':
+                                skipped_items += 1
+                                action = f"Will SKIP (already exists in '{target_snippet}')"
+                            else:
+                                conflicts += 1
+                                action = f"Will {obj_strategy} in snippet '{target_snippet}'"
                         else:
                             new_items += 1
                             action = f"Will create in snippet '{target_snippet}'"
                     else:
                         exists = obj_name in dest_objects
                         if exists:
-                            conflicts += 1
-                            action = f"Will {obj_strategy}"
+                            if obj_strategy == 'skip':
+                                skipped_items += 1
+                                action = "Will SKIP (already exists)"
+                            else:
+                                conflicts += 1
+                                action = f"Will {obj_strategy}"
                         else:
                             new_items += 1
                             action = "Will create"
                     
-                    err, warn = check_name_length(obj_name, obj_type, obj_strategy)
+                    # Validate destination name length
+                    err, warn = check_name_length(obj_dest_name, obj_type, 'skip')
                     if err:
                         errors.append(err)
                     if warn:
                         warnings.append(warn)
-                    
-                    # Check dependencies - pass container info to find deps in same snippet
-                    obj_missing_deps = check_dependencies(obj, obj_type, obj_name, 'snippet', snippet_name)
+
+                    # Only check dependencies if item will actually be pushed
+                    # If item exists and strategy is SKIP, no need to check dependencies
+                    obj_missing_deps = []
+                    if not (exists and obj_strategy == 'skip'):
+                        # Check dependencies - pass container info to find deps in same snippet
+                        obj_missing_deps = check_dependencies(obj, obj_type, obj_name, 'snippet', snippet_name)
+
                     if obj_missing_deps:
                         # Determine target destination for dependencies - use ITEM's destination, not container
                         dep_dest_location = obj_new_snippet_name if obj_is_new_snippet else obj_dest_folder if obj_dest_folder else snippet_name
                         dep_is_existing = obj_is_existing_snippet
                         dep_is_new = obj_is_new_snippet
-                        
+
+                        # DEBUG: Log the destination resolution for dependencies
+                        logger.debug(f"[Validation] Dependencies for '{obj_dest_name}' will use destination:")
+                        logger.debug(f"  obj_new_snippet_name={obj_new_snippet_name}, obj_dest_folder={obj_dest_folder}, snippet_name={snippet_name}")
+                        logger.debug(f"  -> dep_dest_location={dep_dest_location}, dep_is_existing={dep_is_existing}")
+
                         for dep in obj_missing_deps:
                             # Add target destination info to the dependency
                             # Dependencies should go to the SAME destination as the item requiring them
@@ -1406,7 +2097,7 @@ class PushConfigWidget(QWidget):
                                 missing_dependencies.append(dep)
                         dep_names = [d['name'] for d in obj_missing_deps]
                         dep_warning = f"Missing dependencies: {', '.join(dep_names)}"
-                        warnings.append(f"{obj_name}: {dep_warning}")
+                        warnings.append(f"{obj_dest_name}: {dep_warning}")
                     
                     # Determine the correct destination location to display - use ITEM's destination
                     if obj_is_new_snippet:
@@ -1418,7 +2109,7 @@ class PushConfigWidget(QWidget):
                     
                     item_details.append({
                         'type': obj_type,
-                        'name': obj_name,
+                        'name': obj_dest_name,
                         'location': display_location,
                         'dest_type': 'snippet',
                         'exists': exists,
@@ -1428,54 +2119,77 @@ class PushConfigWidget(QWidget):
                         'warning': warn,
                         'missing_deps': [d['name'] for d in obj_missing_deps] if obj_missing_deps else None,
                     })
-            
+
             # Check security rules within snippet
-            # IMPORTANT: Security rules must be GLOBALLY unique across the entire tenant
-            # UNLESS the parent snippet is NEW (then auto-pass)
+            # Rule conflict logic:
+            # 1. NEW snippet destination: No conflict (warn about global name conflicts for future association)
+            # 2. EXISTING snippet destination: Only conflict if rule exists in THIS snippet
             for rule in snippet_data.get('security_rules', []):
                 if not isinstance(rule, dict):
                     continue
                 rule_name = rule.get('name', '')
                 total_items += 1
                 rule_strategy = get_item_strategy(rule)
+                rule_dest_name = get_destination_name(rule_name, rule_strategy, rule)
+                name_conflict_warn = None  # Track global name conflict warning separately
                 
-                # If parent snippet is new, this rule auto-passes (no conflict possible)
+                all_rule_names = destination_config.get('all_rule_names', {})
+                rule_info = all_rule_names.get(rule_name, {})
+                global_exists = rule_name in all_rule_names
+                
+                # Determine destination snippet name
+                target_snippet = new_snippet_name if snippet_is_new else snippet_name
+                
+                # If parent snippet is new, rule goes in, but warn about conflicts
                 if snippet_is_new or is_destination_new_snippet(rule):
-                    exists = False
+                    exists = False  # Don't block - new snippet has no local conflicts
                     existing_location = {}
                     new_items += 1
-                    action = f"Will create in '{new_snippet_name}'"
-                else:
-                    # Check GLOBAL uniqueness using all_rule_names
-                    all_rule_names = destination_config.get('all_rule_names', {})
-                    exists = rule_name in all_rule_names
-                    existing_location = all_rule_names.get(rule_name, {})
+                    target_name = new_snippet_name or snippet_name
                     
-                    if exists:
-                        conflicts += 1
-                        # Show where the conflict is
-                        conflict_loc = existing_location.get('folder') or existing_location.get('snippet') or 'unknown'
-                        action = f"Will {rule_strategy} (exists in {conflict_loc})"
+                    if global_exists:
+                        conflict_loc = rule_info.get('folder') or rule_info.get('snippet') or 'unknown'
+                        action = f"Will create in '{target_name}'"
+                        name_conflict_warn = f"⚠️ Name conflict with '{conflict_loc}' - will need renaming before snippet association"
+                        warnings.append(f"Rule '{rule_name}' name conflicts with existing rule in '{conflict_loc}'")
                     else:
+                        action = f"Will create in '{target_name}'"
+                else:
+                    # Existing snippet - only conflict if rule exists in THIS specific snippet
+                    rule_in_this_snippet = (rule_info.get('snippet') == target_snippet)
+                    
+                    if rule_in_this_snippet:
+                        exists = True
+                        existing_location = rule_info
+                        conflicts += 1
+                        action = f"Will {rule_strategy} in snippet '{target_snippet}'"
+                    else:
+                        exists = False
+                        existing_location = {}
                         new_items += 1
-                        action = "Will create"
+                        action = f"Will create in snippet '{target_snippet}'"
                 
-                err, warn = check_name_length(rule_name, 'security_rule', rule_strategy)
+                # Validate destination name length
+                err, length_warn = check_name_length(rule_dest_name, 'security_rule', 'skip')
                 if err:
                     errors.append(err)
-                if warn:
-                    warnings.append(warn)
-                
+                if length_warn:
+                    warnings.append(length_warn)
+
+                # Combine warnings - name conflict warning takes precedence for item display
+                item_warn = name_conflict_warn or length_warn
+
                 item_details.append({
                     'type': 'security_rule',
-                    'name': rule_name,
-                    'location': new_snippet_name if snippet_is_new else snippet_name,
+                    'name': rule_dest_name,
+                    'location': target_snippet,
+                    'dest_type': 'snippet',
                     'exists': exists,
                     'existing_location': f"{existing_location.get('folder') or existing_location.get('snippet')}" if exists else None,
                     'strategy': rule_strategy,
                     'action': action,
                     'error': err,
-                    'warning': warn,
+                    'warning': item_warn,
                 })
         
         # Check infrastructure
@@ -1488,7 +2202,8 @@ class PushConfigWidget(QWidget):
                 item_name = item.get('name', item.get('id', ''))
                 total_items += 1
                 item_strategy = get_item_strategy(item)
-                
+                item_dest_name = get_destination_name(item_name, item_strategy, item)
+
                 exists = item_name in dest_infra
                 if exists:
                     conflicts += 1
@@ -1497,15 +2212,16 @@ class PushConfigWidget(QWidget):
                     new_items += 1
                     action = "Will create"
                 
-                err, warn = check_name_length(item_name, infra_type, item_strategy)
+                # Validate destination name length
+                err, warn = check_name_length(item_dest_name, infra_type, 'skip')
                 if err:
                     errors.append(err)
                 if warn:
                     warnings.append(warn)
-                
+
                 item_details.append({
                     'type': infra_type,
-                    'name': item_name,
+                    'name': item_dest_name,
                     'exists': exists,
                     'strategy': item_strategy,
                     'action': action,
@@ -1513,14 +2229,19 @@ class PushConfigWidget(QWidget):
                     'warning': warn,
                 })
         
+        # Get reference conflicts from destination config (rules referencing objects we're pushing)
+        reference_conflicts = destination_config.get('reference_conflicts', [])
+        
         return {
             'errors': errors,
             'warnings': warnings,
             'item_details': item_details,
             'new_items': new_items,
             'conflicts': conflicts,
+            'skipped_items': skipped_items,
             'total_items': total_items,
             'missing_dependencies': missing_dependencies,
+            'reference_conflicts': reference_conflicts,
         }
     
     def _show_validation_details(self, validation_results: Dict[str, Any]):
@@ -1902,6 +2623,13 @@ class PushConfigWidget(QWidget):
         # Reset cancelled flag
         self._push_cancelled = False
         
+        # Acquire workflow lock to prevent navigation during push
+        self.workflow_lock.acquire_lock(
+            owner=self,
+            operation_name="Push",
+            cancel_callback=self._cancel_push_operation
+        )
+        
         # Disable UI during push
         self._set_ui_enabled(False)
 
@@ -1931,10 +2659,14 @@ class PushConfigWidget(QWidget):
 
         # Create and start worker
         from gui.workers import SelectivePushWorker
-        
+
+        # Filter selected_items to only include items that need action
+        # (excludes items that validation determined will be skipped)
+        filtered_items = self._filter_items_for_push(self.selected_items)
+
         self.worker = SelectivePushWorker(
             self.destination_client,
-            self.selected_items,
+            filtered_items,
             destination_config,
             resolution
         )
@@ -1942,6 +2674,16 @@ class PushConfigWidget(QWidget):
         self.worker.finished.connect(self._on_push_finished, Qt.ConnectionType.QueuedConnection)
         self.worker.error.connect(self._on_error, Qt.ConnectionType.QueuedConnection)
         self.worker.start()
+    
+    def _cancel_push_operation(self) -> bool:
+        """
+        Cancel the current push operation.
+        
+        Returns:
+            True if cancellation was successful, False otherwise
+        """
+        # Use existing cancel push logic
+        return self._cancel_push()
 
     def _on_push_progress(self, message: str, current: int, total: int):
         """Handle selective push progress updates."""
@@ -1967,6 +2709,9 @@ class PushConfigWidget(QWidget):
 
     def _on_push_finished(self, success: bool, message: str, result: Optional[Dict]):
         """Handle push completion."""
+        # Release workflow lock - push is complete
+        self.workflow_lock.release_lock(self)
+        
         try:
             # Re-enable UI
             self._set_ui_enabled(True)
@@ -2057,8 +2802,13 @@ class PushConfigWidget(QWidget):
                     all_details = results_data.get('details', []) if isinstance(results_data, dict) else []
                     
                     # Count unique items by (type, name, destination)
+                    # Exclude validation-only skips (default profiles that were never sent to push)
                     unique_items = set()
                     for d in all_details:
+                        # Skip items that were validation-only skips (default profiles)
+                        msg = d.get('message', '')
+                        if d.get('action') == 'skipped' and 'Default' in msg and 'system profile' in msg:
+                            continue
                         item_key = (d.get('type'), d.get('name'), d.get('destination'))
                         unique_items.add(item_key)
                     
@@ -2066,10 +2816,16 @@ class PushConfigWidget(QWidget):
                     
                     # Categorize results by action and success
                     created_success = [d for d in all_details if d.get('action') == 'created' and d.get('success')]
+                    deleted_success = [d for d in all_details if d.get('action') == 'deleted' and d.get('success')]
                     created_failed = [d for d in all_details if d.get('action') == 'failed' and not d.get('success')]
                     updated_success = [d for d in all_details if d.get('action') == 'updated' and d.get('success')]
                     renamed_success = [d for d in all_details if d.get('action') == 'renamed' and d.get('success')]
-                    skipped_items = [d for d in all_details if d.get('action') == 'skipped']
+                    # Filter skipped items to exclude validation-only skips (default profiles)
+                    skipped_items = [
+                        d for d in all_details 
+                        if d.get('action') == 'skipped' 
+                        and not ('Default' in d.get('message', '') and 'system profile' in d.get('message', ''))
+                    ]
                     
                     # Build summary to APPEND to existing output
                     summary_lines = []
@@ -2079,6 +2835,8 @@ class PushConfigWidget(QWidget):
                     summary_lines.append("=" * 70)
                     summary_lines.append("")
                     summary_lines.append(f"Total Items: {total_unique_items}")
+                    if deleted_success:
+                        summary_lines.append(f"  ✓ Deleted:   {len(deleted_success)}")
                     summary_lines.append(f"  ✓ Created:   {len(created_success)}")
                     if updated_success:
                         summary_lines.append(f"  ✓ Updated:   {len(updated_success)}")
@@ -2184,6 +2942,9 @@ class PushConfigWidget(QWidget):
         if "Push completed" in error_message:
             return
         
+        # Release workflow lock on error
+        self.workflow_lock.release_lock(self)
+        
         self.progress_label.setText("Error occurred")
         self.progress_label.setStyleSheet("color: red;")
         # Don't show popup - the results panel and status bar already show the error
@@ -2201,8 +2962,13 @@ class PushConfigWidget(QWidget):
 
         self.results_panel.set_text(conflict_text)
     
-    def _cancel_push(self):
-        """Cancel the ongoing push operation."""
+    def _cancel_push(self) -> bool:
+        """
+        Cancel the ongoing push operation.
+        
+        Returns:
+            True if cancellation was successful
+        """
         import logging
         logger = logging.getLogger(__name__)
         
@@ -2222,6 +2988,9 @@ class PushConfigWidget(QWidget):
             if self.worker.isRunning():
                 self.worker.terminate()
                 self.worker.wait()
+        
+        # Release workflow lock
+        self.workflow_lock.release_lock(self)
         
         # Update UI
         self.progress_label.setText("Push cancelled by user")
@@ -2252,6 +3021,8 @@ class PushConfigWidget(QWidget):
         self._set_ui_enabled(True)
         
         logger.normal("[Push] Push operation cancelled")
+        
+        return True
 
     def _set_ui_enabled(self, enabled: bool):
         """Enable or disable UI controls."""
@@ -2261,12 +3032,43 @@ class PushConfigWidget(QWidget):
         should_enable = enabled and bool(self.destination_client) and bool(self.config) and bool(self.selected_items)
         self.push_btn.setEnabled(should_enable)
     
+    def _toggle_live_log_viewer(self):
+        """Toggle the live log viewer visibility."""
+        if self.live_log_container.isVisible():
+            self._hide_live_log_viewer()
+        else:
+            self._show_live_log_viewer()
+    
+    def _show_live_log_viewer(self):
+        """Show and start the live log viewer."""
+        self.live_log_container.setVisible(True)
+        
+        # Update button text to indicate it can be hidden
+        self.results_panel.view_details_btn.setText("📄 Hide Activity Log")
+        
+        # Load recent entries and start live monitoring
+        self.live_log_viewer.load_recent(50)
+        self.live_log_viewer.start_live()
+    
+    def _hide_live_log_viewer(self):
+        """Hide and stop the live log viewer."""
+        self.live_log_container.setVisible(False)
+        
+        # Restore button text
+        self.results_panel.view_details_btn.setText("📄 View Activity Log")
+        
+        # Stop live monitoring
+        self.live_log_viewer.stop_live()
+    
     def _return_to_selection(self):
         """Return to the selection screen to modify selection or push again."""
         # Hide progress and results
         self.progress_group.setVisible(False)
         self.results_group.setVisible(False)
         self.return_to_selection_btn.setVisible(False)
+        
+        # Hide live log viewer if visible
+        self._hide_live_log_viewer()
         
         # Show validation section again
         self.validation_group.setVisible(True)
@@ -2282,6 +3084,9 @@ class PushConfigWidget(QWidget):
         
         # Clear results
         self.results_panel.clear()
+        
+        # Clear live log viewer
+        self.live_log_viewer.clear()
         
         # Emit signal to go back to selection tab
         self.return_to_selection_requested.emit()
@@ -2315,9 +3120,521 @@ class PushConfigWidget(QWidget):
         # When validation completes, _finalize_validation will reset the button appropriately
         self.add_dependencies_requested.emit(missing_deps)
     
+    def _validate_name_lengths(self, selected_items: dict) -> list:
+        """Validate all destination names for length before API calls.
+
+        Returns a list of error messages for names exceeding 55 characters.
+        """
+        MAX_NAME_LENGTH = 55
+        COPY_SUFFIX = "-copy"
+        errors = []
+
+        def get_dest_name(item_data, source_name):
+            """Get destination name based on strategy and user input."""
+            dest = item_data.get('_destination', {})
+            strategy = dest.get('strategy', 'skip')
+            if strategy == 'rename':
+                custom_name = dest.get('name', '')
+                if custom_name and custom_name != source_name:
+                    return custom_name
+                return f"{source_name}{COPY_SUFFIX}"
+            return source_name
+
+        def check_item(item_type, item_data, source_name):
+            """Check a single item's destination name length."""
+            dest_name = get_dest_name(item_data, source_name)
+            if len(dest_name) > MAX_NAME_LENGTH:
+                errors.append(f"{item_type}: '{dest_name}' ({len(dest_name)} chars)")
+
+        # Check folders
+        for folder in selected_items.get('folders', []):
+            folder_name = folder.get('name', '')
+            # Check objects
+            for obj_type, obj_list in folder.get('objects', {}).items():
+                if isinstance(obj_list, list):
+                    for obj in obj_list:
+                        check_item(obj_type, obj, obj.get('name', ''))
+            # Check profiles
+            for prof_type, prof_list in folder.get('profiles', {}).items():
+                if isinstance(prof_list, list):
+                    for prof in prof_list:
+                        check_item(prof_type, prof, prof.get('name', ''))
+            # Check HIP
+            for hip_type, hip_list in folder.get('hip', {}).items():
+                if isinstance(hip_list, list):
+                    for hip in hip_list:
+                        check_item(hip_type, hip, hip.get('name', ''))
+            # Check security rules
+            for rule in folder.get('security_rules', []):
+                check_item('security_rule', rule, rule.get('name', ''))
+
+        # Check snippets
+        for snippet in selected_items.get('snippets', []):
+            snippet_name = snippet.get('name', '')
+            # Check new snippet name
+            dest_info = snippet.get('_destination', {})
+            if dest_info.get('is_new_snippet') or dest_info.get('is_rename_snippet'):
+                new_name = dest_info.get('new_snippet_name', '')
+                if new_name and len(new_name) > MAX_NAME_LENGTH:
+                    errors.append(f"snippet: '{new_name}' ({len(new_name)} chars)")
+            # Check objects
+            for obj_type, obj_list in snippet.get('objects', {}).items():
+                if isinstance(obj_list, list):
+                    for obj in obj_list:
+                        check_item(obj_type, obj, obj.get('name', ''))
+            # Check profiles
+            for prof_type, prof_list in snippet.get('profiles', {}).items():
+                if isinstance(prof_list, list):
+                    for prof in prof_list:
+                        check_item(prof_type, prof, prof.get('name', ''))
+            # Check HIP
+            for hip_type, hip_list in snippet.get('hip', {}).items():
+                if isinstance(hip_list, list):
+                    for hip in hip_list:
+                        check_item(hip_type, hip, hip.get('name', ''))
+            # Check security rules
+            for rule in snippet.get('security_rules', []):
+                check_item('security_rule', rule, rule.get('name', ''))
+
+        # Check infrastructure
+        for infra_type, infra_list in selected_items.get('infrastructure', {}).items():
+            if isinstance(infra_list, list):
+                for item in infra_list:
+                    check_item(infra_type, item, item.get('name', item.get('id', '')))
+
+        return errors
+
     # Phase 3: Receive selection from selection widget
-    
+
     def set_selected_items(self, selected_items):
         """Set the selected items from selection widget."""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.debug("[Push] set_selected_items called - resetting push state")
+
+        # Reset all push state for new selection
+        self._reset_for_new_selection()
+
+        # Store new selection
         self.selected_items = selected_items
+
+        # Log detailed selection info at DETAIL level
+        self._log_selected_items_detail(selected_items)
+
         self._update_status()
+
+    def _log_selected_items_detail(self, selected_items):
+        """Log detailed info about each selected item."""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        if not selected_items:
+            return
+
+        logger.log(15, "[Selection] " + "=" * 80)  # 15 = DETAIL level
+        logger.log(15, "[Selection] SELECTED ITEMS DETAIL")
+        logger.log(15, "[Selection] " + "=" * 80)
+
+        def get_dest_name(item_data, source_name):
+            """Get destination name based on strategy and user input."""
+            dest = item_data.get('_destination', {})
+            strategy = dest.get('strategy', 'skip')
+            if strategy == 'rename':
+                # Check if user specified a custom destination name
+                custom_name = dest.get('name', '')
+                if custom_name and custom_name != source_name:
+                    return custom_name
+                # Default: append -copy suffix
+                return f"{source_name}-copy"
+            return source_name
+
+        def log_item(item_type, source_name, source_location, dest_location, dest_name, strategy):
+            """Log a single item's details."""
+            logger.log(15, f"[Selection] {item_type:20} | Source: {source_name:40} | "
+                          f"From: {source_location:25} | To: {dest_location:25} | "
+                          f"Dest Name: {dest_name:40} | Strategy: {strategy}")
+
+        # Log header
+        logger.log(15, f"[Selection] {'TYPE':20} | {'SOURCE NAME':40} | "
+                      f"{'SOURCE LOCATION':25} | {'DEST LOCATION':25} | "
+                      f"{'DEST NAME':40} | STRATEGY")
+        logger.log(15, "[Selection] " + "-" * 180)
+
+        # Process folders
+        for folder in selected_items.get('folders', []):
+            folder_name = folder.get('name', '')
+            dest_info = folder.get('_destination', {})
+            dest_location = dest_info.get('folder', folder_name)
+            if dest_info.get('is_new_snippet'):
+                dest_location = dest_info.get('new_snippet_name', dest_location) + ' (NEW)'
+            elif dest_info.get('is_existing_snippet'):
+                dest_location = dest_location + ' (snippet)'
+
+            # Log objects in folder
+            for obj_type, obj_list in folder.get('objects', {}).items():
+                if isinstance(obj_list, list):
+                    for obj in obj_list:
+                        name = obj.get('name', '')
+                        item_dest = obj.get('_destination', {})
+                        item_dest_loc = item_dest.get('folder', '') or dest_location
+                        if item_dest.get('is_new_snippet'):
+                            item_dest_loc = item_dest.get('new_snippet_name', item_dest_loc) + ' (NEW)'
+                        elif item_dest.get('is_existing_snippet'):
+                            item_dest_loc = item_dest_loc + ' (snippet)'
+                        strategy = item_dest.get('strategy', dest_info.get('strategy', 'skip'))
+                        dest_name = get_dest_name(obj, name)
+                        log_item(obj_type, name, f"folder:{folder_name}", item_dest_loc, dest_name, strategy)
+
+            # Log profiles in folder
+            for prof_type, prof_list in folder.get('profiles', {}).items():
+                if isinstance(prof_list, list):
+                    for prof in prof_list:
+                        name = prof.get('name', '')
+                        item_dest = prof.get('_destination', {})
+                        item_dest_loc = item_dest.get('folder', '') or dest_location
+                        if item_dest.get('is_new_snippet'):
+                            item_dest_loc = item_dest.get('new_snippet_name', item_dest_loc) + ' (NEW)'
+                        elif item_dest.get('is_existing_snippet'):
+                            item_dest_loc = item_dest_loc + ' (snippet)'
+                        strategy = item_dest.get('strategy', dest_info.get('strategy', 'skip'))
+                        dest_name = get_dest_name(prof, name)
+                        log_item(prof_type, name, f"folder:{folder_name}", item_dest_loc, dest_name, strategy)
+
+            # Log HIP in folder
+            for hip_type, hip_list in folder.get('hip', {}).items():
+                if isinstance(hip_list, list):
+                    for hip in hip_list:
+                        name = hip.get('name', '')
+                        item_dest = hip.get('_destination', {})
+                        item_dest_loc = item_dest.get('folder', '') or dest_location
+                        if item_dest.get('is_new_snippet'):
+                            item_dest_loc = item_dest.get('new_snippet_name', item_dest_loc) + ' (NEW)'
+                        elif item_dest.get('is_existing_snippet'):
+                            item_dest_loc = item_dest_loc + ' (snippet)'
+                        strategy = item_dest.get('strategy', dest_info.get('strategy', 'skip'))
+                        dest_name = get_dest_name(hip, name)
+                        log_item(hip_type, name, f"folder:{folder_name}", item_dest_loc, dest_name, strategy)
+
+            # Log security rules in folder
+            for rule in folder.get('security_rules', []):
+                name = rule.get('name', '')
+                item_dest = rule.get('_destination', {})
+                item_dest_loc = item_dest.get('folder', '') or dest_location
+                if item_dest.get('is_new_snippet'):
+                    item_dest_loc = item_dest.get('new_snippet_name', item_dest_loc) + ' (NEW)'
+                elif item_dest.get('is_existing_snippet'):
+                    item_dest_loc = item_dest_loc + ' (snippet)'
+                strategy = item_dest.get('strategy', dest_info.get('strategy', 'skip'))
+                dest_name = get_dest_name(rule, name)
+                log_item('security_rule', name, f"folder:{folder_name}", item_dest_loc, dest_name, strategy)
+
+        # Process snippets
+        for snippet in selected_items.get('snippets', []):
+            snippet_name = snippet.get('name', '')
+            dest_info = snippet.get('_destination', {})
+            dest_location = dest_info.get('folder', snippet_name)
+            if dest_info.get('is_new_snippet'):
+                dest_location = dest_info.get('new_snippet_name', dest_location) + ' (NEW)'
+            elif dest_info.get('is_existing_snippet'):
+                dest_location = dest_location + ' (snippet)'
+
+            # Log objects in snippet
+            for obj_type, obj_list in snippet.get('objects', {}).items():
+                if isinstance(obj_list, list):
+                    for obj in obj_list:
+                        name = obj.get('name', '')
+                        item_dest = obj.get('_destination', {})
+                        item_dest_loc = item_dest.get('folder', '') or dest_location
+                        if item_dest.get('is_new_snippet'):
+                            item_dest_loc = item_dest.get('new_snippet_name', item_dest_loc) + ' (NEW)'
+                        elif item_dest.get('is_existing_snippet'):
+                            item_dest_loc = item_dest_loc + ' (snippet)'
+                        strategy = item_dest.get('strategy', dest_info.get('strategy', 'skip'))
+                        dest_name = get_dest_name(obj, name)
+                        log_item(obj_type, name, f"snippet:{snippet_name}", item_dest_loc, dest_name, strategy)
+
+            # Log profiles in snippet
+            for prof_type, prof_list in snippet.get('profiles', {}).items():
+                if isinstance(prof_list, list):
+                    for prof in prof_list:
+                        name = prof.get('name', '')
+                        item_dest = prof.get('_destination', {})
+                        item_dest_loc = item_dest.get('folder', '') or dest_location
+                        if item_dest.get('is_new_snippet'):
+                            item_dest_loc = item_dest.get('new_snippet_name', item_dest_loc) + ' (NEW)'
+                        elif item_dest.get('is_existing_snippet'):
+                            item_dest_loc = item_dest_loc + ' (snippet)'
+                        strategy = item_dest.get('strategy', dest_info.get('strategy', 'skip'))
+                        dest_name = get_dest_name(prof, name)
+                        log_item(prof_type, name, f"snippet:{snippet_name}", item_dest_loc, dest_name, strategy)
+
+            # Log HIP in snippet
+            for hip_type, hip_list in snippet.get('hip', {}).items():
+                if isinstance(hip_list, list):
+                    for hip in hip_list:
+                        name = hip.get('name', '')
+                        item_dest = hip.get('_destination', {})
+                        item_dest_loc = item_dest.get('folder', '') or dest_location
+                        if item_dest.get('is_new_snippet'):
+                            item_dest_loc = item_dest.get('new_snippet_name', item_dest_loc) + ' (NEW)'
+                        elif item_dest.get('is_existing_snippet'):
+                            item_dest_loc = item_dest_loc + ' (snippet)'
+                        strategy = item_dest.get('strategy', dest_info.get('strategy', 'skip'))
+                        dest_name = get_dest_name(hip, name)
+                        log_item(hip_type, name, f"snippet:{snippet_name}", item_dest_loc, dest_name, strategy)
+
+            # Log security rules in snippet
+            for rule in snippet.get('security_rules', []):
+                name = rule.get('name', '')
+                item_dest = rule.get('_destination', {})
+                item_dest_loc = item_dest.get('folder', '') or dest_location
+                if item_dest.get('is_new_snippet'):
+                    item_dest_loc = item_dest.get('new_snippet_name', item_dest_loc) + ' (NEW)'
+                elif item_dest.get('is_existing_snippet'):
+                    item_dest_loc = item_dest_loc + ' (snippet)'
+                strategy = item_dest.get('strategy', dest_info.get('strategy', 'skip'))
+                dest_name = get_dest_name(rule, name)
+                log_item('security_rule', name, f"snippet:{snippet_name}", item_dest_loc, dest_name, strategy)
+
+        # Process infrastructure
+        for infra_type, infra_list in selected_items.get('infrastructure', {}).items():
+            if isinstance(infra_list, list):
+                for infra in infra_list:
+                    name = infra.get('name', '')
+                    item_dest = infra.get('_destination', {})
+                    item_dest_loc = item_dest.get('folder', 'Shared')
+                    strategy = item_dest.get('strategy', 'skip')
+                    dest_name = get_dest_name(infra, name)
+                    log_item(infra_type, name, "infrastructure", item_dest_loc, dest_name, strategy)
+
+        logger.log(15, "[Selection] " + "=" * 80)
+    
+    def _reset_for_new_selection(self):
+        """Reset push widget state for a new selection."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.debug("[Push] Resetting push widget state")
+        
+        # Clear validation state
+        self._destination_config = None
+        self._validation_results = None
+        self._pending_missing_dependencies = []
+        self._pending_reference_conflicts = []
+        
+        # Clear push completion flag
+        self.push_completed_successfully = False
+        
+        # Stop any running validation worker
+        if hasattr(self, 'validation_worker') and self.validation_worker:
+            if self.validation_worker.isRunning():
+                logger.debug("[Push] Stopping running validation worker")
+                self.validation_worker.quit()
+                self.validation_worker.wait(1000)  # Wait up to 1 second
+            self.validation_worker = None
+        
+        # Reset UI to initial state
+        # Hide validation and results sections
+        self.validation_group.setVisible(False)
+        self.results_group.setVisible(False)
+        
+        # Show and reset progress section
+        self.progress_group.setVisible(True)
+        self.progress_label.setText("⏳ Ready to validate...")
+        self.progress_label.setStyleSheet("")
+        self.progress_bar.setValue(0)
+        self.progress_bar.setVisible(True)
+        
+        # Reset results panel
+        self.results_panel.results_text.clear()
+        
+        # Reset push button and return button visibility
+        self.push_btn.setVisible(True)
+        self.push_btn.setEnabled(False)
+        self.push_btn.setText("Push Config")
+        self.dry_run_check.setVisible(True)
+        self.dry_run_check.setEnabled(False)
+        self.dry_run_check.setChecked(False)
+        self.validation_return_btn.setVisible(False)
+        self.return_to_selection_btn.setVisible(False)
+
+        # Clear validation details
+        self.validation_details.clear()
+
+        logger.debug("[Push] Push widget state reset complete")
+
+    def _filter_items_for_push(self, selected_items: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Filter selected_items to only include items that need to be pushed.
+
+        Based on validation results, excludes items that:
+        - Already exist in destination AND have 'skip' strategy
+
+        Keeps items that:
+        - Don't exist in destination (will be created)
+        - Exist but have 'overwrite' or 'rename' strategy
+
+        Returns:
+            Filtered copy of selected_items with only items that need action
+        """
+        import copy
+        import logging
+        logger = logging.getLogger(__name__)
+
+        if not hasattr(self, '_validation_results') or not self._validation_results:
+            logger.warning("[Push] No validation results available, returning all items")
+            return selected_items
+
+        item_details = self._validation_results.get('item_details', [])
+        if not item_details:
+            logger.warning("[Push] No item details in validation results, returning all items")
+            return selected_items
+
+        # Build set of items that should be SKIPPED (exists=True AND strategy=skip)
+        items_to_skip = set()
+        items_to_push = set()
+        for item in item_details:
+            key = (item.get('type', ''), item.get('name', ''))
+            if item.get('exists', False) and item.get('strategy', 'skip') == 'skip':
+                items_to_skip.add(key)
+            else:
+                items_to_push.add(key)
+
+        logger.info(f"[Push] Filtering: {len(items_to_push)} items to push, {len(items_to_skip)} items to skip")
+
+        # Deep copy to avoid modifying original
+        filtered = copy.deepcopy(selected_items)
+
+        def filter_item_list(items: list, item_type: str) -> list:
+            """Filter a list of items, keeping only those that need action."""
+            result = []
+            for item in items:
+                name = item.get('name', '')
+                key = (item_type, name)
+                if key not in items_to_skip:
+                    result.append(item)
+                else:
+                    logger.debug(f"[Push] Filtering out {item_type}/{name} (will skip)")
+            return result
+
+        def filter_typed_dict(typed_dict: Dict[str, list]) -> Dict[str, list]:
+            """Filter a dict of {type: [items]} keeping only items that need action."""
+            result = {}
+            for item_type, items in typed_dict.items():
+                filtered_items = filter_item_list(items, item_type)
+                if filtered_items:
+                    result[item_type] = filtered_items
+            return result
+
+        # Filter folders
+        filtered_folders = []
+        for folder in filtered.get('folders', []):
+            new_folder = {
+                'name': folder.get('name', ''),
+            }
+            # Filter objects
+            if 'objects' in folder:
+                new_folder['objects'] = filter_typed_dict(folder['objects'])
+            # Filter profiles
+            if 'profiles' in folder:
+                new_folder['profiles'] = filter_typed_dict(folder['profiles'])
+            # Filter HIP
+            if 'hip' in folder:
+                new_folder['hip'] = filter_typed_dict(folder['hip'])
+            # Filter security rules
+            if 'security_rules' in folder:
+                new_folder['security_rules'] = filter_item_list(
+                    folder['security_rules'], 'security_rule'
+                )
+            # Filter authentication rules
+            if 'authentication_rules' in folder:
+                new_folder['authentication_rules'] = filter_item_list(
+                    folder['authentication_rules'], 'authentication_rule'
+                )
+            # Filter decryption rules
+            if 'decryption_rules' in folder:
+                new_folder['decryption_rules'] = filter_item_list(
+                    folder['decryption_rules'], 'decryption_rule'
+                )
+            # Only include folder if it has any items
+            has_items = (
+                new_folder.get('objects') or
+                new_folder.get('profiles') or
+                new_folder.get('hip') or
+                new_folder.get('security_rules') or
+                new_folder.get('authentication_rules') or
+                new_folder.get('decryption_rules')
+            )
+            if has_items:
+                filtered_folders.append(new_folder)
+        filtered['folders'] = filtered_folders
+
+        # Filter snippets (same structure as folders)
+        filtered_snippets = []
+        for snippet in filtered.get('snippets', []):
+            new_snippet = {
+                'name': snippet.get('name', ''),
+            }
+            if 'objects' in snippet:
+                new_snippet['objects'] = filter_typed_dict(snippet['objects'])
+            if 'profiles' in snippet:
+                new_snippet['profiles'] = filter_typed_dict(snippet['profiles'])
+            if 'hip' in snippet:
+                new_snippet['hip'] = filter_typed_dict(snippet['hip'])
+            if 'security_rules' in snippet:
+                new_snippet['security_rules'] = filter_item_list(
+                    snippet['security_rules'], 'security_rule'
+                )
+            if 'authentication_rules' in snippet:
+                new_snippet['authentication_rules'] = filter_item_list(
+                    snippet['authentication_rules'], 'authentication_rule'
+                )
+            if 'decryption_rules' in snippet:
+                new_snippet['decryption_rules'] = filter_item_list(
+                    snippet['decryption_rules'], 'decryption_rule'
+                )
+            has_items = (
+                new_snippet.get('objects') or
+                new_snippet.get('profiles') or
+                new_snippet.get('hip') or
+                new_snippet.get('security_rules') or
+                new_snippet.get('authentication_rules') or
+                new_snippet.get('decryption_rules')
+            )
+            if has_items:
+                filtered_snippets.append(new_snippet)
+        filtered['snippets'] = filtered_snippets
+
+        # Filter infrastructure
+        if 'infrastructure' in filtered:
+            filtered['infrastructure'] = filter_typed_dict(filtered['infrastructure'])
+
+        # Count filtered items
+        total_filtered = 0
+        for folder in filtered['folders']:
+            for items in folder.get('objects', {}).values():
+                total_filtered += len(items)
+            for items in folder.get('profiles', {}).values():
+                total_filtered += len(items)
+            for items in folder.get('hip', {}).values():
+                total_filtered += len(items)
+            total_filtered += len(folder.get('security_rules', []))
+            total_filtered += len(folder.get('authentication_rules', []))
+            total_filtered += len(folder.get('decryption_rules', []))
+        for snippet in filtered['snippets']:
+            for items in snippet.get('objects', {}).values():
+                total_filtered += len(items)
+            for items in snippet.get('profiles', {}).values():
+                total_filtered += len(items)
+            for items in snippet.get('hip', {}).values():
+                total_filtered += len(items)
+            total_filtered += len(snippet.get('security_rules', []))
+            total_filtered += len(snippet.get('authentication_rules', []))
+            total_filtered += len(snippet.get('decryption_rules', []))
+        for items in filtered.get('infrastructure', {}).values():
+            total_filtered += len(items)
+
+        logger.info(f"[Push] After filtering: {total_filtered} items to push")
+
+        return filtered

@@ -12,12 +12,15 @@ from config.models.objects import (
     Tag,
     AddressObject,
     AddressGroup,
+    Region,
     ServiceObject,
     ServiceGroup,
     ApplicationObject,
     ApplicationGroup,
     ApplicationFilter,
     Schedule,
+    LocalUser,
+    LocalUserGroup,
 )
 from config.models.profiles import (
     AuthenticationProfile,
@@ -50,6 +53,7 @@ from config.models.infrastructure import (
     AgentProfile,
     Portal,
     Gateway,
+    AutoTagAction,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,13 +76,16 @@ class ConfigItemFactory:
         'tag': Tag,
         'address_object': AddressObject,
         'address_group': AddressGroup,
+        'region': Region,
         'service_object': ServiceObject,
         'service_group': ServiceGroup,
         'application_object': ApplicationObject,
         'application_group': ApplicationGroup,
         'application_filter': ApplicationFilter,
         'schedule': Schedule,
-        
+        'local_user': LocalUser,
+        'local_user_group': LocalUserGroup,
+
         # Profiles
         'authentication_profile': AuthenticationProfile,
         'decryption_profile': DecryptionProfile,
@@ -94,13 +101,13 @@ class ConfigItemFactory:
         'ocsp_responder': OCSPResponder,
         'scep_profile': SCEPProfile,
         'qos_profile': QoSProfile,
-        
+
         # Policies/Rules
         'security_rule': SecurityRule,
         'decryption_rule': DecryptionRule,
         'authentication_rule': AuthenticationRule,
         'qos_policy_rule': QoSPolicyRule,
-        
+
         # Infrastructure
         'ike_crypto_profile': IKECryptoProfile,
         'ipsec_crypto_profile': IPsecCryptoProfile,
@@ -110,6 +117,7 @@ class ConfigItemFactory:
         'agent_profile': AgentProfile,
         'portal': Portal,
         'gateway': Gateway,
+        'auto_tag_action': AutoTagAction,
     }
     
     # API endpoint to item_type mapping
@@ -117,13 +125,16 @@ class ConfigItemFactory:
         '/sse/config/v1/tags': 'tag',
         '/sse/config/v1/addresses': 'address_object',
         '/sse/config/v1/address-groups': 'address_group',
+        '/sse/config/v1/regions': 'region',
         '/sse/config/v1/services': 'service_object',
         '/sse/config/v1/service-groups': 'service_group',
         '/sse/config/v1/applications': 'application_object',
         '/sse/config/v1/application-groups': 'application_group',
         '/sse/config/v1/application-filters': 'application_filter',
         '/sse/config/v1/schedules': 'schedule',
-        
+        '/sse/config/v1/local-users': 'local_user',
+        '/sse/config/v1/local-user-groups': 'local_user_group',
+
         '/sse/config/v1/authentication-profiles': 'authentication_profile',
         '/sse/config/v1/decryption-profiles': 'decryption_profile',
         '/sse/config/v1/anti-spyware-profiles': 'anti_spyware_profile',
@@ -138,12 +149,12 @@ class ConfigItemFactory:
         '/sse/config/v1/ocsp-responder': 'ocsp_responder',
         '/sse/config/v1/scep-profiles': 'scep_profile',
         '/sse/config/v1/qos-profiles': 'qos_profile',
-        
+
         '/sse/config/v1/security-rules': 'security_rule',
         '/sse/config/v1/decryption-rules': 'decryption_rule',
         '/sse/config/v1/authentication-rules': 'authentication_rule',
         '/sse/config/v1/qos-policy-rules': 'qos_policy_rule',
-        
+
         '/sse/config/v1/ike-crypto-profiles': 'ike_crypto_profile',
         '/sse/config/v1/ipsec-crypto-profiles': 'ipsec_crypto_profile',
         '/sse/config/v1/ike-gateways': 'ike_gateway',
@@ -152,6 +163,7 @@ class ConfigItemFactory:
         '/sse/config/v1/mobile-agent/agent-profiles': 'agent_profile',
         '/sse/config/v1/mobile-agent/portals': 'portal',
         '/sse/config/v1/mobile-agent/gateways': 'gateway',
+        '/sse/config/v1/auto-tag-actions': 'auto_tag_action',
     }
     
     @classmethod

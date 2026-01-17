@@ -30,6 +30,7 @@ from gui.connection_dialog import ConnectionDialog
 from gui.logs_widget import LogsWidget
 from gui.settings_dialog import SettingsDialog
 from gui.dialogs import SaveConfigDialog, LoadConfigDialog, ExportConfigDialog
+from gui.widgets.workflow_lock import WorkflowLockManager
 
 
 class PrismaConfigMainWindow(QMainWindow):
@@ -42,6 +43,9 @@ class PrismaConfigMainWindow(QMainWindow):
         self.settings = QSettings("PrismaAccess", "ConfigManager")
         self.api_client = None
         self.current_config = None
+        
+        # Initialize workflow lock manager
+        self.workflow_lock = WorkflowLockManager.instance()
 
         self._ensure_saved_folder()
         self._init_ui()
@@ -399,6 +403,17 @@ class PrismaConfigMainWindow(QMainWindow):
         # If switching to same workflow, do nothing
         if current_index == index:
             return
+        
+        # Check if workflow is locked (operation in progress)
+        if self.workflow_lock.is_locked():
+            # Revert selection first
+            self.workflow_list.blockSignals(True)
+            self.workflow_list.setCurrentRow(current_index)
+            self.workflow_list.blockSignals(False)
+            
+            # Show warning and optionally allow cancellation
+            if not self.workflow_lock.request_switch(self):
+                return  # User chose not to cancel or cancel failed
         
         # Check if current workflow has unsaved work
         current_widget = self.stacked_widget.widget(current_index)

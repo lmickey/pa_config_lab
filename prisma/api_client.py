@@ -16,6 +16,7 @@ from .api_endpoints import (
     APIEndpoints,
     AUTH_URL,
     build_folder_query,
+    build_snippet_query,
 )
 from .api_utils import (
     RateLimiter,
@@ -718,13 +719,15 @@ class PrismaAccessAPIClient:
     # Security Policy - Security Rules
 
     def get_security_rules(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         Get security rules.
 
         Args:
             folder: Folder name (optional, will be URL encoded with %20)
+            snippet: Snippet name (optional, alternative to folder)
             limit: Items per page
             offset: Offset for pagination
 
@@ -734,7 +737,10 @@ class PrismaAccessAPIClient:
         url = APIEndpoints.SECURITY_RULES
         params = {}
 
-        if folder:
+        if snippet:
+            # Use snippet query parameter
+            url += build_snippet_query(snippet)
+        elif folder:
             # Build query string manually to ensure %20 encoding (not +)
             # requests library uses + for spaces, but API expects %20
             url += build_folder_query(folder)
@@ -748,13 +754,228 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_all_security_rules(
-        self, folder: Optional[str] = None
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """Get all security rules with automatic pagination."""
+        """Get all security rules with automatic pagination.
+        
+        Args:
+            folder: Folder name (optional)
+            snippet: Snippet name (optional, alternative to folder)
+        """
 
         def api_func(offset=0, limit=100):
-            return self.get_security_rules(folder=folder, limit=limit, offset=offset)
+            return self.get_security_rules(folder=folder, snippet=snippet, limit=limit, offset=offset)
 
+        return paginate_api_request(api_func)
+    
+    # Authentication Rules
+    
+    def get_authentication_rules(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get authentication rules.
+
+        Args:
+            folder: Folder name (optional)
+            snippet: Snippet name (optional, alternative to folder)
+            limit: Items per page
+            offset: Offset for pagination
+
+        Returns:
+            List of authentication rules
+        """
+        url = APIEndpoints.AUTHENTICATION_RULES
+        params = {}
+
+        if snippet:
+            url += build_snippet_query(snippet)
+        elif folder:
+            url += build_folder_query(folder)
+
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+    
+    def get_all_authentication_rules(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all authentication rules with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_authentication_rules(folder=folder, snippet=snippet, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+    
+    # Decryption Rules
+    
+    def get_decryption_rules(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get decryption rules.
+
+        Args:
+            folder: Folder name (optional)
+            snippet: Snippet name (optional, alternative to folder)
+            limit: Items per page
+            offset: Offset for pagination
+
+        Returns:
+            List of decryption rules
+        """
+        url = APIEndpoints.DECRYPTION_RULES
+        params = {}
+
+        if snippet:
+            url += build_snippet_query(snippet)
+        elif folder:
+            url += build_folder_query(folder)
+
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+    
+    def get_all_decryption_rules(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all decryption rules with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_decryption_rules(folder=folder, snippet=snippet, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    # QoS Policy Rules
+
+    def get_qos_policy_rules(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get QoS policy rules.
+
+        Args:
+            folder: Folder name (optional)
+            snippet: Snippet name (optional, alternative to folder)
+            limit: Items per page
+            offset: Offset for pagination
+
+        Returns:
+            List of QoS policy rules
+        """
+        url = APIEndpoints.QOS_POLICY_RULES
+        params = {}
+
+        if snippet:
+            url += build_snippet_query(snippet)
+        elif folder:
+            url += build_folder_query(folder)
+
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_qos_policy_rules(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all QoS policy rules with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_qos_policy_rules(folder=folder, snippet=snippet, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    # Tags
+    
+    def get_tags(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get tags.
+
+        Args:
+            folder: Folder name (optional)
+            snippet: Snippet name (optional, alternative to folder)
+            limit: Items per page
+            offset: Offset for pagination
+
+        Returns:
+            List of tags
+        """
+        url = APIEndpoints.TAGS
+        params = {}
+
+        if snippet:
+            url += build_snippet_query(snippet)
+        elif folder:
+            url += build_folder_query(folder)
+
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+    
+    def get_all_tags(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all tags with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_tags(folder=folder, snippet=snippet, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+    
+    # Schedules
+    
+    def get_schedules(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get schedules.
+
+        Args:
+            folder: Folder name (optional)
+            snippet: Snippet name (optional, alternative to folder)
+            limit: Items per page
+            offset: Offset for pagination
+
+        Returns:
+            List of schedules
+        """
+        url = APIEndpoints.SCHEDULES
+        params = {}
+
+        if snippet:
+            url += build_snippet_query(snippet)
+        elif folder:
+            url += build_folder_query(folder)
+
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+    
+    def get_all_schedules(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all schedules with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_schedules(folder=folder, snippet=snippet, limit=limit, offset=offset)
         return paginate_api_request(api_func)
 
     # Security Policy - Snippets
@@ -763,6 +984,15 @@ class PrismaAccessAPIClient:
         """Get all security policy snippets."""
         response = self._make_request("GET", APIEndpoints.SECURITY_POLICY_SNIPPETS)
         return response.get("data", [])
+
+    def get_snippets(self) -> List[Dict[str, Any]]:
+        """
+        Get all snippets (alias for get_security_policy_snippets).
+
+        Returns:
+            List of snippet dictionaries with 'name', 'id', etc.
+        """
+        return self.get_security_policy_snippets()
 
     def get_security_policy_snippet(self, snippet_id: str) -> Dict[str, Any]:
         """
@@ -793,13 +1023,16 @@ class PrismaAccessAPIClient:
     # Objects - Addresses
 
     def get_addresses(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None, limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """Get address objects."""
         url = APIEndpoints.ADDRESSES
         params = {}
 
-        if folder:
+        if snippet:
+            # Snippet takes precedence over folder
+            url += f"?snippet={quote(snippet, safe='')}"
+        elif folder:
             # Build query string manually to ensure %20 encoding (not +)
             url += build_folder_query(folder)
         if limit != 100:
@@ -810,24 +1043,26 @@ class PrismaAccessAPIClient:
         response = self._make_request("GET", url, params=params if params else None)
         return response.get("data", [])
 
-    def get_all_addresses(self, folder: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_all_addresses(self, folder: Optional[str] = None, snippet: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all address objects with automatic pagination."""
 
         def api_func(offset=0, limit=100):
-            return self.get_addresses(folder=folder, limit=limit, offset=offset)
+            return self.get_addresses(folder=folder, snippet=snippet, limit=limit, offset=offset)
 
         return paginate_api_request(api_func)
 
     # Objects - Address Groups
 
     def get_address_groups(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None, limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """Get address groups."""
         url = APIEndpoints.ADDRESS_GROUPS
         params = {}
 
-        if folder:
+        if snippet:
+            url += f"?snippet={quote(snippet, safe='')}"
+        elif folder:
             # Build query string manually to ensure %20 encoding (not +)
             url += build_folder_query(folder)
         if limit != 100:
@@ -839,24 +1074,26 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_all_address_groups(
-        self, folder: Optional[str] = None
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all address groups with automatic pagination."""
 
         def api_func(offset=0, limit=100):
-            return self.get_address_groups(folder=folder, limit=limit, offset=offset)
+            return self.get_address_groups(folder=folder, snippet=snippet, limit=limit, offset=offset)
 
         return paginate_api_request(api_func)
 
     # Service Groups
     def get_service_groups(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None, limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """Get service groups."""
         url = APIEndpoints.SERVICE_GROUPS
         params = {}
 
-        if folder:
+        if snippet:
+            url += f"?snippet={quote(snippet, safe='')}"
+        elif folder:
             # Build query string manually to ensure %20 encoding (not +)
             url += build_folder_query(folder)
         if limit != 100:
@@ -868,24 +1105,26 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_all_service_groups(
-        self, folder: Optional[str] = None
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all service groups with automatic pagination."""
 
         def api_func(offset=0, limit=100):
-            return self.get_service_groups(folder=folder, limit=limit, offset=offset)
+            return self.get_service_groups(folder=folder, snippet=snippet, limit=limit, offset=offset)
 
         return paginate_api_request(api_func)
 
     # Services
     def get_services(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None, limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """Get service objects."""
         url = APIEndpoints.SERVICES
         params = {}
 
-        if folder:
+        if snippet:
+            url += f"?snippet={quote(snippet, safe='')}"
+        elif folder:
             # Build query string manually to ensure %20 encoding (not +)
             url += build_folder_query(folder)
         if limit != 100:
@@ -896,11 +1135,11 @@ class PrismaAccessAPIClient:
         response = self._make_request("GET", url, params=params if params else None)
         return response.get("data", [])
 
-    def get_all_services(self, folder: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_all_services(self, folder: Optional[str] = None, snippet: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all service objects with automatic pagination."""
 
         def api_func(offset=0, limit=100):
-            return self.get_services(folder=folder, limit=limit, offset=offset)
+            return self.get_services(folder=folder, snippet=snippet, limit=limit, offset=offset)
 
         return paginate_api_request(api_func)
 
@@ -948,13 +1187,14 @@ class PrismaAccessAPIClient:
 
     # Application Groups
     def get_application_groups(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None, limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         Get application groups.
         
         Args:
             folder: Optional folder name to filter results
+            snippet: Optional snippet name to filter results
             limit: Maximum number of results per page
             offset: Pagination offset
             
@@ -965,6 +1205,9 @@ class PrismaAccessAPIClient:
         params = {}
         if folder:
             url += build_folder_query(folder)
+        elif snippet:
+            encoded_snippet = quote(snippet, safe='')
+            url += f"?snippet={encoded_snippet}"
         if limit != 100:
             params["limit"] = limit
         if offset > 0:
@@ -973,22 +1216,38 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_all_application_groups(
-        self, folder: Optional[str] = None
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all application groups with automatic pagination."""
         def api_func(offset=0, limit=100):
-            return self.get_application_groups(folder=folder, limit=limit, offset=offset)
+            return self.get_application_groups(folder=folder, snippet=snippet, limit=limit, offset=offset)
         return paginate_api_request(api_func)
+
+    def create_application_group(self, data: Dict[str, Any], folder: str = None, snippet: str = None) -> Dict[str, Any]:
+        """Create an application group."""
+        url = APIEndpoints.APPLICATION_GROUPS
+        if snippet:
+            encoded_snippet = quote(snippet, safe='')
+            url += f"?snippet={encoded_snippet}"
+        elif folder:
+            url += build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+
+    def delete_application_group(self, group_id: str) -> Dict[str, Any]:
+        """Delete an application group."""
+        url = APIEndpoints.application_group(group_id)
+        return self._make_request("DELETE", url, use_cache=False)
 
     # Application Filters
     def get_application_filters(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None, limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         Get application filters.
         
         Args:
             folder: Optional folder name to filter results
+            snippet: Optional snippet name to filter results
             limit: Maximum number of results per page
             offset: Pagination offset
             
@@ -999,6 +1258,9 @@ class PrismaAccessAPIClient:
         params = {}
         if folder:
             url += build_folder_query(folder)
+        elif snippet:
+            encoded_snippet = quote(snippet, safe='')
+            url += f"?snippet={encoded_snippet}"
         if limit != 100:
             params["limit"] = limit
         if offset > 0:
@@ -1007,31 +1269,50 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_all_application_filters(
-        self, folder: Optional[str] = None
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all application filters with automatic pagination."""
         def api_func(offset=0, limit=100):
-            return self.get_application_filters(folder=folder, limit=limit, offset=offset)
+            return self.get_application_filters(folder=folder, snippet=snippet, limit=limit, offset=offset)
         return paginate_api_request(api_func)
+
+    def create_application_filter(self, data: Dict[str, Any], folder: str = None, snippet: str = None) -> Dict[str, Any]:
+        """Create an application filter."""
+        url = APIEndpoints.APPLICATION_FILTERS
+        if snippet:
+            encoded_snippet = quote(snippet, safe='')
+            url += f"?snippet={encoded_snippet}"
+        elif folder:
+            url += build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+
+    def delete_application_filter(self, filter_id: str) -> Dict[str, Any]:
+        """Delete an application filter."""
+        url = APIEndpoints.application_filter(filter_id)
+        return self._make_request("DELETE", url, use_cache=False)
 
     # External Dynamic Lists
     def get_external_dynamic_lists(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         Get external dynamic lists.
-        
+
         Args:
             folder: Optional folder name to filter results
+            snippet: Optional snippet name to filter results
             limit: Maximum number of results per page
             offset: Pagination offset
-            
+
         Returns:
             List of external dynamic lists
         """
         url = APIEndpoints.EXTERNAL_DYNAMIC_LISTS
         params = {}
-        if folder:
+        if snippet:
+            url += build_snippet_query(snippet)
+        elif folder:
             url += build_folder_query(folder)
         if limit != 100:
             params["limit"] = limit
@@ -1041,11 +1322,11 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_all_external_dynamic_lists(
-        self, folder: Optional[str] = None
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all external dynamic lists with automatic pagination."""
         def api_func(offset=0, limit=100):
-            return self.get_external_dynamic_lists(folder=folder, limit=limit, offset=offset)
+            return self.get_external_dynamic_lists(folder=folder, snippet=snippet, limit=limit, offset=offset)
         return paginate_api_request(api_func)
 
     # FQDN Objects
@@ -1084,22 +1365,26 @@ class PrismaAccessAPIClient:
 
     # URL Categories
     def get_url_categories(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         Get URL filtering categories.
-        
+
         Args:
             folder: Optional folder name to filter results
+            snippet: Optional snippet name to filter results
             limit: Maximum number of results per page
             offset: Pagination offset
-            
+
         Returns:
             List of URL filtering categories
         """
         url = APIEndpoints.URL_CATEGORIES
         params = {}
-        if folder:
+        if snippet:
+            url += build_snippet_query(snippet)
+        elif folder:
             url += build_folder_query(folder)
         if limit != 100:
             params["limit"] = limit
@@ -1109,11 +1394,11 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_all_url_categories(
-        self, folder: Optional[str] = None
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all URL filtering categories with automatic pagination."""
         def api_func(offset=0, limit=100):
-            return self.get_url_categories(folder=folder, limit=limit, offset=offset)
+            return self.get_url_categories(folder=folder, snippet=snippet, limit=limit, offset=offset)
         return paginate_api_request(api_func)
 
     # Authentication Profiles
@@ -1150,12 +1435,15 @@ class PrismaAccessAPIClient:
     # Security Profiles (based on Master-API-Entpoint-List.txt - only those marked "include in test")
 
     def get_anti_spyware_profiles(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """Get anti-spyware profiles."""
         url = APIEndpoints.ANTI_SPYWARE_PROFILES
         params = {}
-        if folder:
+        if snippet:
+            url += build_snippet_query(snippet)
+        elif folder:
             url += build_folder_query(folder)
         if limit != 100:
             params["limit"] = limit
@@ -1165,12 +1453,15 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_dns_security_profiles(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """Get DNS security profiles."""
         url = APIEndpoints.DNS_SECURITY_PROFILES
         params = {}
-        if folder:
+        if snippet:
+            url += build_snippet_query(snippet)
+        elif folder:
             url += build_folder_query(folder)
         if limit != 100:
             params["limit"] = limit
@@ -1180,12 +1471,15 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_file_blocking_profiles(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """Get file blocking profiles."""
         url = APIEndpoints.FILE_BLOCKING_PROFILES
         params = {}
-        if folder:
+        if snippet:
+            url += build_snippet_query(snippet)
+        elif folder:
             url += build_folder_query(folder)
         if limit != 100:
             params["limit"] = limit
@@ -1195,12 +1489,15 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_http_header_profiles(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """Get HTTP header profiles."""
         url = APIEndpoints.HTTP_HEADER_PROFILES
         params = {}
-        if folder:
+        if snippet:
+            url += build_snippet_query(snippet)
+        elif folder:
             url += build_folder_query(folder)
         if limit != 100:
             params["limit"] = limit
@@ -1208,6 +1505,39 @@ class PrismaAccessAPIClient:
             params["offset"] = offset
         response = self._make_request("GET", url, params=params if params else None)
         return response.get("data", [])
+
+    def get_all_http_header_profiles(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all HTTP header profiles with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_http_header_profiles(folder=folder, snippet=snippet, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    def get_certificate_profiles(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """Get certificate profiles."""
+        url = APIEndpoints.CERTIFICATE_PROFILES
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        elif snippet:
+            url += f"?snippet={snippet}"
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_certificate_profiles(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all certificate profiles with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_certificate_profiles(folder=folder, snippet=snippet, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
 
     def get_profile_groups(
         self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
@@ -1270,12 +1600,15 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_decryption_profiles(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """Get decryption profiles."""
         url = APIEndpoints.DECRYPTION_PROFILES
         params = {}
-        if folder:
+        if snippet:
+            url += build_snippet_query(snippet)
+        elif folder:
             url += build_folder_query(folder)
         if limit != 100:
             params["limit"] = limit
@@ -1285,11 +1618,11 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_all_decryption_profiles(
-        self, folder: Optional[str] = None
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all decryption profiles with automatic pagination."""
         def api_func(offset=0, limit=100):
-            return self.get_decryption_profiles(folder=folder, limit=limit, offset=offset)
+            return self.get_decryption_profiles(folder=folder, snippet=snippet, limit=limit, offset=offset)
         return paginate_api_request(api_func)
     
     def get_profile_groups(
@@ -1330,22 +1663,26 @@ class PrismaAccessAPIClient:
 
     # Security Profiles
     def get_anti_spyware_profiles(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         Get anti-spyware profiles.
-        
+
         Args:
             folder: Optional folder name to filter results
+            snippet: Optional snippet name to filter results
             limit: Maximum number of results per page
             offset: Pagination offset
-            
+
         Returns:
             List of anti-spyware profiles
         """
         url = APIEndpoints.ANTI_SPYWARE_PROFILES
         params = {}
-        if folder:
+        if snippet:
+            url += build_snippet_query(snippet)
+        elif folder:
             url += build_folder_query(folder)
         if limit != 100:
             params["limit"] = limit
@@ -1355,30 +1692,34 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_all_anti_spyware_profiles(
-        self, folder: Optional[str] = None
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all anti-spyware profiles with automatic pagination."""
         def api_func(offset=0, limit=100):
-            return self.get_anti_spyware_profiles(folder=folder, limit=limit, offset=offset)
+            return self.get_anti_spyware_profiles(folder=folder, snippet=snippet, limit=limit, offset=offset)
         return paginate_api_request(api_func)
 
     def get_dns_security_profiles(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         Get DNS security profiles.
-        
+
         Args:
             folder: Optional folder name to filter results
+            snippet: Optional snippet name to filter results
             limit: Maximum number of results per page
             offset: Pagination offset
-            
+
         Returns:
             List of DNS security profiles
         """
         url = APIEndpoints.DNS_SECURITY_PROFILES
         params = {}
-        if folder:
+        if snippet:
+            url += build_snippet_query(snippet)
+        elif folder:
             url += build_folder_query(folder)
         if limit != 100:
             params["limit"] = limit
@@ -1388,30 +1729,34 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_all_dns_security_profiles(
-        self, folder: Optional[str] = None
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all DNS security profiles with automatic pagination."""
         def api_func(offset=0, limit=100):
-            return self.get_dns_security_profiles(folder=folder, limit=limit, offset=offset)
+            return self.get_dns_security_profiles(folder=folder, snippet=snippet, limit=limit, offset=offset)
         return paginate_api_request(api_func)
 
     def get_file_blocking_profiles(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         Get file blocking profiles.
-        
+
         Args:
             folder: Optional folder name to filter results
+            snippet: Optional snippet name to filter results
             limit: Maximum number of results per page
             offset: Pagination offset
-            
+
         Returns:
             List of file blocking profiles
         """
         url = APIEndpoints.FILE_BLOCKING_PROFILES
         params = {}
-        if folder:
+        if snippet:
+            url += build_snippet_query(snippet)
+        elif folder:
             url += build_folder_query(folder)
         if limit != 100:
             params["limit"] = limit
@@ -1421,11 +1766,11 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_all_file_blocking_profiles(
-        self, folder: Optional[str] = None
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all file blocking profiles with automatic pagination."""
         def api_func(offset=0, limit=100):
-            return self.get_file_blocking_profiles(folder=folder, limit=limit, offset=offset)
+            return self.get_file_blocking_profiles(folder=folder, snippet=snippet, limit=limit, offset=offset)
         return paginate_api_request(api_func)
 
     def get_url_access_profiles(
@@ -1462,13 +1807,14 @@ class PrismaAccessAPIClient:
         return paginate_api_request(api_func)
 
     def get_vulnerability_profiles(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None, limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         Get vulnerability protection profiles.
         
         Args:
             folder: Optional folder name to filter results
+            snippet: Optional snippet name to filter results
             limit: Maximum number of results per page
             offset: Pagination offset
             
@@ -1477,7 +1823,9 @@ class PrismaAccessAPIClient:
         """
         url = APIEndpoints.VULNERABILITY_PROTECTION_PROFILES
         params = {}
-        if folder:
+        if snippet:
+            url += f"?snippet={quote(snippet, safe='')}"
+        elif folder:
             url += build_folder_query(folder)
         if limit != 100:
             params["limit"] = limit
@@ -1487,21 +1835,57 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_all_vulnerability_profiles(
-        self, folder: Optional[str] = None
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all vulnerability protection profiles with automatic pagination."""
         def api_func(offset=0, limit=100):
-            return self.get_vulnerability_profiles(folder=folder, limit=limit, offset=offset)
+            return self.get_vulnerability_profiles(folder=folder, snippet=snippet, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    def get_qos_profiles(
+        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get QoS profiles.
+
+        Note: QoS profiles are only available in Remote Networks and Service Connections folders.
+
+        Args:
+            folder: Folder name (should be 'Remote Networks' or 'Service Connections')
+            limit: Maximum number of results per page
+            offset: Pagination offset
+
+        Returns:
+            List of QoS profiles
+        """
+        url = APIEndpoints.QOS_PROFILES
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_qos_profiles(
+        self, folder: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all QoS profiles with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_qos_profiles(folder=folder, limit=limit, offset=offset)
         return paginate_api_request(api_func)
 
     def get_wildfire_profiles(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None, limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         Get WildFire antivirus profiles.
         
         Args:
             folder: Optional folder name to filter results
+            snippet: Optional snippet name to filter results
             limit: Maximum number of results per page
             offset: Pagination offset
             
@@ -1510,7 +1894,9 @@ class PrismaAccessAPIClient:
         """
         url = APIEndpoints.WILDFIRE_ANTI_VIRUS_PROFILES
         params = {}
-        if folder:
+        if snippet:
+            url += f"?snippet={quote(snippet, safe='')}"
+        elif folder:
             url += build_folder_query(folder)
         if limit != 100:
             params["limit"] = limit
@@ -1520,31 +1906,36 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_all_wildfire_profiles(
-        self, folder: Optional[str] = None
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all WildFire antivirus profiles with automatic pagination."""
         def api_func(offset=0, limit=100):
-            return self.get_wildfire_profiles(folder=folder, limit=limit, offset=offset)
+            return self.get_wildfire_profiles(folder=folder, snippet=snippet, limit=limit, offset=offset)
         return paginate_api_request(api_func)
 
-    def get_profile_groups(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+    # Regions (Address Regions)
+    def get_regions(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
-        Get profile groups.
-        
+        Get address regions.
+
         Args:
             folder: Optional folder name to filter results
+            snippet: Optional snippet name to filter results
             limit: Maximum number of results per page
             offset: Pagination offset
-            
+
         Returns:
-            List of profile groups
+            List of address regions
         """
-        url = APIEndpoints.PROFILE_GROUPS
+        url = APIEndpoints.REGIONS
         params = {}
         if folder:
             url += build_folder_query(folder)
+        elif snippet:
+            url += build_snippet_query(snippet)
         if limit != 100:
             params["limit"] = limit
         if offset > 0:
@@ -1552,12 +1943,88 @@ class PrismaAccessAPIClient:
         response = self._make_request("GET", url, params=params if params else None)
         return response.get("data", [])
 
-    def get_all_profile_groups(
-        self, folder: Optional[str] = None
+    def get_all_regions(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """Get all profile groups with automatic pagination."""
+        """Get all address regions with automatic pagination."""
         def api_func(offset=0, limit=100):
-            return self.get_profile_groups(folder=folder, limit=limit, offset=offset)
+            return self.get_regions(folder=folder, snippet=snippet, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    # Local Users
+    def get_local_users(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get local users.
+
+        Args:
+            folder: Optional folder name to filter results
+            snippet: Optional snippet name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+
+        Returns:
+            List of local users
+        """
+        url = APIEndpoints.LOCAL_USERS
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        elif snippet:
+            url += build_snippet_query(snippet)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_local_users(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all local users with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_local_users(folder=folder, snippet=snippet, limit=limit, offset=offset)
+        return paginate_api_request(api_func)
+
+    # Local User Groups
+    def get_local_user_groups(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get local user groups.
+
+        Args:
+            folder: Optional folder name to filter results
+            snippet: Optional snippet name to filter results
+            limit: Maximum number of results per page
+            offset: Pagination offset
+
+        Returns:
+            List of local user groups
+        """
+        url = APIEndpoints.LOCAL_USER_GROUPS
+        params = {}
+        if folder:
+            url += build_folder_query(folder)
+        elif snippet:
+            url += build_snippet_query(snippet)
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_local_user_groups(
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all local user groups with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_local_user_groups(folder=folder, snippet=snippet, limit=limit, offset=offset)
         return paginate_api_request(api_func)
 
     # ==================== Infrastructure Methods (NEW) ====================
@@ -1930,19 +2397,21 @@ class PrismaAccessAPIClient:
 
     # HIP Objects and Profiles
     def get_hip_objects(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         Get HIP (Host Information Profile) objects.
-        
+
         Note: This endpoint may not be available in all environments.
         Graceful error handling recommended.
-        
+
         Args:
             folder: Optional folder name to filter results
+            snippet: Optional snippet name to filter results
             limit: Maximum number of results per page
             offset: Pagination offset
-            
+
         Returns:
             List of HIP object configurations
         """
@@ -1950,6 +2419,8 @@ class PrismaAccessAPIClient:
         params = {}
         if folder:
             url += build_folder_query(folder)
+        elif snippet:
+            url += build_snippet_query(snippet)
         if limit != 100:
             params["limit"] = limit
         if offset > 0:
@@ -1958,27 +2429,29 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_all_hip_objects(
-        self, folder: Optional[str] = None
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all HIP objects with automatic pagination."""
         def api_func(offset=0, limit=100):
-            return self.get_hip_objects(folder=folder, limit=limit, offset=offset)
+            return self.get_hip_objects(folder=folder, snippet=snippet, limit=limit, offset=offset)
         return paginate_api_request(api_func)
 
     def get_hip_profiles(
-        self, folder: Optional[str] = None, limit: int = 100, offset: int = 0
+        self, folder: Optional[str] = None, snippet: Optional[str] = None,
+        limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         Get HIP (Host Information Profile) profiles.
-        
+
         Note: This endpoint may not be available in all environments.
         Graceful error handling recommended.
-        
+
         Args:
             folder: Optional folder name to filter results
+            snippet: Optional snippet name to filter results
             limit: Maximum number of results per page
             offset: Pagination offset
-            
+
         Returns:
             List of HIP profile configurations
         """
@@ -1986,6 +2459,8 @@ class PrismaAccessAPIClient:
         params = {}
         if folder:
             url += build_folder_query(folder)
+        elif snippet:
+            url += build_snippet_query(snippet)
         if limit != 100:
             params["limit"] = limit
         if offset > 0:
@@ -1994,11 +2469,11 @@ class PrismaAccessAPIClient:
         return response.get("data", [])
 
     def get_all_hip_profiles(
-        self, folder: Optional[str] = None
+        self, folder: Optional[str] = None, snippet: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all HIP profiles with automatic pagination."""
         def api_func(offset=0, limit=100):
-            return self.get_hip_profiles(folder=folder, limit=limit, offset=offset)
+            return self.get_hip_profiles(folder=folder, snippet=snippet, limit=limit, offset=offset)
         return paginate_api_request(api_func)
     
     # Mobile Agent Configuration (replaces old GlobalProtect endpoints)
@@ -2145,6 +2620,35 @@ class PrismaAccessAPIClient:
         response = self._make_request("GET", endpoint, params=params if params else None)
         # _make_request already returns parsed data, not response object
         return response if isinstance(response, dict) else {}
+
+    # Auto Tag Actions (Infrastructure - no folder parameter)
+    def get_auto_tag_actions(
+        self, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get auto tag actions (infrastructure configuration).
+
+        Args:
+            limit: Maximum number of results per page
+            offset: Pagination offset
+
+        Returns:
+            List of auto tag action configurations
+        """
+        url = APIEndpoints.AUTO_TAG_ACTIONS
+        params = {}
+        if limit != 100:
+            params["limit"] = limit
+        if offset > 0:
+            params["offset"] = offset
+        response = self._make_request("GET", url, params=params if params else None)
+        return response.get("data", [])
+
+    def get_all_auto_tag_actions(self) -> List[Dict[str, Any]]:
+        """Get all auto tag actions with automatic pagination."""
+        def api_func(offset=0, limit=100):
+            return self.get_auto_tag_actions(limit=limit, offset=offset)
+        return paginate_api_request(api_func)
 
     # Bandwidth Allocations and Locations (for regions/subnets)
     def get_bandwidth_allocations(
@@ -2364,6 +2868,16 @@ class PrismaAccessAPIClient:
         url = APIEndpoints.security_rule(rule_id)
         return self._make_request("DELETE", url, use_cache=False)
     
+    def delete_authentication_rule(self, rule_id: str) -> Dict[str, Any]:
+        """Delete an authentication rule."""
+        url = APIEndpoints.authentication_rule(rule_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    def delete_decryption_rule(self, rule_id: str) -> Dict[str, Any]:
+        """Delete a decryption rule."""
+        url = APIEndpoints.decryption_rule(rule_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
     def move_security_rule(self, rule_id: str, folder: str, destination: str = "bottom", rulebase: str = "pre") -> Dict[str, Any]:
         """
         Move a security rule to a specific position in the rulebase.
@@ -2572,6 +3086,41 @@ class PrismaAccessAPIClient:
         """Delete a HIP profile."""
         url = APIEndpoints.hip_profile(profile_id)
         return self._make_request("DELETE", url, use_cache=False)
+    
+    # Tags
+    
+    def delete_tag(self, tag_id: str) -> Dict[str, Any]:
+        """Delete a tag."""
+        url = APIEndpoints.tag(tag_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    # Schedules
+    
+    def delete_schedule(self, schedule_id: str) -> Dict[str, Any]:
+        """Delete a schedule."""
+        url = APIEndpoints.schedule(schedule_id)
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    # External Dynamic Lists
+    
+    def delete_external_dynamic_list(self, edl_id: str) -> Dict[str, Any]:
+        """Delete an external dynamic list."""
+        url = f"{APIEndpoints.EXTERNAL_DYNAMIC_LISTS}/{edl_id}"
+        return self._make_request("DELETE", url, use_cache=False)
+    
+    # Alias methods for consistent naming
+    
+    def delete_wildfire_profile(self, profile_id: str) -> Dict[str, Any]:
+        """Delete a WildFire profile (alias for delete_wildfire_anti_virus_profile)."""
+        return self.delete_wildfire_anti_virus_profile(profile_id)
+    
+    def delete_vulnerability_profile(self, profile_id: str) -> Dict[str, Any]:
+        """Delete a vulnerability profile (alias for delete_vulnerability_protection_profile)."""
+        return self.delete_vulnerability_protection_profile(profile_id)
+    
+    def delete_url_filtering_profile(self, profile_id: str) -> Dict[str, Any]:
+        """Delete a URL filtering profile (alias for delete_url_access_profile)."""
+        return self.delete_url_access_profile(profile_id)
     
     # Infrastructure - Remote Networks
     
