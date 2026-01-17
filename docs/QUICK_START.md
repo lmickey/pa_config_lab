@@ -1,155 +1,109 @@
 # Quick Start Guide
 
-**Prisma Access Configuration Capture Tool v2.0**
+**Prisma Access Configuration Capture Tool**
 
 ---
 
-## What's New in v2.0
+## Quick Install
 
-✅ **Infrastructure Capture** - Remote Networks, Service Connections, IPsec/IKE, Mobile Users, HIP, Regions  
-✅ **Custom Applications** - Option to capture custom/user-created applications  
-✅ **Enhanced GUI** - 6 new infrastructure options + application selector  
-✅ **Rate Limiting** - 45 req/min (90% of API limit) for safe operation  
-✅ **Comprehensive Testing** - 300+ test cases for reliability
+```bash
+# Clone repository
+git clone https://github.com/lmickey/pa_config_lab.git
+cd pa_config_lab
 
----
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# or: venv\Scripts\activate  # Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the GUI
+python3 run_gui.py
+```
 
 ## Running the GUI
 
 ### Linux/Mac
 ```bash
-# Make sure script is executable
-chmod +x run_gui.sh
-
-# Run the GUI
-./run_gui.sh
-```
-
-**OR** run directly with bash:
-```bash
-bash run_gui.sh
+source venv/bin/activate
+python3 run_gui.py
 ```
 
 ### Windows
 ```cmd
-run_gui.bat
-```
-
-### Manual Method (if scripts don't work)
-
-**Linux/Mac:**
-```bash
-source venv/bin/activate
-python3 pa_config_gui.py
-```
-
-**Windows:**
-```cmd
 venv\Scripts\activate
-python pa_config_gui.py
+python run_gui.py
 ```
+
+---
 
 ## Common Issues
 
-### "SyntaxError" when running run_gui.sh
-**Problem**: You're running the script with Python instead of bash.
+### "ModuleNotFoundError: No module named 'PyQt6'"
+**Problem**: Dependencies not installed.
 
-**Solution**: Use one of these methods:
+**Solution**:
 ```bash
-# Method 1: Make executable and run directly
-chmod +x run_gui.sh
-./run_gui.sh
-
-# Method 2: Run with bash explicitly
-bash run_gui.sh
-
-# Method 3: Use sh
-sh run_gui.sh
-```
-
-**DO NOT** run it like this:
-```bash
-python3 run_gui.sh  # ❌ WRONG - This is a bash script, not Python!
-```
-
-### "No such file or directory" or "venv/bin/activate: No such file"
-**Problem**: Virtual environment not set up.
-
-**Solution**: 
-```bash
-python3 -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or
-venv\Scripts\activate     # Windows
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### "ModuleNotFoundError: No module named 'tkinter'"
-**Problem**: tkinter not installed.
+### PyQt6 crashes or won't start (Linux)
+**Problem**: Missing system Qt libraries.
 
-**Solution**: Install python3-tk package:
+**Solution**: Install required system packages:
 ```bash
-# Linux (Ubuntu/Debian)
-sudo apt-get install python3-tk
+# Ubuntu/Debian
+sudo apt-get install -y libxcb-xinerama0 libxkbcommon0 libgl1
 
-# Linux (Fedora/RHEL)
-sudo dnf install python3-tkinter
+# Fedora/RHEL
+sudo dnf install libxkbcommon mesa-libGL
+```
+
+### "No such file or directory" or "venv not found"
+**Problem**: Virtual environment not set up.
+
+**Solution**:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
 ### GUI doesn't open / No window appears
 **Problem**: No display available (common on SSH/headless systems).
 
-**Solution**: 
-- Set DISPLAY variable: `export DISPLAY=:0`
+**Solution**:
 - Use X11 forwarding: `ssh -X user@host`
-- Or use CLI scripts instead
-
-## Testing the Setup
-
-Run this to verify everything is set up:
-```bash
-python3 test_gui_import.py
-```
-
-If all checks pass, you're ready to run the GUI!
+- Set DISPLAY variable: `export DISPLAY=:0`
 
 ---
 
-## New Features Guide
+## Features
 
-### Infrastructure Capture
+### Pull (Capture Configuration)
+- Capture security policies, objects, and profiles from Prisma Access
+- Support for multiple folders and snippets
+- Infrastructure capture (Remote Networks, Service Connections, etc.)
 
-The GUI now includes 6 infrastructure component options:
+### Push (Deploy Configuration)
+- Push captured configuration to same or different tenant
+- Pre-push validation with dependency checking
+- Conflict resolution (skip, overwrite, rename)
 
-1. **Remote Networks** - Branch offices and data centers
-2. **Service Connections** - On-premises connectivity  
-3. **IPsec Tunnels & Crypto** - VPN infrastructure
-4. **Mobile User Infrastructure** - GlobalProtect gateways/portals
-5. **HIP Objects & Profiles** - Endpoint compliance checks
-6. **Regions & Bandwidth** - Deployment locations
-
-**To use:**
-1. Go to "Pull" tab
-2. Scroll to "Infrastructure Components" section
-3. All are checked by default
-4. Uncheck any you don't need
-
-### Custom Applications
-
-**NEW:** Option to capture custom/user-created applications.
-
-**To use:**
-1. Check "Custom Applications" in Pull tab
-2. Click "Select Applications..." button
-3. Enter app names (comma-separated): `App1, App2, App3`
-
-**Note:** Only needed for custom apps. Predefined applications are automatically included.
+### Multi-Tenant Support
+- Configure multiple tenant credentials
+- Easy switching between tenants
+- Cross-tenant migration support
 
 ---
 
 ## Quick Links
 
-- **📖 Full Documentation:** See [docs/README.md](docs/README.md)
-- **🏗️ Infrastructure Guide:** See [docs/INFRASTRUCTURE_CAPTURE_GUIDE.md](docs/INFRASTRUCTURE_CAPTURE_GUIDE.md)
-- **🔧 API Reference:** See [docs/API_REFERENCE_INFRASTRUCTURE.md](docs/API_REFERENCE_INFRASTRUCTURE.md)
-- **❓ Troubleshooting:** See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+- **Full Setup Guide**: [docs/SETUP.md](SETUP.md)
+- **GUI User Guide**: [docs/GUI_USER_GUIDE.md](GUI_USER_GUIDE.md)
+- **Infrastructure Guide**: [docs/INFRASTRUCTURE_CAPTURE_GUIDE.md](INFRASTRUCTURE_CAPTURE_GUIDE.md)
+- **API Reference**: [docs/API_REFERENCE.md](API_REFERENCE.md)
+- **Troubleshooting**: [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md)

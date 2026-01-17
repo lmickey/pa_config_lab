@@ -224,12 +224,13 @@ pip install -r requirements.txt
 ### Launching the GUI
 
 ```bash
+# Linux/Mac
+source venv/bin/activate
 python3 run_gui.py
-```
 
-Or on Windows:
-```batch
-run_gui.bat
+# Windows
+venv\Scripts\activate
+python run_gui.py
 ```
 
 ### Step-by-Step: Pulling Infrastructure Configuration

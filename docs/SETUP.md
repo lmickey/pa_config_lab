@@ -1,45 +1,40 @@
-# Setup Guide for GUI Testing
+# Setup Guide
 
 ## Prerequisites
 
-### 1. Install tkinter (Required for GUI)
-
-#### Linux (Ubuntu/Debian)
-```bash
-sudo apt-get update
-sudo apt-get install python3-tk
-```
-
-#### Linux (Fedora/RHEL/CentOS)
-```bash
-sudo dnf install python3-tkinter
-# or
-sudo yum install python3-tkinter
-```
-
-#### Mac
-tkinter should be included with Python. If not:
-```bash
-brew install python-tk
-```
-
-#### Windows
-tkinter is included with Python installations. If missing, reinstall Python and select "tcl/tk and IDLE" option.
-
-### 2. Verify Python Version
+### Python Version
 ```bash
 python3 --version
 ```
-Should be Python 3.7 or higher.
+Python 3.9 or higher is required.
 
-## Setup Steps
+### System Dependencies (Linux)
 
-### Step 1: Create Virtual Environment (Already Done)
+PyQt6 requires certain system libraries. On Ubuntu/Debian:
+```bash
+sudo apt-get update
+sudo apt-get install -y libxcb-xinerama0 libxkbcommon0 libgl1
+```
+
+On Fedora/RHEL:
+```bash
+sudo dnf install libxkbcommon mesa-libGL
+```
+
+## Installation Steps
+
+### Step 1: Clone the Repository
+```bash
+git clone https://github.com/lmickey/pa_config_lab.git
+cd pa_config_lab
+```
+
+### Step 2: Create Virtual Environment
 ```bash
 python3 -m venv venv
 ```
 
-### Step 2: Activate Virtual Environment
+### Step 3: Activate Virtual Environment
 
 **Linux/Mac:**
 ```bash
@@ -51,71 +46,67 @@ source venv/bin/activate
 venv\Scripts\activate
 ```
 
-### Step 3: Install Dependencies (Already Done)
+### Step 4: Install Dependencies
 ```bash
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### Step 4: Verify Setup
-```bash
-python3 test_gui_import.py
-```
-
-This will check if all dependencies are available.
-
 ### Step 5: Run the GUI
-
-**Option 1: Use the run script**
 ```bash
-# Linux/Mac
-./run_gui.sh
-
-# Windows
-run_gui.bat
-```
-
-**Option 2: Manual activation**
-```bash
-# Linux/Mac
-source venv/bin/activate
-python3 pa_config_gui.py
-
-# Windows
-venv\Scripts\activate
-python pa_config_gui.py
+python3 run_gui.py
 ```
 
 ## Troubleshooting
 
-### tkinter Not Found
-If you see `ModuleNotFoundError: No module named 'tkinter'`:
+### PyQt6 Import Errors
+If you see errors about PyQt6 or Qt libraries:
 
-1. **Linux**: Install python3-tk package (see above)
-2. **Mac**: May need to install via Homebrew or reinstall Python
-3. **Windows**: Reinstall Python with tkinter option
+1. **Linux**: Install system Qt dependencies:
+   ```bash
+   sudo apt-get install -y libxcb-xinerama0 libxkbcommon0 libgl1
+   ```
 
-### Import Errors for load_settings/get_settings
-- Make sure you're running from the project directory
-- Verify `load_settings.py` and `get_settings.py` are in the same directory as `pa_config_gui.py`
+2. **Try reinstalling PyQt6**:
+   ```bash
+   pip uninstall PyQt6 PyQt6-Qt6 PyQt6-sip
+   pip install PyQt6
+   ```
 
-### Virtual Environment Issues
-- Make sure venv is activated (you should see `(venv)` in your prompt)
-- If activation fails, recreate: `rm -rf venv && python3 -m venv venv`
-
-## Quick Test
-
-After installing tkinter, run:
+### "No module named 'gui'" Error
+Make sure you're running from the project root directory:
 ```bash
-python3 test_gui_import.py
+cd /path/to/pa_config_lab
+python3 run_gui.py
 ```
 
-If all checks pass, you're ready to run the GUI!
+### Virtual Environment Issues
+If activation fails, recreate the environment:
+```bash
+rm -rf venv
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Display Issues (Headless/SSH)
+For remote sessions, use X11 forwarding:
+```bash
+ssh -X user@host
+export DISPLAY=:0
+python3 run_gui.py
+```
+
+## Verifying Installation
+
+Run a quick test to verify the API client works:
+```bash
+python3 -c "from prisma.api_client import PrismaAccessAPIClient; print('OK')"
+```
 
 ## Next Steps
 
-Once the GUI launches successfully:
-1. Test basic functionality (see TESTING.md)
-2. Try creating a new configuration
-3. Test copy/paste functionality
-4. Test loading/saving configurations
+Once the GUI launches:
+1. Configure tenant credentials in Settings
+2. Test Pull functionality to capture configuration
+3. Review captured data in the Results panel
