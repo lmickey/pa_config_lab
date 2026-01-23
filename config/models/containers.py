@@ -11,6 +11,7 @@ This module contains container classes that organize ConfigItem instances:
 from typing import List, Dict, Any, Optional, Union, Type
 import logging
 from config.models.base import ConfigItem
+from config.models.cloud import CloudConfig
 
 logger = logging.getLogger(__name__)
 
@@ -473,7 +474,10 @@ class Configuration:
         self.folders: Dict[str, FolderConfig] = {}
         self.snippets: Dict[str, SnippetConfig] = {}
         self.infrastructure: InfrastructureConfig = InfrastructureConfig()
-        
+
+        # Cloud infrastructure (POV deployments)
+        self.cloud: Optional[CloudConfig] = None
+
         # Metadata
         self.source_tsg = source_tsg
         self.source_tenant = source_tenant  # Friendly tenant name
@@ -726,6 +730,7 @@ class Configuration:
             "infrastructure": {
                 "items": []
             },
+            "cloud": None,
             "stats": {}
         }
         
@@ -752,7 +757,13 @@ class Configuration:
             item.to_dict(include_id=True) for item in self.infrastructure.items
         ]
         logger.debug(f"  Infrastructure: {len(self.infrastructure.items)} items")
-        
+
+        # Serialize cloud infrastructure (if present)
+        if self.cloud:
+            logger.debug("Serializing cloud infrastructure")
+            config_dict["cloud"] = self.cloud.to_dict()
+            logger.debug(f"  Cloud: {len(self.cloud.firewalls)} firewalls, panorama={self.cloud.panorama is not None}")
+
         # Generate stats
         all_items = self.get_all_items()
         items_by_type = {}
@@ -1045,7 +1056,23 @@ class Configuration:
                     raise ValueError(error_msg) from e
                 elif on_error == "warn":
                     logger.warning(error_msg)
-        
+
+        # Load cloud infrastructure (if present)
+        cloud_dict = config_dict.get('cloud')
+        if cloud_dict:
+            logger.info("Loading cloud infrastructure")
+            try:
+                config.cloud = CloudConfig.from_dict(cloud_dict)
+                logger.info(f"Loaded cloud: {len(config.cloud.firewalls)} firewalls, panorama={config.cloud.panorama is not None}")
+            except Exception as e:
+                error_msg = f"Failed to load cloud infrastructure: {e}"
+                errors.append(error_msg)
+                if on_error == "fail" or (strict and on_error != "skip"):
+                    logger.error(error_msg)
+                    raise ValueError(error_msg) from e
+                elif on_error == "warn":
+                    logger.warning(error_msg)
+
         # Log summary
         logger.normal("=" * 80)
         logger.normal(f"CONFIGURATION LOADED: {items_loaded} items")

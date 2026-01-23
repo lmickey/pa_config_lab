@@ -2,7 +2,14 @@
 Tenant Manager - Manage saved tenant credentials.
 
 This module provides functionality to save, load, and manage Prisma Access
-tenant information (TSG ID, Client ID, labels) without storing client secrets.
+tenant information (TSG ID, Client ID, labels) and extended cloud credentials
+for firewalls, Panorama, and supporting VMs.
+
+Extended in Phase 2 to support:
+- Firewall credentials (password, API key, certificate)
+- Panorama credentials (password, API key, certificate)
+- Supporting VM credentials (password, SSH key)
+- Secure credential generation
 """
 
 import json
@@ -13,6 +20,15 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 from config.storage.crypto_utils import derive_key_secure, encrypt_data, decrypt_data
+from config.credential_manager import (
+    TenantCredentials,
+    DeviceCredentials,
+    VMCredentials,
+    SCMCredentials,
+    CredentialManager,
+    PasswordGenerator,
+    AuthType,
+)
 
 
 class TenantManager:
@@ -533,11 +549,11 @@ class TenantManager:
     def import_tenants(self, filepath: str, merge: bool = True) -> tuple[bool, str]:
         """
         Import tenants from a JSON file.
-        
+
         Args:
             filepath: Path to import file
             merge: If True, merge with existing; if False, replace
-        
+
         Returns:
             Tuple of (success, message)
         """
@@ -545,15 +561,15 @@ class TenantManager:
             # Load import file
             with open(filepath, 'r') as f:
                 import_data = json.load(f)
-            
+
             if "tenants" not in import_data:
                 return False, "Invalid tenant file format"
-            
+
             if merge:
                 # Merge with existing
                 existing_data = self._load_tenants()
                 existing_names = {t["name"].lower() for t in existing_data["tenants"]}
-                
+
                 added = 0
                 skipped = 0
                 for tenant in import_data["tenants"]:
@@ -564,7 +580,7 @@ class TenantManager:
                         tenant["id"] = str(uuid.uuid4())
                         existing_data["tenants"].append(tenant)
                         added += 1
-                
+
                 if self._save_tenants(existing_data):
                     return True, f"Imported {added} tenant(s), skipped {skipped} duplicate(s)"
                 else:
@@ -575,6 +591,373 @@ class TenantManager:
                     return True, f"Imported {len(import_data['tenants'])} tenant(s)"
                 else:
                     return False, "Failed to save imported tenants"
-                
+
         except Exception as e:
             return False, f"Import failed: {str(e)}"
+
+    # ========== Extended Credential Management (Phase 2) ==========
+
+    def get_tenant_credentials(self, tenant_id: str) -> Optional[TenantCredentials]:
+        """
+        Get full credential object for a tenant.
+
+        Supports both legacy and new credential formats.
+
+        Args:
+            tenant_id: Tenant ID
+
+        Returns:
+            TenantCredentials object or None if tenant not found
+        """
+        tenant = self.get_tenant(tenant_id)
+        if not tenant:
+            return None
+
+        # Check if using new format (has 'credentials' key)
+        if 'credentials' in tenant:
+            return TenantCredentials.from_dict(tenant['credentials'])
+
+        # Convert from legacy format
+        return TenantCredentials.from_legacy_tenant(tenant)
+
+    def update_tenant_credentials(
+        self,
+        tenant_id: str,
+        credentials: TenantCredentials
+    ) -> tuple[bool, str]:
+        """
+        Update tenant with full credential set.
+
+        Args:
+            tenant_id: Tenant ID
+            credentials: TenantCredentials object
+
+        Returns:
+            Tuple of (success, message)
+        """
+        data = self._load_tenants()
+
+        # Find tenant
+        tenant = None
+        for t in data["tenants"]:
+            if t["id"] == tenant_id:
+                tenant = t
+                break
+
+        if not tenant:
+            return False, f"Tenant with ID '{tenant_id}' not found"
+
+        # Store credentials in new format
+        tenant['credentials'] = credentials.to_dict()
+
+        # Also update legacy fields for backward compatibility
+        tenant['tsg_id'] = credentials.scm.tsg_id
+        tenant['client_id'] = credentials.scm.client_id
+        tenant['client_secret'] = credentials.scm.client_secret
+
+        if self._save_tenants(data):
+            return True, f"Credentials updated for tenant '{tenant['name']}'"
+        else:
+            return False, "Failed to save credentials"
+
+    def set_firewall_credentials(
+        self,
+        tenant_id: str,
+        use_generated: bool = True,
+        username: str = "admin",
+        password: Optional[str] = None,
+        auth_type: str = "password"
+    ) -> tuple[bool, str]:
+        """
+        Set firewall credentials for a tenant.
+
+        Args:
+            tenant_id: Tenant ID
+            use_generated: Use auto-generated password
+            username: Admin username
+            password: Password (required if not use_generated)
+            auth_type: Authentication type (password, api_key, certificate)
+
+        Returns:
+            Tuple of (success, message)
+        """
+        credentials = self.get_tenant_credentials(tenant_id)
+        if not credentials:
+            return False, f"Tenant with ID '{tenant_id}' not found"
+
+        credentials.firewall.use_generated = use_generated
+        credentials.firewall.username = username
+        credentials.firewall.auth_type = AuthType(auth_type)
+
+        if not use_generated:
+            if not password:
+                return False, "Password required when not using generated credentials"
+            credentials.firewall.password = password
+        elif use_generated and not credentials.firewall.password:
+            # Generate password now
+            credentials.firewall.generate_password()
+
+        return self.update_tenant_credentials(tenant_id, credentials)
+
+    def set_panorama_credentials(
+        self,
+        tenant_id: str,
+        use_generated: bool = True,
+        username: str = "admin",
+        password: Optional[str] = None,
+        auth_type: str = "password"
+    ) -> tuple[bool, str]:
+        """
+        Set Panorama credentials for a tenant.
+
+        Args:
+            tenant_id: Tenant ID
+            use_generated: Use auto-generated password
+            username: Admin username
+            password: Password (required if not use_generated)
+            auth_type: Authentication type (password, api_key, certificate)
+
+        Returns:
+            Tuple of (success, message)
+        """
+        credentials = self.get_tenant_credentials(tenant_id)
+        if not credentials:
+            return False, f"Tenant with ID '{tenant_id}' not found"
+
+        credentials.panorama.use_generated = use_generated
+        credentials.panorama.username = username
+        credentials.panorama.auth_type = AuthType(auth_type)
+
+        if not use_generated:
+            if not password:
+                return False, "Password required when not using generated credentials"
+            credentials.panorama.password = password
+        elif use_generated and not credentials.panorama.password:
+            # Generate password now
+            credentials.panorama.generate_password()
+
+        return self.update_tenant_credentials(tenant_id, credentials)
+
+    def set_vm_credentials(
+        self,
+        tenant_id: str,
+        use_generated: bool = True,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        ssh_public_key: Optional[str] = None,
+        resource_group: str = ""
+    ) -> tuple[bool, str]:
+        """
+        Set supporting VM credentials for a tenant.
+
+        Args:
+            tenant_id: Tenant ID
+            use_generated: Use auto-generated credentials
+            username: VM admin username
+            password: Password
+            ssh_public_key: SSH public key for Linux VMs
+            resource_group: Resource group name (for username generation)
+
+        Returns:
+            Tuple of (success, message)
+        """
+        credentials = self.get_tenant_credentials(tenant_id)
+        if not credentials:
+            return False, f"Tenant with ID '{tenant_id}' not found"
+
+        credentials.supporting_vms.use_generated = use_generated
+
+        if not use_generated:
+            if not username:
+                return False, "Username required when not using generated credentials"
+            if not password and not ssh_public_key:
+                return False, "Password or SSH key required when not using generated credentials"
+            credentials.supporting_vms.username = username
+            credentials.supporting_vms.password = password
+            credentials.supporting_vms.ssh_public_key = ssh_public_key
+        elif use_generated and not credentials.supporting_vms.has_credentials():
+            # Generate credentials now
+            credentials.supporting_vms.generate_credentials(
+                resource_group=resource_group or 'pov',
+                include_ssh_key=True
+            )
+
+        return self.update_tenant_credentials(tenant_id, credentials)
+
+    def generate_all_credentials(
+        self,
+        tenant_id: str,
+        resource_group: str = ""
+    ) -> tuple[bool, str, Dict[str, Any]]:
+        """
+        Generate all device credentials for a tenant.
+
+        Used before Terraform deployment to ensure all credentials exist.
+
+        Args:
+            tenant_id: Tenant ID
+            resource_group: Resource group name for VM username
+
+        Returns:
+            Tuple of (success, message, generated_credentials)
+        """
+        credentials = self.get_tenant_credentials(tenant_id)
+        if not credentials:
+            return False, f"Tenant with ID '{tenant_id}' not found", {}
+
+        try:
+            generated = credentials.generate_all_device_credentials(
+                resource_group=resource_group,
+                include_ssh=True
+            )
+
+            # Save updated credentials
+            success, message = self.update_tenant_credentials(tenant_id, credentials)
+            if not success:
+                return False, message, {}
+
+            return True, "Credentials generated successfully", generated
+
+        except Exception as e:
+            return False, f"Error generating credentials: {str(e)}", {}
+
+    def get_terraform_credentials(
+        self,
+        tenant_id: str,
+        resource_group: str
+    ) -> tuple[bool, str, Dict[str, Any]]:
+        """
+        Get credentials formatted for Terraform deployment.
+
+        Generates any missing credentials before returning.
+
+        Args:
+            tenant_id: Tenant ID
+            resource_group: Resource group name
+
+        Returns:
+            Tuple of (success, message, terraform_vars)
+        """
+        credentials = self.get_tenant_credentials(tenant_id)
+        if not credentials:
+            return False, f"Tenant with ID '{tenant_id}' not found", {}
+
+        try:
+            tf_creds = CredentialManager.prepare_terraform_credentials(
+                credentials,
+                resource_group
+            )
+
+            # Save any generated credentials
+            success, message = self.update_tenant_credentials(tenant_id, credentials)
+            if not success:
+                return False, f"Warning: {message}", tf_creds
+
+            return True, "Credentials ready for Terraform", tf_creds
+
+        except Exception as e:
+            return False, f"Error preparing credentials: {str(e)}", {}
+
+    def get_credential_summary(self, tenant_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get credential summary for UI display (no sensitive data).
+
+        Args:
+            tenant_id: Tenant ID
+
+        Returns:
+            Summary dictionary or None if tenant not found
+        """
+        credentials = self.get_tenant_credentials(tenant_id)
+        if not credentials:
+            return None
+
+        return credentials.get_summary()
+
+    def validate_all_credentials(self, tenant_id: str) -> tuple[bool, Dict[str, List[str]]]:
+        """
+        Validate all credentials for a tenant.
+
+        Args:
+            tenant_id: Tenant ID
+
+        Returns:
+            Tuple of (all_valid, errors_by_type)
+        """
+        credentials = self.get_tenant_credentials(tenant_id)
+        if not credentials:
+            return False, {'tenant': ['Tenant not found']}
+
+        errors = credentials.validate()
+        all_valid = len(errors) == 0
+
+        return all_valid, errors
+
+    def migrate_legacy_tenant(self, tenant_id: str) -> tuple[bool, str]:
+        """
+        Migrate a legacy tenant to new credential format.
+
+        Preserves existing SCM credentials and initializes device credentials
+        with default (use_generated=True) settings.
+
+        Args:
+            tenant_id: Tenant ID
+
+        Returns:
+            Tuple of (success, message)
+        """
+        data = self._load_tenants()
+
+        # Find tenant
+        tenant = None
+        for t in data["tenants"]:
+            if t["id"] == tenant_id:
+                tenant = t
+                break
+
+        if not tenant:
+            return False, f"Tenant with ID '{tenant_id}' not found"
+
+        # Skip if already migrated
+        if 'credentials' in tenant:
+            return True, "Tenant already using new credential format"
+
+        # Create new credentials from legacy format
+        credentials = TenantCredentials.from_legacy_tenant(tenant)
+
+        # Store in new format
+        tenant['credentials'] = credentials.to_dict()
+
+        if self._save_tenants(data):
+            return True, f"Tenant '{tenant['name']}' migrated to new credential format"
+        else:
+            return False, "Failed to save migrated tenant"
+
+    def migrate_all_tenants(self) -> tuple[int, int, List[str]]:
+        """
+        Migrate all legacy tenants to new credential format.
+
+        Returns:
+            Tuple of (migrated_count, skipped_count, errors)
+        """
+        data = self._load_tenants()
+        migrated = 0
+        skipped = 0
+        errors = []
+
+        for tenant in data["tenants"]:
+            if 'credentials' in tenant:
+                skipped += 1
+                continue
+
+            try:
+                credentials = TenantCredentials.from_legacy_tenant(tenant)
+                tenant['credentials'] = credentials.to_dict()
+                migrated += 1
+            except Exception as e:
+                errors.append(f"Error migrating '{tenant['name']}': {str(e)}")
+
+        if migrated > 0:
+            self._save_tenants(data)
+
+        return migrated, skipped, errors
