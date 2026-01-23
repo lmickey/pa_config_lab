@@ -24,6 +24,14 @@ from PyQt6.QtWidgets import (
     QTabWidget,
     QFormLayout,
     QCheckBox,
+    QComboBox,
+    QFrame,
+    QGridLayout,
+    QScrollArea,
+    QSpinBox,
+    QListWidget,
+    QListWidgetItem,
+    QSizePolicy,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
 
@@ -110,7 +118,7 @@ class POVWorkflowWidget(QWidget):
         # Use Cases configuration storage
         self.use_case_configs = {
             'mobile_users': {'enabled': True},  # Default enabled
-            'proxy_users': {'enabled': False},
+            'prisma_browser': {'enabled': False},
             'private_app': {'enabled': False},
             'remote_branch': {'enabled': False},
             'aiops_adem': {'enabled': False},
@@ -170,11 +178,11 @@ class POVWorkflowWidget(QWidget):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        title = QLabel("<h3>Step 1: Tenant Information & Environment</h3>")
+        title = QLabel("<h3>Step 1: Tenant & Customer Information</h3>")
         layout.addWidget(title)
 
         info = QLabel(
-            "Configure your management type, connect to your SCM tenant, and define your deployment environment."
+            "Configure your management type, connect to your SCM tenant, and provide customer details."
         )
         info.setWordWrap(True)
         info.setStyleSheet("color: gray; margin-bottom: 15px;")
@@ -213,218 +221,224 @@ class POVWorkflowWidget(QWidget):
         layout.addLayout(top_row)
 
         # =====================================================================
-        # Environment Deployment Section
+        # Customer Information Section (Name and Industry side by side)
         # =====================================================================
-        self.deployment_group = QGroupBox("Environment Deployment")
-        deployment_layout = QVBoxLayout()
+        customer_group = QGroupBox("Customer Information")
+        customer_layout = QHBoxLayout()
 
-        # --- SCM Managed: Azure Deployment Question ---
-        self.azure_deploy_widget = QWidget()
-        azure_layout = QVBoxLayout(self.azure_deploy_widget)
-        azure_layout.setContentsMargins(0, 0, 0, 0)
+        # Customer Name
+        name_label = QLabel("Customer Name:")
+        name_label.setStyleSheet("font-size: 12px; color: #333;")
+        customer_layout.addWidget(name_label)
 
-        azure_label = QLabel("Will you need to deploy firewall resources in Azure?")
-        azure_label.setStyleSheet("font-weight: bold;")
-        azure_layout.addWidget(azure_label)
-
-        azure_radio_layout = QHBoxLayout()
-        self.azure_no_radio = QRadioButton("No")
-        self.azure_no_radio.setChecked(True)
-        self.azure_no_radio.toggled.connect(self._on_azure_deploy_changed)
-        azure_radio_layout.addWidget(self.azure_no_radio)
-
-        self.azure_yes_radio = QRadioButton("Yes")
-        self.azure_yes_radio.toggled.connect(self._on_azure_deploy_changed)
-        azure_radio_layout.addWidget(self.azure_yes_radio)
-        azure_radio_layout.addStretch()
-        azure_layout.addLayout(azure_radio_layout)
-
-        # SCM Azure Firewall Options (hidden by default)
-        self.scm_firewall_options = QWidget()
-        scm_fw_layout = QVBoxLayout(self.scm_firewall_options)
-        scm_fw_layout.setContentsMargins(20, 10, 0, 0)
-
-        scm_fw_label = QLabel("Select firewall types to deploy:")
-        scm_fw_layout.addWidget(scm_fw_label)
-
-        self.deploy_sc_firewall_check = QCheckBox("Deploy Service Connection Firewall")
-        self.deploy_sc_firewall_check.setToolTip("Deploy a firewall for Service Connection to Azure")
-        self.deploy_sc_firewall_check.stateChanged.connect(self._update_deployment_status_visibility)
-        scm_fw_layout.addWidget(self.deploy_sc_firewall_check)
-
-        self.deploy_rn_firewall_check = QCheckBox("Deploy Remote Network Firewall")
-        self.deploy_rn_firewall_check.setToolTip("Deploy a firewall for Remote Network connectivity")
-        self.deploy_rn_firewall_check.stateChanged.connect(self._update_deployment_status_visibility)
-        scm_fw_layout.addWidget(self.deploy_rn_firewall_check)
-
-        self.scm_firewall_options.setVisible(False)
-        azure_layout.addWidget(self.scm_firewall_options)
-
-        deployment_layout.addWidget(self.azure_deploy_widget)
-
-        # --- Panorama Managed: Firewall Deployment (always shown for Panorama) ---
-        self.panorama_deploy_widget = QWidget()
-        panorama_layout = QVBoxLayout(self.panorama_deploy_widget)
-        panorama_layout.setContentsMargins(0, 0, 0, 0)
-
-        panorama_info = QLabel(
-            "<b>Panorama-managed deployments require at least one Service Connection firewall.</b>"
+        self.customer_name_input = QLineEdit()
+        self.customer_name_input.setPlaceholderText("e.g., acme")
+        self.customer_name_input.setMaximumWidth(150)
+        self.customer_name_input.setStyleSheet(
+            "QLineEdit { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; }"
         )
-        panorama_info.setStyleSheet("color: #1565C0; margin-bottom: 10px;")
-        panorama_layout.addWidget(panorama_info)
+        self.customer_name_input.textChanged.connect(self._on_customer_name_changed)
+        customer_layout.addWidget(self.customer_name_input)
 
-        self.panorama_sc_check = QCheckBox("Service Connection Firewall (Required)")
-        self.panorama_sc_check.setChecked(True)
-        self.panorama_sc_check.setEnabled(False)  # Always required for Panorama
-        panorama_layout.addWidget(self.panorama_sc_check)
+        customer_layout.addSpacing(20)
 
-        rn_question = QLabel("Will you also deploy Remote Network firewalls?")
-        rn_question.setStyleSheet("margin-top: 10px;")
-        panorama_layout.addWidget(rn_question)
+        # Industry (shortened label)
+        industry_label = QLabel("Industry:")
+        industry_label.setStyleSheet("font-size: 12px; color: #333;")
+        customer_layout.addWidget(industry_label)
 
-        rn_radio_layout = QHBoxLayout()
-        self.panorama_rn_no_radio = QRadioButton("No")
-        self.panorama_rn_no_radio.setChecked(True)
-        self.panorama_rn_no_radio.toggled.connect(self._on_panorama_rn_changed)
-        rn_radio_layout.addWidget(self.panorama_rn_no_radio)
+        self.customer_industry_combo = QComboBox()
+        self.customer_industry_combo.addItems([
+            "-- Select --",
+            "Healthcare",
+            "Financial Services",
+            "Retail & E-Commerce",
+            "Manufacturing",
+            "Technology & Software",
+            "Education",
+            "Government",
+            "Energy & Utilities",
+            "Telecommunications",
+            "Media & Entertainment",
+            "Transportation & Logistics",
+            "Professional Services",
+            "Hospitality",
+            "Real Estate",
+            "Other",
+        ])
+        self.customer_industry_combo.setStyleSheet(
+            "QComboBox { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; }"
+        )
+        self.customer_industry_combo.currentTextChanged.connect(self._on_customer_industry_changed)
+        customer_layout.addWidget(self.customer_industry_combo)
 
-        self.panorama_rn_yes_radio = QRadioButton("Yes")
-        self.panorama_rn_yes_radio.toggled.connect(self._on_panorama_rn_changed)
-        rn_radio_layout.addWidget(self.panorama_rn_yes_radio)
-        rn_radio_layout.addStretch()
-        panorama_layout.addLayout(rn_radio_layout)
-
-        # RN count (hidden by default)
-        self.panorama_rn_count_widget = QWidget()
-        rn_count_layout = QHBoxLayout(self.panorama_rn_count_widget)
-        rn_count_layout.setContentsMargins(20, 5, 0, 0)
-        rn_count_layout.addWidget(QLabel("Number of RN firewalls:"))
-        self.panorama_rn_count_input = QLineEdit()
-        self.panorama_rn_count_input.setPlaceholderText("1")
-        self.panorama_rn_count_input.setMaximumWidth(60)
-        rn_count_layout.addWidget(self.panorama_rn_count_input)
-        rn_count_layout.addStretch()
-        self.panorama_rn_count_widget.setVisible(False)
-        panorama_layout.addWidget(self.panorama_rn_count_widget)
-
-        self.panorama_deploy_widget.setVisible(False)
-        deployment_layout.addWidget(self.panorama_deploy_widget)
+        customer_layout.addStretch()
+        customer_group.setLayout(customer_layout)
+        layout.addWidget(customer_group)
 
         # =====================================================================
-        # Deployment Status Section
+        # Existing Resources Section
         # =====================================================================
-        self.deployment_status_widget = QWidget()
-        status_layout = QVBoxLayout(self.deployment_status_widget)
-        status_layout.setContentsMargins(0, 15, 0, 0)
+        self.resources_group = QGroupBox("Existing Resources")
+        resources_layout = QVBoxLayout()
 
-        status_label = QLabel("Have the firewalls already been deployed?")
-        status_label.setStyleSheet("font-weight: bold;")
-        status_layout.addWidget(status_label)
+        resources_label = QLabel("Do you have any firewall or Panorama resources already deployed?")
+        resources_label.setStyleSheet("font-weight: bold;")
+        resources_layout.addWidget(resources_label)
 
-        status_radio_layout = QHBoxLayout()
-        self.deployed_yes_radio = QRadioButton("Yes, already deployed")
-        self.deployed_yes_radio.toggled.connect(self._on_deployment_status_changed)
-        status_radio_layout.addWidget(self.deployed_yes_radio)
+        resources_radio_layout = QHBoxLayout()
+        self.resources_no_radio = QRadioButton("No, starting fresh")
+        self.resources_no_radio.setChecked(True)
+        self.resources_no_radio.toggled.connect(self._on_existing_resources_changed)
+        resources_radio_layout.addWidget(self.resources_no_radio)
 
-        self.deployed_no_radio = QRadioButton("No, need to deploy")
-        self.deployed_no_radio.setChecked(True)
-        self.deployed_no_radio.toggled.connect(self._on_deployment_status_changed)
-        status_radio_layout.addWidget(self.deployed_no_radio)
-        status_radio_layout.addStretch()
-        status_layout.addLayout(status_radio_layout)
+        self.resources_yes_radio = QRadioButton("Yes, I have existing resources")
+        self.resources_yes_radio.toggled.connect(self._on_existing_resources_changed)
+        resources_radio_layout.addWidget(self.resources_yes_radio)
+        resources_radio_layout.addStretch()
+        resources_layout.addLayout(resources_radio_layout)
 
-        # --- Already Deployed: Credentials Section ---
-        self.credentials_widget = QWidget()
-        creds_layout = QVBoxLayout(self.credentials_widget)
-        creds_layout.setContentsMargins(20, 10, 0, 0)
+        # --- Existing Resources: Two-column layout (credentials + device list) ---
+        self.existing_creds_widget = QWidget()
+        creds_main_layout = QHBoxLayout(self.existing_creds_widget)
+        creds_main_layout.setContentsMargins(10, 10, 10, 0)
 
-        creds_info = QLabel(
-            "Enter the credentials for your deployed firewall(s) so we can pull their configuration."
+        # Left side: Compact credentials form
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 10, 0)
+
+        creds_info = QLabel("Add existing device:")
+        creds_info.setStyleSheet("color: #333; font-weight: bold; margin-bottom: 5px;")
+        left_layout.addWidget(creds_info)
+
+        # Device Type dropdown
+        type_row = QHBoxLayout()
+        type_label = QLabel("Type:")
+        type_label.setStyleSheet("font-size: 11px; color: #555; min-width: 50px;")
+        type_row.addWidget(type_label)
+        self.existing_device_type = QComboBox()
+        self.existing_device_type.addItems([
+            "Firewall",
+            "Panorama",
+            "ServerVM",
+            "UserVM",
+        ])
+        self.existing_device_type.setMaximumWidth(140)
+        self.existing_device_type.setStyleSheet(
+            "QComboBox { padding: 3px 6px; border: 1px solid #ccc; border-radius: 3px; }"
         )
-        creds_info.setStyleSheet("color: gray; margin-bottom: 10px;")
-        creds_info.setWordWrap(True)
-        creds_layout.addWidget(creds_info)
+        self.existing_device_type.currentTextChanged.connect(self._on_existing_device_type_changed)
+        type_row.addWidget(self.existing_device_type)
+        left_layout.addLayout(type_row)
 
-        # Firewall credentials form
-        fw_creds_form = QFormLayout()
-        self.fw_mgmt_ip_input = QLineEdit()
-        self.fw_mgmt_ip_input.setPlaceholderText("192.168.1.1 or firewall.example.com")
-        fw_creds_form.addRow("Management IP/Hostname:", self.fw_mgmt_ip_input)
-
-        self.fw_username_input = QLineEdit()
-        self.fw_username_input.setPlaceholderText("admin")
-        fw_creds_form.addRow("Username:", self.fw_username_input)
-
-        self.fw_password_input = QLineEdit()
-        self.fw_password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.fw_password_input.setPlaceholderText("Password or API Key")
-        fw_creds_form.addRow("Password/API Key:", self.fw_password_input)
-
-        creds_layout.addLayout(fw_creds_form)
-
-        # Add more firewalls button (placeholder)
-        add_fw_btn = QPushButton("+ Add Another Firewall")
-        add_fw_btn.setMaximumWidth(200)
-        add_fw_btn.setEnabled(False)  # Placeholder
-        add_fw_btn.setToolTip("Coming soon: Add credentials for additional firewalls")
-        creds_layout.addWidget(add_fw_btn)
-
-        self.credentials_widget.setVisible(False)
-        status_layout.addWidget(self.credentials_widget)
-
-        # --- Need to Deploy: Deployment Method Section ---
-        self.deploy_method_widget = QWidget()
-        method_layout = QVBoxLayout(self.deploy_method_widget)
-        method_layout.setContentsMargins(20, 10, 0, 0)
-
-        method_label = QLabel("How would you like to deploy the firewalls?")
-        method_layout.addWidget(method_label)
-
-        method_radio_layout = QHBoxLayout()
-        self.deploy_manual_radio = QRadioButton("Manually")
-        self.deploy_manual_radio.setChecked(True)
-        self.deploy_manual_radio.toggled.connect(self._on_deploy_method_changed)
-        method_radio_layout.addWidget(self.deploy_manual_radio)
-
-        self.deploy_terraform_radio = QRadioButton("Terraform")
-        self.deploy_terraform_radio.toggled.connect(self._on_deploy_method_changed)
-        method_radio_layout.addWidget(self.deploy_terraform_radio)
-        method_radio_layout.addStretch()
-        method_layout.addLayout(method_radio_layout)
-
-        # Manual deployment info
-        self.manual_deploy_info = QLabel(
-            "You will deploy the firewalls manually. Once deployed, return here and select "
-            "'Yes, already deployed' to enter the credentials and pull the configuration."
+        # Services (for ServerVM/UserVM) - hidden by default
+        self.existing_services_widget = QWidget()
+        services_layout = QVBoxLayout(self.existing_services_widget)
+        services_layout.setContentsMargins(0, 5, 0, 0)
+        services_label = QLabel("Services/Role:")
+        services_label.setStyleSheet("font-size: 11px; color: #555;")
+        services_layout.addWidget(services_label)
+        self.existing_services_input = QLineEdit()
+        self.existing_services_input.setPlaceholderText("e.g., DNS, Web, AD")
+        self.existing_services_input.setMaximumWidth(200)
+        self.existing_services_input.setStyleSheet(
+            "QLineEdit { padding: 3px 6px; border: 1px solid #ccc; border-radius: 3px; }"
         )
-        self.manual_deploy_info.setStyleSheet(
-            "color: #F57C00; padding: 10px; background-color: #FFF3E0; "
-            "border-radius: 5px; margin-top: 10px;"
+        services_layout.addWidget(self.existing_services_input)
+        self.existing_services_widget.setVisible(False)
+        left_layout.addWidget(self.existing_services_widget)
+
+        # Credentials section (for Firewall/Panorama) - visible by default
+        self.existing_creds_fields = QWidget()
+        creds_fields_layout = QVBoxLayout(self.existing_creds_fields)
+        creds_fields_layout.setContentsMargins(0, 5, 0, 0)
+
+        self.existing_mgmt_ip_input = QLineEdit()
+        self.existing_mgmt_ip_input.setPlaceholderText("IP or hostname")
+        self.existing_mgmt_ip_input.setMaximumWidth(200)
+        self.existing_mgmt_ip_input.setStyleSheet(
+            "QLineEdit { padding: 3px 6px; border: 1px solid #ccc; border-radius: 3px; }"
         )
-        self.manual_deploy_info.setWordWrap(True)
-        method_layout.addWidget(self.manual_deploy_info)
+        creds_fields_layout.addWidget(self.existing_mgmt_ip_input)
 
-        # Terraform deployment info
-        self.terraform_deploy_info = QLabel(
-            "We will generate a customized Terraform configuration based on your selections. "
-            "The Terraform files will include default firewall configurations optimized for POV environments."
+        self.existing_username_input = QLineEdit()
+        self.existing_username_input.setPlaceholderText("Username")
+        self.existing_username_input.setMaximumWidth(200)
+        self.existing_username_input.setStyleSheet(
+            "QLineEdit { padding: 3px 6px; border: 1px solid #ccc; border-radius: 3px; }"
         )
-        self.terraform_deploy_info.setStyleSheet(
-            "color: #1565C0; padding: 10px; background-color: #E3F2FD; "
-            "border-radius: 5px; margin-top: 10px;"
+        creds_fields_layout.addWidget(self.existing_username_input)
+
+        self.existing_password_input = QLineEdit()
+        self.existing_password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.existing_password_input.setPlaceholderText("Password/API Key")
+        self.existing_password_input.setMaximumWidth(200)
+        self.existing_password_input.setStyleSheet(
+            "QLineEdit { padding: 3px 6px; border: 1px solid #ccc; border-radius: 3px; }"
         )
-        self.terraform_deploy_info.setWordWrap(True)
-        self.terraform_deploy_info.setVisible(False)
-        method_layout.addWidget(self.terraform_deploy_info)
+        creds_fields_layout.addWidget(self.existing_password_input)
+        left_layout.addWidget(self.existing_creds_fields)
 
-        status_layout.addWidget(self.deploy_method_widget)
+        # Add button
+        self.add_device_btn = QPushButton("+ Add Device")
+        self.add_device_btn.setMaximumWidth(200)
+        self.add_device_btn.setStyleSheet(
+            "QPushButton { background-color: #4CAF50; color: white; padding: 6px 12px; "
+            "font-weight: bold; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #45a049; }"
+        )
+        self.add_device_btn.clicked.connect(self._add_existing_device)
+        left_layout.addWidget(self.add_device_btn)
 
-        self.deployment_status_widget.setVisible(False)
-        deployment_layout.addWidget(self.deployment_status_widget)
+        left_layout.addStretch()
+        creds_main_layout.addWidget(left_widget)
 
-        deployment_layout.addStretch()
-        self.deployment_group.setLayout(deployment_layout)
-        layout.addWidget(self.deployment_group)
+        # Separator line
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.VLine)
+        separator.setStyleSheet("background-color: #ccc;")
+        creds_main_layout.addWidget(separator)
+
+        # Right side: Device list
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(10, 0, 0, 0)
+
+        devices_label = QLabel("Existing devices:")
+        devices_label.setStyleSheet("color: #333; font-weight: bold; margin-bottom: 5px;")
+        right_layout.addWidget(devices_label)
+
+        self.existing_devices_list = QListWidget()
+        self.existing_devices_list.setMinimumHeight(120)
+        self.existing_devices_list.setStyleSheet(
+            "QListWidget { border: 1px solid #ccc; border-radius: 4px; background-color: white; }"
+            "QListWidget::item { padding: 4px; color: #333; }"
+            "QListWidget::item:selected { background-color: #e3f2fd; color: #333; }"
+        )
+        right_layout.addWidget(self.existing_devices_list)
+
+        # Remove button
+        self.remove_device_btn = QPushButton("- Remove Selected")
+        self.remove_device_btn.setStyleSheet(
+            "QPushButton { background-color: #f44336; color: white; padding: 6px 12px; "
+            "font-weight: bold; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #d32f2f; }"
+            "QPushButton:disabled { background-color: #ccc; }"
+        )
+        self.remove_device_btn.clicked.connect(self._remove_existing_device)
+        right_layout.addWidget(self.remove_device_btn)
+
+        creds_main_layout.addWidget(right_widget, 1)
+
+        self.existing_creds_widget.setVisible(False)
+        resources_layout.addWidget(self.existing_creds_widget)
+
+        resources_layout.addStretch()
+        self.resources_group.setLayout(resources_layout)
+        layout.addWidget(self.resources_group)
+
+        layout.addStretch()
 
         # =====================================================================
         # Bottom Status and Navigation
@@ -437,20 +451,20 @@ class POVWorkflowWidget(QWidget):
 
         bottom_layout.addStretch()
 
-        # Save button
-        save_config_btn = QPushButton("💾 Save Config")
-        save_config_btn.setMinimumWidth(120)
-        save_config_btn.setMinimumHeight(40)
-        save_config_btn.setStyleSheet(
+        # Resume POV Deployment button
+        resume_btn = QPushButton("📂 Resume POV Deployment")
+        resume_btn.setMinimumWidth(180)
+        resume_btn.setMinimumHeight(40)
+        resume_btn.setStyleSheet(
             "QPushButton { "
-            "  background-color: #FF9800; color: white; padding: 10px; font-weight: bold; "
-            "  border-radius: 5px; border: 1px solid #F57C00; border-bottom: 3px solid #E65100; "
+            "  background-color: #9C27B0; color: white; padding: 10px; font-weight: bold; "
+            "  border-radius: 5px; border: 1px solid #7B1FA2; border-bottom: 3px solid #6A1B9A; "
             "}"
-            "QPushButton:hover { background-color: #FB8C00; border-bottom: 3px solid #BF360C; }"
-            "QPushButton:pressed { background-color: #F57C00; border-bottom: 1px solid #E65100; }"
+            "QPushButton:hover { background-color: #8E24AA; border-bottom: 3px solid #4A148C; }"
+            "QPushButton:pressed { background-color: #7B1FA2; border-bottom: 1px solid #6A1B9A; }"
         )
-        save_config_btn.clicked.connect(self._save_current_config)
-        bottom_layout.addWidget(save_config_btn)
+        resume_btn.clicked.connect(self._show_resume_pov_dialog)
+        bottom_layout.addWidget(resume_btn)
 
         # Next button
         next_btn = QPushButton("Next: Cloud Resources →")
@@ -464,7 +478,7 @@ class POVWorkflowWidget(QWidget):
             "QPushButton:hover { background-color: #45a049; border-bottom: 3px solid #1B5E20; }"
             "QPushButton:pressed { background-color: #388E3C; border-bottom: 1px solid #2E7D32; }"
         )
-        next_btn.clicked.connect(lambda: self.tabs.setCurrentIndex(1))
+        next_btn.clicked.connect(lambda: self._next_tab(1))
         bottom_layout.addWidget(next_btn)
 
         layout.addLayout(bottom_layout)
@@ -598,20 +612,7 @@ class POVWorkflowWidget(QWidget):
 
             card_layout.addLayout(top_row)
 
-            # Customer Name field
-            customer_row = QHBoxLayout()
-            customer_label = QLabel("Customer Name:")
-            customer_label.setStyleSheet("font-size: 12px; color: #333; min-width: 110px;")
-            customer_row.addWidget(customer_label)
-
-            self.cloud_customer_name = QLineEdit()
-            self.cloud_customer_name.setPlaceholderText("e.g., acme")
-            self.cloud_customer_name.setStyleSheet(
-                "QLineEdit { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; }"
-            )
-            self.cloud_customer_name.textChanged.connect(self._on_cloud_customer_changed)
-            customer_row.addWidget(self.cloud_customer_name)
-            card_layout.addLayout(customer_row)
+            # Note: Customer Name moved to Tenant Info tab
 
             # Primary Cloud Service field (Azure - greyed out)
             cloud_row = QHBoxLayout()
@@ -1006,6 +1007,15 @@ class POVWorkflowWidget(QWidget):
 
             card_layout.addLayout(source_row)
 
+            # Help note for source IPs
+            source_help = QLabel(
+                "💡 Default is your current public IP for management access. "
+                "Add others in comma-separated format."
+            )
+            source_help.setStyleSheet("font-size: 9px; color: #888; font-style: italic; margin-left: 2px;")
+            source_help.setWordWrap(True)
+            card_layout.addWidget(source_help)
+
             # Network Security Groups section
             nsg_label = QLabel("<b>Network Security Groups</b>")
             nsg_label.setStyleSheet("font-size: 11px; color: #555; margin-top: 4px;")
@@ -1221,11 +1231,25 @@ class POVWorkflowWidget(QWidget):
 
             card_layout.addWidget(summary_frame)
 
-            # Initialize config
+            # Initialize config with default datacenter
+            default_region = self.cloud_region_combo.currentText() if hasattr(self, 'cloud_region_combo') else "eastus"
             self.cloud_resource_configs['locations'] = {
                 'branches': [],
-                'datacenters': [],
+                'datacenters': [
+                    {
+                        'name': 'Datacenter',
+                        'cloud': 'Azure',
+                        'region': default_region,
+                        'bgp_enabled': True,
+                        'default_gateway': False,
+                        'connection_type': 'service_connection',
+                    }
+                ],
             }
+
+            # Populate the datacenters list with the default
+            self._refresh_datacenters_list()
+            self._update_locations_status()
 
             return card
 
@@ -1353,13 +1377,16 @@ class POVWorkflowWidget(QWidget):
             self.trust_devices_error_label.setWordWrap(True)
             card_layout.addWidget(self.trust_devices_error_label)
 
-            # Initialize config with empty devices list
+            # Initialize config with empty devices list (will be populated by sync)
             self.cloud_resource_configs['trust_devices'] = {
                 'devices': [],
             }
 
             # Initialize location dropdown
             self._refresh_device_location_dropdown()
+
+            # Sync devices from locations (creates default ServerVM for default Datacenter)
+            self._sync_devices_from_locations()
 
             # Prevent vertical stretching
             card_layout.addStretch()
@@ -1421,7 +1448,7 @@ class POVWorkflowWidget(QWidget):
             "QPushButton:hover { background-color: #1E88E5; border-bottom: 3px solid #0D47A1; }"
             "QPushButton:pressed { background-color: #1976D2; border-bottom: 1px solid #1565C0; }"
         )
-        next_btn.clicked.connect(lambda: self.tabs.setCurrentIndex(2))
+        next_btn.clicked.connect(lambda: self._next_tab(2))
         nav_layout.addWidget(next_btn)
 
         layout.addLayout(nav_layout)
@@ -1562,19 +1589,32 @@ class POVWorkflowWidget(QWidget):
             self.mobile_locations_list.itemSelectionChanged.connect(self._on_mobile_users_changed)
             card_layout.addWidget(self.mobile_locations_list)
 
+            # Explicit Proxy checkbox
+            self.mobile_explicit_proxy = QCheckBox("Enable Explicit Proxy")
+            self.mobile_explicit_proxy.setStyleSheet(checkbox_style)
+            self.mobile_explicit_proxy.stateChanged.connect(self._on_mobile_users_changed)
+            card_layout.addWidget(self.mobile_explicit_proxy)
+
+            # Hint about auto-enable
+            self.explicit_proxy_hint = QLabel("")
+            self.explicit_proxy_hint.setStyleSheet("font-size: 8px; color: #888; font-style: italic;")
+            self.explicit_proxy_hint.setWordWrap(True)
+            card_layout.addWidget(self.explicit_proxy_hint)
+
             # Initialize config
             self.use_case_configs['mobile_users'] = {
                 'enabled': False,
                 'portal_name': '',
                 'vpn_mode': 'On Demand',
                 'locations': [],
+                'explicit_proxy': False,
             }
 
             card_layout.addStretch()
             return card
 
-        # ========== PROXY USERS CARD ==========
-        def create_proxy_users_card():
+        # ========== PRISMA BROWSER CARD ==========
+        def create_prisma_browser_card():
             card = QFrame()
             card.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Raised)
             card.setStyleSheet(
@@ -1588,58 +1628,64 @@ class POVWorkflowWidget(QWidget):
             # Top row
             top_row = QHBoxLayout()
 
-            self.proxy_users_enable = QCheckBox()
-            self.proxy_users_enable.setStyleSheet("margin-right: 4px;")
-            self.proxy_users_enable.stateChanged.connect(self._on_proxy_users_changed)
-            top_row.addWidget(self.proxy_users_enable)
+            self.prisma_browser_enable = QCheckBox()
+            self.prisma_browser_enable.setStyleSheet("margin-right: 4px;")
+            self.prisma_browser_enable.stateChanged.connect(self._on_prisma_browser_changed)
+            top_row.addWidget(self.prisma_browser_enable)
 
-            title_label = QLabel("<b>🌐 Proxy Users (Explicit Proxy)</b>")
+            title_label = QLabel("<b>🌐 Prisma Access Browser</b>")
             title_label.setStyleSheet("font-size: 13px; color: #333;")
             top_row.addWidget(title_label)
 
-            self.proxy_users_status = QLabel("")
-            self.proxy_users_status.setStyleSheet("color: #4CAF50; font-size: 11px;")
-            top_row.addWidget(self.proxy_users_status)
+            self.prisma_browser_status = QLabel("")
+            self.prisma_browser_status.setStyleSheet("color: #4CAF50; font-size: 11px;")
+            top_row.addWidget(self.prisma_browser_status)
             top_row.addStretch()
             card_layout.addLayout(top_row)
 
-            # Port and options row
-            config_row = QHBoxLayout()
-            config_row.setSpacing(8)
+            # Options
+            self.browser_default_policy = QCheckBox("Setup default policy for testing")
+            self.browser_default_policy.setStyleSheet(checkbox_style)
+            self.browser_default_policy.stateChanged.connect(self._on_prisma_browser_changed)
+            card_layout.addWidget(self.browser_default_policy)
 
-            port_label = QLabel("Port:")
-            port_label.setStyleSheet("font-size: 10px; color: #666;")
-            config_row.addWidget(port_label)
+            self.browser_device_posture = QCheckBox("Device posture checks")
+            self.browser_device_posture.setStyleSheet(checkbox_style)
+            self.browser_device_posture.stateChanged.connect(self._on_prisma_browser_changed)
+            card_layout.addWidget(self.browser_device_posture)
 
-            self.proxy_port_input = QSpinBox()
-            self.proxy_port_input.setRange(1, 65535)
-            self.proxy_port_input.setValue(8080)
-            self.proxy_port_input.setStyleSheet(spinbox_style)
-            self.proxy_port_input.setFixedWidth(70)
-            self.proxy_port_input.valueChanged.connect(self._on_proxy_users_changed)
-            config_row.addWidget(self.proxy_port_input)
+            # Route traffic dropdown
+            route_row = QHBoxLayout()
+            route_label = QLabel("Route traffic:")
+            route_label.setStyleSheet("font-size: 10px; color: #666;")
+            route_row.addWidget(route_label)
 
-            self.proxy_auth_required = QCheckBox("Auth Required")
-            self.proxy_auth_required.setChecked(True)
-            self.proxy_auth_required.setStyleSheet(checkbox_style)
-            self.proxy_auth_required.stateChanged.connect(self._on_proxy_users_changed)
-            config_row.addWidget(self.proxy_auth_required)
+            self.browser_route_traffic = QComboBox()
+            self.browser_route_traffic.addItems([
+                "None",
+                "Route private apps only",
+                "Route all traffic to PA",
+            ])
+            self.browser_route_traffic.setStyleSheet(
+                "QComboBox { padding: 2px 6px; border: 1px solid #ccc; border-radius: 3px; font-size: 10px; }"
+            )
+            self.browser_route_traffic.currentTextChanged.connect(self._on_prisma_browser_changed)
+            route_row.addWidget(self.browser_route_traffic)
+            route_row.addStretch()
+            card_layout.addLayout(route_row)
 
-            self.proxy_pac_file = QCheckBox("Generate PAC")
-            self.proxy_pac_file.setChecked(True)
-            self.proxy_pac_file.setStyleSheet(checkbox_style)
-            self.proxy_pac_file.stateChanged.connect(self._on_proxy_users_changed)
-            config_row.addWidget(self.proxy_pac_file)
-
-            config_row.addStretch()
-            card_layout.addLayout(config_row)
+            # Hint about explicit proxy
+            browser_hint = QLabel("💡 Route traffic options will auto-enable Explicit Proxy in Mobile Users")
+            browser_hint.setStyleSheet("font-size: 8px; color: #888; font-style: italic;")
+            browser_hint.setWordWrap(True)
+            card_layout.addWidget(browser_hint)
 
             # Initialize config
-            self.use_case_configs['proxy_users'] = {
+            self.use_case_configs['prisma_browser'] = {
                 'enabled': False,
-                'proxy_port': 8080,
-                'auth_required': True,
-                'pac_file': True,
+                'default_policy': False,
+                'device_posture': False,
+                'route_traffic': 'None',
             }
 
             card_layout.addStretch()
@@ -1677,29 +1723,72 @@ class POVWorkflowWidget(QWidget):
             top_row.addStretch()
             card_layout.addLayout(top_row)
 
-            # Connections list (populated from datacenters/branches)
-            conn_label = QLabel("Location Connections:")
+            # Connections list header
+            conn_header = QHBoxLayout()
+            conn_label = QLabel("Connections:")
             conn_label.setStyleSheet("font-size: 10px; color: #666;")
-            card_layout.addWidget(conn_label)
+            conn_header.addWidget(conn_label)
+            conn_header.addStretch()
+            card_layout.addLayout(conn_header)
+
+            # Click-to-toggle hint
+            toggle_hint = QLabel("💡 Click a datacenter to toggle: Service Connection ↔ ZTNA Connector")
+            toggle_hint.setStyleSheet("font-size: 9px; color: #888; font-style: italic;")
+            card_layout.addWidget(toggle_hint)
 
             self.private_app_connections_list = QListWidget()
-            self.private_app_connections_list.setMaximumHeight(80)
+            self.private_app_connections_list.setMaximumHeight(100)
             self.private_app_connections_list.setStyleSheet(
-                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 10px; }"
-                "QListWidget::item { padding: 2px; }"
+                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 10px; background-color: white; }"
+                "QListWidget::item { padding: 2px; color: #333; }"
+                "QListWidget::item:selected { background-color: #e3f2fd; color: #333; }"
             )
+            self.private_app_connections_list.itemClicked.connect(self._on_private_app_item_clicked)
+            self.private_app_connections_list.currentRowChanged.connect(self._on_private_app_selection_changed)
             card_layout.addWidget(self.private_app_connections_list)
 
-            # Info label
-            info_label = QLabel("💡 Connection types auto-populated from Locations tab")
-            info_label.setStyleSheet("font-size: 9px; color: #888; font-style: italic;")
-            info_label.setWordWrap(True)
-            card_layout.addWidget(info_label)
+            # Add/Remove ZTNA buttons
+            ztna_btn_row = QHBoxLayout()
+
+            self.add_ztna_btn = QPushButton("+ Add ZTNA")
+            self.add_ztna_btn.setStyleSheet(
+                "QPushButton { background-color: #4CAF50; color: white; padding: 4px 8px; "
+                "font-size: 10px; font-weight: bold; border-radius: 3px; }"
+                "QPushButton:hover { background-color: #45a049; }"
+            )
+            self.add_ztna_btn.clicked.connect(self._add_ztna_connector)
+            ztna_btn_row.addWidget(self.add_ztna_btn)
+
+            self.remove_ztna_btn = QPushButton("- Remove")
+            self.remove_ztna_btn.setStyleSheet(
+                "QPushButton { background-color: #f44336; color: white; padding: 4px 8px; "
+                "font-size: 10px; font-weight: bold; border-radius: 3px; }"
+                "QPushButton:hover { background-color: #d32f2f; }"
+                "QPushButton:disabled { background-color: #ccc; }"
+            )
+            self.remove_ztna_btn.clicked.connect(self._remove_ztna_connector)
+            self.remove_ztna_btn.setEnabled(False)
+            ztna_btn_row.addWidget(self.remove_ztna_btn)
+
+            ztna_btn_row.addStretch()
+            card_layout.addLayout(ztna_btn_row)
+
+            # Limits info
+            self.private_app_limits_label = QLabel("Limits: 5 Service Connections, 10 ZTNA Connectors")
+            self.private_app_limits_label.setStyleSheet("font-size: 9px; color: #666;")
+            card_layout.addWidget(self.private_app_limits_label)
+
+            # ZTNA note
+            ztna_note = QLabel("⚠️ Adding ZTNA creates a placeholder in a new Connector Group")
+            ztna_note.setStyleSheet("font-size: 9px; color: #888; font-style: italic;")
+            ztna_note.setWordWrap(True)
+            card_layout.addWidget(ztna_note)
 
             # Initialize config
             self.use_case_configs['private_app'] = {
                 'enabled': False,
-                'connections': [],  # List of {name, type, connection_type: 'service_connection'|'ztna'}
+                'connections': [],  # List of {name, type, connection_type: 'service_connection'|'ztna'|'remote_network'}
+                'custom_ztna': [],  # List of custom ZTNA connectors added by user
             }
 
             card_layout.addStretch()
@@ -1714,10 +1803,10 @@ class POVWorkflowWidget(QWidget):
                 "border-radius: 8px; padding: 12px; }"
             )
             card_layout = QVBoxLayout(card)
-            card_layout.setSpacing(6)
-            card_layout.setContentsMargins(12, 10, 12, 12)
+            card_layout.setSpacing(4)
+            card_layout.setContentsMargins(12, 8, 12, 8)
 
-            # Top row
+            # Top row with enable and title
             top_row = QHBoxLayout()
 
             self.remote_branch_enable = QCheckBox()
@@ -1735,37 +1824,119 @@ class POVWorkflowWidget(QWidget):
             top_row.addStretch()
             card_layout.addLayout(top_row)
 
-            # Branch config row
-            config_row = QHBoxLayout()
-            config_row.setSpacing(8)
+            # ========== BANDWIDTH ALLOCATION ROW (header + controls on same line) ==========
+            bw_row = QHBoxLayout()
+            bw_row.setSpacing(4)
+
+            self.branch_bw_total_label = QLabel("Bandwidth: 0/1000 Mbps")
+            self.branch_bw_total_label.setStyleSheet("font-size: 10px; color: #666; font-weight: bold;")
+            bw_row.addWidget(self.branch_bw_total_label)
+
+            bw_row.addStretch()
+
+            # Prisma Access location dropdown
+            self.branch_bw_region_combo = QComboBox()
+            self.branch_bw_region_combo.addItems(PRISMA_ACCESS_LOCATIONS)
+            self.branch_bw_region_combo.setStyleSheet(combo_style)
+            self.branch_bw_region_combo.setFixedWidth(140)
+            bw_row.addWidget(self.branch_bw_region_combo)
+
+            # Bandwidth dropdown with Mbps included
+            self.branch_bw_amount_combo = QComboBox()
+            self.branch_bw_amount_combo.addItems(["50 Mbps", "100 Mbps", "200 Mbps", "500 Mbps", "1000 Mbps"])
+            self.branch_bw_amount_combo.setStyleSheet(combo_style)
+            self.branch_bw_amount_combo.setFixedWidth(80)
+            bw_row.addWidget(self.branch_bw_amount_combo)
+
+            add_bw_btn = QPushButton("+")
+            add_bw_btn.setStyleSheet(
+                "QPushButton { background-color: #4CAF50; color: white; padding: 2px 8px; "
+                "font-size: 12px; font-weight: bold; border-radius: 3px; }"
+                "QPushButton:hover { background-color: #45a049; }"
+            )
+            add_bw_btn.setFixedWidth(28)
+            add_bw_btn.clicked.connect(self._add_bandwidth_allocation)
+            bw_row.addWidget(add_bw_btn)
+
+            card_layout.addLayout(bw_row)
+
+            # Bandwidth list
+            self.branch_bw_list = QListWidget()
+            self.branch_bw_list.setMaximumHeight(45)
+            self.branch_bw_list.setStyleSheet(
+                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 9px; background-color: white; }"
+                "QListWidget::item { padding: 1px; color: #333; }"
+                "QListWidget::item:selected { background-color: #e3f2fd; color: #333; }"
+            )
+            card_layout.addWidget(self.branch_bw_list)
+
+            # Remove bandwidth button
+            remove_bw_btn = QPushButton("- Remove Selected")
+            remove_bw_btn.setStyleSheet(
+                "QPushButton { background-color: #f44336; color: white; padding: 2px 6px; "
+                "font-size: 9px; border-radius: 3px; }"
+                "QPushButton:hover { background-color: #d32f2f; }"
+            )
+            remove_bw_btn.clicked.connect(self._remove_bandwidth_allocation)
+            card_layout.addWidget(remove_bw_btn)
+
+            # ========== BRANCHES SECTION (header + add controls on same line) ==========
+            branches_row = QHBoxLayout()
+            branches_row.setSpacing(4)
 
             branches_label = QLabel("Branches:")
-            branches_label.setStyleSheet("font-size: 10px; color: #666;")
-            config_row.addWidget(branches_label)
+            branches_label.setStyleSheet("font-size: 10px; color: #666; font-weight: bold;")
+            branches_row.addWidget(branches_label)
 
-            self.branch_count_input = QSpinBox()
-            self.branch_count_input.setRange(1, 10)
-            self.branch_count_input.setValue(1)
-            self.branch_count_input.setStyleSheet(spinbox_style)
-            self.branch_count_input.setFixedWidth(50)
-            self.branch_count_input.valueChanged.connect(self._on_remote_branch_changed)
-            config_row.addWidget(self.branch_count_input)
+            branches_row.addStretch()
 
-            bw_label = QLabel("@")
-            bw_label.setStyleSheet("font-size: 10px; color: #666;")
-            config_row.addWidget(bw_label)
+            self.staged_branch_name = QLineEdit()
+            self.staged_branch_name.setPlaceholderText("Name")
+            self.staged_branch_name.setStyleSheet(
+                "QLineEdit { padding: 2px 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 9px; }"
+            )
+            self.staged_branch_name.setFixedWidth(70)
+            branches_row.addWidget(self.staged_branch_name)
 
-            self.branch_bandwidth_combo = QComboBox()
-            self.branch_bandwidth_combo.addItems(["25 Mbps", "50 Mbps", "100 Mbps", "200 Mbps", "500 Mbps"])
-            self.branch_bandwidth_combo.setCurrentIndex(1)  # Default 50 Mbps
-            self.branch_bandwidth_combo.setStyleSheet(combo_style)
-            self.branch_bandwidth_combo.currentTextChanged.connect(self._on_remote_branch_changed)
-            config_row.addWidget(self.branch_bandwidth_combo)
+            # Region dropdown - populated from bandwidth allocations
+            self.staged_branch_region = QComboBox()
+            self.staged_branch_region.setStyleSheet(combo_style)
+            self.staged_branch_region.setFixedWidth(140)
+            self.staged_branch_region.setPlaceholderText("Allocate BW first")
+            branches_row.addWidget(self.staged_branch_region)
 
-            config_row.addStretch()
-            card_layout.addLayout(config_row)
+            add_branch_btn = QPushButton("+ Add")
+            add_branch_btn.setStyleSheet(
+                "QPushButton { background-color: #2196F3; color: white; padding: 2px 6px; "
+                "font-size: 9px; font-weight: bold; border-radius: 3px; }"
+                "QPushButton:hover { background-color: #1976D2; }"
+            )
+            add_branch_btn.clicked.connect(self._add_staged_branch)
+            branches_row.addWidget(add_branch_btn)
 
-            # Options row
+            card_layout.addLayout(branches_row)
+
+            # Branches list (auto-populated from Locations + staged)
+            self.branch_list = QListWidget()
+            self.branch_list.setMaximumHeight(55)
+            self.branch_list.setStyleSheet(
+                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 9px; background-color: white; }"
+                "QListWidget::item { padding: 1px; color: #333; }"
+                "QListWidget::item:selected { background-color: #e3f2fd; color: #333; }"
+            )
+            card_layout.addWidget(self.branch_list)
+
+            # Remove branch button
+            remove_branch_btn = QPushButton("- Remove Selected")
+            remove_branch_btn.setStyleSheet(
+                "QPushButton { background-color: #f44336; color: white; padding: 2px 6px; "
+                "font-size: 9px; border-radius: 3px; }"
+                "QPushButton:hover { background-color: #d32f2f; }"
+            )
+            remove_branch_btn.clicked.connect(self._remove_staged_branch)
+            card_layout.addWidget(remove_branch_btn)
+
+            # Options row (SD-WAN, BGP)
             opts_row = QHBoxLayout()
             opts_row.setSpacing(8)
 
@@ -1776,22 +1947,26 @@ class POVWorkflowWidget(QWidget):
 
             self.branch_bgp = QCheckBox("BGP")
             self.branch_bgp.setStyleSheet(checkbox_style)
+            self.branch_bgp.setChecked(True)  # Default BGP on
             self.branch_bgp.stateChanged.connect(self._on_remote_branch_changed)
             opts_row.addWidget(self.branch_bgp)
 
             opts_row.addStretch()
+            card_layout.addWidget(QLabel("💡 Cloud branches auto-assigned from Locations",
+                styleSheet="font-size: 8px; color: #888; font-style: italic;"))
+
             card_layout.addLayout(opts_row)
 
             # Initialize config
             self.use_case_configs['remote_branch'] = {
                 'enabled': False,
-                'branch_count': 1,
-                'branch_bandwidth': '50 Mbps',
+                'bandwidth_allocations': [],  # [{region (PA location), bandwidth}]
+                'cloud_branches': [],  # Auto-populated from Locations
+                'staged_branches': [],  # User-added staged branches
                 'sdwan_integration': False,
-                'bgp_routing': False,
+                'bgp_routing': True,
             }
 
-            card_layout.addStretch()
             return card
 
         # ========== AIOPS-ADEM CARD ==========
@@ -2119,7 +2294,7 @@ class POVWorkflowWidget(QWidget):
 
         # Row 0
         grid.addWidget(create_mobile_users_card(), 0, 0)
-        grid.addWidget(create_proxy_users_card(), 0, 1)
+        grid.addWidget(create_prisma_browser_card(), 0, 1)
 
         # Row 1
         grid.addWidget(create_private_app_card(), 1, 0)
@@ -2165,7 +2340,7 @@ class POVWorkflowWidget(QWidget):
             "QPushButton:hover { background-color: #1E88E5; border-bottom: 3px solid #0D47A1; }"
             "QPushButton:pressed { background-color: #1976D2; border-bottom: 1px solid #1565C0; }"
         )
-        next_btn.clicked.connect(lambda: self.tabs.setCurrentIndex(3))
+        next_btn.clicked.connect(lambda: self._next_tab(3))
         nav_layout.addWidget(next_btn)
 
         layout.addLayout(nav_layout)
@@ -2219,7 +2394,7 @@ class POVWorkflowWidget(QWidget):
         next_btn.setStyleSheet(
             "QPushButton { background-color: #2196F3; color: white; padding: 8px; }"
         )
-        next_btn.clicked.connect(lambda: self.tabs.setCurrentIndex(2))
+        next_btn.clicked.connect(lambda: self._next_tab(2))
         nav_layout.addWidget(next_btn)
 
         layout.addLayout(nav_layout)
@@ -2395,7 +2570,7 @@ class POVWorkflowWidget(QWidget):
             "QPushButton:hover { background-color: #1E88E5; border-bottom: 3px solid #0D47A1; }"
             "QPushButton:pressed { background-color: #1976D2; border-bottom: 1px solid #1565C0; }"
         )
-        next_btn.clicked.connect(lambda: self.tabs.setCurrentIndex(4))
+        next_btn.clicked.connect(lambda: self._next_tab(4))
         nav_layout.addWidget(next_btn)
 
         layout.addLayout(nav_layout)
@@ -2620,14 +2795,6 @@ class POVWorkflowWidget(QWidget):
             self.tenant_selector.group_box.setTitle("SCM Tenant (Optional for Hybrid)")
             self.tenant_selector.setEnabled(True)  # Still allow optional SCM for hybrid
 
-        # Update deployment section visibility based on management type
-        if hasattr(self, 'azure_deploy_widget'):
-            self.azure_deploy_widget.setVisible(is_scm)
-            self.panorama_deploy_widget.setVisible(not is_scm)
-
-            # Show deployment status section if any firewalls will be deployed
-            self._update_deployment_status_visibility()
-
         # Update Panorama visibility in Tab 5
         self._update_panorama_visibility()
 
@@ -2635,48 +2802,186 @@ class POVWorkflowWidget(QWidget):
         if hasattr(self, 'devices_list'):
             self._sync_devices_from_locations()
 
-    def _on_azure_deploy_changed(self):
-        """Handle Azure deployment option change (SCM managed)."""
-        deploy_azure = self.azure_yes_radio.isChecked()
-        self.scm_firewall_options.setVisible(deploy_azure)
-        self._update_deployment_status_visibility()
+    def _sanitize_customer_name(self, name: str) -> str:
+        """Sanitize customer name for use in system identifiers (lowercase, no spaces/special chars)."""
+        import re
+        # Lowercase, remove spaces and special characters, keep only alphanumeric
+        return re.sub(r'[^a-z0-9]', '', name.lower())
 
-    def _on_panorama_rn_changed(self):
-        """Handle Panorama RN firewall option change."""
-        deploy_rn = self.panorama_rn_yes_radio.isChecked()
-        self.panorama_rn_count_widget.setVisible(deploy_rn)
+    def _on_customer_name_changed(self, text: str):
+        """Handle customer name change in Tenant Info tab."""
+        # Store original name (with case/spaces) for display
+        customer_display = text.strip()
+        # Sanitized version for system use (lowercase, no spaces/special chars)
+        customer_sanitized = self._sanitize_customer_name(text)
 
-    def _on_deployment_status_changed(self):
-        """Handle deployment status change (already deployed vs need to deploy)."""
-        already_deployed = self.deployed_yes_radio.isChecked()
-        self.credentials_widget.setVisible(already_deployed)
-        self.deploy_method_widget.setVisible(not already_deployed)
+        # Store in config - both versions
+        if 'customer_info' not in self.cloud_resource_configs:
+            self.cloud_resource_configs['customer_info'] = {}
+        self.cloud_resource_configs['customer_info']['customer_name'] = customer_display
+        self.cloud_resource_configs['customer_info']['customer_name_sanitized'] = customer_sanitized
+        self.cloud_resource_configs['cloud_deployment']['customer_name'] = customer_sanitized
 
-    def _on_deploy_method_changed(self):
-        """Handle deployment method change (manual vs terraform)."""
-        use_terraform = self.deploy_terraform_radio.isChecked()
-        self.manual_deploy_info.setVisible(not use_terraform)
-        self.terraform_deploy_info.setVisible(use_terraform)
+        # Update resource group preview if it exists
+        if hasattr(self, 'cloud_rg_preview'):
+            self._update_cloud_rg_preview()
 
-    def _update_deployment_status_visibility(self):
-        """Update visibility of deployment status section based on firewall selections."""
-        is_scm = self.scm_managed_radio.isChecked()
+        # Update Cloud Deployment status
+        if hasattr(self, 'cloud_deployment_status'):
+            self._update_cloud_deployment_status()
 
-        # Check if any firewalls will be deployed
-        firewalls_to_deploy = False
-        if is_scm:
-            # SCM: Check if user selected Azure deployment and any firewall type
-            if self.azure_yes_radio.isChecked():
-                firewalls_to_deploy = (
-                    self.deploy_sc_firewall_check.isChecked() or
-                    self.deploy_rn_firewall_check.isChecked()
+        # Auto-update admin username if it's empty or matches old pattern (use sanitized)
+        if hasattr(self, 'cloud_admin_username'):
+            current_username = self.cloud_admin_username.text()
+            last_auto = self.cloud_resource_configs['cloud_deployment'].get('_last_auto_username', '')
+            if not current_username or current_username == last_auto:
+                if customer_sanitized:
+                    new_username = f"{customer_sanitized}admin"
+                    self.cloud_admin_username.setText(new_username)
+                    self.cloud_resource_configs['cloud_deployment']['_last_auto_username'] = new_username
+
+        # Auto-update mobile portal name if it's empty or matches old pattern (use sanitized)
+        if hasattr(self, 'mobile_portal_input'):
+            current_portal = self.mobile_portal_input.text()
+            last_auto_portal = self.use_case_configs.get('mobile_users', {}).get('_last_auto_portal', '')
+            if not current_portal or current_portal == last_auto_portal:
+                if customer_sanitized:
+                    self.mobile_portal_input.setText(customer_sanitized)
+                    self.use_case_configs['mobile_users']['_last_auto_portal'] = customer_sanitized
+
+    def _on_customer_industry_changed(self, industry: str):
+        """Handle customer industry change."""
+        if industry == "-- Select Industry --":
+            industry = ""
+
+        if 'customer_info' not in self.cloud_resource_configs:
+            self.cloud_resource_configs['customer_info'] = {}
+        self.cloud_resource_configs['customer_info']['industry'] = industry
+
+    def _on_existing_resources_changed(self):
+        """Handle existing resources radio button change."""
+        has_existing = self.resources_yes_radio.isChecked()
+        self.existing_creds_widget.setVisible(has_existing)
+
+    def _on_existing_device_type_changed(self, device_type: str):
+        """Handle device type change - show/hide relevant fields."""
+        is_scannable = device_type in ("Firewall", "Panorama")
+        self.existing_creds_fields.setVisible(is_scannable)
+        self.existing_services_widget.setVisible(not is_scannable)
+
+    def _add_existing_device(self):
+        """Add an existing device to the list."""
+        device_type = self.existing_device_type.currentText()
+        is_scannable = device_type in ("Firewall", "Panorama")
+
+        if is_scannable:
+            # Firewall/Panorama require credentials
+            mgmt_ip = self.existing_mgmt_ip_input.text().strip()
+            username = self.existing_username_input.text().strip()
+            password = self.existing_password_input.text()
+
+            if not mgmt_ip or not username or not password:
+                QMessageBox.warning(
+                    self, "Missing Information",
+                    "Please fill in all fields (IP, username, and password)."
                 )
-        else:
-            # Panorama: Always has at least SC firewall
-            firewalls_to_deploy = True
+                return
 
-        # Show deployment status section only if firewalls will be deployed
-        self.deployment_status_widget.setVisible(firewalls_to_deploy)
+            device_id = mgmt_ip
+            display_text = f"🔥 {device_type}: {mgmt_ip} ({username})" if device_type == "Firewall" else f"🌐 {device_type}: {mgmt_ip} ({username})"
+
+            device_data = {
+                'device_type': device_type,
+                'mgmt_ip': mgmt_ip,
+                'username': username,
+                'password': password,
+                'scannable': True,
+            }
+        else:
+            # ServerVM/UserVM just need services info
+            services = self.existing_services_input.text().strip()
+            if not services:
+                QMessageBox.warning(
+                    self, "Missing Information",
+                    "Please enter the services or role for this VM."
+                )
+                return
+
+            device_id = f"{device_type}_{services}"
+            icon = "🖥️" if device_type == "ServerVM" else "💻"
+            display_text = f"{icon} {device_type}: {services}"
+
+            device_data = {
+                'device_type': device_type,
+                'services': services,
+                'scannable': False,
+            }
+
+        # Check for duplicates
+        if 'existing_devices' not in self.cloud_resource_configs:
+            self.cloud_resource_configs['existing_devices'] = []
+
+        for device in self.cloud_resource_configs['existing_devices']:
+            existing_id = device.get('mgmt_ip') or f"{device.get('device_type')}_{device.get('services')}"
+            if existing_id == device_id:
+                QMessageBox.warning(
+                    self, "Duplicate Device",
+                    f"This device is already in the list."
+                )
+                return
+
+        # Add to config
+        self.cloud_resource_configs['existing_devices'].append(device_data)
+
+        # Add to list widget
+        self.existing_devices_list.addItem(display_text)
+
+        # Clear input fields
+        self.existing_mgmt_ip_input.clear()
+        self.existing_username_input.clear()
+        self.existing_password_input.clear()
+        self.existing_services_input.clear()
+
+        logger.info(f"Added {device_type} to existing devices list")
+
+    def _remove_existing_device(self):
+        """Remove the selected device from the list."""
+        current_item = self.existing_devices_list.currentItem()
+        if not current_item:
+            QMessageBox.information(
+                self, "No Selection",
+                "Please select a device to remove."
+            )
+            return
+
+        # Get the index and remove from list widget
+        row = self.existing_devices_list.row(current_item)
+        self.existing_devices_list.takeItem(row)
+
+        # Remove from config
+        if 'existing_devices' in self.cloud_resource_configs:
+            if row < len(self.cloud_resource_configs['existing_devices']):
+                removed = self.cloud_resource_configs['existing_devices'].pop(row)
+                logger.info(f"Removed device from existing devices list: {removed}")
+
+    def _refresh_existing_devices_list(self):
+        """Refresh the existing devices list widget from config."""
+        self.existing_devices_list.clear()
+        devices = self.cloud_resource_configs.get('existing_devices', [])
+        for device in devices:
+            device_type = device.get('device_type', 'Firewall')
+            if device.get('scannable', True):
+                # Firewall or Panorama
+                icon = "🔥" if device_type == "Firewall" else "🌐"
+                mgmt_ip = device.get('mgmt_ip', 'Unknown')
+                username = device.get('username', '')
+                display = f"{icon} {device_type}: {mgmt_ip} ({username})"
+            else:
+                # ServerVM or UserVM
+                icon = "🖥️" if device_type == "ServerVM" else "💻"
+                services = device.get('services', 'Unknown')
+                display = f"{icon} {device_type}: {services}"
+            self.existing_devices_list.addItem(display)
 
     def _on_tenant_connection_changed(self, api_client, tenant_name: str):
         """Handle tenant connection changes from the selector."""
@@ -2696,12 +3001,22 @@ class POVWorkflowWidget(QWidget):
 
     def _gather_deployment_config(self) -> Dict[str, Any]:
         """Gather deployment configuration from the UI selections."""
+        # Check if existing resources checkbox exists
+        has_existing = False
+        if hasattr(self, 'resources_yes_radio'):
+            has_existing = self.resources_yes_radio.isChecked()
+
         config = {
             "management_type": self.management_type,
-            "firewalls": [],
-            "deployment_method": None,
-            "already_deployed": self.deployed_yes_radio.isChecked(),
+            "deployment_method": "terraform",  # Default to Terraform deployment
+            "has_existing_resources": has_existing,
         }
+
+        # Add customer information
+        customer_info = self.cloud_resource_configs.get('customer_info', {})
+        if customer_info:
+            config["customer_name"] = customer_info.get('customer_name', '')
+            config["customer_industry"] = customer_info.get('customer_industry', '')
 
         # Add SCM tenant info if connected
         if self.api_client and self.connection_name:
@@ -2710,67 +3025,31 @@ class POVWorkflowWidget(QWidget):
                 "connected": True,
             }
 
-        is_scm = self.scm_managed_radio.isChecked()
+        # Add cloud deployment configuration
+        config["cloud_deployment"] = self.cloud_resource_configs.get('cloud_deployment', {})
 
-        if is_scm:
-            # SCM Managed: Check Azure deployment options
-            if self.azure_yes_radio.isChecked():
-                if self.deploy_sc_firewall_check.isChecked():
-                    config["firewalls"].append({
-                        "type": "service_connection",
-                        "name": "SC Firewall",
-                        "platform": "azure",
-                    })
-                if self.deploy_rn_firewall_check.isChecked():
-                    config["firewalls"].append({
-                        "type": "remote_network",
-                        "name": "RN Firewall",
-                        "platform": "azure",
-                    })
-        else:
-            # Panorama Managed: Always has SC, optionally RN
-            config["firewalls"].append({
-                "type": "service_connection",
-                "name": "SC Firewall",
-                "platform": "azure",
-                "required": True,
-            })
-            if self.panorama_rn_yes_radio.isChecked():
-                rn_count = 1
-                try:
-                    rn_count = int(self.panorama_rn_count_input.text() or "1")
-                except ValueError:
-                    rn_count = 1
-                for i in range(rn_count):
-                    config["firewalls"].append({
-                        "type": "remote_network",
-                        "name": f"RN Firewall {i + 1}",
-                        "platform": "azure",
-                    })
+        # Add locations (branches and datacenters)
+        config["locations"] = self.cloud_resource_configs.get('locations', {})
 
-        # Add deployment method if not already deployed
-        if not config["already_deployed"]:
-            config["deployment_method"] = (
-                "terraform" if self.deploy_terraform_radio.isChecked() else "manual"
-            )
-        else:
-            # Add firewall credentials if already deployed
-            fw_ip = self.fw_mgmt_ip_input.text().strip()
-            fw_user = self.fw_username_input.text().strip()
-            if fw_ip and fw_user:
-                config["firewall_credentials"] = {
-                    "mgmt_ip": fw_ip,
-                    "username": fw_user,
-                    # Password not stored in config for security
-                }
+        # Add trust devices configuration
+        config["trust_devices"] = self.cloud_resource_configs.get('trust_devices', {})
+
+        # Add existing device credentials if resources already deployed
+        if has_existing:
+            existing_devices = self.cloud_resource_configs.get('existing_devices', [])
+            if existing_devices:
+                config["existing_devices"] = existing_devices
 
         return config
 
     def _get_firewall_credentials(self) -> Optional[Dict[str, str]]:
-        """Get firewall credentials from the UI."""
-        fw_ip = self.fw_mgmt_ip_input.text().strip()
-        fw_user = self.fw_username_input.text().strip()
-        fw_pass = self.fw_password_input.text()
+        """Get firewall credentials from the UI (from Tenant Info existing resources section)."""
+        if not hasattr(self, 'existing_mgmt_ip_input'):
+            return None
+
+        fw_ip = self.existing_mgmt_ip_input.text().strip()
+        fw_user = self.existing_username_input.text().strip()
+        fw_pass = self.existing_password_input.text()
 
         if fw_ip and fw_user and fw_pass:
             return {
@@ -3001,33 +3280,6 @@ class POVWorkflowWidget(QWidget):
         # POV use cases tab uses a different approach
         pass
 
-    def _on_cloud_customer_changed(self, text: str):
-        """Handle customer name change in Cloud Deployment card."""
-        self._update_cloud_rg_preview()
-        # Sync to cloud_resource_configs
-        customer = text.lower().strip()
-        self.cloud_resource_configs['cloud_deployment']['customer_name'] = customer
-        self._update_cloud_deployment_status()
-
-        # Auto-update admin username if it's empty or matches old pattern
-        if hasattr(self, 'cloud_admin_username'):
-            current_username = self.cloud_admin_username.text()
-            # Update if empty or if it looks like an auto-generated username
-            if not current_username or current_username == self.cloud_resource_configs['cloud_deployment'].get('_last_auto_username', ''):
-                if customer:
-                    new_username = f"{customer}admin"
-                    self.cloud_admin_username.setText(new_username)
-                    self.cloud_resource_configs['cloud_deployment']['_last_auto_username'] = new_username
-
-        # Auto-update mobile portal name if it's empty or matches old pattern
-        if hasattr(self, 'mobile_portal_input'):
-            current_portal = self.mobile_portal_input.text()
-            last_auto_portal = self.use_case_configs.get('mobile_users', {}).get('_last_auto_portal', '')
-            if not current_portal or current_portal == last_auto_portal:
-                if customer:
-                    self.mobile_portal_input.setText(customer)
-                    self.use_case_configs['mobile_users']['_last_auto_portal'] = customer
-
     def _on_cloud_region_changed(self, region: str):
         """Handle region change in Cloud Deployment card."""
         self._update_cloud_rg_preview()
@@ -3038,10 +3290,11 @@ class POVWorkflowWidget(QWidget):
 
     def _update_cloud_rg_preview(self):
         """Update the resource group name preview."""
-        if not hasattr(self, 'cloud_customer_name') or not hasattr(self, 'cloud_region_combo'):
+        if not hasattr(self, 'customer_name_input') or not hasattr(self, 'cloud_region_combo'):
             return
 
-        customer = self.cloud_customer_name.text().lower().strip()
+        # Use sanitized customer name for resource group
+        customer = self._sanitize_customer_name(self.customer_name_input.text())
         region = self.cloud_region_combo.currentText()
 
         if customer and region:
@@ -3049,15 +3302,15 @@ class POVWorkflowWidget(QWidget):
             self.cloud_rg_preview.setText(f"<b>{rg_name}</b>")
             self.cloud_rg_preview.setStyleSheet("font-size: 12px; color: #2E7D32;")
         else:
-            self.cloud_rg_preview.setText("<i>(enter customer name)</i>")
+            self.cloud_rg_preview.setText("<i>(enter customer name on Tenant Info tab)</i>")
             self.cloud_rg_preview.setStyleSheet("font-size: 12px; color: #666;")
 
     def _update_cloud_deployment_status(self):
         """Update Cloud Deployment card status based on required fields."""
-        if not hasattr(self, 'cloud_customer_name'):
+        if not hasattr(self, 'customer_name_input'):
             return
 
-        customer = self.cloud_customer_name.text().strip()
+        customer = self.customer_name_input.text().strip()
         if customer:
             self.cloud_deployment_status.setText("✓ Configured")
             self.cloud_deployment_status.setStyleSheet("color: #4CAF50; font-size: 11px;")
@@ -3237,6 +3490,7 @@ class POVWorkflowWidget(QWidget):
         self._update_locations_status()
         self._sync_devices_from_locations()
         self._refresh_private_app_connections()
+        self._sync_branches_to_remote_branch_card()
 
         logger.info(f"Added branch: {name} in {region}")
 
@@ -3259,6 +3513,7 @@ class POVWorkflowWidget(QWidget):
         self._update_locations_status()
         self._sync_devices_from_locations()
         self._refresh_private_app_connections()
+        self._sync_branches_to_remote_branch_card()
 
         logger.info(f"Removed branch: {branch_name}")
 
@@ -3612,7 +3867,12 @@ class POVWorkflowWidget(QWidget):
     def _update_trust_devices_status(self):
         """Update the Trust Network Devices status indicator."""
         devices = self.cloud_resource_configs.get('trust_devices', {}).get('devices', [])
-        count = len(devices)
+
+        # Exclude Panorama from count if Panorama Managed
+        if self.management_type == 'panorama':
+            count = len([d for d in devices if d.get('device_type') != 'Panorama'])
+        else:
+            count = len(devices)
 
         if count > 0:
             self.trust_devices_status.setText(f"✓ {count} devices")
@@ -3643,13 +3903,13 @@ class POVWorkflowWidget(QWidget):
         # Build preview message
         use_case_names = {
             'mobile_users': 'Connect & Secure Mobile Users',
-            'proxy_users': 'Connect & Secure Proxy Users',
+            'prisma_browser': 'Prisma Access Browser',
             'private_app': 'Private App Access',
             'remote_branch': 'Connect Remote Branch',
             'aiops_adem': 'AIOPS-ADEM',
             'app_accel': 'App Acceleration',
             'rbi': 'Remote Browser Isolation',
-            'pab': 'Prisma Access Browser',
+            'pab': 'Prisma Access Browser (Legacy)',
         }
 
         preview = "Selected Use Cases:\n\n"
@@ -3750,18 +4010,36 @@ class POVWorkflowWidget(QWidget):
             'portal_name': self.mobile_portal_input.text(),
             'vpn_mode': self.mobile_vpn_mode.currentText(),
             'locations': selected_locations,
+            'explicit_proxy': self.mobile_explicit_proxy.isChecked(),
         }
         self._update_use_case_status('mobile_users')
 
-    def _on_proxy_users_changed(self):
-        """Handle Proxy Users inline field changes."""
-        self.use_case_configs['proxy_users'] = {
-            'enabled': self.proxy_users_enable.isChecked(),
-            'proxy_port': self.proxy_port_input.value(),
-            'auth_required': self.proxy_auth_required.isChecked(),
-            'pac_file': self.proxy_pac_file.isChecked(),
+    def _on_prisma_browser_changed(self):
+        """Handle Prisma Browser inline field changes."""
+        self.use_case_configs['prisma_browser'] = {
+            'enabled': self.prisma_browser_enable.isChecked(),
+            'default_policy': self.browser_default_policy.isChecked(),
+            'device_posture': self.browser_device_posture.isChecked(),
+            'route_traffic': self.browser_route_traffic.currentText(),
         }
-        self._update_use_case_status('proxy_users')
+        self._update_use_case_status('prisma_browser')
+
+        # Auto-enable explicit proxy in Mobile Users if routing traffic through PA
+        route_traffic = self.browser_route_traffic.currentText()
+        browser_enabled = self.prisma_browser_enable.isChecked()
+
+        if browser_enabled and route_traffic in ("Route private apps only", "Route all traffic to PA"):
+            # Auto-enable and grey out the checkbox
+            self.mobile_explicit_proxy.setChecked(True)
+            self.mobile_explicit_proxy.setEnabled(False)
+            self.explicit_proxy_hint.setText("⚠️ Auto-enabled by Prisma Browser routing")
+        else:
+            # Re-enable user control
+            self.mobile_explicit_proxy.setEnabled(True)
+            self.explicit_proxy_hint.setText("")
+
+        # Update mobile users config to reflect the change
+        self._on_mobile_users_changed()
 
     def _on_private_app_changed(self):
         """Handle Private App Access inline field changes."""
@@ -3771,16 +4049,519 @@ class POVWorkflowWidget(QWidget):
         self.use_case_configs['private_app'] = config
         self._update_use_case_status('private_app')
 
+    def _on_private_app_selection_changed(self, row: int):
+        """Handle Private App connection selection change."""
+        if row < 0:
+            self.remove_ztna_btn.setEnabled(False)
+            return
+
+        connections = self.use_case_configs.get('private_app', {}).get('connections', [])
+        if row >= len(connections):
+            return
+
+        conn = connections[row]
+
+        # Enable remove button only for custom ZTNA connectors
+        is_custom = conn.get('custom', False)
+        self.remove_ztna_btn.setEnabled(is_custom)
+
+    def _on_private_app_item_clicked(self, item):
+        """Handle click on a connection item to toggle type."""
+        row = self.private_app_connections_list.currentRow()
+        if row < 0:
+            return
+
+        connections = self.use_case_configs.get('private_app', {}).get('connections', [])
+        if row >= len(connections):
+            return
+
+        conn = connections[row]
+        loc_type = conn.get('type', 'datacenter')
+
+        # Handle branches: toggle RN <-> RN + ZTNA
+        if loc_type == 'branch':
+            ztna_count = sum(1 for c in connections if c.get('connection_type') == 'ztna')
+            has_ztna = conn.get('has_ztna', False)
+
+            if has_ztna:
+                # Remove ZTNA from branch
+                conn['has_ztna'] = False
+            else:
+                # Add ZTNA to branch - check limit
+                if ztna_count >= 10:
+                    QMessageBox.warning(
+                        self, "Limit Reached",
+                        "Maximum of 10 ZTNA Connectors allowed."
+                    )
+                    return
+                conn['has_ztna'] = True
+
+            self._refresh_private_app_connections_display()
+            self._update_private_app_limits()
+            self._on_private_app_changed()
+            return
+
+        # Handle datacenters: toggle SC <-> ZTNA
+        if conn.get('locked', False) or loc_type != 'datacenter':
+            return
+
+        # Count current SC and ZTNA
+        sc_count = sum(1 for c in connections if c.get('connection_type') == 'service_connection')
+        ztna_count = sum(1 for c in connections if c.get('connection_type') == 'ztna')
+
+        current_type = conn.get('connection_type', 'service_connection')
+
+        # Toggle type with limit checks
+        if current_type == 'service_connection':
+            # Switching to ZTNA - check ZTNA limit
+            if ztna_count >= 10:
+                QMessageBox.warning(
+                    self, "Limit Reached",
+                    "Maximum of 10 ZTNA Connectors allowed."
+                )
+                return
+            conn['connection_type'] = 'ztna'
+        else:
+            # Switching to SC - check SC limit
+            if sc_count >= 5:
+                QMessageBox.warning(
+                    self, "Limit Reached",
+                    "Maximum of 5 Service Connections allowed."
+                )
+                return
+            conn['connection_type'] = 'service_connection'
+
+        # Refresh display and update limits label
+        self._refresh_private_app_connections_display()
+        self._update_private_app_limits()
+        self._on_private_app_changed()
+
+    def _add_ztna_connector(self):
+        """Add a new custom ZTNA connector."""
+        from PyQt6.QtWidgets import QInputDialog
+
+        # Check ZTNA limit first
+        connections = self.use_case_configs.get('private_app', {}).get('connections', [])
+        ztna_count = sum(1 for c in connections if c.get('connection_type') == 'ztna')
+        if ztna_count >= 10:
+            QMessageBox.warning(
+                self, "Limit Reached",
+                "Maximum of 10 ZTNA Connectors allowed.\n\n"
+                "You can convert an existing Service Connection to ZTNA by clicking on it."
+            )
+            return
+
+        name, ok = QInputDialog.getText(
+            self, "Add ZTNA Connector",
+            "Enter a name for the ZTNA connector:\n\n"
+            "(This creates a placeholder in a new Connector Group)"
+        )
+        if not ok or not name.strip():
+            return
+
+        name = name.strip()
+
+        # Check for duplicates
+        if any(c['name'] == name for c in connections):
+            QMessageBox.warning(self, "Duplicate", f"A connection named '{name}' already exists.")
+            return
+
+        # Add custom ZTNA connector
+        conn = {
+            'name': name,
+            'type': 'datacenter',
+            'connection_type': 'ztna',
+            'locked': False,
+            'custom': True,
+        }
+        connections.append(conn)
+
+        # Also track in custom_ztna list
+        if 'custom_ztna' not in self.use_case_configs['private_app']:
+            self.use_case_configs['private_app']['custom_ztna'] = []
+        self.use_case_configs['private_app']['custom_ztna'].append(name)
+
+        # Refresh display and update limits
+        self._refresh_private_app_connections_display()
+        self._update_private_app_limits()
+        self._on_private_app_changed()
+
+    def _remove_ztna_connector(self):
+        """Remove the selected custom ZTNA connector."""
+        row = self.private_app_connections_list.currentRow()
+        if row < 0:
+            return
+
+        connections = self.use_case_configs.get('private_app', {}).get('connections', [])
+        if row >= len(connections):
+            return
+
+        conn = connections[row]
+        if not conn.get('custom', False):
+            QMessageBox.information(
+                self, "Cannot Remove",
+                "Only custom ZTNA connectors can be removed. Location-based connections are managed from the Locations tab."
+            )
+            return
+
+        # Remove from connections and custom_ztna list
+        name = conn['name']
+        connections.pop(row)
+        custom_list = self.use_case_configs['private_app'].get('custom_ztna', [])
+        if name in custom_list:
+            custom_list.remove(name)
+
+        # Refresh display and update limits
+        self._refresh_private_app_connections_display()
+        self._update_private_app_limits()
+        self._on_private_app_changed()
+
+    def _update_private_app_limits(self):
+        """Update the Private App limits label with current counts."""
+        connections = self.use_case_configs.get('private_app', {}).get('connections', [])
+        sc_count = sum(1 for c in connections if c.get('connection_type') == 'service_connection')
+        # Count ZTNA connectors + branches with ZTNA enabled
+        ztna_count = sum(1 for c in connections if c.get('connection_type') == 'ztna')
+        ztna_count += sum(1 for c in connections if c.get('type') == 'branch' and c.get('has_ztna', False))
+
+        # Color code based on limits
+        sc_color = "#f44336" if sc_count >= 5 else "#666"
+        ztna_color = "#f44336" if ztna_count >= 10 else "#666"
+
+        self.private_app_limits_label.setText(
+            f"<span style='color:{sc_color}'>SC: {sc_count}/5</span> | "
+            f"<span style='color:{ztna_color}'>ZTNA: {ztna_count}/10</span>"
+        )
+
+    def _refresh_private_app_connections_display(self):
+        """Refresh the Private App connections list display only (not data)."""
+        self.private_app_connections_list.clear()
+        connections = self.use_case_configs.get('private_app', {}).get('connections', [])
+
+        for conn in connections:
+            name = conn['name']
+            conn_type = conn.get('connection_type', 'service_connection')
+            is_locked = conn.get('locked', False)
+            is_custom = conn.get('custom', False)
+            loc_type = conn.get('type', 'datacenter')
+
+            if loc_type == 'branch':
+                icon = "🏢"
+                has_ztna = conn.get('has_ztna', False)
+                if has_ztna:
+                    type_display = "Remote Network + ZTNA"
+                    suffix = ""
+                else:
+                    type_display = "Remote Network"
+                    suffix = " (click to add ZTNA)"
+            elif conn_type == 'ztna':
+                icon = "🔗" if is_custom else "🏛️"
+                type_display = "ZTNA Connector"
+                suffix = " (custom)" if is_custom else ""
+            else:
+                icon = "🏛️"
+                type_display = "Service Connection"
+                suffix = " (required)" if is_locked else ""
+
+            self.private_app_connections_list.addItem(f"{icon} {name} → {type_display}{suffix}")
+
     def _on_remote_branch_changed(self):
         """Handle Remote Branch inline field changes."""
-        self.use_case_configs['remote_branch'] = {
-            'enabled': self.remote_branch_enable.isChecked(),
-            'branch_count': self.branch_count_input.value(),
-            'branch_bandwidth': self.branch_bandwidth_combo.currentText(),
-            'sdwan_integration': self.branch_sdwan.isChecked(),
-            'bgp_routing': self.branch_bgp.isChecked(),
-        }
+        config = self.use_case_configs.get('remote_branch', {})
+        config['enabled'] = self.remote_branch_enable.isChecked()
+        config['sdwan_integration'] = self.branch_sdwan.isChecked()
+        config['bgp_routing'] = self.branch_bgp.isChecked()
+        self.use_case_configs['remote_branch'] = config
         self._update_use_case_status('remote_branch')
+
+    def _add_bandwidth_allocation(self):
+        """Add a bandwidth allocation for a Prisma Access region."""
+        region = self.branch_bw_region_combo.currentText()
+        # Parse "200 Mbps" to get 200
+        bandwidth_text = self.branch_bw_amount_combo.currentText()
+        bandwidth = int(bandwidth_text.replace(" Mbps", ""))
+
+        config = self.use_case_configs.get('remote_branch', {})
+        allocations = config.get('bandwidth_allocations', [])
+
+        # Check total bandwidth limit
+        current_total = sum(a['bandwidth'] for a in allocations)
+        if current_total + bandwidth > 1000:
+            QMessageBox.warning(
+                self, "Bandwidth Limit",
+                f"Cannot add {bandwidth} Mbps. Total would exceed 1000 Mbps.\n"
+                f"Currently allocated: {current_total} Mbps\n"
+                f"Available: {1000 - current_total} Mbps"
+            )
+            return
+
+        # Check for duplicate region
+        if any(a['region'] == region for a in allocations):
+            QMessageBox.warning(
+                self, "Duplicate Region",
+                f"Bandwidth already allocated to {region}. Remove it first to change."
+            )
+            return
+
+        # Add allocation
+        allocations.append({'region': region, 'bandwidth': bandwidth})
+        config['bandwidth_allocations'] = allocations
+        self.use_case_configs['remote_branch'] = config
+
+        # Refresh UI and reassign branches to closest regions
+        self._sync_branches_to_remote_branch_card()
+        self._refresh_remote_branch_lists()
+        self._on_remote_branch_changed()
+
+    def _remove_bandwidth_allocation(self):
+        """Remove selected bandwidth allocation."""
+        row = self.branch_bw_list.currentRow()
+        if row < 0:
+            return
+
+        config = self.use_case_configs.get('remote_branch', {})
+        allocations = config.get('bandwidth_allocations', [])
+
+        if row < len(allocations):
+            allocations.pop(row)
+            config['bandwidth_allocations'] = allocations
+            self.use_case_configs['remote_branch'] = config
+
+            # Reassign branches to closest remaining regions
+            self._sync_branches_to_remote_branch_card()
+            self._refresh_remote_branch_lists()
+            self._on_remote_branch_changed()
+
+    def _add_staged_branch(self):
+        """Add a staged branch (config only, no Azure deployment)."""
+        name = self.staged_branch_name.text().strip()
+        if not name:
+            QMessageBox.warning(self, "Name Required", "Please enter a branch name.")
+            return
+
+        region = self.staged_branch_region.currentText()
+        if not region:
+            QMessageBox.warning(
+                self, "No Region",
+                "Please allocate bandwidth to a region first, then select it."
+            )
+            return
+
+        config = self.use_case_configs.get('remote_branch', {})
+        staged = config.get('staged_branches', [])
+        cloud = config.get('cloud_branches', [])
+
+        # Check for duplicates
+        all_names = [b['name'] for b in staged] + [b['name'] for b in cloud]
+        if name in all_names:
+            QMessageBox.warning(self, "Duplicate", f"A branch named '{name}' already exists.")
+            return
+
+        staged.append({'name': name, 'region': region, 'staged': True})
+        config['staged_branches'] = staged
+        self.use_case_configs['remote_branch'] = config
+
+        # Clear input and refresh
+        self.staged_branch_name.clear()
+        self._refresh_remote_branch_lists()
+        self._on_remote_branch_changed()
+
+    def _remove_staged_branch(self):
+        """Remove selected staged branch (only staged branches can be removed)."""
+        row = self.branch_list.currentRow()
+        if row < 0:
+            return
+
+        config = self.use_case_configs.get('remote_branch', {})
+        cloud = config.get('cloud_branches', [])
+        staged = config.get('staged_branches', [])
+
+        # Cloud branches come first in the list
+        if row < len(cloud):
+            QMessageBox.information(
+                self, "Cannot Remove",
+                "Cloud-deployed branches are managed from the Locations tab (Step 2).\n"
+                "Only staged branches can be removed here."
+            )
+            return
+
+        # Remove from staged list
+        staged_index = row - len(cloud)
+        if staged_index < len(staged):
+            staged.pop(staged_index)
+            config['staged_branches'] = staged
+            self.use_case_configs['remote_branch'] = config
+
+            self._refresh_remote_branch_lists()
+            self._on_remote_branch_changed()
+
+    def _refresh_remote_branch_lists(self):
+        """Refresh the bandwidth and branch lists."""
+        config = self.use_case_configs.get('remote_branch', {})
+
+        # Refresh bandwidth list
+        self.branch_bw_list.clear()
+        allocations = config.get('bandwidth_allocations', [])
+        total_bw = 0
+        for alloc in allocations:
+            self.branch_bw_list.addItem(f"📍 {alloc['region']}: {alloc['bandwidth']} Mbps")
+            total_bw += alloc['bandwidth']
+
+        # Update total label with color coding
+        color = "#f44336" if total_bw >= 1000 else "#666"
+        self.branch_bw_total_label.setText(f"Bandwidth: <span style='color:{color}'>{total_bw}/1000 Mbps</span>")
+
+        # Update staged branch region dropdown with only allocated regions
+        self.staged_branch_region.clear()
+        if allocations:
+            for alloc in allocations:
+                self.staged_branch_region.addItem(alloc['region'])
+        else:
+            self.staged_branch_region.setPlaceholderText("Allocate BW first")
+
+        # Refresh branch list
+        self.branch_list.clear()
+
+        # Cloud-deployed branches first (from Locations tab)
+        cloud_branches = config.get('cloud_branches', [])
+        for branch in cloud_branches:
+            assigned_region = branch.get('assigned_region', branch.get('region', '?'))
+            self.branch_list.addItem(f"☁️ {branch['name']} → {assigned_region} (cloud)")
+
+        # Staged branches
+        staged_branches = config.get('staged_branches', [])
+        for branch in staged_branches:
+            self.branch_list.addItem(f"📋 {branch['name']} → {branch['region']} (staged)")
+
+    def _sync_branches_to_remote_branch_card(self):
+        """Sync branches from Locations tab to Remote Branch card with auto-allocation."""
+        locations = self.cloud_resource_configs.get('locations', {})
+        branches = locations.get('branches', [])
+
+        config = self.use_case_configs.get('remote_branch', {})
+        allocations = config.get('bandwidth_allocations', [])
+
+        # Map each branch's Azure region to closest Prisma Access location
+        pa_locations_needed = set()
+        branch_pa_mapping = {}
+
+        for branch in branches:
+            azure_region = branch.get('region', 'eastus')
+            pa_location = self._azure_to_prisma_access_location(azure_region)
+            pa_locations_needed.add(pa_location)
+            branch_pa_mapping[branch['name']] = pa_location
+
+        # Auto-allocate bandwidth for PA locations not already allocated
+        already_allocated = {a['region'] for a in allocations}
+        new_locations = pa_locations_needed - already_allocated
+
+        if new_locations:
+            # Determine bandwidth: 200 Mbps default, 100 Mbps if 4+ unique regions
+            total_regions = len(already_allocated) + len(new_locations)
+            default_bw = 100 if total_regions >= 4 else 200
+
+            # Check if we have enough bandwidth capacity
+            current_total = sum(a['bandwidth'] for a in allocations)
+            needed_bw = len(new_locations) * default_bw
+
+            if current_total + needed_bw > 1000:
+                # Reduce bandwidth per region to fit
+                available = 1000 - current_total
+                default_bw = max(50, available // len(new_locations)) if new_locations else 50
+
+            for pa_loc in new_locations:
+                if current_total + default_bw <= 1000:
+                    allocations.append({'region': pa_loc, 'bandwidth': default_bw})
+                    current_total += default_bw
+
+        # Build list of cloud branches with assigned PA locations
+        cloud_branches = []
+        for branch in branches:
+            pa_location = branch_pa_mapping.get(branch['name'], 'US East')
+            cloud_branches.append({
+                'name': branch['name'],
+                'region': branch.get('region', 'eastus'),  # Azure region
+                'assigned_region': pa_location,  # Prisma Access location
+                'staged': False,
+            })
+
+        config['bandwidth_allocations'] = allocations
+        config['cloud_branches'] = cloud_branches
+        self.use_case_configs['remote_branch'] = config
+
+        # Refresh the display
+        if hasattr(self, 'branch_list'):
+            self._refresh_remote_branch_lists()
+
+    def _azure_to_prisma_access_location(self, azure_region: str) -> str:
+        """Map Azure region to closest Prisma Access location."""
+        # Azure region to Prisma Access location mapping
+        mapping = {
+            # US regions
+            'eastus': 'US East',
+            'eastus2': 'US East',
+            'centralus': 'US Central',
+            'westus': 'US West',
+            'westus2': 'US West',
+            'westus3': 'US West',
+            'northcentralus': 'US Central',
+            'southcentralus': 'US Central',
+            # Europe regions
+            'northeurope': 'Europe North',
+            'westeurope': 'Europe West',
+            'uksouth': 'UK',
+            'ukwest': 'UK',
+            'francecentral': 'Europe West',
+            'germanywestcentral': 'Germany',
+            # Asia Pacific regions
+            'australiaeast': 'Australia East',
+            'australiasoutheast': 'Australia Southeast',
+            'southeastasia': 'Singapore',
+            'eastasia': 'Hong Kong',
+            'japaneast': 'Japan Central',
+            'japanwest': 'Japan Central',
+            'koreacentral': 'South Korea',
+            'indiacentral': 'India West',
+            # Default
+        }
+        return mapping.get(azure_region, 'US East')
+
+    def _find_closest_bandwidth_region(self, branch_region: str, allocations: list) -> str:
+        """Find the closest bandwidth allocation region (PA location) to an Azure region."""
+        if not allocations:
+            return self._azure_to_prisma_access_location(branch_region)
+
+        # Get the PA location for this Azure region
+        target_pa = self._azure_to_prisma_access_location(branch_region)
+
+        # Check if we already have this PA location allocated
+        for alloc in allocations:
+            if alloc['region'] == target_pa:
+                return target_pa
+
+        # Group PA locations by continent for fallback
+        pa_groups = {
+            'americas': ['US East', 'US West', 'US Central', 'US Northwest', 'US Southwest', 'Canada East', 'Canada West', 'Mexico Central', 'Brazil South'],
+            'europe': ['Europe North', 'Europe West', 'UK', 'Germany', 'France North', 'France South', 'Switzerland', 'Netherlands North', 'Netherlands South'],
+            'asia': ['Singapore', 'Hong Kong', 'Japan Central', 'Japan South', 'South Korea', 'India West', 'India South', 'Taiwan'],
+            'oceania': ['Australia East', 'Australia Southeast', 'New Zealand'],
+        }
+
+        # Find which group target PA location belongs to
+        target_group = None
+        for group, locations in pa_groups.items():
+            if target_pa in locations:
+                target_group = group
+                break
+
+        # Try to find an allocation in the same group
+        for alloc in allocations:
+            for group, locations in pa_groups.items():
+                if alloc['region'] in locations and group == target_group:
+                    return alloc['region']
+
+        # No same-group allocation, return first allocation's region
+        return allocations[0]['region']
 
     def _on_aiops_adem_changed(self):
         """Handle AIOPS-ADEM inline field changes."""
@@ -3874,46 +4655,103 @@ class POVWorkflowWidget(QWidget):
         self._update_use_case_status('pab')
 
     def _refresh_private_app_connections(self):
-        """Refresh the Private App connections list based on Locations tab data."""
-        self.private_app_connections_list.clear()
+        """Refresh the Private App connections list based on Locations tab data.
 
+        Applies limits: max 5 Service Connections, max 10 ZTNA Connectors.
+        When defaults exceed limits, first 5 datacenters get SC, next 10 get ZTNA.
+        """
         locations = self.cloud_resource_configs.get('locations', {})
-        connections = []
 
-        # Add Panorama if panorama managed (must be Service Connection)
+        # Get existing connections to preserve user's connection type changes
+        existing_connections = {
+            c['name']: c for c in self.use_case_configs.get('private_app', {}).get('connections', [])
+        }
+
+        connections = []
+        sc_count = 0
+        ztna_count = 0
+
+        # Add Panorama if panorama managed (must be Service Connection, counts toward limit)
         if self.management_type == 'panorama':
             conn = {
                 'name': 'Panorama',
                 'type': 'datacenter',
                 'connection_type': 'service_connection',
                 'locked': True,  # Cannot change
+                'custom': False,
             }
             connections.append(conn)
-            self.private_app_connections_list.addItem("🏛️ Panorama → Service Connection (required)")
+            sc_count += 1
 
-        # Add datacenters
+        # Add datacenters - preserve user's type if set, otherwise assign based on limits
         for dc in locations.get('datacenters', []):
+            existing = existing_connections.get(dc['name'])
+
+            if existing:
+                # Preserve user's choice
+                conn_type = existing.get('connection_type', 'service_connection')
+            else:
+                # New datacenter - assign type based on limits
+                # First 5 get SC, next 10 get ZTNA, rest are skipped
+                if sc_count < 5:
+                    conn_type = 'service_connection'
+                elif ztna_count < 10:
+                    conn_type = 'ztna'
+                else:
+                    # Skip this datacenter - limits reached
+                    continue
+
+            # Update counts
+            if conn_type == 'service_connection':
+                sc_count += 1
+            elif conn_type == 'ztna':
+                ztna_count += 1
+
             conn = {
                 'name': dc['name'],
                 'type': 'datacenter',
-                'connection_type': 'service_connection',  # Default
+                'connection_type': conn_type,
                 'locked': False,
+                'custom': False,
             }
             connections.append(conn)
-            self.private_app_connections_list.addItem(f"🏛️ {dc['name']} → Service Connection")
 
-        # Add branches
+        # Add branches (always Remote Network, not changeable, doesn't count toward limits)
         for branch in locations.get('branches', []):
             conn = {
                 'name': branch['name'],
                 'type': 'branch',
-                'connection_type': 'remote_network',  # Default for branches
-                'locked': False,
+                'connection_type': 'remote_network',
+                'locked': True,  # Branches must be Remote Network
+                'custom': False,
             }
             connections.append(conn)
-            self.private_app_connections_list.addItem(f"🏢 {branch['name']} → Remote Network")
+
+        # Add custom ZTNA connectors (only if under ZTNA limit)
+        custom_ztna = self.use_case_configs.get('private_app', {}).get('custom_ztna', [])
+        for name in custom_ztna:
+            # Skip if already added from locations or ZTNA limit reached
+            if any(c['name'] == name for c in connections):
+                continue
+            if ztna_count >= 10:
+                continue
+
+            conn = {
+                'name': name,
+                'type': 'datacenter',
+                'connection_type': 'ztna',
+                'locked': False,
+                'custom': True,
+            }
+            connections.append(conn)
+            ztna_count += 1
 
         self.use_case_configs['private_app']['connections'] = connections
+
+        # Refresh the display and update limits label
+        self._refresh_private_app_connections_display()
+        if hasattr(self, 'private_app_limits_label'):
+            self._update_private_app_limits()
 
     def _update_cloud_resource_status(self, resource_name: str):
         """Update the status indicator for a cloud resource."""
@@ -4713,7 +5551,326 @@ class POVWorkflowWidget(QWidget):
                     "Save Failed",
                     f"Failed to save configuration:\n{str(e)}"
                 )
-    
+
+    # ========================================================================
+    # STATE PERSISTENCE (Auto-save/Resume)
+    # ========================================================================
+
+    def _get_state_dir(self) -> Path:
+        """Get the directory for POV state files."""
+        state_dir = Path.home() / ".pa_config_lab" / "pov_states"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        return state_dir
+
+    def _next_tab(self, tab_index: int):
+        """Navigate to the next tab after saving state."""
+        # Save current state before moving to next tab
+        self.save_state(tab_index - 1)  # Save the tab we're leaving
+        # Switch to the requested tab
+        self.tabs.setCurrentIndex(tab_index)
+
+    def save_state(self, current_tab: int = None):
+        """Save current workflow state to a file for later resume (overwrites existing)."""
+        import json
+        from datetime import datetime
+
+        if current_tab is None:
+            current_tab = self.tabs.currentIndex()
+
+        # Generate state filename based on sanitized customer name (one file per customer)
+        customer_info = self.cloud_resource_configs.get('customer_info', {})
+        customer_display = customer_info.get('customer_name', '')
+        # Use sanitized name for filename, fall back to sanitizing display name
+        customer = customer_info.get('customer_name_sanitized', '')
+        if not customer and customer_display:
+            customer = self._sanitize_customer_name(customer_display)
+        if not customer:
+            customer = 'unnamed'
+
+        # Use fixed filename per customer (overwrites existing)
+        state_filename = f"pov_state_{customer}.json"
+
+        # Build state data
+        state = {
+            'version': '1.0',
+            'customer': customer,
+            'saved_at': datetime.now().isoformat(),
+            'last_tab': current_tab,
+            'management_type': self.management_type,
+            'connection_name': self.connection_name,
+            'customer_info': self.cloud_resource_configs.get('customer_info', {}),
+            'cloud_resource_configs': self.cloud_resource_configs,
+            'use_case_configs': getattr(self, 'use_case_configs', {}),
+            'config_data': self.config_data,
+        }
+
+        # Save to file (overwrites existing)
+        state_path = self._get_state_dir() / state_filename
+        try:
+            with open(state_path, 'w') as f:
+                json.dump(state, f, indent=2, default=str)
+            logger.info(f"Saved POV state to {state_path}")
+        except Exception as e:
+            logger.error(f"Failed to save POV state: {e}")
+
+    def load_state(self, state_path: Path) -> bool:
+        """Load a saved workflow state from file."""
+        import json
+
+        try:
+            with open(state_path, 'r') as f:
+                state = json.load(f)
+
+            # Restore state
+            self.management_type = state.get('management_type', 'scm')
+            self.connection_name = state.get('connection_name')
+            self.cloud_resource_configs = state.get('cloud_resource_configs', {})
+            self.config_data = state.get('config_data', {})
+
+            if hasattr(self, 'use_case_configs'):
+                self.use_case_configs = state.get('use_case_configs', {})
+
+            # Restore UI state
+            self._restore_ui_from_state(state)
+
+            # Navigate to the tab after the last configured one
+            last_tab = state.get('last_tab', 0)
+            next_tab = min(last_tab + 1, self.tabs.count() - 1)
+            self.tabs.setCurrentIndex(next_tab)
+
+            logger.info(f"Loaded POV state from {state_path}, resuming at tab {next_tab}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to load POV state: {e}")
+            QMessageBox.critical(
+                self,
+                "Load Failed",
+                f"Failed to load saved state:\n{str(e)}"
+            )
+            return False
+
+    def _restore_ui_from_state(self, state: Dict[str, Any]):
+        """Restore UI widgets from loaded state."""
+        # Restore management type radio
+        if self.management_type == 'panorama':
+            self.panorama_managed_radio.setChecked(True)
+        else:
+            self.scm_managed_radio.setChecked(True)
+
+        # Restore customer info
+        customer_info = state.get('customer_info', {})
+        if hasattr(self, 'customer_name_input') and customer_info.get('customer_name'):
+            self.customer_name_input.setText(customer_info['customer_name'])
+
+        if hasattr(self, 'customer_industry_combo') and customer_info.get('industry'):
+            index = self.customer_industry_combo.findText(customer_info['industry'])
+            if index >= 0:
+                self.customer_industry_combo.setCurrentIndex(index)
+
+        # Restore existing devices
+        existing_devices = self.cloud_resource_configs.get('existing_devices', [])
+        if existing_devices:
+            self.resources_yes_radio.setChecked(True)
+            self._refresh_existing_devices_list()
+
+        # Restore tenant connection status display - show saved tenant but note reconnection needed
+        if hasattr(self, 'load_status') and self.connection_name:
+            self.load_status.setText(f"Previously: {self.connection_name} (reconnect to continue)")
+            self.load_status.setStyleSheet("color: #FF9800;")  # Orange - needs attention
+        elif hasattr(self, 'load_status'):
+            self.load_status.setText("No tenant connected")
+            self.load_status.setStyleSheet("color: gray;")
+
+        # If tenant selector exists, select the saved tenant in dropdown so user can easily reconnect
+        if hasattr(self, 'tenant_selector') and self.connection_name:
+            # Find and select the tenant in dropdown without triggering connection
+            combo = self.tenant_selector.tenant_combo
+            combo.blockSignals(True)
+            for i in range(combo.count()):
+                if combo.itemText(i) == self.connection_name:
+                    combo.setCurrentIndex(i)
+                    break
+            combo.blockSignals(False)
+            # Update status label to show needs reconnection
+            self.tenant_selector.status_label.setText(f"⚠️ Select '{self.connection_name}' to reconnect")
+            self.tenant_selector.status_label.setStyleSheet("color: #FF9800; padding: 8px; margin-top: 5px;")
+
+        # Refresh other UI elements
+        if hasattr(self, '_update_cloud_rg_preview'):
+            self._update_cloud_rg_preview()
+        if hasattr(self, '_update_cloud_deployment_status'):
+            self._update_cloud_deployment_status()
+        if hasattr(self, '_refresh_locations_list'):
+            self._refresh_locations_list()
+        if hasattr(self, '_refresh_trust_devices_list'):
+            self._refresh_trust_devices_list()
+
+        # Refresh Use Cases tab elements
+        if hasattr(self, '_refresh_private_app_connections'):
+            self._refresh_private_app_connections()
+        if hasattr(self, '_update_private_app_limits'):
+            self._update_private_app_limits()
+        if hasattr(self, '_refresh_remote_branch_lists'):
+            self._refresh_remote_branch_lists()
+
+    def _get_saved_states(self) -> List[Dict[str, Any]]:
+        """Get list of saved POV states with metadata."""
+        import json
+
+        state_dir = self._get_state_dir()
+        states = []
+
+        for state_file in sorted(state_dir.glob("pov_state_*.json"),
+                                  key=lambda p: p.stat().st_mtime, reverse=True):
+            try:
+                with open(state_file, 'r') as f:
+                    data = json.load(f)
+                # Get display customer name from customer_info (original case/spaces)
+                # Fall back to sanitized 'customer' field if customer_info not available
+                customer_info = data.get('customer_info', {})
+                customer = customer_info.get('customer_name') or data.get('customer', 'Unknown')
+                states.append({
+                    'path': state_file,
+                    'filename': state_file.name,
+                    'customer': customer,
+                    'saved_at': data.get('saved_at', 'Unknown'),
+                    'last_tab': data.get('last_tab', 0),
+                    'management_type': data.get('management_type', 'scm'),
+                })
+            except Exception as e:
+                logger.warning(f"Failed to read state file {state_file}: {e}")
+
+        return states
+
+    def _show_resume_pov_dialog(self):
+        """Show dialog to select and load a saved POV state."""
+        from PyQt6.QtWidgets import QDialog, QTableWidget, QTableWidgetItem, QHeaderView
+
+        states = self._get_saved_states()
+
+        if not states:
+            QMessageBox.information(
+                self,
+                "No Saved States",
+                "No saved POV deployment states found.\n\n"
+                "States are automatically saved when you click 'Next' on each tab."
+            )
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Resume POV Deployment")
+        dialog.setMinimumSize(700, 400)
+
+        layout = QVBoxLayout(dialog)
+
+        info_label = QLabel(
+            "Select a saved POV deployment state to resume. "
+            "States are automatically saved as you progress through the tabs."
+        )
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: #666; margin-bottom: 10px;")
+        layout.addWidget(info_label)
+
+        # Table of saved states
+        table = QTableWidget()
+        table.setColumnCount(5)
+        table.setHorizontalHeaderLabels(["Customer", "Saved At", "Last Tab", "Type", "Filename"])
+        table.setRowCount(len(states))
+        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+
+        tab_names = ["Tenant Info", "Cloud Resources", "Use Cases", "Cloud Deployment", "Deploy Config", "Review"]
+
+        for row, state in enumerate(states):
+            table.setItem(row, 0, QTableWidgetItem(state['customer']))
+
+            # Format saved_at timestamp
+            saved_at = state['saved_at']
+            if 'T' in saved_at:
+                try:
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(saved_at.replace('Z', '+00:00'))
+                    saved_at = dt.strftime("%b %d, %Y %I:%M %p")
+                except:
+                    pass
+            table.setItem(row, 1, QTableWidgetItem(saved_at))
+
+            last_tab = state['last_tab']
+            tab_name = tab_names[last_tab] if last_tab < len(tab_names) else f"Tab {last_tab}"
+            table.setItem(row, 2, QTableWidgetItem(tab_name))
+            table.setItem(row, 3, QTableWidgetItem(state['management_type'].upper()))
+            table.setItem(row, 4, QTableWidgetItem(state['filename']))
+
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(table)
+
+        # Store states for later access
+        dialog.states = states
+
+        # Button row
+        btn_layout = QHBoxLayout()
+
+        delete_btn = QPushButton("🗑️ Delete Selected")
+        delete_btn.setStyleSheet(
+            "QPushButton { background-color: #f44336; color: white; padding: 8px 16px; "
+            "font-weight: bold; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #d32f2f; }"
+        )
+        def delete_selected():
+            selected = table.selectedItems()
+            if not selected:
+                return
+            row = selected[0].row()
+            state_path = dialog.states[row]['path']
+            reply = QMessageBox.question(
+                dialog, "Confirm Delete",
+                f"Delete saved state for '{dialog.states[row]['customer']}'?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                try:
+                    state_path.unlink()
+                    table.removeRow(row)
+                    dialog.states.pop(row)
+                except Exception as e:
+                    QMessageBox.warning(dialog, "Delete Failed", str(e))
+        delete_btn.clicked.connect(delete_selected)
+        btn_layout.addWidget(delete_btn)
+
+        btn_layout.addStretch()
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setStyleSheet(
+            "QPushButton { background-color: #757575; color: white; padding: 8px 16px; "
+            "font-weight: bold; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #616161; }"
+        )
+        cancel_btn.clicked.connect(dialog.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        load_btn = QPushButton("📂 Load & Resume")
+        load_btn.setStyleSheet(
+            "QPushButton { background-color: #4CAF50; color: white; padding: 8px 16px; "
+            "font-weight: bold; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #45a049; }"
+        )
+        def load_selected():
+            selected = table.selectedItems()
+            if not selected:
+                QMessageBox.information(dialog, "No Selection", "Please select a state to load.")
+                return
+            row = selected[0].row()
+            state_path = dialog.states[row]['path']
+            dialog.accept()
+            self.load_state(state_path)
+        load_btn.clicked.connect(load_selected)
+        btn_layout.addWidget(load_btn)
+
+        layout.addLayout(btn_layout)
+        dialog.exec()
+
     def has_unsaved_work(self) -> bool:
         """
         Check if workflow has unsaved work that would be lost on switch.
@@ -4755,17 +5912,42 @@ class POVWorkflowWidget(QWidget):
         if hasattr(self, 'tenant_selector'):
             self.tenant_selector.reset()
 
-        # Reset deployment options
-        if hasattr(self, 'azure_no_radio'):
-            self.azure_no_radio.setChecked(True)
-            self.deploy_sc_firewall_check.setChecked(False)
-            self.deploy_rn_firewall_check.setChecked(False)
-            self.panorama_rn_no_radio.setChecked(True)
-            self.deployed_no_radio.setChecked(True)
-            self.deploy_manual_radio.setChecked(True)
-            self.fw_mgmt_ip_input.clear()
-            self.fw_username_input.clear()
-            self.fw_password_input.clear()
+        # Reset Tenant Info tab options
+        if hasattr(self, 'customer_name_input'):
+            self.customer_name_input.clear()
+        if hasattr(self, 'customer_industry_combo'):
+            self.customer_industry_combo.setCurrentIndex(0)
+        if hasattr(self, 'resources_no_radio'):
+            self.resources_no_radio.setChecked(True)
+        if hasattr(self, 'existing_creds_widget'):
+            self.existing_creds_widget.setVisible(False)
+        if hasattr(self, 'existing_device_type'):
+            self.existing_device_type.setCurrentIndex(0)
+        if hasattr(self, 'existing_creds_fields'):
+            self.existing_creds_fields.setVisible(True)
+        if hasattr(self, 'existing_services_widget'):
+            self.existing_services_widget.setVisible(False)
+        if hasattr(self, 'existing_mgmt_ip_input'):
+            self.existing_mgmt_ip_input.clear()
+        if hasattr(self, 'existing_username_input'):
+            self.existing_username_input.clear()
+        if hasattr(self, 'existing_password_input'):
+            self.existing_password_input.clear()
+        if hasattr(self, 'existing_services_input'):
+            self.existing_services_input.clear()
+        if hasattr(self, 'existing_devices_list'):
+            self.existing_devices_list.clear()
+
+        # Reset Cloud Resources configs
+        self.cloud_resource_configs = {
+            'cloud_deployment': {},
+            'cloud_security': {},
+            'device_config': {},
+            'policy_objects': {},
+            'locations': {'branches': [], 'datacenters': []},
+            'trust_devices': {'devices': []},
+            'customer_info': {},
+        }
 
         # Reset UI elements
         import json

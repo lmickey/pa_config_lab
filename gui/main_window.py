@@ -144,6 +144,13 @@ class PrismaConfigMainWindow(QMainWindow):
         load_config_action.triggered.connect(self._load_configuration_file)
         file_menu.addAction(load_config_action)
 
+        # Resume POV Deployment
+        resume_pov_action = QAction("&Resume POV Deployment...", self)
+        resume_pov_action.setShortcut("Ctrl+R")
+        resume_pov_action.setStatusTip("Resume a saved POV deployment workflow")
+        resume_pov_action.triggered.connect(self._resume_pov_deployment)
+        file_menu.addAction(resume_pov_action)
+
         file_menu.addSeparator()
 
         # Export Configuration (new)
@@ -649,7 +656,31 @@ class PrismaConfigMainWindow(QMainWindow):
                     )
         else:
             logger.detail("[Config] Configuration load cancelled by user")
-    
+
+    def _resume_pov_deployment(self):
+        """Open the Resume POV Deployment dialog."""
+        # Switch to POV Builder workflow if not already active
+        if hasattr(self, 'workflow_selector'):
+            # Find the POV Builder option
+            for i in range(self.workflow_selector.count()):
+                if "POV" in self.workflow_selector.itemText(i):
+                    self.workflow_selector.setCurrentIndex(i)
+                    break
+
+        # Get the current workflow widget
+        current_widget = self.stacked_widget.currentWidget()
+
+        # Check if it has the resume dialog method
+        if hasattr(current_widget, '_show_resume_pov_dialog'):
+            current_widget._show_resume_pov_dialog()
+        else:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.information(
+                self,
+                "POV Builder Required",
+                "Please switch to the POV Builder workflow to resume a POV deployment."
+            )
+
     def _convert_dict_to_configuration(self, config_data: dict, logger=None):
         """
         Convert a configuration dictionary to a Configuration object.
