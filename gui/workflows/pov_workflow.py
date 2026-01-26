@@ -5739,13 +5739,11 @@ class POVWorkflowWidget(QWidget):
             try:
                 import azure.identity
                 import azure.mgmt.subscription
-                self._log_activity(f"[DEBUG] azure-identity version: {azure.identity.__version__}", "debug")
-                self._log_activity(f"[DEBUG] azure-mgmt-subscription version: {azure.mgmt.subscription.VERSION}", "debug")
+                self._log_activity(f"SDK: azure-identity={azure.identity.__version__}, azure-mgmt-subscription={azure.mgmt.subscription.VERSION}")
             except Exception as ver_err:
-                self._log_activity(f"[DEBUG] Could not get SDK versions: {ver_err}", "debug")
+                self._log_activity(f"Could not get SDK versions: {ver_err}", "warning")
 
             self._log_activity("Opening browser for Azure sign-in...")
-            self._log_activity("[DEBUG] Using InteractiveBrowserCredential with redirect_uri=http://localhost:8400", "debug")
 
             # Suppress browser subprocess stderr (Chrome warnings)
             # Save original stderr
@@ -5761,9 +5759,25 @@ class POVWorkflowWidget(QWidget):
 
                 # Trigger authentication (this opens browser)
                 # We call get_token to force the auth flow
-                self._log_activity("[DEBUG] Requesting token for scope: https://management.azure.com/.default", "debug")
+                self._log_activity("Requesting token for Azure Management API...")
                 token = credential.get_token("https://management.azure.com/.default")
-                self._log_activity(f"[DEBUG] Token acquired, expires_on: {token.expires_on}", "debug")
+                self._log_activity(f"Token acquired successfully (expires: {token.expires_on})")
+
+                # Decode token to get tenant info (JWT is base64 encoded)
+                try:
+                    import base64
+                    import json
+                    # JWT format: header.payload.signature
+                    payload = token.token.split('.')[1]
+                    # Add padding if needed
+                    payload += '=' * (4 - len(payload) % 4)
+                    decoded = json.loads(base64.b64decode(payload))
+                    tenant_id = decoded.get('tid', 'unknown')
+                    upn = decoded.get('upn', decoded.get('unique_name', 'unknown'))
+                    self._log_activity(f"Authenticated as: {upn}")
+                    self._log_activity(f"Tenant ID: {tenant_id}")
+                except Exception as decode_err:
+                    self._log_activity(f"Could not decode token details: {decode_err}", "warning")
 
             finally:
                 # Restore stderr
@@ -5773,34 +5787,27 @@ class POVWorkflowWidget(QWidget):
 
             # Test the credential by listing subscriptions
             self._log_activity("Fetching Azure subscriptions...")
-            self._log_activity("[DEBUG] Creating SubscriptionClient...", "debug")
             try:
                 subscription_client = SubscriptionClient(credential)
-                self._log_activity("[DEBUG] SubscriptionClient created, calling subscriptions.list()...", "debug")
-
-                # Try to log API base URL (attribute name varies by SDK version)
-                try:
-                    base_url = getattr(subscription_client._config, 'base_url', None) or \
-                               getattr(subscription_client._config, 'endpoint', None) or \
-                               'https://management.azure.com'
-                    self._log_activity(f"[DEBUG] API base URL: {base_url}", "debug")
-                except Exception:
-                    self._log_activity("[DEBUG] API base URL: https://management.azure.com (default)", "debug")
+                self._log_activity("SubscriptionClient created, listing subscriptions...")
 
                 # Get subscriptions as iterator first to see if there are any issues
                 sub_iterator = subscription_client.subscriptions.list()
-                self._log_activity("[DEBUG] Got subscription iterator, converting to list...", "debug")
+                self._log_activity("Iterating subscription results...")
 
                 subscriptions = []
+                sub_count = 0
                 for sub in sub_iterator:
-                    self._log_activity(f"[DEBUG] Found subscription: {sub.display_name} ({sub.subscription_id}) state={sub.state}", "debug")
+                    sub_count += 1
+                    self._log_activity(f"  Found: {sub.display_name} ({sub.subscription_id}) state={sub.state}")
                     subscriptions.append(sub)
 
+                self._log_activity(f"Subscription iteration complete. Found {sub_count} subscription(s).")
+
             except Exception as sub_error:
-                self._log_activity(f"[DEBUG] Subscription list error type: {type(sub_error).__name__}", "debug")
-                self._log_activity(f"[DEBUG] Subscription list error: {sub_error}", "debug")
+                self._log_activity(f"Subscription list error: {type(sub_error).__name__}: {sub_error}", "error")
                 import traceback
-                self._log_activity(f"[DEBUG] Traceback: {traceback.format_exc()}", "debug")
+                self._log_activity(f"Traceback: {traceback.format_exc()}", "error")
                 raise Exception(
                     f"Failed to list Azure subscriptions: {sub_error}\n\n"
                     "This may be due to:\n"
