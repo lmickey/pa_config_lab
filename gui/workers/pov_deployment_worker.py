@@ -88,7 +88,7 @@ class TerraformWorker(QThread):
 
         try:
             generator = TerraformGenerator(
-                config=self.config,
+                cloud_config=self.config,
                 output_dir=self.output_dir,
             )
 
@@ -131,8 +131,8 @@ class TerraformWorker(QThread):
             self.progress.emit("Terraform initialized", 100)
             self.finished.emit(True, "Terraform initialized successfully", {})
         else:
-            self.error.emit(result.error or "Init failed")
-            self.finished.emit(False, result.error or "Init failed", {})
+            self.error.emit(result.error_message or "Init failed")
+            self.finished.emit(False, result.error_message or "Init failed", {})
 
     def _plan(self):
         """Run terraform plan."""
@@ -151,11 +151,11 @@ class TerraformWorker(QThread):
 
         if result.success:
             self.progress.emit("Plan complete", 100)
-            self.log_message.emit(result.output or "")
+            self.log_message.emit(result.stdout or "")
             self.finished.emit(True, "Plan completed successfully", {})
         else:
-            self.error.emit(result.error or "Plan failed")
-            self.finished.emit(False, result.error or "Plan failed", {})
+            self.error.emit(result.error_message or "Plan failed")
+            self.finished.emit(False, result.error_message or "Plan failed", {})
 
     def _apply(self):
         """Run terraform apply."""
@@ -179,13 +179,13 @@ class TerraformWorker(QThread):
         if result.success:
             self.progress.emit("Getting outputs...", 90)
             output_result = executor.output()
-            outputs = output_result.output if output_result.success else {}
+            outputs = output_result.outputs if output_result.success else {}
 
             self.progress.emit("Deployment complete", 100)
             self.finished.emit(True, "Infrastructure deployed successfully", outputs)
         else:
-            self.error.emit(result.error or "Apply failed")
-            self.finished.emit(False, result.error or "Apply failed", {})
+            self.error.emit(result.error_message or "Apply failed")
+            self.finished.emit(False, result.error_message or "Apply failed", {})
 
     def _destroy(self):
         """Run terraform destroy."""
@@ -203,8 +203,8 @@ class TerraformWorker(QThread):
             self.progress.emit("Infrastructure destroyed", 100)
             self.finished.emit(True, "Infrastructure destroyed successfully", {})
         else:
-            self.error.emit(result.error or "Destroy failed")
-            self.finished.emit(False, result.error or "Destroy failed", {})
+            self.error.emit(result.error_message or "Destroy failed")
+            self.finished.emit(False, result.error_message or "Destroy failed", {})
 
     def _full_deployment(self):
         """Run full Terraform deployment (generate, init, plan, apply)."""
@@ -245,7 +245,7 @@ class TerraformWorker(QThread):
 
         try:
             generator = TerraformGenerator(
-                config=self.config,
+                cloud_config=self.config,
                 output_dir=self.output_dir,
             )
             generator.generate()
@@ -269,8 +269,8 @@ class TerraformWorker(QThread):
         result = executor.init()
 
         if not result.success:
-            self.error.emit(result.error or "Init failed")
-            self.finished.emit(False, result.error or "Init failed", {})
+            self.error.emit(result.error_message or "Init failed")
+            self.finished.emit(False, result.error_message or "Init failed", {})
             return False
 
         return True
@@ -286,8 +286,8 @@ class TerraformWorker(QThread):
         result = executor.plan(var_file=var_file)
 
         if not result.success:
-            self.error.emit(result.error or "Plan failed")
-            self.finished.emit(False, result.error or "Plan failed", {})
+            self.error.emit(result.error_message or "Plan failed")
+            self.finished.emit(False, result.error_message or "Plan failed", {})
             return False
 
         return True
