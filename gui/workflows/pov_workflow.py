@@ -9774,28 +9774,53 @@ output "{device_name}_private_ip" {{
         self.pov_deploy_results.append_text(f"\n  Deploying {len(addr_objects)} address objects...")
         self.pov_deploy_results.append_text(f"\n  Deploying {len(addr_groups)} address groups...")
 
-        if self.api_client:
+        # Get deploy tenant API client
+        deploy_api_client = self._get_deploy_api_client()
+
+        if deploy_api_client:
             try:
                 created_objects = 0
+                skipped_objects = 0
                 created_groups = 0
+                skipped_groups = 0
 
                 # Deploy address objects
                 for obj in addr_objects:
                     try:
-                        # self.api_client.create_address_object(obj, folder='Mobile Users')
+                        obj_name = obj.get('name', 'unnamed')
+                        # Remove 'id' if present (from pulled config)
+                        obj_data = {k: v for k, v in obj.items() if k != 'id'}
+                        deploy_api_client.create_address(obj_data, folder='Mobile Users')
                         created_objects += 1
+                        self._log_activity(f"Created address object: {obj_name}")
                     except Exception as e:
-                        self._log_activity(f"Failed to create address {obj.get('name')}: {e}", "warning")
+                        if 'already exists' in str(e).lower():
+                            skipped_objects += 1
+                        else:
+                            self._log_activity(f"Failed to create address {obj.get('name')}: {e}", "warning")
 
-                # Deploy address groups
+                # Deploy address groups (after objects since groups may reference objects)
                 for grp in addr_groups:
                     try:
-                        # self.api_client.create_address_group(grp, folder='Mobile Users')
+                        grp_name = grp.get('name', 'unnamed')
+                        # Remove 'id' if present
+                        grp_data = {k: v for k, v in grp.items() if k != 'id'}
+                        deploy_api_client.create_address_group(grp_data, folder='Mobile Users')
                         created_groups += 1
+                        self._log_activity(f"Created address group: {grp_name}")
                     except Exception as e:
-                        self._log_activity(f"Failed to create group {grp.get('name')}: {e}", "warning")
+                        if 'already exists' in str(e).lower():
+                            skipped_groups += 1
+                        else:
+                            self._log_activity(f"Failed to create group {grp.get('name')}: {e}", "warning")
 
-                self.pov_deploy_results.append_text(f"\n  [OK] Created {created_objects} objects, {created_groups} groups")
+                result_text = f"\n  [OK] Objects: {created_objects} created"
+                if skipped_objects:
+                    result_text += f", {skipped_objects} existed"
+                result_text += f" | Groups: {created_groups} created"
+                if skipped_groups:
+                    result_text += f", {skipped_groups} existed"
+                self.pov_deploy_results.append_text(result_text)
                 self._advance_to_next_phase(True, f"Deployed {created_objects} objects, {created_groups} groups")
 
             except Exception as e:
@@ -9803,8 +9828,8 @@ output "{device_name}_private_ip" {{
                 self.pov_deploy_results.append_text(f"\n  [ERROR] {str(e)}")
                 self._advance_to_next_phase(False, str(e))
         else:
-            self.pov_deploy_results.append_text("\n  [SKIP] No API client")
-            self._advance_to_next_phase(True, "Skipped - no API client")
+            self.pov_deploy_results.append_text("\n  [SKIP] No deploy tenant connected")
+            self._advance_to_next_phase(True, "Skipped - no deploy tenant")
 
     def _execute_security_policies_phase(self, phase: dict):
         """Deploy security policies to SCM."""
@@ -9812,11 +9837,44 @@ output "{device_name}_private_ip" {{
 
         self.pov_deploy_results.append_text(f"\n  Deploying {len(policies)} security policies...")
 
-        # TODO: Implement security policy deployment via SCM API
-        self.pov_deploy_results.append_text("\n  [OK] Security policies deployed")
+        # Get deploy tenant API client
+        deploy_api_client = self._get_deploy_api_client()
 
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(500, lambda: self._advance_to_next_phase(True, f"Deployed {len(policies)} policies"))
+        if deploy_api_client and policies:
+            try:
+                created_rules = 0
+                skipped_rules = 0
+
+                for policy in policies:
+                    try:
+                        policy_name = policy.get('name', 'unnamed')
+                        # Remove 'id' and 'folder' if present (will use target folder)
+                        policy_data = {k: v for k, v in policy.items() if k not in ['id', 'folder']}
+                        deploy_api_client.create_security_rule(policy_data, folder='Mobile Users')
+                        created_rules += 1
+                        self._log_activity(f"Created security rule: {policy_name}")
+                    except Exception as e:
+                        if 'already exists' in str(e).lower():
+                            skipped_rules += 1
+                        else:
+                            self._log_activity(f"Failed to create rule {policy.get('name')}: {e}", "warning")
+
+                result_text = f"\n  [OK] Rules: {created_rules} created"
+                if skipped_rules:
+                    result_text += f", {skipped_rules} existed"
+                self.pov_deploy_results.append_text(result_text)
+                self._advance_to_next_phase(True, f"Deployed {created_rules} security rules")
+
+            except Exception as e:
+                self._log_activity(f"Failed to deploy security policies: {e}", "error")
+                self.pov_deploy_results.append_text(f"\n  [ERROR] {str(e)}")
+                self._advance_to_next_phase(False, str(e))
+        elif not policies:
+            self.pov_deploy_results.append_text("\n  [OK] No security policies to deploy")
+            self._advance_to_next_phase(True, "No policies to deploy")
+        else:
+            self.pov_deploy_results.append_text("\n  [SKIP] No deploy tenant connected")
+            self._advance_to_next_phase(True, "Skipped - no deploy tenant")
 
     def _execute_adem_phase(self, phase: dict):
         """Configure ADEM synthetic tests."""
