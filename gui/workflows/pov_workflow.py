@@ -9413,29 +9413,156 @@ output "{device_name}_private_ip" {{
             True, f"Firewall IPsec configured for {dc['name']}"
         ))
 
+    def _get_deploy_api_client(self):
+        """Get the API client from the deploy tenant selector (Tab 5)."""
+        if hasattr(self, 'deploy_tenant_selector'):
+            api_client, tenant_name = self.deploy_tenant_selector.get_connection()
+            return api_client
+        return None
+
     def _execute_service_connection_pa_phase(self, phase: dict):
         """Create Service Connection in Prisma Access."""
         dc = phase['datacenter']
+        sc_name = f"SC-{dc['name'].replace(' ', '-')}"
+        tunnel_name = f"{sc_name}-tunnel"
+        ike_gw_name = f"{sc_name}-ike-gw"
+        region = dc.get('region', 'us-east-1')
 
         self.pov_deploy_results.append_text(f"\n  Creating Service Connection in Prisma Access...")
-        self.pov_deploy_results.append_text(f"\n  - Name: SC-{dc['name']}")
-        self.pov_deploy_results.append_text(f"\n  - Region: {dc.get('region', 'us-east-1')}")
+        self.pov_deploy_results.append_text(f"\n  - Name: {sc_name}")
+        self.pov_deploy_results.append_text(f"\n  - Region: {region}")
 
-        if self.api_client:
+        # Get deploy tenant API client (not source tenant)
+        deploy_api_client = self._get_deploy_api_client()
+
+        if deploy_api_client:
             try:
-                # Build service connection configuration
+                # Get subnets from terraform outputs or use trust subnet
+                subnets = dc.get('subnets', [])
+                if not subnets:
+                    # Try to get trust subnet from terraform outputs
+                    tf_outputs = getattr(self, '_terraform_outputs', {})
+                    for key, value in tf_outputs.items():
+                        if 'trust' in key.lower() and 'subnet' in key.lower():
+                            subnets = [value]
+                            break
+                    # Default fallback
+                    if not subnets:
+                        subnets = ['10.100.2.0/24']
+
+                self.pov_deploy_results.append_text(f"\n  - Subnets: {', '.join(subnets)}")
+
+                # Step 1: Create IKE Gateway
+                self.pov_deploy_results.append_text(f"\n  Creating IKE Gateway: {ike_gw_name}...")
+                ike_gateway_config = {
+                    'name': ike_gw_name,
+                    'authentication': {
+                        'pre_shared_key': {
+                            'key': 'PaloAltoPOV123!'  # Default POV PSK
+                        }
+                    },
+                    'peer_address': {
+                        'dynamic': {}  # Dynamic peer for service connections
+                    },
+                    'protocol': {
+                        'ikev2': {
+                            'dpd': {'enable': True}
+                        }
+                    },
+                    'protocol_common': {
+                        'nat_traversal': {'enable': True},
+                        'fragmentation': {'enable': False}
+                    }
+                }
+                try:
+                    deploy_api_client.create_ike_gateway(ike_gateway_config, folder='Service Connections')
+                    self.pov_deploy_results.append_text(" [OK]")
+                except Exception as e:
+                    if 'already exists' in str(e).lower():
+                        self.pov_deploy_results.append_text(" [EXISTS]")
+                    else:
+                        raise
+
+                # Step 2: Create IPsec Tunnel
+                self.pov_deploy_results.append_text(f"\n  Creating IPsec Tunnel: {tunnel_name}...")
+                ipsec_tunnel_config = {
+                    'name': tunnel_name,
+                    'auto_key': {
+                        'ike_gateway': [{'name': ike_gw_name}],
+                        'ipsec_crypto_profile': 'PaloAlto-Networks-IPSec-Crypto'  # Default profile
+                    },
+                    'tunnel_monitor': {'enable': False},
+                    'anti_replay': True
+                }
+                try:
+                    deploy_api_client.create_ipsec_tunnel(ipsec_tunnel_config, folder='Service Connections')
+                    self.pov_deploy_results.append_text(" [OK]")
+                except Exception as e:
+                    if 'already exists' in str(e).lower():
+                        self.pov_deploy_results.append_text(" [EXISTS]")
+                    else:
+                        raise
+
+                # Step 3: Create Service Connection
+                self.pov_deploy_results.append_text(f"\n  Creating Service Connection: {sc_name}...")
                 sc_config = {
-                    'name': f"SC-{dc['name'].replace(' ', '-')}",
-                    'region': dc.get('region', 'us-east-1'),
+                    'name': sc_name,
+                    'region': region,
                     'onboarding_type': 'classic',
-                    'ipsec_tunnel': f"SC-{dc['name'].replace(' ', '-')}-tunnel",
-                    'subnets': dc.get('subnets', []),
+                    'ipsec_tunnel': tunnel_name,
+                    'subnets': subnets,
                 }
 
-                # Note: Actual API call would be:
-                # self.api_client.create_service_connection(sc_config, folder='Service Connections')
+                try:
+                    result = deploy_api_client.create_service_connection(sc_config, folder='Service Connections')
+                    self.pov_deploy_results.append_text(" [OK]")
 
-                self.pov_deploy_results.append_text("\n  [OK] Service Connection created")
+                    # Store service endpoint details for FW side
+                    # The API should return details including service_ip_address
+                    if result and 'details' in result:
+                        endpoint_ip = result['details'].get('service_ip_address')
+                        endpoint_fqdn = result['details'].get('fqdn')
+                        if endpoint_ip:
+                            self.pov_deploy_results.append_text(f"\n  - PA Endpoint IP: {endpoint_ip}")
+                        if endpoint_fqdn:
+                            self.pov_deploy_results.append_text(f"\n  - PA Endpoint FQDN: {endpoint_fqdn}")
+
+                        # Store for FW side phase
+                        if not hasattr(self, '_pa_endpoints'):
+                            self._pa_endpoints = {}
+                        self._pa_endpoints[dc['name']] = {
+                            'service_ip': endpoint_ip,
+                            'fqdn': endpoint_fqdn,
+                            'tunnel_name': tunnel_name,
+                            'ike_gateway': ike_gw_name,
+                        }
+                except Exception as e:
+                    if 'already exists' in str(e).lower():
+                        self.pov_deploy_results.append_text(" [EXISTS]")
+                        # Try to get existing service connection details
+                        try:
+                            existing = deploy_api_client.get_all_service_connections()
+                            for sc in existing:
+                                if sc.get('name') == sc_name:
+                                    details = sc.get('details', {})
+                                    endpoint_ip = details.get('service_ip_address')
+                                    if endpoint_ip:
+                                        self.pov_deploy_results.append_text(f"\n  - PA Endpoint IP: {endpoint_ip}")
+                                        if not hasattr(self, '_pa_endpoints'):
+                                            self._pa_endpoints = {}
+                                        self._pa_endpoints[dc['name']] = {
+                                            'service_ip': endpoint_ip,
+                                            'fqdn': details.get('fqdn'),
+                                            'tunnel_name': tunnel_name,
+                                            'ike_gateway': ike_gw_name,
+                                        }
+                                    break
+                        except Exception:
+                            pass
+                    else:
+                        raise
+
+                self.pov_deploy_results.append_text("\n  [OK] Service Connection configured successfully")
                 self._advance_to_next_phase(True, f"Service Connection created for {dc['name']}")
 
             except Exception as e:
@@ -9443,8 +9570,8 @@ output "{device_name}_private_ip" {{
                 self.pov_deploy_results.append_text(f"\n  [ERROR] {str(e)}")
                 self._advance_to_next_phase(False, str(e))
         else:
-            self.pov_deploy_results.append_text("\n  [SKIP] No API client - skipping PA configuration")
-            self._advance_to_next_phase(True, "Skipped - no API client")
+            self.pov_deploy_results.append_text("\n  [SKIP] No deploy tenant connected - connect on Tab 5 first")
+            self._advance_to_next_phase(False, "No deploy tenant connected")
 
     def _execute_remote_network_fw_phase(self, phase: dict):
         """Configure IPsec tunnel on firewall for remote network."""
@@ -9468,25 +9595,151 @@ output "{device_name}_private_ip" {{
     def _execute_remote_network_pa_phase(self, phase: dict):
         """Create Remote Network in Prisma Access."""
         branch = phase['branch']
+        rn_name = f"RN-{branch['name'].replace(' ', '-')}"
+        tunnel_name = f"{rn_name}-tunnel"
+        ike_gw_name = f"{rn_name}-ike-gw"
+        region = branch.get('region', 'us-east-1')
 
         self.pov_deploy_results.append_text(f"\n  Creating Remote Network in Prisma Access...")
-        self.pov_deploy_results.append_text(f"\n  - Name: RN-{branch['name']}")
-        self.pov_deploy_results.append_text(f"\n  - Region: {branch.get('region', 'us-east-1')}")
+        self.pov_deploy_results.append_text(f"\n  - Name: {rn_name}")
+        self.pov_deploy_results.append_text(f"\n  - Region: {region}")
 
-        if self.api_client:
+        # Get deploy tenant API client (not source tenant)
+        deploy_api_client = self._get_deploy_api_client()
+
+        if deploy_api_client:
             try:
-                # Build remote network configuration
+                # Get subnets from branch config
+                subnets = branch.get('subnets', [])
+                if not subnets:
+                    # Default fallback for branch subnet
+                    subnets = ['10.200.0.0/24']
+
+                self.pov_deploy_results.append_text(f"\n  - Subnets: {', '.join(subnets)}")
+
+                # Step 1: Create IKE Gateway for Remote Network
+                self.pov_deploy_results.append_text(f"\n  Creating IKE Gateway: {ike_gw_name}...")
+                ike_gateway_config = {
+                    'name': ike_gw_name,
+                    'authentication': {
+                        'pre_shared_key': {
+                            'key': 'PaloAltoPOV123!'  # Default POV PSK
+                        }
+                    },
+                    'peer_address': {
+                        'dynamic': {}  # Dynamic peer for remote networks
+                    },
+                    'protocol': {
+                        'ikev2': {
+                            'dpd': {'enable': True}
+                        }
+                    },
+                    'protocol_common': {
+                        'nat_traversal': {'enable': True},
+                        'fragmentation': {'enable': False}
+                    }
+                }
+                try:
+                    deploy_api_client.create_ike_gateway(ike_gateway_config, folder='Remote Networks')
+                    self.pov_deploy_results.append_text(" [OK]")
+                except Exception as e:
+                    if 'already exists' in str(e).lower():
+                        self.pov_deploy_results.append_text(" [EXISTS]")
+                    else:
+                        raise
+
+                # Step 2: Create IPsec Tunnel for Remote Network
+                self.pov_deploy_results.append_text(f"\n  Creating IPsec Tunnel: {tunnel_name}...")
+                ipsec_tunnel_config = {
+                    'name': tunnel_name,
+                    'auto_key': {
+                        'ike_gateway': [{'name': ike_gw_name}],
+                        'ipsec_crypto_profile': 'PaloAlto-Networks-IPSec-Crypto'  # Default profile
+                    },
+                    'tunnel_monitor': {'enable': False},
+                    'anti_replay': True
+                }
+                try:
+                    deploy_api_client.create_ipsec_tunnel(ipsec_tunnel_config, folder='Remote Networks')
+                    self.pov_deploy_results.append_text(" [OK]")
+                except Exception as e:
+                    if 'already exists' in str(e).lower():
+                        self.pov_deploy_results.append_text(" [EXISTS]")
+                    else:
+                        raise
+
+                # Step 3: Create Remote Network
+                self.pov_deploy_results.append_text(f"\n  Creating Remote Network: {rn_name}...")
                 rn_config = {
-                    'name': f"RN-{branch['name'].replace(' ', '-')}",
-                    'region': branch.get('region', 'us-east-1'),
-                    'spn_name': branch.get('spn_name', ''),
-                    'subnets': branch.get('subnets', []),
+                    'name': rn_name,
+                    'region': region,
+                    'license_type': 'FWAAS-AGGREGATE',
+                    'ecmp_load_balancing': 'disable',
+                    'ipsec_tunnel': tunnel_name,
+                    'subnets': subnets,
                 }
 
-                # Note: Actual API call would be:
-                # self.api_client.create_remote_network(rn_config, folder='Remote Networks')
+                # Add BGP configuration if enabled
+                if branch.get('bgp_enabled', False):
+                    peer_as = branch.get('bgp_peer_as', '65000')
+                    rn_config['protocol'] = {
+                        'bgp': {
+                            'enable': True,
+                            'peer_as': str(peer_as),
+                        }
+                    }
 
-                self.pov_deploy_results.append_text("\n  [OK] Remote Network created")
+                try:
+                    result = deploy_api_client.create_remote_network(rn_config, folder='Remote Networks')
+                    self.pov_deploy_results.append_text(" [OK]")
+
+                    # Store service endpoint details for FW side
+                    if result and 'details' in result:
+                        endpoint_ip = result['details'].get('service_ip_address')
+                        endpoint_fqdn = result['details'].get('fqdn')
+                        if endpoint_ip:
+                            self.pov_deploy_results.append_text(f"\n  - PA Endpoint IP: {endpoint_ip}")
+                        if endpoint_fqdn:
+                            self.pov_deploy_results.append_text(f"\n  - PA Endpoint FQDN: {endpoint_fqdn}")
+
+                        # Store for FW side phase
+                        if not hasattr(self, '_pa_endpoints'):
+                            self._pa_endpoints = {}
+                        self._pa_endpoints[branch['name']] = {
+                            'service_ip': endpoint_ip,
+                            'fqdn': endpoint_fqdn,
+                            'tunnel_name': tunnel_name,
+                            'ike_gateway': ike_gw_name,
+                            'type': 'remote_network',
+                        }
+                except Exception as e:
+                    if 'already exists' in str(e).lower():
+                        self.pov_deploy_results.append_text(" [EXISTS]")
+                        # Try to get existing remote network details
+                        try:
+                            existing = deploy_api_client.get_all_remote_networks()
+                            for rn in existing:
+                                if rn.get('name') == rn_name:
+                                    details = rn.get('details', {})
+                                    endpoint_ip = details.get('service_ip_address')
+                                    if endpoint_ip:
+                                        self.pov_deploy_results.append_text(f"\n  - PA Endpoint IP: {endpoint_ip}")
+                                        if not hasattr(self, '_pa_endpoints'):
+                                            self._pa_endpoints = {}
+                                        self._pa_endpoints[branch['name']] = {
+                                            'service_ip': endpoint_ip,
+                                            'fqdn': details.get('fqdn'),
+                                            'tunnel_name': tunnel_name,
+                                            'ike_gateway': ike_gw_name,
+                                            'type': 'remote_network',
+                                        }
+                                    break
+                        except Exception:
+                            pass
+                    else:
+                        raise
+
+                self.pov_deploy_results.append_text("\n  [OK] Remote Network configured successfully")
                 self._advance_to_next_phase(True, f"Remote Network created for {branch['name']}")
 
             except Exception as e:
@@ -9494,8 +9747,8 @@ output "{device_name}_private_ip" {{
                 self.pov_deploy_results.append_text(f"\n  [ERROR] {str(e)}")
                 self._advance_to_next_phase(False, str(e))
         else:
-            self.pov_deploy_results.append_text("\n  [SKIP] No API client - skipping PA configuration")
-            self._advance_to_next_phase(True, "Skipped - no API client")
+            self.pov_deploy_results.append_text("\n  [SKIP] No deploy tenant connected - connect on Tab 5 first")
+            self._advance_to_next_phase(False, "No deploy tenant connected")
 
     def _execute_mobile_users_phase(self, phase: dict):
         """Configure Mobile Users settings."""
