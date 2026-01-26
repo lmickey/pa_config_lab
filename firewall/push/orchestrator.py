@@ -120,6 +120,8 @@ class FirewallPushOrchestrator:
         self,
         wait_timeout: int = 600,
         commit_timeout: int = 300,
+        max_retries: int = 0,
+        retry_interval: int = 30,
         progress_callback: Callable[[PushPhase, str], None] = None,
     ) -> PushResult:
         """
@@ -128,11 +130,15 @@ class FirewallPushOrchestrator:
         Args:
             wait_timeout: Timeout for waiting for firewall to be ready
             commit_timeout: Timeout for commit operation
+            max_retries: Maximum connection retry attempts (0 = no limit)
+            retry_interval: Seconds between retry attempts
             progress_callback: Optional callback for progress updates
 
         Returns:
             PushResult with operation status
         """
+        self._max_retries = max_retries
+        self._retry_interval = retry_interval
         self._progress_callback = progress_callback
         self._result = PushResult(
             status=PushStatus.IN_PROGRESS,
@@ -226,6 +232,8 @@ class FirewallPushOrchestrator:
             username=self.credentials.get('username', 'admin'),
             password=self.credentials.get('password'),
             timeout=timeout,
+            interval=getattr(self, '_retry_interval', 30),
+            max_retries=getattr(self, '_max_retries', 0),
         )
         return self._client is not None
 

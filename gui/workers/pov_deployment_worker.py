@@ -445,6 +445,13 @@ class DeviceConfigWorker(QThread):
         self.license_auth_code = license_auth_code
         self._cancelled = False
 
+        # Load infrastructure settings
+        from PyQt6.QtCore import QSettings
+        settings = QSettings("PrismaAccess", "ConfigManager")
+        self.device_retries = settings.value("infrastructure/device_retries", 3, type=int)
+        self.device_retry_interval = settings.value("infrastructure/device_retry_interval", 30, type=int)
+        self.device_timeout = settings.value("infrastructure/device_timeout", 600, type=int)
+
     def cancel(self):
         """Cancel the operation."""
         self._cancelled = True
@@ -485,8 +492,15 @@ class DeviceConfigWorker(QThread):
             credentials=self.credentials,
         )
 
+        self.log_message.emit(f"[firewall] Waiting for firewall to be accessible")
+        self.log_message.emit(f"[firewall] Retries: {self.device_retries}, Interval: {self.device_retry_interval}s, Timeout: {self.device_timeout}s")
         self.progress.emit("Pushing configuration...", 30)
-        result = orchestrator.push(progress_callback=progress_callback)
+        result = orchestrator.push(
+            wait_timeout=self.device_timeout,
+            max_retries=self.device_retries,
+            retry_interval=self.device_retry_interval,
+            progress_callback=progress_callback,
+        )
 
         if self._cancelled:
             self.finished.emit(False, "Operation cancelled", {})

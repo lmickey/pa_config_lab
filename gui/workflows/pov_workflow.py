@@ -8636,38 +8636,73 @@ output "{device_name}_private_ip" {{
 
             # Helper function to find firewall IP in outputs
             def find_firewall_ip(outputs: dict) -> Optional[str]:
-                """Search terraform outputs for a firewall management IP."""
-                # Priority order of key patterns to check
+                """Search terraform outputs for a firewall PUBLIC management IP.
+
+                Prioritizes public IPs over private IPs since we need to connect
+                from outside Azure.
+                """
+                # First pass: Look for PUBLIC IP keys (preferred)
+                for key, value in outputs.items():
+                    if not value:
+                        continue
+                    key_lower = key.lower()
+                    # Skip private IPs - we need public for external access
+                    if 'private' in key_lower:
+                        continue
+                    # Look for firewall public IP
+                    if ('firewall' in key_lower or 'fw' in key_lower) and 'public' in key_lower:
+                        self._log_activity(f"Found public IP key: {key} = {value}")
+                        return value
+
+                # Second pass: Look for any public IP
+                for key, value in outputs.items():
+                    if not value:
+                        continue
+                    key_lower = key.lower()
+                    if 'private' in key_lower:
+                        continue
+                    if 'public_ip' in key_lower or 'public_address' in key_lower:
+                        self._log_activity(f"Found public IP key: {key} = {value}")
+                        return value
+
+                # Third pass: Generic management IP patterns (but not private)
                 ip_patterns = [
                     'firewall_management_ip',
                     'fw_management_ip',
                     'management_ip',
                     'firewall_ip',
                     'fw_ip',
-                    'public_ip',
                 ]
-
-                # First try exact matches
                 for pattern in ip_patterns:
                     if pattern in outputs and outputs[pattern]:
-                        return outputs[pattern]
+                        # Check it's not a private IP pattern
+                        if 'private' not in pattern.lower():
+                            return outputs[pattern]
 
-                # Then try partial matches
+                # Last resort: Any firewall IP that's not explicitly private
                 for key, value in outputs.items():
                     if not value:
                         continue
                     key_lower = key.lower()
-                    # Look for firewall-related IP keys
+                    if 'private' in key_lower:
+                        continue
                     if ('firewall' in key_lower or 'fw' in key_lower) and \
                        ('ip' in key_lower or 'address' in key_lower):
                         return value
-                    # Look for management IP keys
-                    if 'management' in key_lower and 'ip' in key_lower:
-                        return value
-                    if 'mgmt' in key_lower and 'ip' in key_lower:
-                        return value
 
                 return None
+
+            # Get customer name for admin username (format: {customer}admin)
+            customer_info = self.cloud_resource_configs.get('customer_info', {})
+            customer_name_sanitized = customer_info.get(
+                'customer_name_sanitized',
+                self._sanitize_customer_name(customer_info.get('customer_name', 'pov'))
+            )
+            # Build admin username: {customer}admin (e.g., "acmeadmin")
+            admin_username = f"{customer_name_sanitized}admin"
+            admin_password = 'PaloAlto123!'  # Default POV password
+
+            self._log_activity(f"Using firewall credentials: {admin_username}")
 
             # Map firewalls from deployment config to Terraform outputs
             deployment_firewalls = deployment_config.get('firewalls', [])
@@ -8682,8 +8717,8 @@ output "{device_name}_private_ip" {{
                             'name': fw_name,
                             'ip': fw_ip,
                             'credentials': {
-                                'username': 'admin',
-                                'password': 'PaloAlto123!',  # Default POV password
+                                'username': admin_username,
+                                'password': admin_password,
                             },
                             'type': fw.get('type', 'service_connection'),
                             'location': fw.get('location', ''),
@@ -8694,16 +8729,12 @@ output "{device_name}_private_ip" {{
                 # Try to use any firewall IP found in terraform outputs
                 fw_ip = find_firewall_ip(tf_outputs)
                 if fw_ip:
-                    customer_name = self.cloud_resource_configs.get('customer_info', {}).get(
-                        'customer_name_sanitized',
-                        self.cloud_resource_configs.get('customer_info', {}).get('customer_name', 'pov')
-                    )
                     firewalls_to_configure.append({
-                        'name': f"fw-{customer_name}",
+                        'name': f"fw-{customer_name_sanitized}",
                         'ip': fw_ip,
                         'credentials': {
-                            'username': 'admin',
-                            'password': 'PaloAlto123!',
+                            'username': admin_username,
+                            'password': admin_password,
                         },
                         'type': 'service_connection',
                         'location': 'datacenter',

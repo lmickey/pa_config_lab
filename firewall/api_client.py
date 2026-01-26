@@ -703,6 +703,7 @@ def wait_for_firewall(
     password: str = None,
     timeout: int = 600,
     interval: int = 30,
+    max_retries: int = 0,
 ) -> Optional[FirewallAPIClient]:
     """
     Wait for a firewall to become accessible.
@@ -715,21 +716,34 @@ def wait_for_firewall(
         password: Admin password
         timeout: Maximum wait time in seconds
         interval: Check interval in seconds
+        max_retries: Maximum number of connection attempts (0 = no limit, use timeout only)
 
     Returns:
-        FirewallAPIClient if successful, None if timeout
+        FirewallAPIClient if successful, None if timeout or max retries exceeded
     """
-    logger.info(f"Waiting for firewall {hostname} to be accessible (timeout: {timeout}s)")
+    if max_retries > 0:
+        logger.info(f"Waiting for firewall {hostname} to be accessible (max {max_retries} retries, interval {interval}s)")
+    else:
+        logger.info(f"Waiting for firewall {hostname} to be accessible (timeout: {timeout}s)")
+
     start_time = time.time()
+    attempt = 0
 
     while time.time() - start_time < timeout:
+        attempt += 1
         try:
             client = FirewallAPIClient(hostname, username, password)
             client.connect()
-            logger.info(f"Firewall {hostname} is accessible")
+            logger.info(f"Firewall {hostname} is accessible (attempt {attempt})")
             return client
         except FirewallConnectionError as e:
             logger.debug(f"Firewall not accessible yet: {e}")
+
+            # Check if max retries exceeded
+            if max_retries > 0 and attempt >= max_retries:
+                logger.warning(f"Firewall {hostname} not accessible after {max_retries} retries")
+                return None
+
             time.sleep(interval)
 
     logger.warning(f"Firewall {hostname} not accessible after {timeout}s")

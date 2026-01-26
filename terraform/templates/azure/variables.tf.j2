@@ -80,9 +80,9 @@ variable "tags" {
 
 {% if has_firewalls %}
 variable "firewall_username" {
-  description = "Admin username for firewalls"
+  description = "Admin username for firewalls (format: {customer}admin)"
   type        = string
-  default     = "admin"
+  default     = "{{ deployment.customer_name }}admin"
   sensitive   = true
 }
 

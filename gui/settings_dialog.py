@@ -60,6 +60,9 @@ class SettingsDialog(QDialog):
         # API tab
         tabs.addTab(self._create_api_tab(), "API")
 
+        # Infrastructure tab
+        tabs.addTab(self._create_infrastructure_tab(), "Infrastructure")
+
         # Encryption tab
         tabs.addTab(self._create_encryption_tab(), "Encryption")
 
@@ -163,6 +166,72 @@ class SettingsDialog(QDialog):
 
         cache_group.setLayout(cache_layout)
         layout.addWidget(cache_group)
+
+        layout.addStretch()
+        return widget
+
+    def _create_infrastructure_tab(self) -> QWidget:
+        """Create infrastructure settings tab."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+
+        # Device Management
+        device_group = QGroupBox("Device Management")
+        device_layout = QFormLayout()
+
+        self.device_retries_spin = QSpinBox()
+        self.device_retries_spin.setRange(1, 20)
+        self.device_retries_spin.setValue(3)
+        self.device_retries_spin.setSuffix(" retries")
+        self.device_retries_spin.setToolTip(
+            "Number of connection attempts before failing when connecting to firewalls/Panorama"
+        )
+        device_layout.addRow("Connection Retries:", self.device_retries_spin)
+
+        self.device_retry_interval_spin = QSpinBox()
+        self.device_retry_interval_spin.setRange(5, 120)
+        self.device_retry_interval_spin.setValue(30)
+        self.device_retry_interval_spin.setSuffix(" seconds")
+        self.device_retry_interval_spin.setToolTip(
+            "Time to wait between connection retry attempts"
+        )
+        device_layout.addRow("Retry Interval:", self.device_retry_interval_spin)
+
+        self.device_timeout_spin = QSpinBox()
+        self.device_timeout_spin.setRange(60, 1800)
+        self.device_timeout_spin.setValue(600)
+        self.device_timeout_spin.setSuffix(" seconds")
+        self.device_timeout_spin.setToolTip(
+            "Maximum total time to wait for device to become accessible"
+        )
+        device_layout.addRow("Total Timeout:", self.device_timeout_spin)
+
+        device_group.setLayout(device_layout)
+        layout.addWidget(device_group)
+
+        # Terraform
+        tf_group = QGroupBox("Terraform")
+        tf_layout = QFormLayout()
+
+        self.tf_auto_approve_check = QCheckBox("Auto-approve Terraform apply")
+        self.tf_auto_approve_check.setChecked(True)
+        self.tf_auto_approve_check.setToolTip(
+            "Automatically approve Terraform changes without manual confirmation"
+        )
+        tf_layout.addRow("", self.tf_auto_approve_check)
+
+        tf_group.setLayout(tf_layout)
+        layout.addWidget(tf_group)
+
+        # Info
+        info_label = QLabel(
+            "<i>Note: Device management settings apply to firewall and Panorama "
+            "connections during POV deployment. Increase retries if devices take "
+            "longer to boot in your cloud environment.</i>"
+        )
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: #666; margin-top: 10px;")
+        layout.addWidget(info_label)
 
         layout.addStretch()
         return widget
@@ -325,6 +394,20 @@ class SettingsDialog(QDialog):
             self.settings.value("api/cache_ttl", 300, type=int)
         )
 
+        # Infrastructure
+        self.device_retries_spin.setValue(
+            self.settings.value("infrastructure/device_retries", 3, type=int)
+        )
+        self.device_retry_interval_spin.setValue(
+            self.settings.value("infrastructure/device_retry_interval", 30, type=int)
+        )
+        self.device_timeout_spin.setValue(
+            self.settings.value("infrastructure/device_timeout", 600, type=int)
+        )
+        self.tf_auto_approve_check.setChecked(
+            self.settings.value("infrastructure/tf_auto_approve", True, type=bool)
+        )
+
         # Encryption
         self.min_length_spin.setValue(
             self.settings.value("encryption/min_length", 8, type=int)
@@ -387,6 +470,12 @@ class SettingsDialog(QDialog):
         self.settings.setValue("api/timeout", self.timeout_spin.value())
         self.settings.setValue("api/rate_limit", self.rate_limit_spin.value())
         self.settings.setValue("api/cache_ttl", self.cache_ttl_spin.value())
+
+        # Infrastructure
+        self.settings.setValue("infrastructure/device_retries", self.device_retries_spin.value())
+        self.settings.setValue("infrastructure/device_retry_interval", self.device_retry_interval_spin.value())
+        self.settings.setValue("infrastructure/device_timeout", self.device_timeout_spin.value())
+        self.settings.setValue("infrastructure/tf_auto_approve", self.tf_auto_approve_check.isChecked())
 
         # Encryption
         self.settings.setValue("encryption/min_length", self.min_length_spin.value())
