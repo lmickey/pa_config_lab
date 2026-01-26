@@ -5665,12 +5665,18 @@ class POVWorkflowWidget(QWidget):
             logger.error(message)
         elif level == "warning":
             logger.warning(message)
+        elif level == "debug":
+            logger.debug(message)
         else:
             logger.info(message)
 
         # Log to results panels if available
         if hasattr(self, 'cloud_deploy_results'):
-            self.cloud_deploy_results.append_text(f"[{level.upper()}] {message}\n")
+            # Show debug messages with a distinct format
+            if level == "debug":
+                self.cloud_deploy_results.append_text(f"  {message}\n")
+            else:
+                self.cloud_deploy_results.append_text(f"[{level.upper()}] {message}\n")
 
     def _update_all_status_indicators(self):
         """Update all status indicators based on current configurations."""
@@ -5729,7 +5735,17 @@ class POVWorkflowWidget(QWidget):
             from azure.identity import InteractiveBrowserCredential
             from azure.mgmt.subscription import SubscriptionClient
 
+            # Log SDK versions for debugging
+            try:
+                import azure.identity
+                import azure.mgmt.subscription
+                self._log_activity(f"[DEBUG] azure-identity version: {azure.identity.__version__}", "debug")
+                self._log_activity(f"[DEBUG] azure-mgmt-subscription version: {azure.mgmt.subscription.VERSION}", "debug")
+            except Exception as ver_err:
+                self._log_activity(f"[DEBUG] Could not get SDK versions: {ver_err}", "debug")
+
             self._log_activity("Opening browser for Azure sign-in...")
+            self._log_activity("[DEBUG] Using InteractiveBrowserCredential with redirect_uri=http://localhost:8400", "debug")
 
             # Suppress browser subprocess stderr (Chrome warnings)
             # Save original stderr
@@ -5745,7 +5761,9 @@ class POVWorkflowWidget(QWidget):
 
                 # Trigger authentication (this opens browser)
                 # We call get_token to force the auth flow
-                credential.get_token("https://management.azure.com/.default")
+                self._log_activity("[DEBUG] Requesting token for scope: https://management.azure.com/.default", "debug")
+                token = credential.get_token("https://management.azure.com/.default")
+                self._log_activity(f"[DEBUG] Token acquired, expires_on: {token.expires_on}", "debug")
 
             finally:
                 # Restore stderr
@@ -5755,11 +5773,26 @@ class POVWorkflowWidget(QWidget):
 
             # Test the credential by listing subscriptions
             self._log_activity("Fetching Azure subscriptions...")
+            self._log_activity("[DEBUG] Creating SubscriptionClient...", "debug")
             try:
                 subscription_client = SubscriptionClient(credential)
-                subscriptions = list(subscription_client.subscriptions.list())
+                self._log_activity("[DEBUG] SubscriptionClient created, calling subscriptions.list()...", "debug")
+                self._log_activity(f"[DEBUG] API base URL: {subscription_client._config.base_url}", "debug")
+
+                # Get subscriptions as iterator first to see if there are any issues
+                sub_iterator = subscription_client.subscriptions.list()
+                self._log_activity("[DEBUG] Got subscription iterator, converting to list...", "debug")
+
+                subscriptions = []
+                for sub in sub_iterator:
+                    self._log_activity(f"[DEBUG] Found subscription: {sub.display_name} ({sub.subscription_id}) state={sub.state}", "debug")
+                    subscriptions.append(sub)
+
             except Exception as sub_error:
-                self._log_activity(f"Failed to list subscriptions: {sub_error}", "error")
+                self._log_activity(f"[DEBUG] Subscription list error type: {type(sub_error).__name__}", "debug")
+                self._log_activity(f"[DEBUG] Subscription list error: {sub_error}", "debug")
+                import traceback
+                self._log_activity(f"[DEBUG] Traceback: {traceback.format_exc()}", "debug")
                 raise Exception(
                     f"Failed to list Azure subscriptions: {sub_error}\n\n"
                     "This may be due to:\n"
@@ -5767,6 +5800,8 @@ class POVWorkflowWidget(QWidget):
                     "- Azure AD permissions issue\n"
                     "- Network/firewall blocking Azure management API"
                 )
+
+            self._log_activity(f"[DEBUG] Total subscriptions found: {len(subscriptions)}", "debug")
 
             if not subscriptions:
                 raise Exception(
