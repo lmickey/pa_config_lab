@@ -8585,6 +8585,14 @@ output "{device_name}_private_ip" {{
         existing_devices = self.cloud_resource_configs.get('existing_devices', [])
         has_existing = len(existing_devices) > 0
 
+        # If no terraform outputs in memory, try to read from terraform.tfstate file
+        if not has_terraform and hasattr(self, '_terraform_output_dir') and self._terraform_output_dir:
+            self._log_activity("No terraform outputs in memory, checking state file...")
+            self._terraform_outputs = self._read_terraform_outputs_from_state()
+            has_terraform = bool(self._terraform_outputs)
+            if has_terraform:
+                self._log_activity(f"Loaded {len(self._terraform_outputs)} outputs from terraform.tfstate")
+
         if not has_terraform and not has_existing:
             self._log_activity("No deployed infrastructure found", "warning")
             QMessageBox.warning(
