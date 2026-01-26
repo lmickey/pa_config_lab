@@ -6136,17 +6136,26 @@ class POVWorkflowWidget(QWidget):
                 logger.debug(f"Already connected to deploy tenant: {saved_tenant}")
                 return
 
-            # Pre-select the saved tenant in the dropdown and trigger connection
-            logger.info(f"Auto-connecting to saved deploy tenant: {saved_tenant}")
+            # Check if tenant exists in the dropdown
             combo = self.deploy_tenant_selector.tenant_combo
+            tenant_found = False
             for i in range(combo.count()):
                 if combo.itemText(i) == saved_tenant:
-                    # This will trigger _on_tenant_selected which connects
+                    tenant_found = True
+                    # Ensure correct index is selected (without triggering signal)
+                    combo.blockSignals(True)
                     combo.setCurrentIndex(i)
-                    return
+                    combo.blockSignals(False)
+                    break
 
-            # If tenant not found in combo, log warning
-            logger.warning(f"Saved deploy tenant '{saved_tenant}' not found in tenant list")
+            if not tenant_found:
+                logger.warning(f"Saved deploy tenant '{saved_tenant}' not found in tenant list")
+                return
+
+            # Directly call the connection method on the TenantSelector
+            # This bypasses the combo signal issue when index is already set
+            logger.info(f"Auto-connecting to saved deploy tenant: {saved_tenant}")
+            self.deploy_tenant_selector._connect_to_saved_tenant(saved_tenant)
 
     # ============================================================================
     # EVENT HANDLERS - CLOUD DEPLOYMENT TAB (Tab 4)
@@ -9396,22 +9405,89 @@ output "{device_name}_private_ip" {{
         """Configure IPsec tunnel on firewall for service connection."""
         fw = phase['firewall']
         dc = phase['datacenter']
+        dc_name = dc['name']
+        fw_name = fw['name']
 
-        self.pov_deploy_results.append_text(f"\n  Configuring IPsec on {fw['name']} for {dc['name']}...")
-        self.pov_deploy_results.append_text("\n  - IKE Gateway configuration")
-        self.pov_deploy_results.append_text("\n  - IPsec Tunnel configuration")
-        self.pov_deploy_results.append_text("\n  - Tunnel interface")
-        self.pov_deploy_results.append_text("\n  - Static routes to Prisma Access")
+        self.pov_deploy_results.append_text(f"\n  Configuring IPsec on {fw_name} for {dc_name}...")
 
-        # TODO: Implement actual firewall IPsec configuration via XML API
-        # For now, log what would be configured and advance
-        self._log_activity(f"Service Connection FW config for {dc['name']} - placeholder")
+        # Get PA endpoint details from PA side phase
+        pa_endpoints = getattr(self, '_pa_endpoints', {})
+        pa_info = pa_endpoints.get(dc_name, {})
+        pa_endpoint_ip = pa_info.get('service_ip')
 
-        # Simulate completion after brief delay
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(1000, lambda: self._advance_to_next_phase(
-            True, f"Firewall IPsec configured for {dc['name']}"
-        ))
+        if not pa_endpoint_ip:
+            self.pov_deploy_results.append_text("\n  [SKIP] No PA endpoint IP available yet")
+            self.pov_deploy_results.append_text("\n  Note: PA side must complete first to provide endpoint IPs")
+            self._advance_to_next_phase(True, f"Skipped - waiting for PA endpoint")
+            return
+
+        self.pov_deploy_results.append_text(f"\n  - PA Endpoint: {pa_endpoint_ip}")
+
+        # Get firewall connection info
+        fw_ip = fw.get('management_ip')
+        if not fw_ip:
+            self.pov_deploy_results.append_text("\n  [ERROR] No firewall management IP")
+            self._advance_to_next_phase(False, "No firewall management IP")
+            return
+
+        # Get credentials
+        cloud_deployment = self.cloud_resource_configs.get('cloud_deployment', {})
+        customer_info = self.cloud_resource_configs.get('customer_info', {})
+        customer_name = customer_info.get('customer_name_sanitized', 'pov')
+        admin_username = cloud_deployment.get('admin_username', f'{customer_name}admin')
+        admin_password = cloud_deployment.get('admin_password', '')
+
+        try:
+            from firewall.api_client import FirewallAPIClient
+
+            self.pov_deploy_results.append_text(f"\n  Connecting to firewall at {fw_ip}...")
+            client = FirewallAPIClient(
+                hostname=fw_ip,
+                username=admin_username,
+                password=admin_password,
+            )
+            client.connect()
+
+            # Configure IPsec tunnel to Prisma Access
+            tunnel_name = f"SC-{dc_name.replace(' ', '-')}"
+            self.pov_deploy_results.append_text(f"\n  Creating IPsec tunnel: {tunnel_name}")
+
+            result = client.configure_ipsec_to_prisma_access(
+                name=tunnel_name,
+                pa_endpoint_ip=pa_endpoint_ip,
+                pre_shared_key='PaloAltoPOV123!',  # Same PSK as PA side
+                local_interface='ethernet1/1',  # Untrust interface
+                tunnel_number=1,
+                trust_zone='trust',
+            )
+
+            self.pov_deploy_results.append_text(f"\n  - IKE Crypto: {result['ike_crypto_profile']}")
+            self.pov_deploy_results.append_text(f"\n  - IPsec Crypto: {result['ipsec_crypto_profile']}")
+            self.pov_deploy_results.append_text(f"\n  - Tunnel: {result['tunnel_interface']}")
+            self.pov_deploy_results.append_text(f"\n  - IKE GW: {result['ike_gateway']}")
+            self.pov_deploy_results.append_text(f"\n  - IPsec: {result['ipsec_tunnel']}")
+
+            # Commit the configuration
+            self.pov_deploy_results.append_text("\n  Committing configuration...")
+            commit_result = client.commit(
+                description=f"IPsec tunnel for Service Connection {dc_name}",
+                sync=True,
+                timeout=300,
+            )
+
+            client.disconnect()
+
+            if commit_result.success:
+                self.pov_deploy_results.append_text("\n  [OK] IPsec tunnel configured")
+                self._advance_to_next_phase(True, f"Firewall IPsec configured for {dc_name}")
+            else:
+                self.pov_deploy_results.append_text(f"\n  [ERROR] Commit: {commit_result.message}")
+                self._advance_to_next_phase(False, f"Commit failed: {commit_result.message}")
+
+        except Exception as e:
+            self._log_activity(f"Failed to configure firewall IPsec: {e}", "error")
+            self.pov_deploy_results.append_text(f"\n  [ERROR] {str(e)}")
+            self._advance_to_next_phase(False, str(e))
 
     def _get_deploy_api_client(self):
         """Get the API client from the deploy tenant selector (Tab 5)."""
@@ -9437,18 +9513,35 @@ output "{device_name}_private_ip" {{
 
         if deploy_api_client:
             try:
-                # Get subnets from terraform outputs or use trust subnet
+                # Get subnets from datacenter config or use default trust subnet CIDR
                 subnets = dc.get('subnets', [])
                 if not subnets:
-                    # Try to get trust subnet from terraform outputs
+                    # Try to get trust subnet prefix from terraform outputs
+                    # Note: trust_subnet_id is the Azure resource ID, not the CIDR
+                    # We need a CIDR like 10.100.2.0/24, not /subscriptions/.../subnets/trust
                     tf_outputs = getattr(self, '_terraform_outputs', {})
                     for key, value in tf_outputs.items():
-                        if 'trust' in key.lower() and 'subnet' in key.lower():
-                            subnets = [value]
-                            break
-                    # Default fallback
+                        # Look specifically for prefix/cidr outputs, not IDs
+                        if ('trust' in key.lower() and 'prefix' in key.lower()) or \
+                           ('trust' in key.lower() and 'cidr' in key.lower()):
+                            if value and '/' in str(value) and not value.startswith('/subscriptions'):
+                                subnets = [value]
+                                break
+                    # Default fallback - use standard POV trust subnet CIDR
                     if not subnets:
                         subnets = ['10.100.2.0/24']
+
+                # Validate subnets are CIDR format, not Azure resource IDs
+                valid_subnets = []
+                for subnet in subnets:
+                    if subnet and '/' in subnet and not subnet.startswith('/subscriptions'):
+                        valid_subnets.append(subnet)
+                    else:
+                        logger.warning(f"Invalid subnet format (Azure resource ID?): {subnet}")
+
+                if not valid_subnets:
+                    valid_subnets = ['10.100.2.0/24']  # Fallback to default
+                subnets = valid_subnets
 
                 self.pov_deploy_results.append_text(f"\n  - Subnets: {', '.join(subnets)}")
 
@@ -9577,20 +9670,92 @@ output "{device_name}_private_ip" {{
         """Configure IPsec tunnel on firewall for remote network."""
         fw = phase['firewall']
         branch = phase['branch']
+        branch_name = branch['name']
+        fw_name = fw['name']
 
-        self.pov_deploy_results.append_text(f"\n  Configuring IPsec on {fw['name']} for {branch['name']}...")
-        self.pov_deploy_results.append_text("\n  - IKE Gateway configuration")
-        self.pov_deploy_results.append_text("\n  - IPsec Tunnel configuration")
-        self.pov_deploy_results.append_text("\n  - Tunnel interface")
-        self.pov_deploy_results.append_text("\n  - BGP/Static routes")
+        self.pov_deploy_results.append_text(f"\n  Configuring IPsec on {fw_name} for {branch_name}...")
 
-        # TODO: Implement actual firewall IPsec configuration via XML API
-        self._log_activity(f"Remote Network FW config for {branch['name']} - placeholder")
+        # Get PA endpoint details from PA side phase
+        pa_endpoints = getattr(self, '_pa_endpoints', {})
+        pa_info = pa_endpoints.get(branch_name, {})
+        pa_endpoint_ip = pa_info.get('service_ip')
 
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(1000, lambda: self._advance_to_next_phase(
-            True, f"Firewall IPsec configured for {branch['name']}"
-        ))
+        if not pa_endpoint_ip:
+            self.pov_deploy_results.append_text("\n  [SKIP] No PA endpoint IP available yet")
+            self.pov_deploy_results.append_text("\n  Note: PA side must complete first to provide endpoint IPs")
+            self._advance_to_next_phase(True, f"Skipped - waiting for PA endpoint")
+            return
+
+        self.pov_deploy_results.append_text(f"\n  - PA Endpoint: {pa_endpoint_ip}")
+
+        # Get firewall connection info
+        fw_ip = fw.get('management_ip')
+        if not fw_ip:
+            self.pov_deploy_results.append_text("\n  [ERROR] No firewall management IP")
+            self._advance_to_next_phase(False, "No firewall management IP")
+            return
+
+        # Get credentials
+        cloud_deployment = self.cloud_resource_configs.get('cloud_deployment', {})
+        customer_info = self.cloud_resource_configs.get('customer_info', {})
+        customer_name = customer_info.get('customer_name_sanitized', 'pov')
+        admin_username = cloud_deployment.get('admin_username', f'{customer_name}admin')
+        admin_password = cloud_deployment.get('admin_password', '')
+
+        try:
+            from firewall.api_client import FirewallAPIClient
+
+            self.pov_deploy_results.append_text(f"\n  Connecting to firewall at {fw_ip}...")
+            client = FirewallAPIClient(
+                hostname=fw_ip,
+                username=admin_username,
+                password=admin_password,
+            )
+            client.connect()
+
+            # Configure IPsec tunnel to Prisma Access for Remote Network
+            tunnel_name = f"RN-{branch_name.replace(' ', '-')}"
+            # Use different tunnel number than Service Connection
+            tunnel_number = 2 + len([k for k in pa_endpoints.keys() if pa_endpoints[k].get('type') == 'remote_network'])
+
+            self.pov_deploy_results.append_text(f"\n  Creating IPsec tunnel: {tunnel_name}")
+
+            result = client.configure_ipsec_to_prisma_access(
+                name=tunnel_name,
+                pa_endpoint_ip=pa_endpoint_ip,
+                pre_shared_key='PaloAltoPOV123!',  # Same PSK as PA side
+                local_interface='ethernet1/1',  # Untrust interface
+                tunnel_number=tunnel_number,
+                trust_zone='trust',
+            )
+
+            self.pov_deploy_results.append_text(f"\n  - IKE Crypto: {result['ike_crypto_profile']}")
+            self.pov_deploy_results.append_text(f"\n  - IPsec Crypto: {result['ipsec_crypto_profile']}")
+            self.pov_deploy_results.append_text(f"\n  - Tunnel: {result['tunnel_interface']}")
+            self.pov_deploy_results.append_text(f"\n  - IKE GW: {result['ike_gateway']}")
+            self.pov_deploy_results.append_text(f"\n  - IPsec: {result['ipsec_tunnel']}")
+
+            # Commit the configuration
+            self.pov_deploy_results.append_text("\n  Committing configuration...")
+            commit_result = client.commit(
+                description=f"IPsec tunnel for Remote Network {branch_name}",
+                sync=True,
+                timeout=300,
+            )
+
+            client.disconnect()
+
+            if commit_result.success:
+                self.pov_deploy_results.append_text("\n  [OK] IPsec tunnel configured")
+                self._advance_to_next_phase(True, f"Firewall IPsec configured for {branch_name}")
+            else:
+                self.pov_deploy_results.append_text(f"\n  [ERROR] Commit: {commit_result.message}")
+                self._advance_to_next_phase(False, f"Commit failed: {commit_result.message}")
+
+        except Exception as e:
+            self._log_activity(f"Failed to configure firewall IPsec: {e}", "error")
+            self.pov_deploy_results.append_text(f"\n  [ERROR] {str(e)}")
+            self._advance_to_next_phase(False, str(e))
 
     def _execute_remote_network_pa_phase(self, phase: dict):
         """Create Remote Network in Prisma Access."""
@@ -9754,15 +9919,57 @@ output "{device_name}_private_ip" {{
         """Configure Mobile Users settings."""
         mu_config = self._deployment_context.get('use_cases', {}).get('mobile_users', {})
 
-        self.pov_deploy_results.append_text("\n  Configuring Mobile Users...")
-        self.pov_deploy_results.append_text(f"\n  - Portal: {mu_config.get('portal_name', 'GlobalProtect')}")
+        if not mu_config.get('enabled', False):
+            self.pov_deploy_results.append_text("\n  [SKIP] Mobile Users not enabled in POV configuration")
+            self._advance_to_next_phase(True, "Mobile Users not enabled")
+            return
+
+        self.pov_deploy_results.append_text("\n  Verifying Mobile Users configuration...")
+        self.pov_deploy_results.append_text(f"\n  - Portal Name: {mu_config.get('portal_name', 'GlobalProtect-Portal')}")
         self.pov_deploy_results.append_text(f"\n  - VPN Mode: {mu_config.get('vpn_mode', 'On Demand')}")
 
-        # TODO: Implement Mobile Users configuration via SCM API
-        self.pov_deploy_results.append_text("\n  [OK] Mobile Users configured")
+        # Get split tunnel settings
+        split_tunnel = mu_config.get('split_tunnel', {})
+        if split_tunnel.get('enabled', False):
+            self.pov_deploy_results.append_text(f"\n  - Split Tunnel: Enabled")
+            include_domains = split_tunnel.get('include_domains', [])
+            exclude_domains = split_tunnel.get('exclude_domains', [])
+            if include_domains:
+                self.pov_deploy_results.append_text(f"\n    Include: {', '.join(include_domains[:3])}{'...' if len(include_domains) > 3 else ''}")
+            if exclude_domains:
+                self.pov_deploy_results.append_text(f"\n    Exclude: {', '.join(exclude_domains[:3])}{'...' if len(exclude_domains) > 3 else ''}")
+        else:
+            self.pov_deploy_results.append_text(f"\n  - Split Tunnel: Disabled (full tunnel)")
 
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(500, lambda: self._advance_to_next_phase(True, "Mobile Users configured"))
+        # Get deploy tenant API client to verify
+        deploy_api_client = self._get_deploy_api_client()
+
+        if deploy_api_client:
+            try:
+                # Verify Mobile Users is enabled in tenant
+                self.pov_deploy_results.append_text("\n  Checking tenant Mobile Users status...")
+                mu_infra = deploy_api_client.get_mobile_user_infrastructure()
+
+                if mu_infra:
+                    self.pov_deploy_results.append_text("\n  [OK] Mobile Users is active in tenant")
+
+                    # Note: Mobile Users GlobalProtect settings are typically pre-configured
+                    # in Prisma Access and managed via SCM UI. The POV focuses on:
+                    # 1. Security policies for mobile users (handled in security policies phase)
+                    # 2. Address objects for mobile user segments (handled in policy objects phase)
+
+                    self._advance_to_next_phase(True, "Mobile Users verified and active")
+                else:
+                    self.pov_deploy_results.append_text("\n  [WARN] Mobile Users may not be enabled in tenant")
+                    self._advance_to_next_phase(True, "Mobile Users status unknown")
+
+            except Exception as e:
+                self._log_activity(f"Could not verify Mobile Users: {e}", "warning")
+                self.pov_deploy_results.append_text(f"\n  [WARN] Could not verify: {str(e)[:50]}")
+                self._advance_to_next_phase(True, "Mobile Users verification skipped")
+        else:
+            self.pov_deploy_results.append_text("\n  [SKIP] No deploy tenant - cannot verify Mobile Users")
+            self._advance_to_next_phase(True, "Skipped - no deploy tenant")
 
     def _execute_policy_objects_phase(self, phase: dict):
         """Deploy address objects and groups to SCM."""
@@ -9779,12 +9986,46 @@ output "{device_name}_private_ip" {{
 
         if deploy_api_client:
             try:
+                created_tags = 0
+                skipped_tags = 0
                 created_objects = 0
                 skipped_objects = 0
                 created_groups = 0
                 skipped_groups = 0
 
-                # Deploy address objects
+                # Step 1: Extract and create all unique tags first
+                # Tags must exist before objects that reference them
+                unique_tags = set()
+                for obj in addr_objects:
+                    tags = obj.get('tag', [])
+                    if tags:
+                        unique_tags.update(tags)
+                for grp in addr_groups:
+                    tags = grp.get('tag', [])
+                    if tags:
+                        unique_tags.update(tags)
+
+                if unique_tags:
+                    self.pov_deploy_results.append_text(f"\n  Creating {len(unique_tags)} tags first...")
+                    for tag_name in unique_tags:
+                        try:
+                            tag_data = {'name': tag_name}
+                            deploy_api_client.create_tag(tag_data, folder='Mobile Users')
+                            created_tags += 1
+                            self._log_activity(f"Created tag: {tag_name}")
+                        except Exception as e:
+                            if 'already exists' in str(e).lower():
+                                skipped_tags += 1
+                            else:
+                                self._log_activity(f"Failed to create tag {tag_name}: {e}", "warning")
+
+                    if created_tags > 0 or skipped_tags > 0:
+                        tag_text = f"\n  Tags: {created_tags} created"
+                        if skipped_tags:
+                            tag_text += f", {skipped_tags} existed"
+                        self.pov_deploy_results.append_text(tag_text)
+
+                # Step 2: Deploy address objects
                 for obj in addr_objects:
                     try:
                         obj_name = obj.get('name', 'unnamed')
@@ -9799,7 +10040,7 @@ output "{device_name}_private_ip" {{
                         else:
                             self._log_activity(f"Failed to create address {obj.get('name')}: {e}", "warning")
 
-                # Deploy address groups (after objects since groups may reference objects)
+                # Step 3: Deploy address groups (after objects since groups may reference objects)
                 for grp in addr_groups:
                     try:
                         grp_name = grp.get('name', 'unnamed')
@@ -9877,17 +10118,55 @@ output "{device_name}_private_ip" {{
             self._advance_to_next_phase(True, "Skipped - no deploy tenant")
 
     def _execute_adem_phase(self, phase: dict):
-        """Configure ADEM synthetic tests."""
+        """Configure ADEM synthetic tests.
+
+        Note: ADEM (Autonomous Digital Experience Management) synthetic test
+        configuration via API is not publicly documented by Palo Alto Networks.
+        This phase logs the configured tests and provides guidance for manual
+        setup via Strata Cloud Manager UI.
+        """
         adem_config = self._deployment_context.get('use_cases', {}).get('aiops_adem', {})
         tests = adem_config.get('tests', [])
 
-        self.pov_deploy_results.append_text(f"\n  Configuring ADEM with {len(tests)} synthetic tests...")
+        if not adem_config.get('enabled', False):
+            self.pov_deploy_results.append_text("\n  ADEM is disabled - skipping")
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(300, lambda: self._advance_to_next_phase(True, "ADEM disabled"))
+            return
 
-        # TODO: Implement ADEM configuration via SCM API
-        self.pov_deploy_results.append_text("\n  [OK] ADEM configured")
+        if not tests:
+            self.pov_deploy_results.append_text("\n  No ADEM synthetic tests configured")
+            self.pov_deploy_results.append_text("\n  [INFO] Configure tests in SCM: Insights > Application Experience > Application Tests")
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(300, lambda: self._advance_to_next_phase(True, "No ADEM tests to configure"))
+            return
+
+        self.pov_deploy_results.append_text(f"\n  ADEM synthetic tests to configure ({len(tests)}):")
+
+        # Log each test configuration for manual setup reference
+        for i, test in enumerate(tests, 1):
+            target = test.get('target', 'unknown')
+            conditions = []
+            if test.get('on_vpn', True):
+                conditions.append('On VPN')
+            if test.get('in_office', False):
+                conditions.append('In Office')
+            if test.get('not_on_vpn', False):
+                conditions.append('Not on VPN')
+
+            cond_str = ', '.join(conditions) if conditions else 'On VPN'
+            self.pov_deploy_results.append_text(f"\n    {i}. {target} ({cond_str})")
+
+        # ADEM API for synthetic test creation is not publicly documented
+        # Provide guidance for manual configuration
+        self.pov_deploy_results.append_text("\n")
+        self.pov_deploy_results.append_text("\n  [INFO] ADEM synthetic test API is not publicly documented.")
+        self.pov_deploy_results.append_text("\n  [INFO] Please configure tests manually in Strata Cloud Manager:")
+        self.pov_deploy_results.append_text("\n         Insights > Application Experience > Application Tests")
+        self.pov_deploy_results.append_text("\n  [OK] ADEM test requirements documented")
 
         from PyQt6.QtCore import QTimer
-        QTimer.singleShot(500, lambda: self._advance_to_next_phase(True, "ADEM configured"))
+        QTimer.singleShot(500, lambda: self._advance_to_next_phase(True, f"ADEM: {len(tests)} tests documented for manual setup"))
 
     def _on_phase_progress(self, message: str, percentage: int):
         """Handle progress from current phase."""

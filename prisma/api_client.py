@@ -935,7 +935,21 @@ class PrismaAccessAPIClient:
         def api_func(offset=0, limit=100):
             return self.get_tags(folder=folder, snippet=snippet, limit=limit, offset=offset)
         return paginate_api_request(api_func)
-    
+
+    def create_tag(self, data: Dict[str, Any], folder: str) -> Dict[str, Any]:
+        """
+        Create a tag.
+
+        Args:
+            data: Tag data (must include 'name', optionally 'color' and 'comments')
+            folder: Folder name
+
+        Returns:
+            Created tag
+        """
+        url = APIEndpoints.TAGS + build_folder_query(folder)
+        return self._make_request("POST", url, data=data, use_cache=False)
+
     # Schedules
     
     def get_schedules(

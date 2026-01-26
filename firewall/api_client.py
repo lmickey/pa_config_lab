@@ -24,6 +24,11 @@ try:
         Zone,
         VirtualRouter,
         StaticRoute,
+        IkeGateway,
+        IpsecTunnel,
+        IpsecCryptoProfile,
+        IkeCryptoProfile,
+        TunnelInterface,
     )
     from panos.policies import Rulebase, SecurityRule, NatRule
     from panos.objects import AddressObject, ServiceObject, Tag
@@ -571,6 +576,342 @@ class FirewallAPIClient:
         rule.apply()
 
         logger.info(f"Created NAT rule: {name}")
+
+    # ========== IPsec/IKE Configuration ==========
+
+    def create_ike_crypto_profile(
+        self,
+        name: str,
+        dh_group: List[str] = None,
+        authentication: List[str] = None,
+        encryption: List[str] = None,
+        lifetime_hours: int = 8,
+    ):
+        """
+        Create an IKE crypto profile.
+
+        Args:
+            name: Profile name
+            dh_group: DH groups (e.g., ['group14', 'group19'])
+            authentication: Auth algorithms (e.g., ['sha256', 'sha384'])
+            encryption: Encryption algorithms (e.g., ['aes-256-cbc', 'aes-256-gcm'])
+            lifetime_hours: SA lifetime in hours
+        """
+        self._ensure_connected()
+
+        profile = IkeCryptoProfile(
+            name=name,
+            dh_group=dh_group or ['group14', 'group19'],
+            authentication=authentication or ['sha256', 'sha384'],
+            encryption=encryption or ['aes-256-cbc', 'aes-256-gcm'],
+            lifetime_hours=lifetime_hours,
+        )
+
+        self._firewall.add(profile)
+        profile.apply()
+
+        logger.info(f"Created IKE crypto profile: {name}")
+
+    def create_ipsec_crypto_profile(
+        self,
+        name: str,
+        esp_encryption: List[str] = None,
+        esp_authentication: List[str] = None,
+        dh_group: str = "group14",
+        lifetime_hours: int = 1,
+    ):
+        """
+        Create an IPsec crypto profile.
+
+        Args:
+            name: Profile name
+            esp_encryption: ESP encryption algorithms
+            esp_authentication: ESP authentication algorithms
+            dh_group: PFS DH group
+            lifetime_hours: SA lifetime in hours
+        """
+        self._ensure_connected()
+
+        profile = IpsecCryptoProfile(
+            name=name,
+            esp_encryption=esp_encryption or ['aes-256-cbc', 'aes-256-gcm'],
+            esp_authentication=esp_authentication or ['sha256', 'sha384'],
+            dh_group=dh_group,
+            lifetime_hours=lifetime_hours,
+        )
+
+        self._firewall.add(profile)
+        profile.apply()
+
+        logger.info(f"Created IPsec crypto profile: {name}")
+
+    def create_tunnel_interface(
+        self,
+        name: str,
+        comment: str = "",
+        virtual_router: str = "default",
+        zone: str = None,
+    ):
+        """
+        Create a tunnel interface.
+
+        Args:
+            name: Interface name (e.g., 'tunnel.1')
+            comment: Interface comment
+            virtual_router: Virtual router to assign
+            zone: Security zone to assign
+        """
+        self._ensure_connected()
+
+        # Extract tunnel number from name
+        if name.startswith('tunnel.'):
+            tunnel_num = name.split('.')[1]
+        else:
+            tunnel_num = name
+
+        tunnel = TunnelInterface(
+            name=f"tunnel.{tunnel_num}",
+            comment=comment,
+        )
+
+        self._firewall.add(tunnel)
+        tunnel.apply()
+
+        # Add to virtual router if specified
+        if virtual_router:
+            vr = VirtualRouter(name=virtual_router)
+            self._firewall.add(vr)
+            vr.refresh()
+            # Add tunnel interface to VR
+            if tunnel.name not in (vr.interface or []):
+                vr.interface = (vr.interface or []) + [tunnel.name]
+                vr.apply()
+
+        # Add to zone if specified
+        if zone:
+            z = Zone(name=zone)
+            self._firewall.add(z)
+            z.refresh()
+            if tunnel.name not in (z.interface or []):
+                z.interface = (z.interface or []) + [tunnel.name]
+                z.apply()
+
+        logger.info(f"Created tunnel interface: {tunnel.name}")
+        return tunnel.name
+
+    def create_ike_gateway(
+        self,
+        name: str,
+        interface: str,
+        peer_ip: str,
+        pre_shared_key: str,
+        local_id_type: str = None,
+        local_id_value: str = None,
+        peer_id_type: str = None,
+        peer_id_value: str = None,
+        ike_crypto_profile: str = "default",
+        ikev2_only: bool = True,
+        enable_nat_traversal: bool = True,
+        enable_dead_peer_detection: bool = True,
+    ):
+        """
+        Create an IKE gateway.
+
+        Args:
+            name: Gateway name
+            interface: Local interface (e.g., 'ethernet1/1')
+            peer_ip: Peer IP address or FQDN
+            pre_shared_key: Pre-shared key for authentication
+            local_id_type: Local ID type (ipaddr, fqdn, ufqdn, keyid)
+            local_id_value: Local ID value
+            peer_id_type: Peer ID type
+            peer_id_value: Peer ID value
+            ike_crypto_profile: IKE crypto profile name
+            ikev2_only: Use IKEv2 only
+            enable_nat_traversal: Enable NAT traversal
+            enable_dead_peer_detection: Enable DPD
+        """
+        self._ensure_connected()
+
+        gateway = IkeGateway(
+            name=name,
+            interface=interface,
+            peer_ip_value=peer_ip,
+            pre_shared_key=pre_shared_key,
+            ikev2_crypto_profile=ike_crypto_profile if ikev2_only else None,
+            ikev1_crypto_profile=None if ikev2_only else ike_crypto_profile,
+            enable_passive_mode=False,
+            enable_nat_traversal=enable_nat_traversal,
+            enable_dead_peer_detection=enable_dead_peer_detection,
+        )
+
+        # Set local ID if specified
+        if local_id_type and local_id_value:
+            gateway.local_id_type = local_id_type
+            gateway.local_id_value = local_id_value
+
+        # Set peer ID if specified
+        if peer_id_type and peer_id_value:
+            gateway.peer_id_type = peer_id_type
+            gateway.peer_id_value = peer_id_value
+
+        self._firewall.add(gateway)
+        gateway.apply()
+
+        logger.info(f"Created IKE gateway: {name} -> {peer_ip}")
+
+    def create_ipsec_tunnel(
+        self,
+        name: str,
+        tunnel_interface: str,
+        ike_gateway: str,
+        ipsec_crypto_profile: str = "default",
+        enable_tunnel_monitor: bool = False,
+        tunnel_monitor_dest_ip: str = None,
+    ):
+        """
+        Create an IPsec tunnel.
+
+        Args:
+            name: Tunnel name
+            tunnel_interface: Tunnel interface (e.g., 'tunnel.1')
+            ike_gateway: IKE gateway name
+            ipsec_crypto_profile: IPsec crypto profile name
+            enable_tunnel_monitor: Enable tunnel monitoring
+            tunnel_monitor_dest_ip: Tunnel monitor destination IP
+        """
+        self._ensure_connected()
+
+        tunnel = IpsecTunnel(
+            name=name,
+            tunnel_interface=tunnel_interface,
+            ak_ike_gateway=ike_gateway,
+            ak_ipsec_crypto_profile=ipsec_crypto_profile,
+        )
+
+        if enable_tunnel_monitor and tunnel_monitor_dest_ip:
+            tunnel.enable_tunnel_monitor = True
+            tunnel.tunnel_monitor_dest_ip = tunnel_monitor_dest_ip
+
+        self._firewall.add(tunnel)
+        tunnel.apply()
+
+        logger.info(f"Created IPsec tunnel: {name} via {ike_gateway}")
+
+    def configure_ipsec_to_prisma_access(
+        self,
+        name: str,
+        pa_endpoint_ip: str,
+        pre_shared_key: str,
+        local_interface: str = "ethernet1/1",
+        tunnel_number: int = 1,
+        trust_zone: str = "trust",
+        local_subnets: List[str] = None,
+    ) -> Dict[str, str]:
+        """
+        Configure complete IPsec tunnel to Prisma Access.
+
+        This is a convenience method that creates all necessary components:
+        - IKE crypto profile
+        - IPsec crypto profile
+        - Tunnel interface
+        - IKE gateway
+        - IPsec tunnel
+        - Static route to Prisma Access
+
+        Args:
+            name: Base name for all objects (e.g., 'PA-DC')
+            pa_endpoint_ip: Prisma Access service endpoint IP
+            pre_shared_key: Pre-shared key
+            local_interface: Local interface for IKE (untrust interface)
+            tunnel_number: Tunnel interface number
+            trust_zone: Trust zone name
+            local_subnets: Local subnets to route through tunnel
+
+        Returns:
+            Dict with created object names
+        """
+        self._ensure_connected()
+
+        ike_crypto_name = f"{name}-ike-crypto"
+        ipsec_crypto_name = f"{name}-ipsec-crypto"
+        tunnel_if_name = f"tunnel.{tunnel_number}"
+        ike_gw_name = f"{name}-ike-gw"
+        ipsec_tunnel_name = f"{name}-ipsec"
+
+        created = {
+            'ike_crypto_profile': ike_crypto_name,
+            'ipsec_crypto_profile': ipsec_crypto_name,
+            'tunnel_interface': tunnel_if_name,
+            'ike_gateway': ike_gw_name,
+            'ipsec_tunnel': ipsec_tunnel_name,
+        }
+
+        # Step 1: Create IKE crypto profile
+        logger.info(f"Creating IKE crypto profile: {ike_crypto_name}")
+        self.create_ike_crypto_profile(
+            name=ike_crypto_name,
+            dh_group=['group19', 'group20'],
+            authentication=['sha256', 'sha384'],
+            encryption=['aes-256-cbc', 'aes-256-gcm'],
+            lifetime_hours=8,
+        )
+
+        # Step 2: Create IPsec crypto profile
+        logger.info(f"Creating IPsec crypto profile: {ipsec_crypto_name}")
+        self.create_ipsec_crypto_profile(
+            name=ipsec_crypto_name,
+            esp_encryption=['aes-256-cbc', 'aes-256-gcm'],
+            esp_authentication=['sha256', 'sha384'],
+            dh_group='group19',
+            lifetime_hours=1,
+        )
+
+        # Step 3: Create tunnel interface
+        logger.info(f"Creating tunnel interface: {tunnel_if_name}")
+        self.create_tunnel_interface(
+            name=tunnel_if_name,
+            comment=f"IPsec tunnel to Prisma Access ({name})",
+            virtual_router="default",
+            zone=trust_zone,  # Tunnel goes in trust zone typically
+        )
+
+        # Step 4: Create IKE gateway
+        logger.info(f"Creating IKE gateway: {ike_gw_name}")
+        self.create_ike_gateway(
+            name=ike_gw_name,
+            interface=local_interface,
+            peer_ip=pa_endpoint_ip,
+            pre_shared_key=pre_shared_key,
+            ike_crypto_profile=ike_crypto_name,
+            ikev2_only=True,
+            enable_nat_traversal=True,
+            enable_dead_peer_detection=True,
+        )
+
+        # Step 5: Create IPsec tunnel
+        logger.info(f"Creating IPsec tunnel: {ipsec_tunnel_name}")
+        self.create_ipsec_tunnel(
+            name=ipsec_tunnel_name,
+            tunnel_interface=tunnel_if_name,
+            ike_gateway=ike_gw_name,
+            ipsec_crypto_profile=ipsec_crypto_name,
+        )
+
+        # Step 6: Create static routes to Prisma Access if subnets specified
+        if local_subnets:
+            # Route to Prisma Access cloud (0.0.0.0/0 or specific ranges)
+            # For now, create a default route through the tunnel
+            logger.info(f"Creating static route to Prisma Access via {tunnel_if_name}")
+            self.create_static_route(
+                name=f"{name}-to-pa",
+                destination="0.0.0.0/0",
+                interface=tunnel_if_name,
+                metric=100,  # Higher metric so it doesn't override default
+            )
+
+        logger.info(f"IPsec tunnel to Prisma Access configured: {name}")
+        return created
 
     # ========== Commit Operations ==========
 
