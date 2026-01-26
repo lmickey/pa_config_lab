@@ -5984,6 +5984,108 @@ class POVWorkflowWidget(QWidget):
         finally:
             self.azure_auth_btn.setEnabled(True)
 
+    def _show_terraform_warning_dialog(self) -> bool:
+        """Show a custom styled warning dialog for Terraform not deployed.
+
+        Returns:
+            True if user wants to continue, False to cancel
+        """
+        from PyQt6.QtWidgets import QDialog
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Cloud Resources Not Deployed")
+        dialog.setMinimumWidth(450)
+        dialog.setStyleSheet("""
+            QDialog {
+                background-color: #fff3f3;
+            }
+        """)
+
+        layout = QVBoxLayout(dialog)
+        layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        # Warning header with icon
+        header_layout = QHBoxLayout()
+        warning_icon = QLabel("⚠️")
+        warning_icon.setStyleSheet("font-size: 32px;")
+        header_layout.addWidget(warning_icon)
+
+        title = QLabel("<b>Terraform has not been deployed!</b>")
+        title.setStyleSheet("font-size: 16px; color: #d32f2f;")
+        header_layout.addWidget(title)
+        header_layout.addStretch()
+        layout.addLayout(header_layout)
+
+        # Warning message
+        message = QLabel(
+            "Cloud resource deployment is enabled but you haven't deployed Terraform.\n\n"
+            "Your Azure infrastructure (VNet, subnets, VMs) will NOT be created.\n\n"
+            "Do you want to continue anyway?"
+        )
+        message.setWordWrap(True)
+        message.setStyleSheet("color: #333; font-size: 13px; padding: 10px;")
+        layout.addWidget(message)
+
+        # Red border frame around content
+        frame = QFrame()
+        frame.setStyleSheet("""
+            QFrame {
+                border: 3px solid #f44336;
+                border-radius: 8px;
+                background-color: #ffebee;
+                padding: 10px;
+            }
+        """)
+        frame_layout = QVBoxLayout(frame)
+        frame_layout.addWidget(QLabel(
+            "⚠️ <b>Warning:</b> Proceeding without Terraform deployment means "
+            "no Azure infrastructure will be created for this POV."
+        ))
+        layout.addWidget(frame)
+
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        no_btn = QPushButton("Go Back and Deploy")
+        no_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 10px 20px;
+                font-weight: bold;
+                border-radius: 4px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        no_btn.clicked.connect(dialog.reject)
+        btn_layout.addWidget(no_btn)
+
+        yes_btn = QPushButton("Continue Anyway")
+        yes_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                padding: 10px 20px;
+                font-weight: bold;
+                border-radius: 4px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #d32f2f;
+            }
+        """)
+        yes_btn.clicked.connect(dialog.accept)
+        btn_layout.addWidget(yes_btn)
+
+        layout.addLayout(btn_layout)
+
+        return dialog.exec() == QDialog.DialogCode.Accepted
+
     def _show_tenant_selection_dialog(self, tenants: list, current_tenant_id: str = None) -> dict:
         """Show dialog to select an Azure directory/tenant.
 
@@ -6595,20 +6697,17 @@ resource "azurerm_network_interface" "nic_{device_name}" {{
 }}
 
 resource "azurerm_linux_virtual_machine" "vm_{device_name}" {{
-  name                = "{device_name}"
-  resource_group_name = azurerm_resource_group.pov.name
-  location            = azurerm_resource_group.pov.location
-  size                = "Standard_B2s"
-  admin_username      = var.admin_username
+  name                            = "{device_name}"
+  resource_group_name             = azurerm_resource_group.pov.name
+  location                        = azurerm_resource_group.pov.location
+  size                            = "Standard_B2s"
+  admin_username                  = var.admin_username
+  admin_password                  = var.admin_password
+  disable_password_authentication = false
 
   network_interface_ids = [
     azurerm_network_interface.nic_{device_name}.id,
   ]
-
-  admin_ssh_key {{
-    username   = var.admin_username
-    public_key = file("~/.ssh/id_rsa.pub")
-  }}
 
   os_disk {{
     caching              = "ReadWrite"
@@ -7340,31 +7439,8 @@ output "{device_name}_private_ip" {{
             # Check if cloud deployment is enabled but not completed
             if self.deployment_config.get('deploy_cloud_resources', False):
                 if not hasattr(self, '_terraform_deployed') or not self._terraform_deployed:
-                    # Use styled warning dialog (red border like push confirmation)
-                    msg_box = QMessageBox(self)
-                    msg_box.setIcon(QMessageBox.Icon.Warning)
-                    msg_box.setWindowTitle("⚠️ Cloud Resources Not Deployed")
-                    msg_box.setText("<b>Terraform has not been deployed yet!</b>")
-                    msg_box.setInformativeText(
-                        "Cloud resource deployment is enabled but you haven't deployed Terraform.\n\n"
-                        "Your Azure infrastructure (VNet, subnets, VMs) will NOT be created.\n\n"
-                        "Do you want to continue anyway?"
-                    )
-                    msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-                    msg_box.setDefaultButton(QMessageBox.StandardButton.No)
-
-                    # Style with red border like push confirmation dialog
-                    msg_box.setStyleSheet("""
-                        QMessageBox {
-                            border: 3px solid #f44336;
-                            background-color: #fff3f3;
-                        }
-                        QLabel {
-                            color: #d32f2f;
-                        }
-                    """)
-
-                    if msg_box.exec() != QMessageBox.StandardButton.Yes:
+                    # Use custom styled warning dialog (QMessageBox styling doesn't work on Windows)
+                    if not self._show_terraform_warning_dialog():
                         return  # User chose not to continue
 
         # Save current state before moving to next tab
