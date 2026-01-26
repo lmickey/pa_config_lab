@@ -121,7 +121,7 @@ class POVWorkflowWidget(QWidget):
             'prisma_browser': {'enabled': False},
             'private_app': {'enabled': True},  # Default enabled
             'remote_branch': {'enabled': False},
-            'aiops_adem': {'enabled': False},
+            'aiops_adem': {'enabled': True, 'tests': []},  # Default enabled with empty tests
             'app_accel': {'enabled': False},
             'rbi': {'enabled': False},
             'custom_policies': {'enabled': True, 'policies': []},  # Replaces PAB
@@ -2030,14 +2030,15 @@ class POVWorkflowWidget(QWidget):
 
             # Tests list
             self.adem_tests_list = QListWidget()
-            self.adem_tests_list.setMaximumHeight(60)
+            self.adem_tests_list.setMinimumHeight(80)
+            self.adem_tests_list.setMaximumHeight(120)
             self.adem_tests_list.setStyleSheet(
-                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 10px; background-color: white; }"
-                "QListWidget::item { padding: 2px; }"
+                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background-color: white; }"
+                "QListWidget::item { padding: 3px 4px; }"
                 "QListWidget::item:selected { background-color: #2196F3; color: white; }"
             )
             self.adem_tests_list.itemSelectionChanged.connect(self._on_adem_test_selected)
-            card_layout.addWidget(self.adem_tests_list)
+            card_layout.addWidget(self.adem_tests_list, 1)  # Give stretch factor
 
             # Remove button row
             remove_row = QHBoxLayout()
@@ -2054,11 +2055,12 @@ class POVWorkflowWidget(QWidget):
             remove_row.addStretch()
             card_layout.addLayout(remove_row)
 
-            # Initialize config
+            # Initialize config - ADEM is enabled by default
             self.use_case_configs['aiops_adem'] = {
-                'enabled': False,
+                'enabled': True,
                 'tests': [],  # List of {target, on_vpn, in_office, not_on_vpn}
             }
+            self.aiops_adem_enable.setChecked(True)  # Set checkbox to match
 
             card_layout.addStretch()
             return card
@@ -6555,113 +6557,182 @@ class POVWorkflowWidget(QWidget):
             QTabBar::tab:selected { background: white; border-bottom: 2px solid #FF9800; }
         """)
 
-        # === TAB 1: Deployment Phases ===
-        phases_tab = QWidget()
-        phases_layout = QVBoxLayout(phases_tab)
+        # === TAB 1: Infrastructure Config (ON deployed firewalls) ===
+        infra_config_tab = QWidget()
+        infra_config_layout = QVBoxLayout(infra_config_tab)
 
-        phases_scroll = QScrollArea()
-        phases_scroll.setWidgetResizable(True)
-        phases_content = QWidget()
-        phases_scroll_layout = QVBoxLayout(phases_content)
+        infra_config_scroll = QScrollArea()
+        infra_config_scroll.setWidgetResizable(True)
+        infra_config_content = QWidget()
+        infra_config_scroll_layout = QVBoxLayout(infra_config_content)
 
-        # Phase 1: Firewall Configuration
-        phase1_group = QGroupBox("Phase 1: Firewall Configuration")
-        phase1_group.setStyleSheet("QGroupBox { font-weight: bold; }")
-        phase1_layout = QVBoxLayout(phase1_group)
+        # Section header
+        infra_header = QLabel("<b>Configuration pushed TO deployed firewalls:</b>")
+        infra_header.setStyleSheet("color: #1565C0; font-size: 12px; padding: 5px; background-color: #E3F2FD;")
+        infra_config_scroll_layout.addWidget(infra_header)
+
+        # Firewall Base Configuration
         firewalls = deployment_config.get('firewalls', [])
+        fw_group = QGroupBox(f"Firewall Base Configuration ({len(firewalls)})")
+        fw_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        fw_layout = QVBoxLayout(fw_group)
         if firewalls:
-            phase1_layout.addWidget(QLabel(f"Configure {len(firewalls)} firewall(s):"))
             for fw in firewalls:
-                phase1_layout.addWidget(QLabel(f"  - {fw.get('name')} ({fw.get('type', 'unknown').replace('_', ' ')})"))
-            phase1_layout.addWidget(QLabel("  - Device settings (DNS, NTP, hostname)"))
-            phase1_layout.addWidget(QLabel("  - Network interfaces and zones"))
-            phase1_layout.addWidget(QLabel("  - Basic security policy and NAT"))
+                fw_layout.addWidget(QLabel(f"<b>{fw.get('name')}</b> ({fw.get('type', 'unknown').replace('_', ' ')})"))
+            fw_layout.addWidget(QLabel("Configuration includes:"))
+            fw_layout.addWidget(QLabel("  - Device settings (DNS, NTP, hostname)"))
+            fw_layout.addWidget(QLabel("  - Network interfaces and security zones"))
+            fw_layout.addWidget(QLabel("  - Basic security policy and outbound NAT"))
         else:
-            phase1_layout.addWidget(QLabel("<i>No firewalls to configure</i>"))
-        phases_scroll_layout.addWidget(phase1_group)
+            fw_layout.addWidget(QLabel("<i>No firewalls to configure</i>"))
+        infra_config_scroll_layout.addWidget(fw_group)
 
-        # Phase 2: Service Connections / IPsec Tunnels
+        # Service Connection IPsec (Firewall Side)
         datacenters = deployment_config.get('locations', {}).get('datacenters', [])
         sc_datacenters = [dc for dc in datacenters if dc.get('connection_type') == 'service_connection']
 
-        phase2_group = QGroupBox("Phase 2: Service Connection Setup")
-        phase2_group.setStyleSheet("QGroupBox { font-weight: bold; }")
-        phase2_layout = QVBoxLayout(phase2_group)
+        sc_fw_group = QGroupBox(f"Service Connection IPsec - Firewall Side ({len(sc_datacenters)})")
+        sc_fw_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        sc_fw_layout = QVBoxLayout(sc_fw_group)
         if sc_datacenters:
-            phase2_layout.addWidget(QLabel(f"Setup {len(sc_datacenters)} service connection(s):"))
             for dc in sc_datacenters:
-                phase2_layout.addWidget(QLabel(f"  - {dc.get('name')} ({dc.get('region', 'Unknown')})"))
-            phase2_layout.addWidget(QLabel("Firewall side:"))
-            phase2_layout.addWidget(QLabel("  - IKE Gateway configuration"))
-            phase2_layout.addWidget(QLabel("  - IPsec Tunnel configuration"))
-            phase2_layout.addWidget(QLabel("Prisma Access side:"))
-            phase2_layout.addWidget(QLabel("  - Service Connection object"))
-            phase2_layout.addWidget(QLabel("  - Routing configuration"))
+                sc_fw_layout.addWidget(QLabel(f"<b>{dc.get('name')}</b> - {dc.get('region', 'Unknown')}"))
+            sc_fw_layout.addWidget(QLabel("Configuration includes:"))
+            sc_fw_layout.addWidget(QLabel("  - IKE Gateway (Phase 1)"))
+            sc_fw_layout.addWidget(QLabel("  - IPsec Tunnel (Phase 2)"))
+            sc_fw_layout.addWidget(QLabel("  - Tunnel interface"))
+            sc_fw_layout.addWidget(QLabel("  - Static routes to Prisma Access"))
         else:
-            phase2_layout.addWidget(QLabel("<i>No service connections to configure</i>"))
-        phases_scroll_layout.addWidget(phase2_group)
+            sc_fw_layout.addWidget(QLabel("<i>No service connection tunnels to configure</i>"))
+        infra_config_scroll_layout.addWidget(sc_fw_group)
 
-        # Phase 3: Remote Networks
+        # Remote Network IPsec (Firewall Side)
         branches = deployment_config.get('locations', {}).get('branches', [])
 
-        phase3_group = QGroupBox("Phase 3: Remote Network Setup")
-        phase3_group.setStyleSheet("QGroupBox { font-weight: bold; }")
-        phase3_layout = QVBoxLayout(phase3_group)
+        rn_fw_group = QGroupBox(f"Remote Network IPsec - Firewall Side ({len(branches)})")
+        rn_fw_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        rn_fw_layout = QVBoxLayout(rn_fw_group)
         if branches:
-            phase3_layout.addWidget(QLabel(f"Setup {len(branches)} remote network(s):"))
             for branch in branches:
-                phase3_layout.addWidget(QLabel(f"  - {branch.get('name')} ({branch.get('region', 'Unknown')})"))
-            phase3_layout.addWidget(QLabel("Firewall side:"))
-            phase3_layout.addWidget(QLabel("  - IKE Gateway configuration"))
-            phase3_layout.addWidget(QLabel("  - IPsec Tunnel configuration"))
-            phase3_layout.addWidget(QLabel("Prisma Access side:"))
-            phase3_layout.addWidget(QLabel("  - Remote Network object"))
-            phase3_layout.addWidget(QLabel("  - BGP/Static routing"))
+                rn_fw_layout.addWidget(QLabel(f"<b>{branch.get('name')}</b> - {branch.get('region', 'Unknown')}"))
+            rn_fw_layout.addWidget(QLabel("Configuration includes:"))
+            rn_fw_layout.addWidget(QLabel("  - IKE Gateway (Phase 1)"))
+            rn_fw_layout.addWidget(QLabel("  - IPsec Tunnel (Phase 2)"))
+            rn_fw_layout.addWidget(QLabel("  - Tunnel interface"))
+            rn_fw_layout.addWidget(QLabel("  - BGP or static routing"))
         else:
-            phase3_layout.addWidget(QLabel("<i>No remote networks to configure</i>"))
-        phases_scroll_layout.addWidget(phase3_group)
+            rn_fw_layout.addWidget(QLabel("<i>No remote network tunnels to configure</i>"))
+        infra_config_scroll_layout.addWidget(rn_fw_group)
 
-        # Phase 4: Prisma Access Configuration
-        phase4_group = QGroupBox("Phase 4: Prisma Access Configuration")
-        phase4_group.setStyleSheet("QGroupBox { font-weight: bold; }")
-        phase4_layout = QVBoxLayout(phase4_group)
+        infra_config_scroll_layout.addStretch()
+        infra_config_scroll.setWidget(infra_config_content)
+        infra_config_layout.addWidget(infra_config_scroll)
+        tabs.addTab(infra_config_tab, "Infrastructure Config")
+
+        # === TAB 2: Prisma Access Config (pushed TO SCM/PA) ===
+        pa_config_tab = QWidget()
+        pa_config_layout = QVBoxLayout(pa_config_tab)
+
+        pa_config_scroll = QScrollArea()
+        pa_config_scroll.setWidgetResizable(True)
+        pa_config_content = QWidget()
+        pa_config_scroll_layout = QVBoxLayout(pa_config_content)
+
+        # Section header
+        pa_header = QLabel("<b>Configuration pushed TO Prisma Access / SCM:</b>")
+        pa_header.setStyleSheet("color: #E65100; font-size: 12px; padding: 5px; background-color: #FFF3E0;")
+        pa_config_scroll_layout.addWidget(pa_header)
+
+        # Service Connections (PA Side)
+        sc_pa_group = QGroupBox(f"Service Connections ({len(sc_datacenters)})")
+        sc_pa_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        sc_pa_layout = QVBoxLayout(sc_pa_group)
+        if sc_datacenters:
+            for dc in sc_datacenters:
+                sc_pa_layout.addWidget(QLabel(f"<b>SC-{dc.get('name')}</b> - Region: {dc.get('region', 'Unknown')}"))
+            sc_pa_layout.addWidget(QLabel("Creates in Prisma Access:"))
+            sc_pa_layout.addWidget(QLabel("  - Service Connection object"))
+            sc_pa_layout.addWidget(QLabel("  - IPsec tunnel endpoint"))
+            sc_pa_layout.addWidget(QLabel("  - Routing to on-prem subnets"))
+        else:
+            sc_pa_layout.addWidget(QLabel("<i>No service connections to create</i>"))
+        pa_config_scroll_layout.addWidget(sc_pa_group)
+
+        # Remote Networks (PA Side)
+        rn_pa_group = QGroupBox(f"Remote Networks ({len(branches)})")
+        rn_pa_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        rn_pa_layout = QVBoxLayout(rn_pa_group)
+        if branches:
+            for branch in branches:
+                rn_pa_layout.addWidget(QLabel(f"<b>RN-{branch.get('name')}</b> - Region: {branch.get('region', 'Unknown')}"))
+            rn_pa_layout.addWidget(QLabel("Creates in Prisma Access:"))
+            rn_pa_layout.addWidget(QLabel("  - Remote Network object"))
+            rn_pa_layout.addWidget(QLabel("  - IPsec tunnel endpoint"))
+            rn_pa_layout.addWidget(QLabel("  - BGP/Static routing"))
+        else:
+            rn_pa_layout.addWidget(QLabel("<i>No remote networks to create</i>"))
+        pa_config_scroll_layout.addWidget(rn_pa_group)
+
+        # Use Cases & Policy
         use_cases = self.use_case_configs
         staged = use_cases.get('custom_policies', {}).get('staged_objects', {})
 
-        pa_items = []
-        if use_cases.get('mobile_users', {}).get('enabled'):
-            pa_items.append("Mobile Users configuration")
-        if use_cases.get('private_app', {}).get('enabled'):
-            conn_count = len(use_cases.get('private_app', {}).get('connections', []))
-            pa_items.append(f"Private App Access ({conn_count} connections)")
-        if use_cases.get('aiops_adem', {}).get('enabled'):
-            pa_items.append("AIOps/ADEM synthetic tests")
-        if use_cases.get('rbi', {}).get('enabled'):
-            pa_items.append("Remote Browser Isolation")
+        uc_group = QGroupBox("Use Cases & Features")
+        uc_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        uc_layout = QVBoxLayout(uc_group)
 
+        if use_cases.get('mobile_users', {}).get('enabled'):
+            mu = use_cases.get('mobile_users', {})
+            uc_layout.addWidget(QLabel(f"<b>Mobile Users</b> - Portal: {mu.get('portal_name', 'GlobalProtect')}"))
+
+        if use_cases.get('aiops_adem', {}).get('enabled'):
+            adem = use_cases.get('aiops_adem', {})
+            test_count = len(adem.get('tests', []))
+            uc_layout.addWidget(QLabel(f"<b>ADEM/AIOps</b> - {test_count} synthetic test(s)"))
+
+        if use_cases.get('private_app', {}).get('enabled'):
+            pa_cfg = use_cases.get('private_app', {})
+            conn_count = len(pa_cfg.get('connections', []))
+            uc_layout.addWidget(QLabel(f"<b>Private App Access</b> - {conn_count} connection(s)"))
+
+        if use_cases.get('rbi', {}).get('enabled'):
+            uc_layout.addWidget(QLabel("<b>Remote Browser Isolation</b> - Enabled"))
+
+        if not any([
+            use_cases.get('mobile_users', {}).get('enabled'),
+            use_cases.get('aiops_adem', {}).get('enabled'),
+            use_cases.get('private_app', {}).get('enabled'),
+            use_cases.get('rbi', {}).get('enabled'),
+        ]):
+            uc_layout.addWidget(QLabel("<i>No use cases enabled</i>"))
+
+        pa_config_scroll_layout.addWidget(uc_group)
+
+        # Policy Objects
         addr_count = len(staged.get('address_objects', []))
         grp_count = len(staged.get('address_groups', []))
         policy_count = len(use_cases.get('custom_policies', {}).get('policies', []))
 
-        if addr_count > 0:
-            pa_items.append(f"Address Objects: {addr_count}")
-        if grp_count > 0:
-            pa_items.append(f"Address Groups: {grp_count}")
-        if policy_count > 0:
-            pa_items.append(f"Security Policies: {policy_count}")
+        policy_group = QGroupBox("Security Policy Objects")
+        policy_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        policy_layout = QVBoxLayout(policy_group)
 
-        if pa_items:
-            phase4_layout.addWidget(QLabel("Deploy to SCM:"))
-            for item in pa_items:
-                phase4_layout.addWidget(QLabel(f"  - {item}"))
+        if addr_count > 0 or grp_count > 0 or policy_count > 0:
+            if addr_count > 0:
+                policy_layout.addWidget(QLabel(f"<b>Address Objects:</b> {addr_count}"))
+            if grp_count > 0:
+                policy_layout.addWidget(QLabel(f"<b>Address Groups:</b> {grp_count}"))
+            if policy_count > 0:
+                policy_layout.addWidget(QLabel(f"<b>Security Policies:</b> {policy_count}"))
         else:
-            phase4_layout.addWidget(QLabel("<i>No Prisma Access configuration to deploy</i>"))
-        phases_scroll_layout.addWidget(phase4_group)
+            policy_layout.addWidget(QLabel("<i>No policy objects to deploy</i>"))
 
-        phases_scroll_layout.addStretch()
-        phases_scroll.setWidget(phases_content)
-        phases_layout.addWidget(phases_scroll)
-        tabs.addTab(phases_tab, "Deployment Phases")
+        pa_config_scroll_layout.addWidget(policy_group)
+
+        pa_config_scroll_layout.addStretch()
+        pa_config_scroll.setWidget(pa_config_content)
+        pa_config_layout.addWidget(pa_config_scroll)
+        tabs.addTab(pa_config_tab, "Prisma Access Config")
 
         # === TAB 2: Infrastructure ===
         infra_tab = QWidget()
@@ -8549,51 +8620,105 @@ output "{device_name}_private_ip" {{
                         'type': device.get('connection_type', 'service_connection'),
                         'location': device.get('location', ''),
                     })
-        else:
+
+        if has_terraform and not firewalls_to_configure:
             # Get IPs from Terraform outputs
             tf_outputs = self._terraform_outputs
+            self._log_activity(f"Looking for firewall IPs in Terraform outputs: {list(tf_outputs.keys())}")
+
+            # Helper function to find firewall IP in outputs
+            def find_firewall_ip(outputs: dict) -> Optional[str]:
+                """Search terraform outputs for a firewall management IP."""
+                # Priority order of key patterns to check
+                ip_patterns = [
+                    'firewall_management_ip',
+                    'fw_management_ip',
+                    'management_ip',
+                    'firewall_ip',
+                    'fw_ip',
+                    'public_ip',
+                ]
+
+                # First try exact matches
+                for pattern in ip_patterns:
+                    if pattern in outputs and outputs[pattern]:
+                        return outputs[pattern]
+
+                # Then try partial matches
+                for key, value in outputs.items():
+                    if not value:
+                        continue
+                    key_lower = key.lower()
+                    # Look for firewall-related IP keys
+                    if ('firewall' in key_lower or 'fw' in key_lower) and \
+                       ('ip' in key_lower or 'address' in key_lower):
+                        return value
+                    # Look for management IP keys
+                    if 'management' in key_lower and 'ip' in key_lower:
+                        return value
+                    if 'mgmt' in key_lower and 'ip' in key_lower:
+                        return value
+
+                return None
 
             # Map firewalls from deployment config to Terraform outputs
-            for fw in deployment_config.get('firewalls', []):
-                fw_name = fw.get('name', '')
-                # Try to find matching IP in terraform outputs
-                fw_ip = None
+            deployment_firewalls = deployment_config.get('firewalls', [])
 
-                # Check common output patterns
-                for key, value in tf_outputs.items():
-                    key_lower = key.lower()
-                    fw_name_normalized = fw_name.lower().replace('-', '_')
-                    if fw_name_normalized in key_lower and ('ip' in key_lower or 'address' in key_lower):
-                        fw_ip = value
-                        break
-                    if 'firewall' in key_lower and ('management' in key_lower or 'mgmt' in key_lower) and 'ip' in key_lower:
-                        fw_ip = value
-                        break
+            if deployment_firewalls:
+                for fw in deployment_firewalls:
+                    fw_name = fw.get('name', '')
+                    fw_ip = find_firewall_ip(tf_outputs)
 
-                # Fallback to generic firewall IP
-                if not fw_ip:
-                    fw_ip = tf_outputs.get('firewall_management_ip',
-                                          tf_outputs.get('fw_management_ip',
-                                                        tf_outputs.get('management_ip')))
-
+                    if fw_ip:
+                        firewalls_to_configure.append({
+                            'name': fw_name,
+                            'ip': fw_ip,
+                            'credentials': {
+                                'username': 'admin',
+                                'password': 'PaloAlto123!',  # Default POV password
+                            },
+                            'type': fw.get('type', 'service_connection'),
+                            'location': fw.get('location', ''),
+                        })
+                        self._log_activity(f"Found firewall IP for {fw_name}: {fw_ip}")
+            else:
+                # No explicit firewalls in config, but terraform deployed
+                # Try to use any firewall IP found in terraform outputs
+                fw_ip = find_firewall_ip(tf_outputs)
                 if fw_ip:
+                    customer_name = self.cloud_resource_configs.get('customer_info', {}).get(
+                        'customer_name_sanitized',
+                        self.cloud_resource_configs.get('customer_info', {}).get('customer_name', 'pov')
+                    )
                     firewalls_to_configure.append({
-                        'name': fw_name,
+                        'name': f"fw-{customer_name}",
                         'ip': fw_ip,
                         'credentials': {
                             'username': 'admin',
-                            'password': 'PaloAlto123!',  # Default POV password
+                            'password': 'PaloAlto123!',
                         },
-                        'type': fw.get('type', 'service_connection'),
-                        'location': fw.get('location', ''),
+                        'type': 'service_connection',
+                        'location': 'datacenter',
                     })
+                    self._log_activity(f"Using terraform firewall IP: {fw_ip}")
 
+        # Check if we found any firewalls to configure
         if not firewalls_to_configure:
-            self._log_activity("No firewall IPs found for configuration", "warning")
+            # Show more helpful error with terraform output keys
+            tf_keys = list(getattr(self, '_terraform_outputs', {}).keys()) if has_terraform else []
+            self._log_activity(f"No firewall IPs found. Terraform outputs: {tf_keys}", "warning")
+
+            error_msg = "Could not find firewall management IP(s).\n\n"
+            if has_terraform and tf_keys:
+                error_msg += f"Terraform outputs available:\n  {', '.join(tf_keys)}\n\n"
+                error_msg += "Expected output names like: firewall_management_ip, fw_ip, management_ip"
+            else:
+                error_msg += "No Terraform outputs available and no existing devices configured."
+
             QMessageBox.warning(
                 self,
-                "No Firewall IPs",
-                "Could not find firewall management IP(s) in Terraform outputs or existing devices."
+                "No Firewall IPs Found",
+                error_msg
             )
             return
 
@@ -9387,8 +9512,40 @@ output "{device_name}_private_ip" {{
         if hasattr(self, '_refresh_remote_branch_lists'):
             self._refresh_remote_branch_lists()
 
+        # Restore ADEM configuration
+        self._restore_adem_ui_state()
+
         # Restore terraform UI state
         self._restore_terraform_ui_state(state)
+
+    def _restore_adem_ui_state(self):
+        """Restore ADEM configuration UI from use_case_configs."""
+        adem_config = self.use_case_configs.get('aiops_adem', {})
+
+        # Restore enabled checkbox
+        if hasattr(self, 'aiops_adem_enable'):
+            self.aiops_adem_enable.setChecked(adem_config.get('enabled', True))
+
+        # Restore tests list
+        if hasattr(self, 'adem_tests_list'):
+            self.adem_tests_list.clear()
+            tests = adem_config.get('tests', [])
+            for test in tests:
+                target = test.get('target', '')
+                conditions = []
+                if test.get('on_vpn'):
+                    conditions.append("VPN")
+                if test.get('in_office'):
+                    conditions.append("Office")
+                if test.get('not_on_vpn'):
+                    conditions.append("No-VPN")
+                if not conditions:
+                    conditions.append("VPN")  # Default
+                display_text = f"{target} ({', '.join(conditions)})"
+                self.adem_tests_list.addItem(display_text)
+
+        # Update status label
+        self._update_use_case_status('aiops_adem')
 
     def _restore_terraform_ui_state(self, state: Dict[str, Any]):
         """Restore terraform-related UI state."""
