@@ -6097,7 +6097,11 @@ class POVWorkflowWidget(QWidget):
         for row, sub in enumerate(subscriptions):
             table.setItem(row, 0, QTableWidgetItem(sub.display_name))
             table.setItem(row, 1, QTableWidgetItem(sub.subscription_id))
-            table.setItem(row, 2, QTableWidgetItem(sub.state.value if sub.state else "Unknown"))
+            # Handle state as string or enum
+            state_str = str(sub.state) if sub.state else "Unknown"
+            if hasattr(sub.state, 'value'):
+                state_str = sub.state.value
+            table.setItem(row, 2, QTableWidgetItem(state_str))
 
         table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         table.horizontalHeader().setStretchLastSection(True)
@@ -6147,10 +6151,14 @@ class POVWorkflowWidget(QWidget):
             selected_row = table.currentRow()
             if selected_row >= 0:
                 sub = subscriptions[selected_row]
+                # Handle state as string or enum
+                state_str = str(sub.state) if sub.state else "Unknown"
+                if hasattr(sub.state, 'value'):
+                    state_str = sub.state.value
                 return {
                     'id': sub.subscription_id,
                     'name': sub.display_name,
-                    'state': sub.state.value if sub.state else "Unknown",
+                    'state': state_str,
                 }
 
         return None
