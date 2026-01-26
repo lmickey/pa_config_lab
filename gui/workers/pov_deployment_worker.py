@@ -479,8 +479,12 @@ class DeviceConfigWorker(QThread):
         self.phase_changed.emit("firewall")
         self.progress.emit("Connecting to firewall...", 10)
 
+        # Get firewall name for consistent log prefix
+        fw_name = self.config.get('name', 'firewall')
+
         def progress_callback(phase, message):
-            self.log_message.emit(f"[{phase.value}] {message}")
+            # Use firewall name as prefix for consistent logging
+            self.log_message.emit(f"[{fw_name}] [{phase.value}] {message}")
 
         # Create mock config object if dict
         fw_config = self._create_firewall_config(self.config)
@@ -492,8 +496,8 @@ class DeviceConfigWorker(QThread):
             credentials=self.credentials,
         )
 
-        self.log_message.emit(f"[firewall] Waiting for firewall to be accessible")
-        self.log_message.emit(f"[firewall] Retries: {self.device_retries}, Interval: {self.device_retry_interval}s, Timeout: {self.device_timeout}s")
+        self.log_message.emit(f"[{fw_name}] Waiting for firewall to be accessible")
+        self.log_message.emit(f"[{fw_name}] Retries: {self.device_retries}, Interval: {self.device_retry_interval}s, Timeout: {self.device_timeout}s")
         self.progress.emit("Pushing configuration...", 30)
         result = orchestrator.push(
             wait_timeout=self.device_timeout,
@@ -520,8 +524,12 @@ class DeviceConfigWorker(QThread):
         self.phase_changed.emit("panorama")
         self.progress.emit("Connecting to Panorama...", 10)
 
+        # Get panorama name for consistent log prefix
+        pano_name = self.config.get('name', 'panorama')
+
         def progress_callback(phase, message):
-            self.log_message.emit(f"[{phase.value}] {message}")
+            # Use panorama name as prefix for consistent logging
+            self.log_message.emit(f"[{pano_name}] [{phase.value}] {message}")
 
         pano_config = self._create_panorama_config(self.config)
 

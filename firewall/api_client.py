@@ -220,14 +220,14 @@ class FirewallAPIClient:
         self._firewall.refresh_system_info()
 
         return DeviceInfo(
-            hostname=self._firewall.hostname or "",
-            serial=self._firewall.serial or "",
-            model=self._firewall.model or "",
-            sw_version=self._firewall.version or "",
-            app_version=getattr(self._firewall, 'app_version', "") or "",
-            threat_version=getattr(self._firewall, 'threat_version', "") or "",
-            wildfire_version=getattr(self._firewall, 'wildfire_version', "") or "",
-            uptime=getattr(self._firewall, 'uptime', "") or "",
+            hostname=getattr(self._firewall, 'hostname', '') or "",
+            serial=getattr(self._firewall, 'serial', '') or "",
+            model=getattr(self._firewall, 'model', '') or "",
+            sw_version=getattr(self._firewall, 'version', '') or "",
+            app_version=getattr(self._firewall, 'app_version', '') or "",
+            threat_version=getattr(self._firewall, 'threat_version', '') or "",
+            wildfire_version=getattr(self._firewall, 'wildfire_version', '') or "",
+            uptime=getattr(self._firewall, 'uptime', '') or "",
             management_ip=self.hostname,
         )
 

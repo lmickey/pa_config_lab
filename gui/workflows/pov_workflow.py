@@ -140,6 +140,7 @@ class POVWorkflowWidget(QWidget):
         self._pov_deployment_in_progress = False
         self._pov_deployment_cancelled = False
         self._pov_deployment_phases_completed = []  # Track completed phases for resume
+        self._deploy_tenant_name = None  # Track deploy tenant for auto-connect on tab switch
 
         self._init_ui()
 
@@ -2583,6 +2584,141 @@ class POVWorkflowWidget(QWidget):
         tf_actions_group.setLayout(tf_actions_layout)
         layout.addWidget(tf_actions_group)
 
+        # Deployed Resources Credentials Section (hidden until deployment completes)
+        self.credentials_group = QGroupBox("Deployed Resource Credentials")
+        self.credentials_group.setVisible(False)
+        creds_layout = QVBoxLayout()
+
+        creds_info = QLabel(
+            "Use these credentials to connect to your deployed resources. "
+            "Click 'Copy' to copy individual values to clipboard."
+        )
+        creds_info.setWordWrap(True)
+        creds_info.setStyleSheet("color: #666; margin-bottom: 10px;")
+        creds_layout.addWidget(creds_info)
+
+        # Firewall credentials section
+        fw_creds_label = QLabel("<b>Firewall Credentials</b>")
+        creds_layout.addWidget(fw_creds_label)
+
+        fw_grid = QGridLayout()
+        fw_grid.setColumnStretch(1, 1)
+
+        # Firewall Management IP
+        fw_grid.addWidget(QLabel("Management IP:"), 0, 0)
+        self.creds_fw_ip = QLineEdit()
+        self.creds_fw_ip.setReadOnly(True)
+        self.creds_fw_ip.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
+        fw_grid.addWidget(self.creds_fw_ip, 0, 1)
+        fw_ip_copy_btn = QPushButton("Copy")
+        fw_ip_copy_btn.setFixedWidth(60)
+        fw_ip_copy_btn.clicked.connect(lambda: self._copy_to_clipboard(self.creds_fw_ip.text(), "Firewall IP"))
+        fw_grid.addWidget(fw_ip_copy_btn, 0, 2)
+
+        # Firewall Username
+        fw_grid.addWidget(QLabel("Username:"), 1, 0)
+        self.creds_fw_username = QLineEdit()
+        self.creds_fw_username.setReadOnly(True)
+        self.creds_fw_username.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
+        fw_grid.addWidget(self.creds_fw_username, 1, 1)
+        fw_user_copy_btn = QPushButton("Copy")
+        fw_user_copy_btn.setFixedWidth(60)
+        fw_user_copy_btn.clicked.connect(lambda: self._copy_to_clipboard(self.creds_fw_username.text(), "Username"))
+        fw_grid.addWidget(fw_user_copy_btn, 1, 2)
+
+        # Firewall Password
+        fw_grid.addWidget(QLabel("Password:"), 2, 0)
+        self.creds_fw_password = QLineEdit()
+        self.creds_fw_password.setReadOnly(True)
+        self.creds_fw_password.setEchoMode(QLineEdit.EchoMode.Password)
+        self.creds_fw_password.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
+        fw_grid.addWidget(self.creds_fw_password, 2, 1)
+
+        fw_pwd_btns = QHBoxLayout()
+        self.creds_fw_pwd_show_btn = QPushButton("Show")
+        self.creds_fw_pwd_show_btn.setFixedWidth(60)
+        self.creds_fw_pwd_show_btn.setCheckable(True)
+        self.creds_fw_pwd_show_btn.clicked.connect(self._toggle_fw_password_visibility)
+        fw_pwd_btns.addWidget(self.creds_fw_pwd_show_btn)
+        fw_pwd_copy_btn = QPushButton("Copy")
+        fw_pwd_copy_btn.setFixedWidth(60)
+        fw_pwd_copy_btn.clicked.connect(lambda: self._copy_to_clipboard(self.creds_fw_password.text(), "Password"))
+        fw_pwd_btns.addWidget(fw_pwd_copy_btn)
+        fw_grid.addLayout(fw_pwd_btns, 2, 2)
+
+        creds_layout.addLayout(fw_grid)
+
+        # Separator
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        separator.setStyleSheet("margin: 10px 0;")
+        creds_layout.addWidget(separator)
+
+        # VM/Server credentials section
+        vm_creds_label = QLabel("<b>Server/VM Credentials</b>")
+        creds_layout.addWidget(vm_creds_label)
+
+        vm_grid = QGridLayout()
+        vm_grid.setColumnStretch(1, 1)
+
+        # VM IPs (may have multiple)
+        vm_grid.addWidget(QLabel("Server IPs:"), 0, 0)
+        self.creds_vm_ips = QLineEdit()
+        self.creds_vm_ips.setReadOnly(True)
+        self.creds_vm_ips.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
+        self.creds_vm_ips.setPlaceholderText("No servers deployed")
+        vm_grid.addWidget(self.creds_vm_ips, 0, 1)
+        vm_ip_copy_btn = QPushButton("Copy")
+        vm_ip_copy_btn.setFixedWidth(60)
+        vm_ip_copy_btn.clicked.connect(lambda: self._copy_to_clipboard(self.creds_vm_ips.text(), "Server IPs"))
+        vm_grid.addWidget(vm_ip_copy_btn, 0, 2)
+
+        # VM Username
+        vm_grid.addWidget(QLabel("Username:"), 1, 0)
+        self.creds_vm_username = QLineEdit()
+        self.creds_vm_username.setReadOnly(True)
+        self.creds_vm_username.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
+        vm_grid.addWidget(self.creds_vm_username, 1, 1)
+        vm_user_copy_btn = QPushButton("Copy")
+        vm_user_copy_btn.setFixedWidth(60)
+        vm_user_copy_btn.clicked.connect(lambda: self._copy_to_clipboard(self.creds_vm_username.text(), "Username"))
+        vm_grid.addWidget(vm_user_copy_btn, 1, 2)
+
+        # VM Password
+        vm_grid.addWidget(QLabel("Password:"), 2, 0)
+        self.creds_vm_password = QLineEdit()
+        self.creds_vm_password.setReadOnly(True)
+        self.creds_vm_password.setEchoMode(QLineEdit.EchoMode.Password)
+        self.creds_vm_password.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
+        vm_grid.addWidget(self.creds_vm_password, 2, 1)
+
+        vm_pwd_btns = QHBoxLayout()
+        self.creds_vm_pwd_show_btn = QPushButton("Show")
+        self.creds_vm_pwd_show_btn.setFixedWidth(60)
+        self.creds_vm_pwd_show_btn.setCheckable(True)
+        self.creds_vm_pwd_show_btn.clicked.connect(self._toggle_vm_password_visibility)
+        vm_pwd_btns.addWidget(self.creds_vm_pwd_show_btn)
+        vm_pwd_copy_btn = QPushButton("Copy")
+        vm_pwd_copy_btn.setFixedWidth(60)
+        vm_pwd_copy_btn.clicked.connect(lambda: self._copy_to_clipboard(self.creds_vm_password.text(), "Password"))
+        vm_pwd_btns.addWidget(vm_pwd_copy_btn)
+        vm_grid.addLayout(vm_pwd_btns, 2, 2)
+
+        creds_layout.addLayout(vm_grid)
+
+        # Note about SSH/HTTPS access
+        access_note = QLabel(
+            "<i>Note: Connect via HTTPS to firewall management IP, or SSH to server IPs. "
+            "Ensure your source IP is allowed in the NSG rules.</i>"
+        )
+        access_note.setWordWrap(True)
+        access_note.setStyleSheet("color: #888; margin-top: 10px; font-size: 11px;")
+        creds_layout.addWidget(access_note)
+
+        self.credentials_group.setLayout(creds_layout)
+        layout.addWidget(self.credentials_group)
+
         # Progress bar
         self.cloud_deploy_progress = QProgressBar()
         self.cloud_deploy_progress.setVisible(False)
@@ -3995,6 +4131,122 @@ class POVWorkflowWidget(QWidget):
             self.cloud_admin_password.setEchoMode(QLineEdit.EchoMode.Normal)
         else:
             self.cloud_admin_password.setEchoMode(QLineEdit.EchoMode.Password)
+
+    def _toggle_fw_password_visibility(self, checked: bool):
+        """Toggle firewall password visibility in credentials panel."""
+        if hasattr(self, 'creds_fw_password'):
+            if checked:
+                self.creds_fw_password.setEchoMode(QLineEdit.EchoMode.Normal)
+                self.creds_fw_pwd_show_btn.setText("Hide")
+            else:
+                self.creds_fw_password.setEchoMode(QLineEdit.EchoMode.Password)
+                self.creds_fw_pwd_show_btn.setText("Show")
+
+    def _toggle_vm_password_visibility(self, checked: bool):
+        """Toggle VM password visibility in credentials panel."""
+        if hasattr(self, 'creds_vm_password'):
+            if checked:
+                self.creds_vm_password.setEchoMode(QLineEdit.EchoMode.Normal)
+                self.creds_vm_pwd_show_btn.setText("Hide")
+            else:
+                self.creds_vm_password.setEchoMode(QLineEdit.EchoMode.Password)
+                self.creds_vm_pwd_show_btn.setText("Show")
+
+    def _copy_to_clipboard(self, text: str, label: str = ""):
+        """Copy text to clipboard and show brief confirmation."""
+        from PyQt6.QtWidgets import QApplication
+        from PyQt6.QtCore import QTimer
+
+        if not text:
+            return
+
+        clipboard = QApplication.clipboard()
+        clipboard.setText(text)
+
+        # Show brief toast if available
+        if hasattr(self, 'show_success_toast') and self.show_success_toast:
+            self.show_success_toast(f"Copied {label} to clipboard", 1500)
+        else:
+            self._log_activity(f"Copied {label} to clipboard")
+
+    def _populate_deployment_credentials(self):
+        """Populate the credentials panel with deployed resource info."""
+        if not hasattr(self, 'credentials_group'):
+            return
+
+        # Get terraform outputs
+        outputs = getattr(self, '_terraform_outputs', {})
+        if not outputs:
+            return
+
+        # Get credentials from config
+        cloud_deployment = self.cloud_resource_configs.get('cloud_deployment', {})
+        admin_username = cloud_deployment.get('admin_username', '')
+        admin_password = cloud_deployment.get('admin_password', '')
+
+        # If no stored username, derive from customer name
+        if not admin_username:
+            customer_info = self.cloud_resource_configs.get('customer_info', {})
+            customer_name = customer_info.get('customer_name_sanitized', '')
+            if customer_name:
+                admin_username = f"{customer_name}admin"
+
+        # Find firewall management IP
+        fw_ip = None
+        for key, value in outputs.items():
+            if not value:
+                continue
+            key_lower = key.lower()
+            # Skip private IPs
+            if 'private' in key_lower:
+                continue
+            # Look for management IP
+            if ('firewall' in key_lower or 'fw' in key_lower) and ('mgmt' in key_lower or 'management' in key_lower or 'public' in key_lower):
+                fw_ip = value
+                break
+
+        # Fallback: look for any firewall IP that's not private
+        if not fw_ip:
+            for key, value in outputs.items():
+                if not value:
+                    continue
+                key_lower = key.lower()
+                if 'private' in key_lower:
+                    continue
+                if 'firewall' in key_lower or 'fw_' in key_lower:
+                    fw_ip = value
+                    break
+
+        # Find server/VM IPs
+        vm_ips = []
+        for key, value in outputs.items():
+            if not value:
+                continue
+            key_lower = key.lower()
+            # Look for server, client, or vm private IPs
+            if any(term in key_lower for term in ['server', 'client', 'vm', 'trust_device']):
+                if 'private' in key_lower or 'ip' in key_lower:
+                    vm_ips.append(value)
+
+        # Populate firewall credentials
+        if hasattr(self, 'creds_fw_ip'):
+            self.creds_fw_ip.setText(fw_ip or "Not found")
+        if hasattr(self, 'creds_fw_username'):
+            self.creds_fw_username.setText(admin_username or "admin")
+        if hasattr(self, 'creds_fw_password'):
+            self.creds_fw_password.setText(admin_password or "")
+
+        # Populate VM credentials
+        if hasattr(self, 'creds_vm_ips'):
+            self.creds_vm_ips.setText(", ".join(vm_ips) if vm_ips else "")
+        if hasattr(self, 'creds_vm_username'):
+            self.creds_vm_username.setText(admin_username or "")
+        if hasattr(self, 'creds_vm_password'):
+            self.creds_vm_password.setText(admin_password or "")
+
+        # Show the credentials section
+        self.credentials_group.setVisible(True)
+        self._log_activity("Deployment credentials populated")
 
     def _regenerate_admin_password(self):
         """Generate a new secure admin password."""
@@ -5865,6 +6117,37 @@ class POVWorkflowWidget(QWidget):
                 self._refresh_private_app_connections()
                 self._auto_generate_security_objects()
 
+            # Auto-connect to saved deploy tenant when entering Deploy POV Config tab
+            if index == 4:
+                self._auto_connect_deploy_tenant()
+
+    def _auto_connect_deploy_tenant(self):
+        """Auto-connect to the saved deploy tenant if not already connected."""
+        # Check if we have a saved deploy tenant name
+        saved_tenant = getattr(self, '_deploy_tenant_name', None)
+        if not saved_tenant:
+            logger.debug("No saved deploy tenant to auto-connect")
+            return
+
+        # Check if already connected to this tenant
+        if hasattr(self, 'deploy_tenant_selector'):
+            current_client, current_name = self.deploy_tenant_selector.get_connection()
+            if current_client and current_name == saved_tenant:
+                logger.debug(f"Already connected to deploy tenant: {saved_tenant}")
+                return
+
+            # Pre-select the saved tenant in the dropdown and trigger connection
+            logger.info(f"Auto-connecting to saved deploy tenant: {saved_tenant}")
+            combo = self.deploy_tenant_selector.tenant_combo
+            for i in range(combo.count()):
+                if combo.itemText(i) == saved_tenant:
+                    # This will trigger _on_tenant_selected which connects
+                    combo.setCurrentIndex(i)
+                    return
+
+            # If tenant not found in combo, log warning
+            logger.warning(f"Saved deploy tenant '{saved_tenant}' not found in tenant list")
+
     # ============================================================================
     # EVENT HANDLERS - CLOUD DEPLOYMENT TAB (Tab 4)
     # ============================================================================
@@ -5936,10 +6219,13 @@ class POVWorkflowWidget(QWidget):
 
             self._log_activity("Opening browser for Azure sign-in...")
 
-            # Suppress browser subprocess stderr (Chrome warnings)
+            # Suppress browser subprocess stdout/stderr (Chrome warnings)
+            original_stdout = sys.stdout
             original_stderr = sys.stderr
+            devnull = open(os.devnull, 'w')
             try:
-                sys.stderr = open(os.devnull, 'w')
+                sys.stdout = devnull
+                sys.stderr = devnull
 
                 # Step 1: Initial authentication (multi-tenant if no tenant specified)
                 if specified_tenant_id:
@@ -5952,14 +6238,19 @@ class POVWorkflowWidget(QWidget):
                         redirect_uri="http://localhost:8400",
                     )
 
+                # Restore stdout before logging (so our logs appear)
+                sys.stdout = original_stdout
                 self._log_activity("Requesting token for Azure Management API...")
+                sys.stdout = devnull
+
                 token = credential.get_token("https://management.azure.com/.default")
-                self._log_activity(f"Token acquired successfully")
 
             finally:
-                if sys.stderr != original_stderr:
-                    sys.stderr.close()
+                sys.stdout = original_stdout
                 sys.stderr = original_stderr
+                devnull.close()
+
+            self._log_activity(f"Token acquired successfully")
 
             # Bring window back to focus after browser auth
             self.activateWindow()
@@ -6024,19 +6315,22 @@ class POVWorkflowWidget(QWidget):
             # Step 3: If we selected a different tenant, re-authenticate to that tenant
             if selected_tenant_id and selected_tenant_id != home_tenant_id:
                 self._log_activity(f"Re-authenticating to selected directory...")
+                original_stdout = sys.stdout
                 original_stderr = sys.stderr
+                devnull = open(os.devnull, 'w')
                 try:
-                    sys.stderr = open(os.devnull, 'w')
+                    sys.stdout = devnull
+                    sys.stderr = devnull
                     credential = InteractiveBrowserCredential(
                         redirect_uri="http://localhost:8400",
                         tenant_id=selected_tenant_id,
                     )
                     token = credential.get_token("https://management.azure.com/.default")
-                    self._log_activity(f"Token acquired for selected directory")
                 finally:
-                    if sys.stderr != original_stderr:
-                        sys.stderr.close()
+                    sys.stdout = original_stdout
                     sys.stderr = original_stderr
+                    devnull.close()
+                self._log_activity(f"Token acquired for selected directory")
 
                 # Bring window back to focus after browser auth
                 self.activateWindow()
@@ -8179,6 +8473,9 @@ output "{device_name}_private_ip" {{
             if hasattr(self, 'cloud_deploy_next_btn'):
                 self.cloud_deploy_next_btn.setEnabled(True)
                 self.cloud_deploy_next_btn.setToolTip("Proceed to deploy POV configuration")
+
+            # Populate and show the credentials panel
+            self._populate_deployment_credentials()
         else:
             self._log_activity(f"Infrastructure deployment failed: {message}", "error")
             self.cloud_deploy_results.set_text(f"[FAILED] Deployment Failed\n\n{message}")
@@ -8288,6 +8585,9 @@ output "{device_name}_private_ip" {{
 
     def _on_deploy_tenant_changed(self, api_client, tenant_name: str):
         """Handle deploy tenant connection changes."""
+        # Track the deploy tenant name for state persistence
+        self._deploy_tenant_name = tenant_name if api_client else None
+
         # Enable action buttons when connected
         if api_client:
             self._log_activity(f"Connected to tenant: {tenant_name}")
@@ -8297,6 +8597,8 @@ output "{device_name}_private_ip" {{
                 f"<b>Connected to:</b> {tenant_name}<br><br>"
                 "Configuration from previous steps will be deployed to this tenant."
             )
+            # Save state with deploy tenant
+            self.save_state()
         else:
             self._log_activity("Disconnected from tenant")
             self.review_config_btn.setEnabled(False)
@@ -8904,38 +9206,44 @@ output "{device_name}_private_ip" {{
             })
 
         # Phase 2: Service Connections
+        # PA side must be configured FIRST to get endpoint IPs for FW side IPsec tunnel
         sc_datacenters = [dc for dc in ctx.get('datacenters', [])
                         if dc.get('connection_type') == 'service_connection']
         for dc in sc_datacenters:
             # Find the firewall for this datacenter
             fw = self._find_firewall_for_location(dc.get('name'))
+            # PA side first - creates Service Connection in Prisma Access, returns endpoint IPs
+            phases.append({
+                'name': f"Service Connection: {dc['name']} (PA side)",
+                'type': 'service_connection_pa',
+                'datacenter': dc,
+            })
             if fw:
+                # FW side second - configures IPsec tunnel using endpoint IPs from PA
                 phases.append({
                     'name': f"Service Connection: {dc['name']} (FW side)",
                     'type': 'service_connection_fw',
                     'datacenter': dc,
                     'firewall': fw,
                 })
-                phases.append({
-                    'name': f"Service Connection: {dc['name']} (PA side)",
-                    'type': 'service_connection_pa',
-                    'datacenter': dc,
-                })
 
         # Phase 3: Remote Networks
+        # PA side must be configured FIRST to get endpoint IPs for FW side IPsec tunnel
         for branch in ctx.get('branches', []):
             fw = self._find_firewall_for_location(branch.get('name'))
+            # PA side first - creates Remote Network in Prisma Access, returns endpoint IPs
+            phases.append({
+                'name': f"Remote Network: {branch['name']} (PA side)",
+                'type': 'remote_network_pa',
+                'branch': branch,
+            })
             if fw:
+                # FW side second - configures IPsec tunnel using endpoint IPs from PA
                 phases.append({
                     'name': f"Remote Network: {branch['name']} (FW side)",
                     'type': 'remote_network_fw',
                     'branch': branch,
                     'firewall': fw,
-                })
-                phases.append({
-                    'name': f"Remote Network: {branch['name']} (PA side)",
-                    'type': 'remote_network_pa',
-                    'branch': branch,
                 })
 
         # Phase 4: Prisma Access configuration
@@ -9330,8 +9638,8 @@ output "{device_name}_private_ip" {{
 
         Dependencies:
         - firewall_base failure -> skip service_connection_fw, remote_network_fw for that firewall
-        - service_connection_fw failure -> skip service_connection_pa for that datacenter
-        - remote_network_fw failure -> skip remote_network_pa for that branch
+        - service_connection_pa failure -> skip service_connection_fw for that datacenter (no endpoint IPs)
+        - remote_network_pa failure -> skip remote_network_fw for that branch (no endpoint IPs)
         """
         failed_type = failed_phase.get('type', '')
         failed_fw = failed_phase.get('firewall', {})
@@ -9352,21 +9660,21 @@ output "{device_name}_private_ip" {{
                 if phase_fw.get('name') == failed_fw.get('name'):
                     if phase_type in ['service_connection_fw', 'remote_network_fw']:
                         should_skip = True
-                        skip_reason = f"Firewall {failed_fw.get('name')} not accessible"
+                        skip_reason = f"Firewall {failed_fw.get('name')} base config failed"
 
-            # Service connection FW failure -> skip PA side for that datacenter
-            if failed_type == 'service_connection_fw':
+            # Service connection PA failure -> skip FW side for that datacenter (no endpoint IPs)
+            if failed_type == 'service_connection_pa':
                 phase_dc = phase.get('datacenter', {})
-                if phase_dc.get('name') == failed_dc.get('name') and phase_type == 'service_connection_pa':
+                if phase_dc.get('name') == failed_dc.get('name') and phase_type == 'service_connection_fw':
                     should_skip = True
-                    skip_reason = f"FW side failed for {failed_dc.get('name')}"
+                    skip_reason = f"PA side failed for {failed_dc.get('name')} - no endpoint IPs available"
 
-            # Remote network FW failure -> skip PA side for that branch
-            if failed_type == 'remote_network_fw':
+            # Remote network PA failure -> skip FW side for that branch (no endpoint IPs)
+            if failed_type == 'remote_network_pa':
                 phase_branch = phase.get('branch', {})
-                if phase_branch.get('name') == failed_branch.get('name') and phase_type == 'remote_network_pa':
+                if phase_branch.get('name') == failed_branch.get('name') and phase_type == 'remote_network_fw':
                     should_skip = True
-                    skip_reason = f"FW side failed for {failed_branch.get('name')}"
+                    skip_reason = f"PA side failed for {failed_branch.get('name')} - no endpoint IPs available"
 
             if should_skip:
                 self._deploy_phase_results[phase['name']] = {
@@ -9590,6 +9898,8 @@ output "{device_name}_private_ip" {{
             'terraform_outputs': getattr(self, '_terraform_outputs', {}),
             # POV deployment state tracking
             'pov_deployment_phases_completed': getattr(self, '_pov_deployment_phases_completed', []),
+            # Deploy tenant name (Tab 5 destination tenant)
+            'deploy_tenant_name': getattr(self, '_deploy_tenant_name', None),
         }
 
         # Save to file (overwrites existing)
@@ -9639,6 +9949,9 @@ output "{device_name}_private_ip" {{
             self._pov_deployment_phases_completed = state.get('pov_deployment_phases_completed', [])
             self._pov_deployment_in_progress = False
             self._pov_deployment_cancelled = False
+
+            # Restore deploy tenant name (Tab 5 destination tenant)
+            self._deploy_tenant_name = state.get('deploy_tenant_name')
 
             # Restore UI state
             self._restore_ui_from_state(state)
@@ -9732,6 +10045,25 @@ output "{device_name}_private_ip" {{
             # Update status label to show needs reconnection
             self.tenant_selector.status_label.setText(f"⚠️ Select '{self.connection_name}' to reconnect")
             self.tenant_selector.status_label.setStyleSheet("color: #FF9800; padding: 8px; margin-top: 5px;")
+
+        # Restore deploy tenant selector status (Tab 5)
+        deploy_tenant_name = state.get('deploy_tenant_name')
+        if hasattr(self, 'deploy_tenant_selector') and deploy_tenant_name:
+            # Pre-select the deploy tenant in dropdown (without triggering connection)
+            combo = self.deploy_tenant_selector.tenant_combo
+            combo.blockSignals(True)
+            for i in range(combo.count()):
+                if combo.itemText(i) == deploy_tenant_name:
+                    combo.setCurrentIndex(i)
+                    break
+            combo.blockSignals(False)
+            # Update status to show auto-connect pending
+            self.deploy_tenant_selector.status_label.setText(
+                f"⏳ Will auto-connect to '{deploy_tenant_name}' when tab opens"
+            )
+            self.deploy_tenant_selector.status_label.setStyleSheet(
+                "color: #1565C0; padding: 8px; margin-top: 5px; font-style: italic;"
+            )
 
         # Refresh other UI elements
         if hasattr(self, '_update_cloud_rg_preview'):
@@ -9834,6 +10166,14 @@ output "{device_name}_private_ip" {{
                     if terraform_deployed or state_exists:
                         self.cloud_deploy_next_btn.setEnabled(True)
                         self.cloud_deploy_next_btn.setToolTip("Proceed to deploy POV configuration")
+
+                # Populate credentials panel if terraform was deployed
+                if terraform_deployed or state_exists:
+                    # Ensure terraform outputs are loaded
+                    if not getattr(self, '_terraform_outputs', None):
+                        self._terraform_outputs = self._read_terraform_outputs_from_state()
+                    # Populate and show credentials
+                    self._populate_deployment_credentials()
 
     def _read_terraform_outputs_from_state(self) -> Dict[str, Any]:
         """Read terraform outputs from the terraform.tfstate file.
