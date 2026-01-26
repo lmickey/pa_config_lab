@@ -6058,70 +6058,108 @@ class POVWorkflowWidget(QWidget):
             True if user wants to continue, False to cancel
         """
         from PyQt6.QtWidgets import QDialog
+        from PyQt6.QtGui import QPalette, QColor
 
         dialog = QDialog(self)
-        dialog.setWindowTitle("Cloud Resources Not Deployed")
-        dialog.setMinimumWidth(450)
-        dialog.setStyleSheet("""
-            QDialog {
-                background-color: #fff3f3;
-            }
-        """)
+        dialog.setWindowTitle("⚠️ Cloud Resources Not Deployed")
+        dialog.setMinimumWidth(500)
+        dialog.setModal(True)
 
-        layout = QVBoxLayout(dialog)
-        layout.setSpacing(15)
-        layout.setContentsMargins(20, 20, 20, 20)
+        # Use palette for background color (more reliable on Windows)
+        palette = dialog.palette()
+        palette.setColor(QPalette.ColorRole.Window, QColor("#fff3f3"))
+        dialog.setPalette(palette)
+        dialog.setAutoFillBackground(True)
 
-        # Warning header with icon
-        header_layout = QHBoxLayout()
+        # Main layout
+        main_layout = QVBoxLayout(dialog)
+        main_layout.setSpacing(0)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Red header bar
+        header_widget = QWidget()
+        header_widget.setAutoFillBackground(True)
+        header_palette = header_widget.palette()
+        header_palette.setColor(QPalette.ColorRole.Window, QColor("#f44336"))
+        header_widget.setPalette(header_palette)
+        header_widget.setMinimumHeight(60)
+
+        header_layout = QHBoxLayout(header_widget)
+        header_layout.setContentsMargins(20, 10, 20, 10)
+
         warning_icon = QLabel("⚠️")
-        warning_icon.setStyleSheet("font-size: 32px;")
+        warning_icon.setStyleSheet("font-size: 28px; color: white;")
         header_layout.addWidget(warning_icon)
 
-        title = QLabel("<b>Terraform has not been deployed!</b>")
-        title.setStyleSheet("font-size: 16px; color: #d32f2f;")
+        title = QLabel("Terraform Not Deployed!")
+        title.setStyleSheet("font-size: 18px; font-weight: bold; color: white;")
         header_layout.addWidget(title)
         header_layout.addStretch()
-        layout.addLayout(header_layout)
+
+        main_layout.addWidget(header_widget)
+
+        # Content area
+        content_widget = QWidget()
+        content_widget.setAutoFillBackground(True)
+        content_palette = content_widget.palette()
+        content_palette.setColor(QPalette.ColorRole.Window, QColor("#fff3f3"))
+        content_widget.setPalette(content_palette)
+
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setSpacing(15)
+        content_layout.setContentsMargins(20, 20, 20, 20)
 
         # Warning message
         message = QLabel(
-            "Cloud resource deployment is enabled but you haven't deployed Terraform.\n\n"
-            "Your Azure infrastructure (VNet, subnets, VMs) will NOT be created.\n\n"
-            "Do you want to continue anyway?"
+            "Cloud resource deployment is enabled but you haven't deployed Terraform yet.\n\n"
+            "Your Azure infrastructure (VNet, subnets, VMs) will <b>NOT</b> be created."
         )
         message.setWordWrap(True)
-        message.setStyleSheet("color: #333; font-size: 13px; padding: 10px;")
-        layout.addWidget(message)
+        message.setStyleSheet("color: #333; font-size: 13px;")
+        content_layout.addWidget(message)
 
-        # Red border frame around content
-        frame = QFrame()
-        frame.setStyleSheet("""
-            QFrame {
-                border: 3px solid #f44336;
-                border-radius: 8px;
-                background-color: #ffebee;
-                padding: 10px;
-            }
-        """)
-        frame_layout = QVBoxLayout(frame)
-        frame_layout.addWidget(QLabel(
-            "⚠️ <b>Warning:</b> Proceeding without Terraform deployment means "
+        # Red border warning box
+        warning_frame = QFrame()
+        warning_frame.setFrameShape(QFrame.Shape.Box)
+        warning_frame.setLineWidth(2)
+        warning_frame.setAutoFillBackground(True)
+        warning_palette = warning_frame.palette()
+        warning_palette.setColor(QPalette.ColorRole.Window, QColor("#ffebee"))
+        warning_frame.setPalette(warning_palette)
+        warning_frame.setStyleSheet("QFrame { border: 2px solid #f44336; border-radius: 4px; }")
+
+        warning_layout = QVBoxLayout(warning_frame)
+        warning_layout.setContentsMargins(15, 15, 15, 15)
+        warning_label = QLabel(
+            "⛔ <b>Warning:</b> Proceeding without Terraform deployment means "
             "no Azure infrastructure will be created for this POV."
-        ))
-        layout.addWidget(frame)
+        )
+        warning_label.setWordWrap(True)
+        warning_label.setStyleSheet("color: #c62828; font-size: 12px;")
+        warning_layout.addWidget(warning_label)
+        content_layout.addWidget(warning_frame)
+
+        # Question
+        question = QLabel("Do you want to continue anyway?")
+        question.setStyleSheet("color: #333; font-size: 13px; font-weight: bold;")
+        content_layout.addWidget(question)
+
+        content_layout.addStretch()
 
         # Buttons
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
         no_btn = QPushButton("Go Back and Deploy")
+        no_btn.setMinimumWidth(150)
+        no_btn.setMinimumHeight(36)
         no_btn.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
                 color: white;
-                padding: 10px 20px;
+                padding: 8px 16px;
                 font-weight: bold;
+                font-size: 12px;
                 border-radius: 4px;
                 border: none;
             }
@@ -6133,12 +6171,15 @@ class POVWorkflowWidget(QWidget):
         btn_layout.addWidget(no_btn)
 
         yes_btn = QPushButton("Continue Anyway")
+        yes_btn.setMinimumWidth(150)
+        yes_btn.setMinimumHeight(36)
         yes_btn.setStyleSheet("""
             QPushButton {
                 background-color: #f44336;
                 color: white;
-                padding: 10px 20px;
+                padding: 8px 16px;
                 font-weight: bold;
+                font-size: 12px;
                 border-radius: 4px;
                 border: none;
             }
@@ -6149,7 +6190,8 @@ class POVWorkflowWidget(QWidget):
         yes_btn.clicked.connect(dialog.accept)
         btn_layout.addWidget(yes_btn)
 
-        layout.addLayout(btn_layout)
+        content_layout.addLayout(btn_layout)
+        main_layout.addWidget(content_widget)
 
         return dialog.exec() == QDialog.DialogCode.Accepted
 
