@@ -136,6 +136,11 @@ class POVWorkflowWidget(QWidget):
             'deploy_cloud_resources': False,  # Default to not deploying cloud resources
         }
 
+        # POV deployment state tracking
+        self._pov_deployment_in_progress = False
+        self._pov_deployment_cancelled = False
+        self._pov_deployment_phases_completed = []  # Track completed phases for resume
+
         self._init_ui()
 
         # Populate tenant dropdown from saved tenants
@@ -2728,21 +2733,12 @@ class POVWorkflowWidget(QWidget):
         self.review_config_btn.clicked.connect(self._review_pov_config)
         actions_row.addWidget(self.review_config_btn)
 
-        self.deploy_config_btn = QPushButton("🚀 Deploy Configuration")
+        self.deploy_config_btn = QPushButton("Deploy Configuration")
         self.deploy_config_btn.setMinimumWidth(180)
         self.deploy_config_btn.setEnabled(False)
         self.deploy_config_btn.setToolTip("Deploy POV configuration to SCM/Panorama")
-        self.deploy_config_btn.setStyleSheet(
-            "QPushButton { "
-            "  background-color: #4CAF50; color: white; padding: 10px 20px; "
-            "  font-weight: bold; border-radius: 5px; "
-            "  border: 1px solid #388E3C; border-bottom: 3px solid #2E7D32; "
-            "}"
-            "QPushButton:hover { background-color: #45a049; border-bottom: 3px solid #1B5E20; }"
-            "QPushButton:pressed { background-color: #388E3C; border-bottom: 1px solid #2E7D32; }"
-            "QPushButton:disabled { background-color: #BDBDBD; color: #9E9E9E; border: 1px solid #9E9E9E; border-bottom: 3px solid #757575; }"
-        )
-        self.deploy_config_btn.clicked.connect(self._deploy_pov_config)
+        self._update_deploy_config_button_style()
+        self.deploy_config_btn.clicked.connect(self._handle_deploy_config_click)
         actions_row.addWidget(self.deploy_config_btn)
 
         layout.addLayout(actions_row)
@@ -8206,6 +8202,90 @@ output "{device_name}_private_ip" {{
     # EVENT HANDLERS - DEPLOY POV CONFIG TAB (Tab 5)
     # ============================================================================
 
+    def _update_deploy_config_button_style(self, state: str = "deploy"):
+        """Update the deploy config button style based on state.
+
+        Args:
+            state: One of 'deploy', 'cancel', 'resume'
+        """
+        if state == "cancel":
+            self.deploy_config_btn.setText("Cancel Push")
+            self.deploy_config_btn.setStyleSheet(
+                "QPushButton { "
+                "  background-color: #f44336; color: white; padding: 10px 20px; "
+                "  font-weight: bold; border-radius: 5px; "
+                "  border: 1px solid #d32f2f; border-bottom: 3px solid #c62828; "
+                "}"
+                "QPushButton:hover { background-color: #e53935; border-bottom: 3px solid #b71c1c; }"
+                "QPushButton:pressed { background-color: #d32f2f; border-bottom: 1px solid #c62828; }"
+            )
+            self.deploy_config_btn.setToolTip("Cancel the current deployment")
+        elif state == "resume":
+            self.deploy_config_btn.setText("Resume Deployment")
+            self.deploy_config_btn.setStyleSheet(
+                "QPushButton { "
+                "  background-color: #FF9800; color: white; padding: 10px 20px; "
+                "  font-weight: bold; border-radius: 5px; "
+                "  border: 1px solid #F57C00; border-bottom: 3px solid #E65100; "
+                "}"
+                "QPushButton:hover { background-color: #FB8C00; border-bottom: 3px solid #BF360C; }"
+                "QPushButton:pressed { background-color: #F57C00; border-bottom: 1px solid #E65100; }"
+            )
+            self.deploy_config_btn.setToolTip("Resume deployment from where it left off")
+        else:  # deploy
+            self.deploy_config_btn.setText("Deploy Configuration")
+            self.deploy_config_btn.setStyleSheet(
+                "QPushButton { "
+                "  background-color: #4CAF50; color: white; padding: 10px 20px; "
+                "  font-weight: bold; border-radius: 5px; "
+                "  border: 1px solid #388E3C; border-bottom: 3px solid #2E7D32; "
+                "}"
+                "QPushButton:hover { background-color: #45a049; border-bottom: 3px solid #1B5E20; }"
+                "QPushButton:pressed { background-color: #388E3C; border-bottom: 1px solid #2E7D32; }"
+                "QPushButton:disabled { background-color: #BDBDBD; color: #9E9E9E; border: 1px solid #9E9E9E; border-bottom: 3px solid #757575; }"
+            )
+            self.deploy_config_btn.setToolTip("Deploy POV configuration to SCM/Panorama")
+
+    def _handle_deploy_config_click(self):
+        """Handle the deploy config button click based on current state."""
+        if self._pov_deployment_in_progress:
+            # Cancel the current deployment
+            self._cancel_pov_deployment()
+        else:
+            # Check if we need to resume
+            if self._pov_deployment_phases_completed:
+                # Has previously completed phases - ask to resume or restart
+                reply = QMessageBox.question(
+                    self,
+                    "Resume Deployment?",
+                    f"Previous deployment completed {len(self._pov_deployment_phases_completed)} phase(s).\n\n"
+                    "Do you want to resume from where it left off?\n\n"
+                    "Click 'Yes' to resume, 'No' to restart from the beginning.",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+                )
+                if reply == QMessageBox.StandardButton.Cancel:
+                    return
+                elif reply == QMessageBox.StandardButton.No:
+                    # Reset completed phases
+                    self._pov_deployment_phases_completed = []
+
+            # Start deployment
+            self._deploy_pov_config()
+
+    def _cancel_pov_deployment(self):
+        """Cancel the current POV deployment."""
+        self._log_activity("Cancelling POV deployment...")
+        self._pov_deployment_cancelled = True
+
+        # Update UI
+        self._update_deploy_config_button_style("resume")
+        self.deploy_config_btn.setEnabled(True)
+        self.pov_deploy_results.append_text("\n\n[CANCELLED] Deployment cancelled by user.")
+        self.pov_deploy_results.append_text(f"\nCompleted phases: {len(self._pov_deployment_phases_completed)}")
+
+        # Save state so user can resume later
+        self.save_state()
+
     def _on_deploy_tenant_changed(self, api_client, tenant_name: str):
         """Handle deploy tenant connection changes."""
         # Enable action buttons when connected
@@ -8774,24 +8854,40 @@ output "{device_name}_private_ip" {{
         }
 
         # Update UI for deployment
-        self.deploy_config_btn.setEnabled(False)
+        self._pov_deployment_in_progress = True
+        self._pov_deployment_cancelled = False
+        self._update_deploy_config_button_style("cancel")
+        self.deploy_config_btn.setEnabled(True)  # Enable for cancel
         self.review_config_btn.setEnabled(False)
         self.pov_deploy_progress.setVisible(True)
         self.pov_deploy_progress.setValue(0)
 
         # Start multi-phase deployment
-        self._current_deploy_phase = 0
         self._deploy_phases = self._build_deployment_phases()
         self._deploy_phase_results = {}
+
+        # Determine starting phase (for resume support)
+        if self._pov_deployment_phases_completed:
+            # Find first phase not yet completed
+            self._current_deploy_phase = len(self._pov_deployment_phases_completed)
+            self._log_activity(f"Resuming deployment from phase {self._current_deploy_phase + 1}")
+        else:
+            self._current_deploy_phase = 0
 
         # Show initial status
         phases_text = "POV Deployment Phases:\n"
         for i, phase in enumerate(self._deploy_phases, 1):
-            phases_text += f"  {i}. {phase['name']}\n"
-        phases_text += "\nStarting deployment..."
+            completed = i <= len(self._pov_deployment_phases_completed)
+            status = "[DONE]" if completed else "[    ]"
+            phases_text += f"  {status} {i}. {phase['name']}\n"
+
+        if self._pov_deployment_phases_completed:
+            phases_text += f"\nResuming from phase {self._current_deploy_phase + 1}..."
+        else:
+            phases_text += "\nStarting deployment..."
         self.pov_deploy_results.set_text(phases_text)
 
-        # Begin first phase
+        # Begin deployment
         self._execute_next_deploy_phase()
 
     def _build_deployment_phases(self) -> list:
@@ -8887,6 +8983,12 @@ output "{device_name}_private_ip" {{
 
     def _execute_next_deploy_phase(self):
         """Execute the next deployment phase."""
+        # Check if cancelled
+        if self._pov_deployment_cancelled:
+            self._log_activity("Deployment cancelled, stopping execution")
+            self._pov_deployment_in_progress = False
+            return
+
         if self._current_deploy_phase >= len(self._deploy_phases):
             # All phases complete
             self._on_all_deploy_phases_complete()
@@ -8895,6 +8997,15 @@ output "{device_name}_private_ip" {{
         phase = self._deploy_phases[self._current_deploy_phase]
         phase_num = self._current_deploy_phase + 1
         total_phases = len(self._deploy_phases)
+
+        # Check if this phase was already marked as skipped due to dependency failure
+        if phase['name'] in self._deploy_phase_results and self._deploy_phase_results[phase['name']].get('skipped'):
+            skip_msg = self._deploy_phase_results[phase['name']].get('message', 'Dependency failed')
+            self.pov_deploy_results.append_text(f"\n\n[PHASE {phase_num}/{total_phases}] {phase['name']}")
+            self.pov_deploy_results.append_text(f"\n  [SKIPPED] {skip_msg}")
+            self._current_deploy_phase += 1
+            self._execute_next_deploy_phase()
+            return
 
         self._log_activity(f"Starting phase {phase_num}/{total_phases}: {phase['name']}")
         self.pov_deploy_results.append_text(f"\n\n[PHASE {phase_num}/{total_phases}] {phase['name']}")
@@ -9192,28 +9303,102 @@ output "{device_name}_private_ip" {{
     def _advance_to_next_phase(self, success: bool, message: str):
         """Advance to the next deployment phase."""
         phase = self._deploy_phases[self._current_deploy_phase]
+        phase_type = phase.get('type', '')
+
         if phase['name'] not in self._deploy_phase_results:
             self._deploy_phase_results[phase['name']] = {
                 'success': success,
                 'message': message,
             }
 
+        # Track completed phases for resume support
+        if success:
+            self._pov_deployment_phases_completed.append(phase['name'])
+
+        # If a critical phase failed, mark dependent phases as skipped
+        if not success:
+            self._mark_dependent_phases_failed(phase)
+
+        # Save state after each phase for resume support
+        self.save_state()
+
         self._current_deploy_phase += 1
         self._execute_next_deploy_phase()
 
+    def _mark_dependent_phases_failed(self, failed_phase: dict):
+        """Mark phases that depend on a failed phase as skipped.
+
+        Dependencies:
+        - firewall_base failure -> skip service_connection_fw, remote_network_fw for that firewall
+        - service_connection_fw failure -> skip service_connection_pa for that datacenter
+        - remote_network_fw failure -> skip remote_network_pa for that branch
+        """
+        failed_type = failed_phase.get('type', '')
+        failed_fw = failed_phase.get('firewall', {})
+        failed_dc = failed_phase.get('datacenter', {})
+        failed_branch = failed_phase.get('branch', {})
+
+        for i, phase in enumerate(self._deploy_phases):
+            if i <= self._current_deploy_phase:
+                continue  # Already processed
+
+            phase_type = phase.get('type', '')
+            should_skip = False
+            skip_reason = ""
+
+            # Firewall base failure -> skip FW-side phases for that firewall
+            if failed_type == 'firewall_base':
+                phase_fw = phase.get('firewall', {})
+                if phase_fw.get('name') == failed_fw.get('name'):
+                    if phase_type in ['service_connection_fw', 'remote_network_fw']:
+                        should_skip = True
+                        skip_reason = f"Firewall {failed_fw.get('name')} not accessible"
+
+            # Service connection FW failure -> skip PA side for that datacenter
+            if failed_type == 'service_connection_fw':
+                phase_dc = phase.get('datacenter', {})
+                if phase_dc.get('name') == failed_dc.get('name') and phase_type == 'service_connection_pa':
+                    should_skip = True
+                    skip_reason = f"FW side failed for {failed_dc.get('name')}"
+
+            # Remote network FW failure -> skip PA side for that branch
+            if failed_type == 'remote_network_fw':
+                phase_branch = phase.get('branch', {})
+                if phase_branch.get('name') == failed_branch.get('name') and phase_type == 'remote_network_pa':
+                    should_skip = True
+                    skip_reason = f"FW side failed for {failed_branch.get('name')}"
+
+            if should_skip:
+                self._deploy_phase_results[phase['name']] = {
+                    'success': False,
+                    'message': f"Skipped: {skip_reason}",
+                    'skipped': True,
+                }
+                self._log_activity(f"Skipping {phase['name']}: {skip_reason}", "warning")
+
     def _on_all_deploy_phases_complete(self):
         """Handle completion of all deployment phases."""
-        self.deploy_config_btn.setEnabled(True)
+        # Reset deployment state
+        self._pov_deployment_in_progress = False
+        self._pov_deployment_cancelled = False
+
         self.review_config_btn.setEnabled(True)
         self.pov_deploy_progress.setValue(100)
         self.pov_deploy_progress.setVisible(False)
 
-        # Count successes and failures
+        # Count successes, failures, and skipped
         successes = sum(1 for r in self._deploy_phase_results.values() if r.get('success'))
-        failures = len(self._deploy_phase_results) - successes
+        skipped = sum(1 for r in self._deploy_phase_results.values() if r.get('skipped'))
+        failures = len(self._deploy_phase_results) - successes - skipped
 
-        if failures == 0:
+        # Save final state
+        self.save_state()
+
+        if failures == 0 and skipped == 0:
             self._log_activity("All deployment phases completed successfully")
+            self._update_deploy_config_button_style("deploy")
+            self.deploy_config_btn.setEnabled(True)
+            self._pov_deployment_phases_completed = []  # Reset for fresh deployment
             self.pov_deploy_results.append_text(
                 f"\n\n=== DEPLOYMENT COMPLETE ===\n"
                 f"All {successes} phases completed successfully!\n\n"
@@ -9233,13 +9418,21 @@ output "{device_name}_private_ip" {{
                 "You can now complete the POV setup."
             )
         else:
-            self._log_activity(f"Deployment completed with {failures} failures", "warning")
-            self.pov_deploy_results.append_text(
-                f"\n\n=== DEPLOYMENT COMPLETED WITH ERRORS ===\n"
-                f"Completed: {successes} phases\n"
-                f"Failed: {failures} phases\n\n"
-                "Review the logs above for details."
-            )
+            self._log_activity(f"Deployment completed with {failures} failures, {skipped} skipped", "warning")
+            # Keep button as "Resume Deployment" if there were failures
+            self._update_deploy_config_button_style("resume")
+            self.deploy_config_btn.setEnabled(True)
+
+            summary_text = f"\n\n=== DEPLOYMENT COMPLETED WITH ERRORS ===\n"
+            summary_text += f"Completed: {successes} phases\n"
+            if failures > 0:
+                summary_text += f"Failed: {failures} phases\n"
+            if skipped > 0:
+                summary_text += f"Skipped: {skipped} phases (due to dependencies)\n"
+            summary_text += "\nReview the logs above for details."
+            summary_text += "\nClick 'Resume Deployment' to retry failed phases."
+
+            self.pov_deploy_results.append_text(summary_text)
 
             QMessageBox.warning(
                 self,
@@ -9395,6 +9588,8 @@ output "{device_name}_private_ip" {{
             'terraform_output_dir': getattr(self, '_terraform_output_dir', None),
             'terraform_deployed': getattr(self, '_terraform_deployed', False),
             'terraform_outputs': getattr(self, '_terraform_outputs', {}),
+            # POV deployment state tracking
+            'pov_deployment_phases_completed': getattr(self, '_pov_deployment_phases_completed', []),
         }
 
         # Save to file (overwrites existing)
@@ -9439,6 +9634,11 @@ output "{device_name}_private_ip" {{
             # If terraform was deployed but outputs are missing, try to read from terraform state
             if self._terraform_deployed and not self._terraform_outputs and self._terraform_output_dir:
                 self._terraform_outputs = self._read_terraform_outputs_from_state()
+
+            # Restore POV deployment state
+            self._pov_deployment_phases_completed = state.get('pov_deployment_phases_completed', [])
+            self._pov_deployment_in_progress = False
+            self._pov_deployment_cancelled = False
 
             # Restore UI state
             self._restore_ui_from_state(state)
@@ -9556,6 +9756,10 @@ output "{device_name}_private_ip" {{
 
         # Restore terraform UI state
         self._restore_terraform_ui_state(state)
+
+        # Restore deploy button state based on completed phases
+        if hasattr(self, '_pov_deployment_phases_completed') and self._pov_deployment_phases_completed:
+            self._update_deploy_config_button_style("resume")
 
     def _restore_adem_ui_state(self):
         """Restore ADEM configuration UI from use_case_configs."""
