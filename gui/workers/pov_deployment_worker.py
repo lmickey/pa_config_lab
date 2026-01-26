@@ -484,7 +484,7 @@ class DeviceConfigWorker(QThread):
 
         def progress_callback(phase, message):
             # Use firewall name as prefix for consistent logging
-            self.log_message.emit(f"[{fw_name}] [{phase.value}] {message}")
+            self.log_message.emit(f"[{fw_name}] {message}")
 
         # Create mock config object if dict
         fw_config = self._create_firewall_config(self.config)
@@ -529,7 +529,7 @@ class DeviceConfigWorker(QThread):
 
         def progress_callback(phase, message):
             # Use panorama name as prefix for consistent logging
-            self.log_message.emit(f"[{pano_name}] [{phase.value}] {message}")
+            self.log_message.emit(f"[{pano_name}] {message}")
 
         pano_config = self._create_panorama_config(self.config)
 
