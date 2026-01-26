@@ -8573,6 +8573,7 @@ output "{device_name}_private_ip" {{
             # Terraform state tracking
             'terraform_output_dir': getattr(self, '_terraform_output_dir', None),
             'terraform_deployed': getattr(self, '_terraform_deployed', False),
+            'terraform_outputs': getattr(self, '_terraform_outputs', {}),
         }
 
         # Save to file (overwrites existing)
@@ -8612,6 +8613,11 @@ output "{device_name}_private_ip" {{
             # Restore terraform state
             self._terraform_output_dir = state.get('terraform_output_dir')
             self._terraform_deployed = state.get('terraform_deployed', False)
+            self._terraform_outputs = state.get('terraform_outputs', {})
+
+            # If terraform was deployed but outputs are missing, try to read from terraform state
+            if self._terraform_deployed and not self._terraform_outputs and self._terraform_output_dir:
+                self._terraform_outputs = self._read_terraform_outputs_from_state()
 
             # Restore UI state
             self._restore_ui_from_state(state)
@@ -8771,6 +8777,49 @@ output "{device_name}_private_ip" {{
                     if terraform_deployed or state_exists:
                         self.cloud_deploy_next_btn.setEnabled(True)
                         self.cloud_deploy_next_btn.setToolTip("Proceed to deploy POV configuration")
+
+    def _read_terraform_outputs_from_state(self) -> Dict[str, Any]:
+        """Read terraform outputs from the terraform.tfstate file.
+
+        This is a fallback when resuming a POV where outputs weren't saved.
+
+        Returns:
+            Dict of terraform outputs, or empty dict if not available
+        """
+        import os
+        import json
+
+        if not self._terraform_output_dir:
+            return {}
+
+        state_file = os.path.join(self._terraform_output_dir, 'terraform', 'terraform.tfstate')
+        if not os.path.exists(state_file):
+            logger.debug(f"Terraform state file not found: {state_file}")
+            return {}
+
+        try:
+            with open(state_file, 'r') as f:
+                tf_state = json.load(f)
+
+            # Parse outputs from terraform state
+            outputs = {}
+            tf_outputs = tf_state.get('outputs', {})
+            for key, value_obj in tf_outputs.items():
+                # Terraform state format: {"output_name": {"value": "...", "type": "..."}}
+                if isinstance(value_obj, dict):
+                    outputs[key] = value_obj.get('value')
+                else:
+                    outputs[key] = value_obj
+
+            if outputs:
+                logger.info(f"Restored {len(outputs)} terraform outputs from state file")
+                self._log_activity(f"Restored terraform outputs: {list(outputs.keys())}")
+
+            return outputs
+
+        except Exception as e:
+            logger.warning(f"Failed to read terraform outputs from state: {e}")
+            return {}
 
     def _get_saved_states(self) -> List[Dict[str, Any]]:
         """Get list of saved POV states with metadata."""
