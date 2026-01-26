@@ -1078,7 +1078,7 @@ class POVWorkflowWidget(QWidget):
             self.branches_list = QListWidget()
             self.branches_list.setMaximumHeight(60)
             self.branches_list.setStyleSheet(
-                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 11px; }"
+                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background-color: white; }"
                 "QListWidget::item { padding: 2px; }"
                 "QListWidget::item:selected { background-color: #2196F3; color: white; }"
             )
@@ -1136,7 +1136,7 @@ class POVWorkflowWidget(QWidget):
             self.datacenters_list = QListWidget()
             self.datacenters_list.setMaximumHeight(60)
             self.datacenters_list.setStyleSheet(
-                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 11px; }"
+                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background-color: white; }"
                 "QListWidget::item { padding: 2px; }"
                 "QListWidget::item:selected { background-color: #2196F3; color: white; }"
             )
@@ -1254,7 +1254,7 @@ class POVWorkflowWidget(QWidget):
             self.devices_list = QListWidget()
             self.devices_list.setMaximumHeight(100)
             self.devices_list.setStyleSheet(
-                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 11px; }"
+                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background-color: white; }"
                 "QListWidget::item { padding: 2px; }"
                 "QListWidget::item:selected { background-color: #2196F3; color: white; }"
             )
@@ -1555,7 +1555,7 @@ class POVWorkflowWidget(QWidget):
             self.mobile_locations_list.setMaximumHeight(180)
             self.mobile_locations_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
             self.mobile_locations_list.setStyleSheet(
-                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 10px; }"
+                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 10px; background-color: white; }"
                 "QListWidget::item { padding: 1px; }"
                 "QListWidget::item:selected { background-color: #2196F3; color: white; }"
             )
@@ -2032,7 +2032,7 @@ class POVWorkflowWidget(QWidget):
             self.adem_tests_list = QListWidget()
             self.adem_tests_list.setMaximumHeight(60)
             self.adem_tests_list.setStyleSheet(
-                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 10px; }"
+                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 10px; background-color: white; }"
                 "QListWidget::item { padding: 2px; }"
                 "QListWidget::item:selected { background-color: #2196F3; color: white; }"
             )
@@ -2174,7 +2174,7 @@ class POVWorkflowWidget(QWidget):
             self.rbi_categories_list.setMaximumHeight(150)
             self.rbi_categories_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
             self.rbi_categories_list.setStyleSheet(
-                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 10px; }"
+                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 10px; background-color: white; }"
                 "QListWidget::item { padding: 1px; }"
                 "QListWidget::item:selected { background-color: #2196F3; color: white; }"
             )
@@ -2240,7 +2240,7 @@ class POVWorkflowWidget(QWidget):
             self.custom_policies_list = QListWidget()
             self.custom_policies_list.setMaximumHeight(120)
             self.custom_policies_list.setStyleSheet(
-                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 10px; }"
+                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 10px; background-color: white; }"
                 "QListWidget::item { padding: 2px; }"
             )
 
@@ -2255,6 +2255,7 @@ class POVWorkflowWidget(QWidget):
 
             for policy in default_policies:
                 item = QListWidgetItem(policy)
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
                 item.setCheckState(Qt.CheckState.Checked)
                 self.custom_policies_list.addItem(item)
 
@@ -5348,6 +5349,7 @@ class POVWorkflowWidget(QWidget):
 
         # Add to list with checkbox
         item = QListWidgetItem(policy_text)
+        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
         item.setCheckState(Qt.CheckState.Checked)
         self.custom_policies_list.addItem(item)
 
@@ -5753,11 +5755,27 @@ class POVWorkflowWidget(QWidget):
 
             # Test the credential by listing subscriptions
             self._log_activity("Fetching Azure subscriptions...")
-            subscription_client = SubscriptionClient(credential)
-            subscriptions = list(subscription_client.subscriptions.list())
+            try:
+                subscription_client = SubscriptionClient(credential)
+                subscriptions = list(subscription_client.subscriptions.list())
+            except Exception as sub_error:
+                self._log_activity(f"Failed to list subscriptions: {sub_error}", "error")
+                raise Exception(
+                    f"Failed to list Azure subscriptions: {sub_error}\n\n"
+                    "This may be due to:\n"
+                    "- Account doesn't have Reader access to any subscriptions\n"
+                    "- Azure AD permissions issue\n"
+                    "- Network/firewall blocking Azure management API"
+                )
 
             if not subscriptions:
-                raise Exception("No Azure subscriptions found for this account")
+                raise Exception(
+                    "No Azure subscriptions found for this account.\n\n"
+                    "Please verify:\n"
+                    "- You signed in with the correct Azure account\n"
+                    "- Your account has access to at least one subscription\n"
+                    "- You have Reader role or higher on the subscription"
+                )
 
             self._log_activity(f"Found {len(subscriptions)} subscription(s)")
 
