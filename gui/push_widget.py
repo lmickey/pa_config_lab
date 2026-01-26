@@ -381,7 +381,7 @@ class PushConfigWidget(QWidget):
         """Start validation of selected items against destination."""
         if not self.destination_client or not self.selected_items:
             self.validation_group.setVisible(True)
-            self.validation_status.setText("⚠️ Select a destination tenant to validate")
+            self.validation_status.setText("[WARN] Select a destination tenant to validate")
             self.validation_status.setStyleSheet("padding: 8px; color: #F57F17;")
             self.validation_details.setPlainText("Please select a destination tenant in the 'Select Components' tab.")
             return
@@ -390,7 +390,7 @@ class PushConfigWidget(QWidget):
         name_errors = self._validate_name_lengths(self.selected_items)
         if name_errors:
             self.validation_group.setVisible(True)
-            self.validation_status.setText("❌ Name length validation failed")
+            self.validation_status.setText("[ERROR] Name length validation failed")
             self.validation_status.setStyleSheet("padding: 8px; color: #c62828; background-color: #ffebee; border-radius: 4px;")
             error_text = "The following names exceed the 55 character limit:\n\n"
             for err in name_errors:
@@ -485,7 +485,7 @@ class PushConfigWidget(QWidget):
         self.workflow_lock.release_lock(self)
         
         # Update progress section
-        self.progress_label.setText("❌ Validation failed")
+        self.progress_label.setText("[ERROR] Validation failed")
         self.progress_label.setStyleSheet("color: red;")
         self.progress_bar.setVisible(False)
         self.results_panel.set_text(f"Validation Error:\n\n{error}")
@@ -502,7 +502,7 @@ class PushConfigWidget(QWidget):
 
         # Show validation section with error
         self.validation_group.setVisible(True)
-        self.validation_status.setText("❌ Validation failed")
+        self.validation_status.setText("[ERROR] Validation failed")
         self.validation_status.setStyleSheet("padding: 8px; color: #c62828; background-color: #ffebee; border-radius: 4px;")
         self.validation_details.setPlainText(f"Error during validation:\n\n{error}")
 
@@ -623,7 +623,7 @@ class PushConfigWidget(QWidget):
             if errors:
                 # Hard errors - can't push
                 self.validation_status.setText(
-                    f"❌ Validation failed - {len(errors)} error(s), {len(warnings)} warning(s)"
+                    f"[ERROR] Validation failed - {len(errors)} error(s), {len(warnings)} warning(s)"
                 )
                 self.validation_status.setStyleSheet(
                     "padding: 8px; color: #c62828; background-color: #ffebee; border-radius: 4px;"
@@ -665,7 +665,7 @@ class PushConfigWidget(QWidget):
                 # Missing dependencies - need to add them first
                 dep_count = len(missing_dependencies)
                 self.validation_status.setText(
-                    f"⚠️ {dep_count} missing dependenc{'y' if dep_count == 1 else 'ies'} - Add required items to continue"
+                    f"[WARN] {dep_count} missing dependenc{'y' if dep_count == 1 else 'ies'} - Add required items to continue"
                 )
                 self.validation_status.setStyleSheet(
                     "padding: 8px; color: #E65100; background-color: #FFF3E0; border-radius: 4px;"
@@ -675,7 +675,7 @@ class PushConfigWidget(QWidget):
                 self.dry_run_check.setEnabled(False)
             elif warnings:
                 self.validation_status.setText(
-                    f"⚠️ {total_items} items: {new_items} new, {conflicts} conflicts, {len(warnings)} warning(s)"
+                    f"[WARN] {total_items} items: {new_items} new, {conflicts} conflicts, {len(warnings)} warning(s)"
                 )
                 self.validation_status.setStyleSheet(
                     "padding: 8px; color: #F57F17; background-color: #FFF9C4; border-radius: 4px;"
@@ -685,7 +685,7 @@ class PushConfigWidget(QWidget):
                 self.dry_run_check.setEnabled(True)
             elif conflicts > 0:
                 self.validation_status.setText(
-                    f"⚠️ {total_items} items: {new_items} new, {conflicts} conflicts - Review strategies"
+                    f"[WARN] {total_items} items: {new_items} new, {conflicts} conflicts - Review strategies"
                 )
                 self.validation_status.setStyleSheet(
                     "padding: 8px; color: #F57F17; background-color: #FFF9C4; border-radius: 4px;"
@@ -710,7 +710,7 @@ class PushConfigWidget(QWidget):
             import traceback
             logger.error(f"[Validation] Error in _finalize_validation: {e}")
             traceback.print_exc()
-            self.validation_status.setText(f"❌ Validation error: {e}")
+            self.validation_status.setText(f"[ERROR] Validation error: {e}")
             self.validation_status.setStyleSheet(
                 "padding: 8px; color: #c62828; background-color: #ffebee; border-radius: 4px;"
             )
@@ -812,22 +812,22 @@ class PushConfigWidget(QWidget):
             # Show existing location detail for security rules with global conflicts
             # Only show warning for SKIP strategy - for OVERWRITE the conflict is expected and handled
             if exists and existing_loc and item_type == 'security_rule' and strategy == 'skip':
-                lines.append(f"{'':20} ⚠️ Rule name already exists in: {existing_loc}")
-                logger.warning(f"[Validation]   ⚠️ Rule name conflict: '{item_name}' exists in {existing_loc}")
+                lines.append(f"{'':20} [WARN] Rule name already exists in: {existing_loc}")
+                logger.warning(f"[Validation]   [WARN] Rule name conflict: '{item_name}' exists in {existing_loc}")
             
             # Show errors/warnings for this item
             if item.get('error'):
-                lines.append(f"{'':20} ❌ ERROR: {item['error']}")
-                logger.error(f"[Validation]   ❌ {item['error']}")
+                lines.append(f"{'':20} [ERROR] ERROR: {item['error']}")
+                logger.error(f"[Validation]   [ERROR] {item['error']}")
             if item.get('warning'):
-                lines.append(f"{'':20} ⚠️ WARNING: {item['warning']}")
-                logger.warning(f"[Validation]   ⚠️ {item['warning']}")
+                lines.append(f"{'':20} [WARN] WARNING: {item['warning']}")
+                logger.warning(f"[Validation]   [WARN] {item['warning']}")
             
             # Show missing dependencies
             if item.get('missing_deps'):
                 deps_str = ', '.join(item['missing_deps'])
-                lines.append(f"{'':20} ⚠️ Missing deps: {deps_str}")
-                logger.warning(f"[Validation]   ⚠️ Missing deps: {deps_str}")
+                lines.append(f"{'':20} [WARN] Missing deps: {deps_str}")
+                logger.warning(f"[Validation]   [WARN] Missing deps: {deps_str}")
         
         lines.append("-" * 115)
         lines.append("")
@@ -901,13 +901,13 @@ class PushConfigWidget(QWidget):
             lines.append("")
             lines.append("ERRORS (must fix before push):")
             for err in validation_results['errors']:
-                lines.append(f"  ❌ {err}")
+                lines.append(f"  [ERROR] {err}")
         
         if validation_results['warnings']:
             lines.append("")
             lines.append("WARNINGS:")
             for warn in validation_results['warnings']:
-                lines.append(f"  ⚠️ {warn}")
+                lines.append(f"  [WARN] {warn}")
         
         lines.append("")
         lines.append("=" * 80)
@@ -1288,7 +1288,7 @@ class PushConfigWidget(QWidget):
                 if snippet_exists:
                     # Snippet name conflict - this is an error/conflict
                     conflicts += 1
-                    action = f"⚠️ Snippet '{new_snippet_name}' already exists!"
+                    action = f"[WARN] Snippet '{new_snippet_name}' already exists!"
                     err = f"Cannot create snippet '{new_snippet_name}' - name already exists"
                     errors.append(err)
                     
@@ -1587,7 +1587,7 @@ class PushConfigWidget(QWidget):
                     # Special warning for certificate_profile - certificates need manual upload
                     cert_warning = None
                     if prof_type == 'certificate_profile' and not exists:
-                        cert_warning = "⚠️ Certificate profile will be created but referenced certificates may need to be uploaded manually"
+                        cert_warning = "[WARN] Certificate profile will be created but referenced certificates may need to be uploaded manually"
                         warnings.append(f"{prof_dest_name}: Certificates may need manual configuration")
 
                     item_details.append({
@@ -1751,7 +1751,7 @@ class PushConfigWidget(QWidget):
                         conflict_loc = existing_location.get('folder') or existing_location.get('snippet') or 'unknown'
                         action = f"Will create in new snippet '{rule_target_name}'"
                         # Add warning about name conflict - store separately so it's shown in item details
-                        name_conflict_warn = f"⚠️ Name conflict with '{conflict_loc}' - will need renaming before snippet association"
+                        name_conflict_warn = f"[WARN] Name conflict with '{conflict_loc}' - will need renaming before snippet association"
                         warnings.append(f"Rule '{rule_name}' name conflicts with existing rule in '{conflict_loc}'")
                     else:
                         action = f"Will create in new snippet '{rule_target_name}'"
@@ -1877,7 +1877,7 @@ class PushConfigWidget(QWidget):
                 if snippet_exists:
                     # Snippet name conflict - this is an error
                     conflicts += 1
-                    action = f"⚠️ Snippet '{new_snippet_name}' already exists!"
+                    action = f"[WARN] Snippet '{new_snippet_name}' already exists!"
                     err = f"Cannot create snippet '{new_snippet_name}' - name already exists"
                     errors.append(err)
                     
@@ -1918,7 +1918,7 @@ class PushConfigWidget(QWidget):
                 
                 if snippet_exists:
                     conflicts += 1
-                    action = f"⚠️ Renamed snippet '{renamed_name}' already exists!"
+                    action = f"[WARN] Renamed snippet '{renamed_name}' already exists!"
                     err = f"Cannot rename snippet to '{renamed_name}' - name already exists"
                     errors.append(err)
                     
@@ -2150,7 +2150,7 @@ class PushConfigWidget(QWidget):
                     if global_exists:
                         conflict_loc = rule_info.get('folder') or rule_info.get('snippet') or 'unknown'
                         action = f"Will create in '{target_name}'"
-                        name_conflict_warn = f"⚠️ Name conflict with '{conflict_loc}' - will need renaming before snippet association"
+                        name_conflict_warn = f"[WARN] Name conflict with '{conflict_loc}' - will need renaming before snippet association"
                         warnings.append(f"Rule '{rule_name}' name conflicts with existing rule in '{conflict_loc}'")
                     else:
                         action = f"Will create in '{target_name}'"
@@ -2261,7 +2261,7 @@ class PushConfigWidget(QWidget):
         # Show errors first
         if validation_results['errors']:
             lines.append("=" * 70)
-            lines.append("❌ ERRORS (must fix before push)")
+            lines.append("[ERROR] ERRORS (must fix before push)")
             lines.append("=" * 70)
             for err in validation_results['errors']:
                 lines.append(f"  ✗ {err}")
@@ -2270,7 +2270,7 @@ class PushConfigWidget(QWidget):
         # Show warnings
         if validation_results['warnings']:
             lines.append("=" * 70)
-            lines.append("⚠️ WARNINGS")
+            lines.append("[WARN] WARNINGS")
             lines.append("=" * 70)
             for warn in validation_results['warnings']:
                 lines.append(f"  ⚠ {warn}")
@@ -2287,9 +2287,9 @@ class PushConfigWidget(QWidget):
             lines.append(f"  {status_icon} {item['type']}: {item['name']}{location}")
             lines.append(f"      Action: {item['action']}")
             if item.get('error'):
-                lines.append(f"      ❌ {item['error']}")
+                lines.append(f"      [ERROR] {item['error']}")
             if item.get('warning'):
-                lines.append(f"      ⚠️ {item['warning']}")
+                lines.append(f"      [WARN] {item['warning']}")
         
         lines.append("")
         lines.append("=" * 70)
@@ -2303,7 +2303,7 @@ class PushConfigWidget(QWidget):
             return
         
         if not self.destination_client:
-            self.status_label.setText("❌ Select destination tenant in 'Select Components' tab")
+            self.status_label.setText("[ERROR] Select destination tenant in 'Select Components' tab")
             self.status_label.setStyleSheet(
                 "color: orange; padding: 10px; background-color: #fff4e6;"
             )
@@ -2311,7 +2311,7 @@ class PushConfigWidget(QWidget):
             self.progress_label.setText("Select destination tenant")
             self._update_summary_label()
         elif not self.config:
-            self.status_label.setText("❌ No configuration loaded - Pull or load a config first")
+            self.status_label.setText("[ERROR] No configuration loaded - Pull or load a config first")
             self.status_label.setStyleSheet(
                 "color: orange; padding: 10px; background-color: #fff4e6;"
             )
@@ -2319,7 +2319,7 @@ class PushConfigWidget(QWidget):
             self.progress_label.setText("Load or pull a configuration")
             self._update_summary_label()
         elif not self.selected_items:
-            self.status_label.setText("❌ Go to 'Select Components' tab to choose what to push")
+            self.status_label.setText("[ERROR] Go to 'Select Components' tab to choose what to push")
             self.status_label.setStyleSheet(
                 "color: orange; padding: 10px; background-color: #fff4e6;"
             )
@@ -2367,7 +2367,7 @@ class PushConfigWidget(QWidget):
             
             if is_same_tenant:
                 # Warning: pushing to same tenant
-                status_text = f"⚠️ Warning: Pushing {total_items} items to the Same Tenant"
+                status_text = f"[WARN] Warning: Pushing {total_items} items to the Same Tenant"
                 if status_parts:
                     status_text += f" ({', '.join(status_parts)})"
                 
@@ -2592,11 +2592,11 @@ class PushConfigWidget(QWidget):
             # Use warning dialog with red border and ! icon
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle("⚠️ Confirm Push")
+            msg_box.setWindowTitle("[WARN] Confirm Push")
             msg_box.setText(f"<b>Push configuration to {dest_display}?</b>")
             msg_box.setInformativeText(
                 f"Conflict Resolution: {resolution}\n\n"
-                f"⚠️ This will modify the target tenant.\n"
+                f"[WARN] This will modify the target tenant.\n"
                 f"This action cannot be undone."
             )
             msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
@@ -2757,7 +2757,7 @@ class PushConfigWidget(QWidget):
                 try:
                     if has_failures and has_successes:
                         # Partial success - yellow
-                        status_msg = f"⚠️ Push completed with issues ({unique_count} items)"
+                        status_msg = f"[WARN] Push completed with issues ({unique_count} items)"
                         status_color = "#F57F17"  # Dark yellow/amber
                         status_bg = "#FFF9C4"     # Light yellow
                         status_border = "#FBC02D" # Medium yellow
@@ -2765,7 +2765,7 @@ class PushConfigWidget(QWidget):
                         progress_color = "#F57F17"
                     elif has_failures and not has_successes:
                         # All failed - red
-                        status_msg = f"❌ Push failed ({unique_count} items)"
+                        status_msg = f"[ERROR] Push failed ({unique_count} items)"
                         status_color = "#c62828"  # Dark red
                         status_bg = "#ffebee"     # Light red
                         status_border = "#f44336" # Medium red
@@ -2850,7 +2850,7 @@ class PushConfigWidget(QWidget):
                     # Show failed items in summary
                     if created_failed:
                         summary_lines.append("")
-                        summary_lines.append("❌ FAILED ITEMS:")
+                        summary_lines.append("[ERROR] FAILED ITEMS:")
                         for item in created_failed:
                             item_type = item.get('type', 'unknown')
                             item_name = item.get('name', 'unknown')
@@ -2896,7 +2896,7 @@ class PushConfigWidget(QWidget):
             else:
                 # Update status banner with error message
                 # Note: status_label is internal state only, not added to layout
-                self.status_label.setText(f"❌ Push failed: {message}")
+                self.status_label.setText(f"[ERROR] Push failed: {message}")
                 
                 self.progress_label.setText("Push failed")
                 self.progress_label.setStyleSheet("color: red;")
@@ -2906,7 +2906,7 @@ class PushConfigWidget(QWidget):
                 error_lines = [
                     "",
                     "=" * 70,
-                    "❌ PUSH OPERATION FAILED",
+                    "[ERROR] PUSH OPERATION FAILED",
                     "=" * 70,
                     "",
                     f"Error: {message}",
@@ -3001,7 +3001,7 @@ class PushConfigWidget(QWidget):
         cancel_lines = [
             "",
             "=" * 70,
-            "⚠️ PUSH OPERATION CANCELLED",
+            "[WARN] PUSH OPERATION CANCELLED",
             "=" * 70,
             "",
             "Push was cancelled by user. Some items may have been pushed before cancellation.",

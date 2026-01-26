@@ -1783,7 +1783,7 @@ class SelectionListWidget(QWidget):
                     item_info = items_to_add[matched_key]
                     if not row.is_checked():
                         container_info = row_data_container or row_container or 'unknown'
-                        logger.info(f"  ✓ Selecting: {row_type} '{row_name}' from '{container_info}'")
+                        logger.info(f"  [OK] Selecting: {row_type} '{row_name}' from '{container_info}'")
                         row.set_checked(True)
                     
                     # Apply target destination if specified (from dependency resolution)

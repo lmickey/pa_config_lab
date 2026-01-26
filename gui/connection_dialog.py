@@ -326,7 +326,7 @@ class ConnectionDialog(QDialog):
             
             # Verify connection by checking token
             if api_client.token:
-                logger.info(f"✓ Successfully connected to tenant: {tenant_name}")
+                logger.info(f" Successfully connected to tenant: {tenant_name}")
                 self.api_client = api_client
                 self.connection_name = tenant_name
                 

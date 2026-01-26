@@ -137,13 +137,13 @@ def optimized_fetch_logic(self):
                     obj_name = obj.get('name')
                     if obj_name in obj_names:
                         dest_config['objects'][obj_type][obj_name] = obj
-                        logger.debug(f"  ✓ Found: {obj_name}")
+                        logger.debug(f"  [OK] Found: {obj_name}")
                 
                 # Report not found
                 found_names = set(dest_config['objects'][obj_type].keys())
                 not_found = obj_names - found_names
                 for name in not_found:
-                    logger.debug(f"  ✗ Not found: {name}")
+                    logger.debug(f"  [X] Not found: {name}")
                     
             except Exception as e:
                 logger.error(f"  ERROR: {e}")

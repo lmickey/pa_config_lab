@@ -381,7 +381,7 @@ class TenantSelectorWidget(QWidget):
         """Handle successful background connection."""
         from config.tenant_manager import TenantManager
         
-        self.logger.normal(f"✓ Successfully connected to: {tenant_name}")
+        self.logger.normal(f"Successfully connected to: {tenant_name}")
         
         # Update last used timestamp
         if hasattr(self, '_pending_tenant_data') and self._pending_tenant_data:
@@ -448,7 +448,7 @@ class TenantSelectorWidget(QWidget):
                 # Get tenant name
                 tenant_name = dialog.connection_name if hasattr(dialog, 'connection_name') else "Manual Connection"
                 
-                self.logger.normal(f"✓ Manual connection successful: {tenant_name}")
+                self.logger.normal(f"Manual connection successful: {tenant_name}")
                 
                 # Set connection
                 self.set_connection(dialog.api_client, tenant_name)

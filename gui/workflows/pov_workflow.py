@@ -6472,6 +6472,191 @@ class POVWorkflowWidget(QWidget):
 
         return dialog.exec() == QDialog.DialogCode.Accepted
 
+    def _show_pov_deploy_confirmation_dialog(self) -> bool:
+        """Show a custom styled confirmation dialog for POV configuration deployment.
+
+        Returns:
+            True if user confirms, False to cancel
+        """
+        from PyQt6.QtWidgets import QDialog
+        from PyQt6.QtGui import QPalette, QColor
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Deploy POV Configuration")
+        dialog.setMinimumWidth(550)
+        dialog.setModal(True)
+
+        # Use orange palette for caution
+        palette = dialog.palette()
+        palette.setColor(QPalette.ColorRole.Window, QColor("#fff8e1"))
+        dialog.setPalette(palette)
+        dialog.setAutoFillBackground(True)
+
+        # Main layout
+        main_layout = QVBoxLayout(dialog)
+        main_layout.setSpacing(0)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Orange header bar
+        header_widget = QWidget()
+        header_widget.setAutoFillBackground(True)
+        header_palette = header_widget.palette()
+        header_palette.setColor(QPalette.ColorRole.Window, QColor("#FF9800"))
+        header_widget.setPalette(header_palette)
+        header_widget.setMinimumHeight(60)
+
+        header_layout = QHBoxLayout(header_widget)
+        header_layout.setContentsMargins(20, 10, 20, 10)
+
+        header_icon = QLabel("!!")
+        header_icon.setStyleSheet("font-size: 28px; font-weight: bold; color: white;")
+        header_layout.addWidget(header_icon)
+
+        title = QLabel("Deploy to Prisma Access")
+        title.setStyleSheet("font-size: 18px; font-weight: bold; color: white;")
+        header_layout.addWidget(title)
+        header_layout.addStretch()
+
+        main_layout.addWidget(header_widget)
+
+        # Content area
+        content_widget = QWidget()
+        content_widget.setAutoFillBackground(True)
+        content_palette = content_widget.palette()
+        content_palette.setColor(QPalette.ColorRole.Window, QColor("#fff8e1"))
+        content_widget.setPalette(content_palette)
+
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setSpacing(15)
+        content_layout.setContentsMargins(20, 20, 20, 20)
+
+        # Main message
+        message = QLabel(
+            "<b>This will push configuration to Prisma Access / SCM.</b>"
+        )
+        message.setWordWrap(True)
+        message.setStyleSheet("color: #333; font-size: 13px;")
+        content_layout.addWidget(message)
+
+        # What will be deployed
+        list_frame = QFrame()
+        list_frame.setFrameShape(QFrame.Shape.Box)
+        list_frame.setAutoFillBackground(True)
+        list_palette = list_frame.palette()
+        list_palette.setColor(QPalette.ColorRole.Window, QColor("#ffffff"))
+        list_frame.setPalette(list_palette)
+        list_frame.setStyleSheet("QFrame { border: 1px solid #ddd; border-radius: 4px; }")
+
+        list_layout = QVBoxLayout(list_frame)
+        list_layout.setContentsMargins(15, 15, 15, 15)
+
+        list_title = QLabel("<b>Configuration to be deployed:</b>")
+        list_title.setStyleSheet("color: #333; font-size: 12px;")
+        list_layout.addWidget(list_title)
+
+        # Count items to deploy
+        use_cases = self.use_case_configs
+        staged = use_cases.get('custom_policies', {}).get('staged_objects', {})
+        addr_count = len(staged.get('address_objects', []))
+        grp_count = len(staged.get('address_groups', []))
+        policy_count = len(use_cases.get('custom_policies', {}).get('policies', []))
+
+        items = [
+            f"Address Objects: {addr_count}",
+            f"Address Groups: {grp_count}",
+            f"Security Policies: {policy_count}",
+        ]
+
+        # Add use case items
+        if use_cases.get('mobile_users', {}).get('enabled'):
+            items.append("Mobile Users configuration")
+        if use_cases.get('private_app', {}).get('enabled'):
+            conn_count = len(use_cases.get('private_app', {}).get('connections', []))
+            items.append(f"Private App Access ({conn_count} connections)")
+        if use_cases.get('remote_branch', {}).get('enabled'):
+            items.append("Remote Branch settings")
+        if use_cases.get('aiops_adem', {}).get('enabled'):
+            items.append("AIOps/ADEM synthetic tests")
+
+        for item in items:
+            item_label = QLabel(f"  * {item}")
+            item_label.setStyleSheet("color: #555; font-size: 12px;")
+            list_layout.addWidget(item_label)
+
+        content_layout.addWidget(list_frame)
+
+        # Warning box
+        warning_frame = QFrame()
+        warning_frame.setFrameShape(QFrame.Shape.Box)
+        warning_frame.setAutoFillBackground(True)
+        warning_palette = warning_frame.palette()
+        warning_palette.setColor(QPalette.ColorRole.Window, QColor("#fff3e0"))
+        warning_frame.setPalette(warning_palette)
+        warning_frame.setStyleSheet("QFrame { border: 2px solid #FF9800; border-radius: 4px; }")
+
+        warning_layout = QVBoxLayout(warning_frame)
+        warning_layout.setContentsMargins(15, 10, 15, 10)
+        warning_label = QLabel(
+            "!! <b>Important:</b> This will modify your Prisma Access tenant configuration. "
+            "Review the configuration summary before proceeding."
+        )
+        warning_label.setWordWrap(True)
+        warning_label.setStyleSheet("color: #e65100; font-size: 12px;")
+        warning_layout.addWidget(warning_label)
+        content_layout.addWidget(warning_frame)
+
+        content_layout.addStretch()
+
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setMinimumWidth(100)
+        cancel_btn.setMinimumHeight(36)
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #9E9E9E;
+                color: white;
+                padding: 8px 16px;
+                font-weight: bold;
+                font-size: 12px;
+                border-radius: 4px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #757575;
+            }
+        """)
+        cancel_btn.clicked.connect(dialog.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        confirm_btn = QPushButton("Deploy Configuration")
+        confirm_btn.setMinimumWidth(150)
+        confirm_btn.setMinimumHeight(36)
+        confirm_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: white;
+                padding: 8px 16px;
+                font-weight: bold;
+                font-size: 12px;
+                border-radius: 4px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #F57C00;
+            }
+        """)
+        confirm_btn.clicked.connect(dialog.accept)
+        confirm_btn.setDefault(True)
+        btn_layout.addWidget(confirm_btn)
+
+        content_layout.addLayout(btn_layout)
+        main_layout.addWidget(content_widget)
+
+        return dialog.exec() == QDialog.DialogCode.Accepted
+
     def _show_tenant_selection_dialog(self, tenants: list, current_tenant_id: str = None) -> dict:
         """Show dialog to select an Azure directory/tenant.
 
@@ -7811,56 +7996,274 @@ output "{device_name}_private_ip" {{
             self.test_panorama_btn.setText("Test Connection")
 
     def _review_pov_config(self):
-        """Review POV configuration before deployment."""
+        """Review comprehensive POV configuration before deployment."""
+        from PyQt6.QtWidgets import (
+            QDialog, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
+            QTabWidget, QWidget, QGroupBox, QDialogButtonBox
+        )
+        from PyQt6.QtGui import QPalette, QColor
+        from PyQt6.QtCore import Qt
+
         deployment_config = self._gather_deployment_config()
 
-        # Build review text
-        review_text = "<h3>POV Configuration Summary</h3>"
+        dialog = QDialog(self)
+        dialog.setWindowTitle("📋 POV Configuration Review")
+        dialog.setMinimumSize(700, 600)
 
-        # Management type
-        mgmt_type = deployment_config.get('management_type', 'scm').upper()
-        review_text += f"<p><b>Management Type:</b> {mgmt_type}</p>"
+        main_layout = QVBoxLayout(dialog)
 
-        # SCM Tenant
-        scm_info = deployment_config.get('scm_tenant', {})
-        if scm_info.get('connected'):
-            review_text += f"<p><b>SCM Tenant:</b> {scm_info.get('name', 'Unknown')}</p>"
+        # Header
+        header = QLabel("<h2>POV Configuration Summary</h2>")
+        header.setStyleSheet("color: #1565C0; margin-bottom: 10px;")
+        main_layout.addWidget(header)
+
+        info = QLabel("Review all configuration that will be deployed to Prisma Access.")
+        info.setStyleSheet("color: #666; margin-bottom: 15px;")
+        main_layout.addWidget(info)
+
+        # Tabbed content for different sections
+        tabs = QTabWidget()
+
+        # === TAB 1: Overview ===
+        overview_tab = QWidget()
+        overview_layout = QVBoxLayout(overview_tab)
+
+        # Customer Info
+        customer_info = self.cloud_resource_configs.get('customer_info', {})
+        customer_group = QGroupBox("Customer Information")
+        customer_layout = QVBoxLayout(customer_group)
+        customer_layout.addWidget(QLabel(f"<b>Customer:</b> {customer_info.get('customer_name', 'Not set')}"))
+        customer_layout.addWidget(QLabel(f"<b>Industry:</b> {customer_info.get('industry', 'Not set')}"))
+        customer_layout.addWidget(QLabel(f"<b>Management:</b> {self.management_type.upper()}"))
+        if self.connection_name:
+            customer_layout.addWidget(QLabel(f"<b>SCM Tenant:</b> {self.connection_name}"))
+        overview_layout.addWidget(customer_group)
+
+        # Infrastructure
+        infra = self.cloud_resource_configs.get('infrastructure', {})
+        infra_group = QGroupBox("Infrastructure Settings")
+        infra_layout = QVBoxLayout(infra_group)
+        network = infra.get('network', {})
+        infra_layout.addWidget(QLabel(f"<b>Infrastructure Subnet:</b> {network.get('infrastructure_subnet', 'Default')}"))
+        infra_layout.addWidget(QLabel(f"<b>BGP AS:</b> {network.get('infrastructure_bgp_as', 'Default')}"))
+        dns = infra.get('dns', {})
+        infra_layout.addWidget(QLabel(f"<b>DNS:</b> {dns.get('primary', '8.8.8.8')}, {dns.get('secondary', '8.8.4.4')}"))
+        overview_layout.addWidget(infra_group)
+
+        overview_layout.addStretch()
+        tabs.addTab(overview_tab, "Overview")
+
+        # === TAB 2: Locations & Devices ===
+        locations_tab = QWidget()
+        locations_layout = QVBoxLayout(locations_tab)
+
+        locations = self.cloud_resource_configs.get('locations', {})
+
+        # Datacenters
+        datacenters = locations.get('datacenters', [])
+        dc_group = QGroupBox(f"Datacenters ({len(datacenters)})")
+        dc_layout = QVBoxLayout(dc_group)
+        if datacenters:
+            for dc in datacenters:
+                conn_type = dc.get('connection_type', 'service_connection').replace('_', ' ').title()
+                dc_layout.addWidget(QLabel(
+                    f"• <b>{dc.get('name', 'Datacenter')}</b> - {dc.get('cloud', 'Azure')} "
+                    f"{dc.get('region', '')} ({conn_type})"
+                ))
+        else:
+            dc_layout.addWidget(QLabel("<i>No datacenters configured</i>"))
+        locations_layout.addWidget(dc_group)
+
+        # Branches
+        branches = locations.get('branches', [])
+        branch_group = QGroupBox(f"Branches ({len(branches)})")
+        branch_layout = QVBoxLayout(branch_group)
+        if branches:
+            for branch in branches:
+                branch_layout.addWidget(QLabel(
+                    f"• <b>{branch.get('name', 'Branch')}</b> - {branch.get('region', 'Unknown region')}"
+                ))
+        else:
+            branch_layout.addWidget(QLabel("<i>No branches configured</i>"))
+        locations_layout.addWidget(branch_group)
+
+        # Trust Devices
+        trust_devices = self.cloud_resource_configs.get('trust_devices', {}).get('devices', [])
+        devices_group = QGroupBox(f"Trust Zone Devices ({len(trust_devices)})")
+        devices_layout = QVBoxLayout(devices_group)
+        if trust_devices:
+            for device in trust_devices:
+                services = ', '.join(device.get('services', [])) or 'None'
+                devices_layout.addWidget(QLabel(
+                    f"• <b>{device.get('name', 'Device')}</b> - {device.get('device_type', 'VM')} "
+                    f"({device.get('subtype', '')}) - Services: {services}"
+                ))
+        else:
+            devices_layout.addWidget(QLabel("<i>No trust devices configured</i>"))
+        locations_layout.addWidget(devices_group)
+
+        locations_layout.addStretch()
+        tabs.addTab(locations_tab, "Locations & Devices")
+
+        # === TAB 3: Use Cases ===
+        usecases_tab = QWidget()
+        usecases_scroll = QScrollArea()
+        usecases_scroll.setWidgetResizable(True)
+        usecases_content = QWidget()
+        usecases_layout = QVBoxLayout(usecases_content)
+
+        use_cases = self.use_case_configs
+
+        # Mobile Users
+        mu = use_cases.get('mobile_users', {})
+        mu_group = QGroupBox("Mobile Users")
+        mu_layout = QVBoxLayout(mu_group)
+        mu_enabled = "✅ Enabled" if mu.get('enabled') else "❌ Disabled"
+        mu_layout.addWidget(QLabel(f"<b>Status:</b> {mu_enabled}"))
+        if mu.get('enabled'):
+            mu_layout.addWidget(QLabel(f"<b>Portal Name:</b> {mu.get('portal_name', 'Not set')}"))
+            mu_layout.addWidget(QLabel(f"<b>VPN Mode:</b> {mu.get('vpn_mode', 'On Demand')}"))
+            locs = ', '.join(mu.get('locations', [])) or 'Default'
+            mu_layout.addWidget(QLabel(f"<b>Locations:</b> {locs}"))
+        usecases_layout.addWidget(mu_group)
+
+        # Private App Access
+        pa = use_cases.get('private_app', {})
+        pa_group = QGroupBox("Private App Access")
+        pa_layout = QVBoxLayout(pa_group)
+        pa_enabled = "✅ Enabled" if pa.get('enabled') else "❌ Disabled"
+        pa_layout.addWidget(QLabel(f"<b>Status:</b> {pa_enabled}"))
+        if pa.get('enabled'):
+            connections = pa.get('connections', [])
+            pa_layout.addWidget(QLabel(f"<b>Connections:</b> {len(connections)}"))
+            for conn in connections[:5]:  # Show first 5
+                pa_layout.addWidget(QLabel(f"  • {conn.get('name', 'Connection')} ({conn.get('connection_type', '')})"))
+        usecases_layout.addWidget(pa_group)
+
+        # Remote Branch
+        rb = use_cases.get('remote_branch', {})
+        rb_group = QGroupBox("Remote Branch")
+        rb_layout = QVBoxLayout(rb_group)
+        rb_enabled = "✅ Enabled" if rb.get('enabled') else "❌ Disabled"
+        rb_layout.addWidget(QLabel(f"<b>Status:</b> {rb_enabled}"))
+        if rb.get('enabled'):
+            rb_layout.addWidget(QLabel(f"<b>BGP Routing:</b> {'Yes' if rb.get('bgp_routing') else 'No'}"))
+            rb_layout.addWidget(QLabel(f"<b>SD-WAN Integration:</b> {'Yes' if rb.get('sdwan_integration') else 'No'}"))
+        usecases_layout.addWidget(rb_group)
+
+        # ADEM
+        adem = use_cases.get('aiops_adem', {})
+        adem_group = QGroupBox("AIOps / ADEM")
+        adem_layout = QVBoxLayout(adem_group)
+        adem_enabled = "✅ Enabled" if adem.get('enabled') else "❌ Disabled"
+        adem_layout.addWidget(QLabel(f"<b>Status:</b> {adem_enabled}"))
+        if adem.get('enabled'):
+            tests = adem.get('tests', [])
+            adem_layout.addWidget(QLabel(f"<b>Synthetic Tests:</b> {len(tests)}"))
+        usecases_layout.addWidget(adem_group)
+
+        # RBI
+        rbi = use_cases.get('rbi', {})
+        rbi_group = QGroupBox("Remote Browser Isolation")
+        rbi_layout = QVBoxLayout(rbi_group)
+        rbi_enabled = "✅ Enabled" if rbi.get('enabled') else "❌ Disabled"
+        rbi_layout.addWidget(QLabel(f"<b>Status:</b> {rbi_enabled}"))
+        usecases_layout.addWidget(rbi_group)
+
+        usecases_layout.addStretch()
+        usecases_scroll.setWidget(usecases_content)
+        usecases_tab_layout = QVBoxLayout(usecases_tab)
+        usecases_tab_layout.addWidget(usecases_scroll)
+        tabs.addTab(usecases_tab, "Use Cases")
+
+        # === TAB 4: Policy Objects ===
+        policy_tab = QWidget()
+        policy_layout = QVBoxLayout(policy_tab)
+
+        custom_policies = use_cases.get('custom_policies', {})
+        staged = custom_policies.get('staged_objects', {})
+
+        # Address Objects
+        addr_objs = staged.get('address_objects', [])
+        addr_group = QGroupBox(f"Address Objects ({len(addr_objs)})")
+        addr_layout = QVBoxLayout(addr_group)
+        if addr_objs:
+            for obj in addr_objs[:10]:  # Show first 10
+                addr_layout.addWidget(QLabel(f"• <b>{obj.get('name')}</b>: {obj.get('ip_netmask', '')}"))
+            if len(addr_objs) > 10:
+                addr_layout.addWidget(QLabel(f"<i>... and {len(addr_objs) - 10} more</i>"))
+        else:
+            addr_layout.addWidget(QLabel("<i>No address objects staged</i>"))
+        policy_layout.addWidget(addr_group)
+
+        # Address Groups
+        addr_groups = staged.get('address_groups', [])
+        grp_group = QGroupBox(f"Address Groups ({len(addr_groups)})")
+        grp_layout = QVBoxLayout(grp_group)
+        if addr_groups:
+            for grp in addr_groups:
+                members = ', '.join(grp.get('static', [])[:3])
+                if len(grp.get('static', [])) > 3:
+                    members += '...'
+                grp_layout.addWidget(QLabel(f"• <b>{grp.get('name')}</b>: {members}"))
+        else:
+            grp_layout.addWidget(QLabel("<i>No address groups staged</i>"))
+        policy_layout.addWidget(grp_group)
+
+        # Policies
+        policies = custom_policies.get('policies', [])
+        pol_group = QGroupBox(f"Security Policies ({len(policies)})")
+        pol_layout = QVBoxLayout(pol_group)
+        if policies:
+            for pol in policies:
+                pol_layout.addWidget(QLabel(f"• {pol}"))
+        else:
+            pol_layout.addWidget(QLabel("<i>No policies staged</i>"))
+        policy_layout.addWidget(pol_group)
+
+        policy_layout.addStretch()
+        tabs.addTab(policy_tab, "Policy Objects")
+
+        # === TAB 5: Cloud Deployment ===
+        cloud_tab = QWidget()
+        cloud_layout = QVBoxLayout(cloud_tab)
+
+        # Terraform Status
+        tf_group = QGroupBox("Terraform Deployment")
+        tf_layout = QVBoxLayout(tf_group)
+        if hasattr(self, '_terraform_deployed') and self._terraform_deployed:
+            tf_layout.addWidget(QLabel("✅ <b>Status:</b> Deployed"))
+            if hasattr(self, '_terraform_outputs') and self._terraform_outputs:
+                tf_layout.addWidget(QLabel("<b>Outputs:</b>"))
+                for key, value in self._terraform_outputs.items():
+                    if value:
+                        name = key.replace('_', ' ').title()
+                        tf_layout.addWidget(QLabel(f"  • {name}: {value}"))
+        else:
+            tf_layout.addWidget(QLabel("⏳ <b>Status:</b> Not deployed"))
+        cloud_layout.addWidget(tf_group)
 
         # Firewalls
         firewalls = deployment_config.get('firewalls', [])
+        fw_group = QGroupBox(f"Firewalls ({len(firewalls)})")
+        fw_layout = QVBoxLayout(fw_group)
         if firewalls:
-            review_text += f"<p><b>Firewalls:</b> {len(firewalls)}</p>"
-            review_text += "<ul>"
             for fw in firewalls:
                 fw_type = fw.get('type', 'unknown').replace('_', ' ').title()
-                review_text += f"<li>{fw.get('name', 'Firewall')} ({fw_type})</li>"
-            review_text += "</ul>"
+                fw_layout.addWidget(QLabel(f"• <b>{fw.get('name')}</b> ({fw_type}) - {fw.get('location_name', '')}"))
+        else:
+            fw_layout.addWidget(QLabel("<i>No firewalls in deployment</i>"))
+        cloud_layout.addWidget(fw_group)
 
-        # Terraform outputs if available
-        if hasattr(self, '_terraform_outputs') and self._terraform_outputs:
-            review_text += "<p><b>Deployed Infrastructure:</b></p><ul>"
-            for key, value in self._terraform_outputs.items():
-                if value and 'ip' in key.lower():
-                    name = key.replace('_', ' ').title()
-                    review_text += f"<li>{name}: {value}</li>"
-            review_text += "</ul>"
+        cloud_layout.addStretch()
+        tabs.addTab(cloud_tab, "Cloud Deployment")
 
-        # Show in message box for now
-        # TODO: Create a proper review dialog
-        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QDialogButtonBox
+        main_layout.addWidget(tabs)
 
-        dialog = QDialog(self)
-        dialog.setWindowTitle("POV Configuration Review")
-        dialog.setMinimumWidth(400)
-
-        layout = QVBoxLayout(dialog)
-        label = QLabel(review_text)
-        label.setWordWrap(True)
-        layout.addWidget(label)
-
+        # Buttons
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
         buttons.accepted.connect(dialog.accept)
-        layout.addWidget(buttons)
+        main_layout.addWidget(buttons)
 
         dialog.exec()
 
@@ -7882,20 +8285,8 @@ output "{device_name}_private_ip" {{
                 )
                 return
 
-        reply = QMessageBox.question(
-            self,
-            "Deploy POV Configuration",
-            "This will push configuration to your deployed firewalls.\n\n"
-            "This includes:\n"
-            "  • Device settings (DNS, NTP, hostname)\n"
-            "  • Network interfaces and zones\n"
-            "  • Basic security policy\n"
-            "  • Outbound NAT\n\n"
-            "Continue?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-
-        if reply != QMessageBox.StandardButton.Yes:
+        # Show styled confirmation dialog
+        if not self._show_pov_deploy_confirmation_dialog():
             self._log_activity("POV configuration deployment cancelled by user")
             return
 
