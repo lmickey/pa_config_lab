@@ -2580,144 +2580,32 @@ class POVWorkflowWidget(QWidget):
         self.deploy_terraform_btn.clicked.connect(self._deploy_terraform)
         actions_row.addWidget(self.deploy_terraform_btn)
 
+        # Add View Credentials button (hidden until deployment completes)
+        self.view_credentials_btn = QPushButton("🔑 View Credentials")
+        self.view_credentials_btn.setMinimumWidth(160)
+        self.view_credentials_btn.setVisible(False)
+        self.view_credentials_btn.setToolTip("View credentials for deployed resources")
+        self.view_credentials_btn.setStyleSheet(
+            "QPushButton { "
+            "  background-color: #673AB7; color: white; padding: 10px 20px; "
+            "  font-weight: bold; border-radius: 5px; "
+            "  border: 1px solid #5E35B1; border-bottom: 3px solid #4527A0; "
+            "}"
+            "QPushButton:hover { background-color: #7E57C2; border-bottom: 3px solid #311B92; }"
+            "QPushButton:pressed { background-color: #5E35B1; border-bottom: 1px solid #4527A0; }"
+        )
+        self.view_credentials_btn.clicked.connect(self._show_credentials_dialog)
+        actions_row.addWidget(self.view_credentials_btn)
+
         tf_actions_layout.addLayout(actions_row)
         tf_actions_group.setLayout(tf_actions_layout)
         layout.addWidget(tf_actions_group)
 
-        # Deployed Resources Credentials Section (hidden until deployment completes)
-        self.credentials_group = QGroupBox("Deployed Resource Credentials")
-        self.credentials_group.setVisible(False)
-        creds_layout = QVBoxLayout()
-
-        creds_info = QLabel(
-            "Use these credentials to connect to your deployed resources. "
-            "Click 'Copy' to copy individual values to clipboard."
-        )
-        creds_info.setWordWrap(True)
-        creds_info.setStyleSheet("color: #666; margin-bottom: 10px;")
-        creds_layout.addWidget(creds_info)
-
-        # Firewall credentials section
-        fw_creds_label = QLabel("<b>Firewall Credentials</b>")
-        creds_layout.addWidget(fw_creds_label)
-
-        fw_grid = QGridLayout()
-        fw_grid.setColumnStretch(1, 1)
-
-        # Firewall Management IP
-        fw_grid.addWidget(QLabel("Management IP:"), 0, 0)
-        self.creds_fw_ip = QLineEdit()
-        self.creds_fw_ip.setReadOnly(True)
-        self.creds_fw_ip.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
-        fw_grid.addWidget(self.creds_fw_ip, 0, 1)
-        fw_ip_copy_btn = QPushButton("Copy")
-        fw_ip_copy_btn.setFixedWidth(60)
-        fw_ip_copy_btn.clicked.connect(lambda: self._copy_to_clipboard(self.creds_fw_ip.text(), "Firewall IP"))
-        fw_grid.addWidget(fw_ip_copy_btn, 0, 2)
-
-        # Firewall Username
-        fw_grid.addWidget(QLabel("Username:"), 1, 0)
-        self.creds_fw_username = QLineEdit()
-        self.creds_fw_username.setReadOnly(True)
-        self.creds_fw_username.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
-        fw_grid.addWidget(self.creds_fw_username, 1, 1)
-        fw_user_copy_btn = QPushButton("Copy")
-        fw_user_copy_btn.setFixedWidth(60)
-        fw_user_copy_btn.clicked.connect(lambda: self._copy_to_clipboard(self.creds_fw_username.text(), "Username"))
-        fw_grid.addWidget(fw_user_copy_btn, 1, 2)
-
-        # Firewall Password
-        fw_grid.addWidget(QLabel("Password:"), 2, 0)
-        self.creds_fw_password = QLineEdit()
-        self.creds_fw_password.setReadOnly(True)
-        self.creds_fw_password.setEchoMode(QLineEdit.EchoMode.Password)
-        self.creds_fw_password.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
-        fw_grid.addWidget(self.creds_fw_password, 2, 1)
-
-        fw_pwd_btns = QHBoxLayout()
-        self.creds_fw_pwd_show_btn = QPushButton("Show")
-        self.creds_fw_pwd_show_btn.setFixedWidth(60)
-        self.creds_fw_pwd_show_btn.setCheckable(True)
-        self.creds_fw_pwd_show_btn.clicked.connect(self._toggle_fw_password_visibility)
-        fw_pwd_btns.addWidget(self.creds_fw_pwd_show_btn)
-        fw_pwd_copy_btn = QPushButton("Copy")
-        fw_pwd_copy_btn.setFixedWidth(60)
-        fw_pwd_copy_btn.clicked.connect(lambda: self._copy_to_clipboard(self.creds_fw_password.text(), "Password"))
-        fw_pwd_btns.addWidget(fw_pwd_copy_btn)
-        fw_grid.addLayout(fw_pwd_btns, 2, 2)
-
-        creds_layout.addLayout(fw_grid)
-
-        # Separator
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setFrameShadow(QFrame.Shadow.Sunken)
-        separator.setStyleSheet("margin: 10px 0;")
-        creds_layout.addWidget(separator)
-
-        # VM/Server credentials section
-        vm_creds_label = QLabel("<b>Server/VM Credentials</b>")
-        creds_layout.addWidget(vm_creds_label)
-
-        vm_grid = QGridLayout()
-        vm_grid.setColumnStretch(1, 1)
-
-        # VM IPs (may have multiple)
-        vm_grid.addWidget(QLabel("Server IPs:"), 0, 0)
-        self.creds_vm_ips = QLineEdit()
-        self.creds_vm_ips.setReadOnly(True)
-        self.creds_vm_ips.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
-        self.creds_vm_ips.setPlaceholderText("No servers deployed")
-        vm_grid.addWidget(self.creds_vm_ips, 0, 1)
-        vm_ip_copy_btn = QPushButton("Copy")
-        vm_ip_copy_btn.setFixedWidth(60)
-        vm_ip_copy_btn.clicked.connect(lambda: self._copy_to_clipboard(self.creds_vm_ips.text(), "Server IPs"))
-        vm_grid.addWidget(vm_ip_copy_btn, 0, 2)
-
-        # VM Username
-        vm_grid.addWidget(QLabel("Username:"), 1, 0)
-        self.creds_vm_username = QLineEdit()
-        self.creds_vm_username.setReadOnly(True)
-        self.creds_vm_username.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
-        vm_grid.addWidget(self.creds_vm_username, 1, 1)
-        vm_user_copy_btn = QPushButton("Copy")
-        vm_user_copy_btn.setFixedWidth(60)
-        vm_user_copy_btn.clicked.connect(lambda: self._copy_to_clipboard(self.creds_vm_username.text(), "Username"))
-        vm_grid.addWidget(vm_user_copy_btn, 1, 2)
-
-        # VM Password
-        vm_grid.addWidget(QLabel("Password:"), 2, 0)
-        self.creds_vm_password = QLineEdit()
-        self.creds_vm_password.setReadOnly(True)
-        self.creds_vm_password.setEchoMode(QLineEdit.EchoMode.Password)
-        self.creds_vm_password.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
-        vm_grid.addWidget(self.creds_vm_password, 2, 1)
-
-        vm_pwd_btns = QHBoxLayout()
-        self.creds_vm_pwd_show_btn = QPushButton("Show")
-        self.creds_vm_pwd_show_btn.setFixedWidth(60)
-        self.creds_vm_pwd_show_btn.setCheckable(True)
-        self.creds_vm_pwd_show_btn.clicked.connect(self._toggle_vm_password_visibility)
-        vm_pwd_btns.addWidget(self.creds_vm_pwd_show_btn)
-        vm_pwd_copy_btn = QPushButton("Copy")
-        vm_pwd_copy_btn.setFixedWidth(60)
-        vm_pwd_copy_btn.clicked.connect(lambda: self._copy_to_clipboard(self.creds_vm_password.text(), "Password"))
-        vm_pwd_btns.addWidget(vm_pwd_copy_btn)
-        vm_grid.addLayout(vm_pwd_btns, 2, 2)
-
-        creds_layout.addLayout(vm_grid)
-
-        # Note about SSH/HTTPS access
-        access_note = QLabel(
-            "<i>Note: Connect via HTTPS to firewall management IP, or SSH to server IPs. "
-            "Ensure your source IP is allowed in the NSG rules.</i>"
-        )
-        access_note.setWordWrap(True)
-        access_note.setStyleSheet("color: #888; margin-top: 10px; font-size: 11px;")
-        creds_layout.addWidget(access_note)
-
-        self.credentials_group.setLayout(creds_layout)
-        layout.addWidget(self.credentials_group)
+        # Store credentials internally (not displayed until requested)
+        self._deployed_credentials = {
+            'firewall': {'ip': '', 'username': '', 'password': ''},
+            'vms': {'ips': [], 'username': '', 'password': ''},
+        }
 
         # Progress bar
         self.cloud_deploy_progress = QProgressBar()
@@ -4132,26 +4020,6 @@ class POVWorkflowWidget(QWidget):
         else:
             self.cloud_admin_password.setEchoMode(QLineEdit.EchoMode.Password)
 
-    def _toggle_fw_password_visibility(self, checked: bool):
-        """Toggle firewall password visibility in credentials panel."""
-        if hasattr(self, 'creds_fw_password'):
-            if checked:
-                self.creds_fw_password.setEchoMode(QLineEdit.EchoMode.Normal)
-                self.creds_fw_pwd_show_btn.setText("Hide")
-            else:
-                self.creds_fw_password.setEchoMode(QLineEdit.EchoMode.Password)
-                self.creds_fw_pwd_show_btn.setText("Show")
-
-    def _toggle_vm_password_visibility(self, checked: bool):
-        """Toggle VM password visibility in credentials panel."""
-        if hasattr(self, 'creds_vm_password'):
-            if checked:
-                self.creds_vm_password.setEchoMode(QLineEdit.EchoMode.Normal)
-                self.creds_vm_pwd_show_btn.setText("Hide")
-            else:
-                self.creds_vm_password.setEchoMode(QLineEdit.EchoMode.Password)
-                self.creds_vm_pwd_show_btn.setText("Show")
-
     def _copy_to_clipboard(self, text: str, label: str = ""):
         """Copy text to clipboard and show brief confirmation."""
         from PyQt6.QtWidgets import QApplication
@@ -4170,8 +4038,8 @@ class POVWorkflowWidget(QWidget):
             self._log_activity(f"Copied {label} to clipboard")
 
     def _populate_deployment_credentials(self):
-        """Populate the credentials panel with deployed resource info."""
-        if not hasattr(self, 'credentials_group'):
+        """Populate the credentials storage with deployed resource info."""
+        if not hasattr(self, 'view_credentials_btn'):
             return
 
         # Get terraform outputs
@@ -4228,25 +4096,190 @@ class POVWorkflowWidget(QWidget):
                 if 'private' in key_lower or 'ip' in key_lower:
                     vm_ips.append(value)
 
-        # Populate firewall credentials
-        if hasattr(self, 'creds_fw_ip'):
-            self.creds_fw_ip.setText(fw_ip or "Not found")
-        if hasattr(self, 'creds_fw_username'):
-            self.creds_fw_username.setText(admin_username or "admin")
-        if hasattr(self, 'creds_fw_password'):
-            self.creds_fw_password.setText(admin_password or "")
+        # Store credentials internally (more secure - not displayed until requested)
+        self._deployed_credentials = {
+            'firewall': {
+                'ip': fw_ip or "Not found",
+                'username': admin_username or "admin",
+                'password': admin_password or "",
+            },
+            'vms': {
+                'ips': vm_ips,
+                'username': admin_username or "",
+                'password': admin_password or "",
+            },
+        }
 
-        # Populate VM credentials
-        if hasattr(self, 'creds_vm_ips'):
-            self.creds_vm_ips.setText(", ".join(vm_ips) if vm_ips else "")
-        if hasattr(self, 'creds_vm_username'):
-            self.creds_vm_username.setText(admin_username or "")
-        if hasattr(self, 'creds_vm_password'):
-            self.creds_vm_password.setText(admin_password or "")
+        # Show the View Credentials button
+        if hasattr(self, 'view_credentials_btn'):
+            self.view_credentials_btn.setVisible(True)
+        self._log_activity("Deployment credentials available (click 'View Credentials' to see)")
 
-        # Show the credentials section
-        self.credentials_group.setVisible(True)
-        self._log_activity("Deployment credentials populated")
+    def _show_credentials_dialog(self):
+        """Show dialog with deployed resource credentials."""
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton, QFrame
+
+        if not hasattr(self, '_deployed_credentials') or not self._deployed_credentials:
+            QMessageBox.information(
+                self, "No Credentials",
+                "No deployment credentials available. Deploy infrastructure first."
+            )
+            return
+
+        creds = self._deployed_credentials
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Deployed Resource Credentials")
+        dialog.setMinimumWidth(450)
+        dialog.setModal(True)
+
+        layout = QVBoxLayout(dialog)
+        layout.setSpacing(15)
+
+        # Security notice
+        notice = QLabel(
+            "🔐 <b>Security Notice:</b> These credentials provide administrative access to your "
+            "deployed resources. Keep them secure and do not share."
+        )
+        notice.setWordWrap(True)
+        notice.setStyleSheet("background-color: #FFF3E0; padding: 10px; border-radius: 5px; color: #E65100;")
+        layout.addWidget(notice)
+
+        # Firewall section
+        fw_label = QLabel("<b>🔥 Firewall Credentials</b>")
+        fw_label.setStyleSheet("font-size: 13px; margin-top: 5px;")
+        layout.addWidget(fw_label)
+
+        fw_grid = QGridLayout()
+        fw_grid.setColumnStretch(1, 1)
+
+        # Firewall IP
+        fw_grid.addWidget(QLabel("Management IP:"), 0, 0)
+        fw_ip_field = QLineEdit(creds['firewall']['ip'])
+        fw_ip_field.setReadOnly(True)
+        fw_ip_field.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
+        fw_grid.addWidget(fw_ip_field, 0, 1)
+        fw_ip_copy = QPushButton("Copy")
+        fw_ip_copy.setFixedWidth(60)
+        fw_ip_copy.clicked.connect(lambda: self._copy_to_clipboard(creds['firewall']['ip'], "Firewall IP"))
+        fw_grid.addWidget(fw_ip_copy, 0, 2)
+
+        # Firewall Username
+        fw_grid.addWidget(QLabel("Username:"), 1, 0)
+        fw_user_field = QLineEdit(creds['firewall']['username'])
+        fw_user_field.setReadOnly(True)
+        fw_user_field.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
+        fw_grid.addWidget(fw_user_field, 1, 1)
+        fw_user_copy = QPushButton("Copy")
+        fw_user_copy.setFixedWidth(60)
+        fw_user_copy.clicked.connect(lambda: self._copy_to_clipboard(creds['firewall']['username'], "Username"))
+        fw_grid.addWidget(fw_user_copy, 1, 2)
+
+        # Firewall Password
+        fw_grid.addWidget(QLabel("Password:"), 2, 0)
+        fw_pwd_field = QLineEdit(creds['firewall']['password'])
+        fw_pwd_field.setReadOnly(True)
+        fw_pwd_field.setEchoMode(QLineEdit.EchoMode.Password)
+        fw_pwd_field.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
+        fw_grid.addWidget(fw_pwd_field, 2, 1)
+
+        fw_pwd_btns = QHBoxLayout()
+        fw_show_btn = QPushButton("Show")
+        fw_show_btn.setFixedWidth(60)
+        fw_show_btn.setCheckable(True)
+        fw_show_btn.clicked.connect(lambda checked: fw_pwd_field.setEchoMode(
+            QLineEdit.EchoMode.Normal if checked else QLineEdit.EchoMode.Password
+        ))
+        fw_pwd_btns.addWidget(fw_show_btn)
+        fw_pwd_copy = QPushButton("Copy")
+        fw_pwd_copy.setFixedWidth(60)
+        fw_pwd_copy.clicked.connect(lambda: self._copy_to_clipboard(creds['firewall']['password'], "Password"))
+        fw_pwd_btns.addWidget(fw_pwd_copy)
+        fw_grid.addLayout(fw_pwd_btns, 2, 2)
+
+        layout.addLayout(fw_grid)
+
+        # Separator
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setFrameShadow(QFrame.Shadow.Sunken)
+        layout.addWidget(sep)
+
+        # VM/Server section
+        vm_label = QLabel("<b>🖥️ Server/VM Credentials</b>")
+        vm_label.setStyleSheet("font-size: 13px;")
+        layout.addWidget(vm_label)
+
+        vm_grid = QGridLayout()
+        vm_grid.setColumnStretch(1, 1)
+
+        # VM IPs
+        vm_ips_str = ", ".join(creds['vms']['ips']) if creds['vms']['ips'] else "No servers deployed"
+        vm_grid.addWidget(QLabel("Server IPs:"), 0, 0)
+        vm_ip_field = QLineEdit(vm_ips_str)
+        vm_ip_field.setReadOnly(True)
+        vm_ip_field.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
+        vm_grid.addWidget(vm_ip_field, 0, 1)
+        vm_ip_copy = QPushButton("Copy")
+        vm_ip_copy.setFixedWidth(60)
+        vm_ip_copy.clicked.connect(lambda: self._copy_to_clipboard(vm_ips_str, "Server IPs"))
+        vm_grid.addWidget(vm_ip_copy, 0, 2)
+
+        # VM Username
+        vm_grid.addWidget(QLabel("Username:"), 1, 0)
+        vm_user_field = QLineEdit(creds['vms']['username'])
+        vm_user_field.setReadOnly(True)
+        vm_user_field.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
+        vm_grid.addWidget(vm_user_field, 1, 1)
+        vm_user_copy = QPushButton("Copy")
+        vm_user_copy.setFixedWidth(60)
+        vm_user_copy.clicked.connect(lambda: self._copy_to_clipboard(creds['vms']['username'], "Username"))
+        vm_grid.addWidget(vm_user_copy, 1, 2)
+
+        # VM Password
+        vm_grid.addWidget(QLabel("Password:"), 2, 0)
+        vm_pwd_field = QLineEdit(creds['vms']['password'])
+        vm_pwd_field.setReadOnly(True)
+        vm_pwd_field.setEchoMode(QLineEdit.EchoMode.Password)
+        vm_pwd_field.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
+        vm_grid.addWidget(vm_pwd_field, 2, 1)
+
+        vm_pwd_btns = QHBoxLayout()
+        vm_show_btn = QPushButton("Show")
+        vm_show_btn.setFixedWidth(60)
+        vm_show_btn.setCheckable(True)
+        vm_show_btn.clicked.connect(lambda checked: vm_pwd_field.setEchoMode(
+            QLineEdit.EchoMode.Normal if checked else QLineEdit.EchoMode.Password
+        ))
+        vm_pwd_btns.addWidget(vm_show_btn)
+        vm_pwd_copy = QPushButton("Copy")
+        vm_pwd_copy.setFixedWidth(60)
+        vm_pwd_copy.clicked.connect(lambda: self._copy_to_clipboard(creds['vms']['password'], "Password"))
+        vm_pwd_btns.addWidget(vm_pwd_copy)
+        vm_grid.addLayout(vm_pwd_btns, 2, 2)
+
+        layout.addLayout(vm_grid)
+
+        # Access note
+        access_note = QLabel(
+            "<i>Connect via HTTPS to firewall management IP, or SSH to server IPs. "
+            "Ensure your source IP is allowed in the NSG rules.</i>"
+        )
+        access_note.setWordWrap(True)
+        access_note.setStyleSheet("color: #666; margin-top: 10px; font-size: 11px;")
+        layout.addWidget(access_note)
+
+        # Close button
+        close_btn = QPushButton("Close")
+        close_btn.setStyleSheet(
+            "QPushButton { background-color: #607D8B; color: white; padding: 8px 20px; "
+            "font-weight: bold; border-radius: 5px; }"
+            "QPushButton:hover { background-color: #546E7A; }"
+        )
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn)
+
+        dialog.exec()
 
     def _regenerate_admin_password(self):
         """Generate a new secure admin password."""
