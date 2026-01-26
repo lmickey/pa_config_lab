@@ -2588,8 +2588,8 @@ class POVWorkflowWidget(QWidget):
 
         nav_layout.addStretch()
 
-        next_btn = QPushButton("Next: Deploy POV Config →")
-        next_btn.setStyleSheet(
+        self.cloud_deploy_next_btn = QPushButton("Next: Deploy POV Config →")
+        self.cloud_deploy_next_btn.setStyleSheet(
             "QPushButton { "
             "  background-color: #2196F3; color: white; padding: 8px 16px; "
             "  font-weight: bold; border-radius: 5px; "
@@ -2597,9 +2597,13 @@ class POVWorkflowWidget(QWidget):
             "}"
             "QPushButton:hover { background-color: #1E88E5; border-bottom: 3px solid #0D47A1; }"
             "QPushButton:pressed { background-color: #1976D2; border-bottom: 1px solid #1565C0; }"
+            "QPushButton:disabled { background-color: #BDBDBD; border: 1px solid #9E9E9E; border-bottom: 3px solid #757575; }"
         )
-        next_btn.clicked.connect(lambda: self._next_tab(4))
-        nav_layout.addWidget(next_btn)
+        self.cloud_deploy_next_btn.clicked.connect(lambda: self._next_tab(4))
+        # Initially disabled until Terraform is deployed (or cloud deployment is disabled)
+        self.cloud_deploy_next_btn.setEnabled(False)
+        self.cloud_deploy_next_btn.setToolTip("Deploy Terraform first to enable this button")
+        nav_layout.addWidget(self.cloud_deploy_next_btn)
 
         layout.addLayout(nav_layout)
 
@@ -4122,6 +4126,23 @@ class POVWorkflowWidget(QWidget):
 
         # Update deployment_config
         self.deployment_config['deploy_cloud_resources'] = is_enabled
+
+        # Update Next button state:
+        # - If cloud deployment disabled: enable Next button (no Terraform needed)
+        # - If cloud deployment enabled: disable Next until Terraform deployed
+        if hasattr(self, 'cloud_deploy_next_btn'):
+            if is_enabled:
+                # Cloud deployment enabled - check if already deployed
+                already_deployed = hasattr(self, '_terraform_deployed') and self._terraform_deployed
+                self.cloud_deploy_next_btn.setEnabled(already_deployed)
+                if already_deployed:
+                    self.cloud_deploy_next_btn.setToolTip("Proceed to deploy POV configuration")
+                else:
+                    self.cloud_deploy_next_btn.setToolTip("Deploy Terraform first to enable this button")
+            else:
+                # Cloud deployment disabled - enable Next button
+                self.cloud_deploy_next_btn.setEnabled(True)
+                self.cloud_deploy_next_btn.setToolTip("Proceed to deploy POV configuration (no cloud resources)")
 
         logger.info(f"Cloud deployment {'enabled' if is_enabled else 'disabled'}")
 
@@ -7103,12 +7124,10 @@ output "{device_name}_private_ip" {{
 
             self.cloud_deploy_results.set_text(result_text)
 
-            QMessageBox.information(
-                self,
-                "Deployment Complete",
-                "Infrastructure deployed successfully!\n\n"
-                "You can now proceed to deploy the POV configuration."
-            )
+            # Enable the Next button now that Terraform is deployed
+            if hasattr(self, 'cloud_deploy_next_btn'):
+                self.cloud_deploy_next_btn.setEnabled(True)
+                self.cloud_deploy_next_btn.setToolTip("Proceed to deploy POV configuration")
         else:
             self._log_activity(f"Infrastructure deployment failed: {message}", "error")
             self.cloud_deploy_results.set_text(f"✗ Deployment Failed\n\n{message}")
@@ -7687,6 +7706,16 @@ output "{device_name}_private_ip" {{
             # Also update the scroll widget state
             if hasattr(self, 'cloud_resources_scroll'):
                 self.cloud_resources_scroll.setEnabled(deploy_enabled)
+            # Update Next button state based on deploy setting
+            if hasattr(self, 'cloud_deploy_next_btn'):
+                if deploy_enabled:
+                    # Cloud deployment enabled - disable Next until Terraform deployed
+                    self.cloud_deploy_next_btn.setEnabled(False)
+                    self.cloud_deploy_next_btn.setToolTip("Deploy Terraform first to enable this button")
+                else:
+                    # Cloud deployment disabled - enable Next
+                    self.cloud_deploy_next_btn.setEnabled(True)
+                    self.cloud_deploy_next_btn.setToolTip("Proceed to deploy POV configuration")
 
         # Restore tenant connection status display - show saved tenant but note reconnection needed
         if hasattr(self, 'load_status') and self.connection_name:
