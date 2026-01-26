@@ -5739,6 +5739,34 @@ class POVWorkflowWidget(QWidget):
         import sys
         import os
 
+        # Check for saved credentials first
+        saved_sub_name = self.deployment_config.get('azure_subscription_name', '')
+        saved_sub_id = self.deployment_config.get('azure_subscription_id', '')
+        saved_tenant_id = self.deployment_config.get('azure_tenant_id', '')
+
+        if saved_sub_name and saved_sub_id:
+            # Offer to use saved credentials
+            reply = QMessageBox.question(
+                self,
+                "Saved Azure Credentials",
+                f"Found saved Azure credentials:\n\n"
+                f"Subscription: {saved_sub_name}\n"
+                f"ID: {saved_sub_id}\n\n"
+                f"Use these credentials, or re-authenticate?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                # Restore saved credentials
+                self._azure_subscription = {
+                    'name': saved_sub_name,
+                    'id': saved_sub_id,
+                    'tenant_id': saved_tenant_id,
+                }
+                self._log_activity(f"Restored saved Azure credentials: {saved_sub_name}")
+                self._on_azure_auth_success()
+                return
+
         self._log_activity("Starting Azure authentication...")
         self.azure_auth_btn.setEnabled(False)
         self.azure_auth_status.setText("🔄 Authenticating...")
@@ -5761,11 +5789,15 @@ class POVWorkflowWidget(QWidget):
             except Exception as ver_err:
                 self._log_activity(f"Could not get SDK versions: {ver_err}", "warning")
 
-            # Check if tenant ID was specified in the input field
+            # Check if tenant ID was specified in the input field or from saved state
             specified_tenant_id = None
             if hasattr(self, 'azure_tenant_input') and self.azure_tenant_input.text().strip():
                 specified_tenant_id = self.azure_tenant_input.text().strip()
                 self._log_activity(f"Using specified tenant: {specified_tenant_id}")
+            elif saved_tenant_id:
+                # Pre-fill tenant from saved state
+                specified_tenant_id = saved_tenant_id
+                self._log_activity(f"Using saved tenant: {specified_tenant_id}")
 
             self._log_activity("Opening browser for Azure sign-in...")
 
@@ -5793,6 +5825,11 @@ class POVWorkflowWidget(QWidget):
                 if sys.stderr != original_stderr:
                     sys.stderr.close()
                 sys.stderr = original_stderr
+
+            # Bring window back to focus after browser auth
+            self.activateWindow()
+            self.raise_()
+            QApplication.processEvents()
 
             # Decode token to get user info
             authenticated_user = "unknown"
@@ -5866,6 +5903,11 @@ class POVWorkflowWidget(QWidget):
                         sys.stderr.close()
                     sys.stderr = original_stderr
 
+                # Bring window back to focus after browser auth
+                self.activateWindow()
+                self.raise_()
+                QApplication.processEvents()
+
             # Step 4: List subscriptions from the selected tenant
             self._log_activity("Fetching Azure subscriptions...")
             try:
@@ -5903,8 +5945,8 @@ class POVWorkflowWidget(QWidget):
             # Store credential for later use
             self._azure_credential = credential
 
-            # Show subscription selection dialog
-            selected_sub = self._show_subscription_dialog(subscriptions)
+            # Show subscription selection dialog (pass tenant_id for saving)
+            selected_sub = self._show_subscription_dialog(subscriptions, selected_tenant_id)
 
             if selected_sub:
                 self._azure_subscription = selected_sub
@@ -6062,14 +6104,15 @@ class POVWorkflowWidget(QWidget):
 
         return None
 
-    def _show_subscription_dialog(self, subscriptions: list) -> dict:
+    def _show_subscription_dialog(self, subscriptions: list, tenant_id: str = None) -> dict:
         """Show dialog to select an Azure subscription.
 
         Args:
             subscriptions: List of Azure subscription objects
+            tenant_id: The Azure tenant ID to include in the result
 
         Returns:
-            Selected subscription dict with 'id' and 'name', or None if cancelled
+            Selected subscription dict with 'id', 'name', and 'tenant_id', or None if cancelled
         """
         from PyQt6.QtWidgets import QDialog, QTableWidget, QTableWidgetItem, QHeaderView
 
@@ -6159,51 +6202,68 @@ class POVWorkflowWidget(QWidget):
                     'id': sub.subscription_id,
                     'name': sub.display_name,
                     'state': state_str,
+                    'tenant_id': tenant_id or '',
                 }
 
         return None
 
     def _build_cloud_config(self) -> dict:
         """Build CloudConfig dictionary from UI selections."""
-        from config.models.cloud import (
-            CloudConfig,
-            CloudDeployment,
-            CloudFirewall,
-            CloudPanorama,
-        )
+        from config.models.cloud import CloudConfig
 
         deployment_config = self._gather_deployment_config()
 
-        # Build deployment settings
-        deployment = CloudDeployment(
-            customer_name="pov",
-            management_type=deployment_config.get('management_type', 'scm'),
-            provider="azure",
-            location="eastus",
-        )
+        # Get customer info
+        customer_info = self.cloud_resource_configs.get('customer_info', {})
+        customer_name = customer_info.get('customer_name_sanitized', 'pov')
 
-        # Build firewalls
-        firewalls = []
+        # Get location from first datacenter
+        locations = self.cloud_resource_configs.get('locations', {})
+        datacenters = locations.get('datacenters', [])
+        azure_region = 'eastus'
+        if datacenters:
+            azure_region = datacenters[0].get('region', 'eastus')
+
+        # Get Azure subscription/tenant from auth
+        subscription_id = ''
+        tenant_id = ''
+        if hasattr(self, '_azure_subscription') and self._azure_subscription:
+            subscription_id = self._azure_subscription.get('id', '')
+            tenant_id = self._azure_subscription.get('tenant_id', '')
+
+        # Build deployment dict
+        deployment_dict = {
+            'customer_name': customer_name,
+            'management_type': deployment_config.get('management_type', 'scm'),
+            'provider': 'azure',
+            'location': azure_region,
+            'subscription_id': subscription_id,
+            'tenant_id': tenant_id,
+        }
+
+        # Build firewalls list
+        firewalls_list = []
         for i, fw_config in enumerate(deployment_config.get('firewalls', [])):
             fw_type = "datacenter" if fw_config.get('type') == 'service_connection' else "branch"
-            fw = CloudFirewall(
-                name=f"fw{i+1}" if len(deployment_config.get('firewalls', [])) > 1 else "fw",
-                firewall_type=fw_type,
-            )
-            firewalls.append(fw)
+            fw_dict = {
+                'name': f"fw{i+1}" if len(deployment_config.get('firewalls', [])) > 1 else "fw",
+                'firewall_type': fw_type,
+            }
+            firewalls_list.append(fw_dict)
 
         # Build Panorama if Panorama-managed
-        panorama = None
+        panorama_dict = None
         if deployment_config.get('management_type') == 'panorama':
-            panorama = CloudPanorama(name="panorama")
+            panorama_dict = {'name': 'panorama'}
 
-        # Create config
-        config = CloudConfig(
-            deployment=deployment,
-            firewalls=firewalls,
-            panorama=panorama,
-        )
+        # Create config from raw_config dict
+        raw_config = {
+            'deployment': deployment_dict,
+            'firewalls': firewalls_list,
+            'panorama': panorama_dict,
+        }
 
+        config = CloudConfig(raw_config)
         return config
 
     def _on_terraform_progress(self, message: str, percentage: int):
@@ -6245,6 +6305,10 @@ class POVWorkflowWidget(QWidget):
         """Handle successful Azure authentication."""
         self._log_activity("Azure authentication successful")
 
+        # Bring window back to focus after browser auth
+        self.activateWindow()
+        self.raise_()
+
         # Update status with subscription info
         sub_name = self._azure_subscription.get('name', 'Unknown') if hasattr(self, '_azure_subscription') else 'Unknown'
         self.azure_auth_status.setText(f"🟢 {sub_name}")
@@ -6253,6 +6317,15 @@ class POVWorkflowWidget(QWidget):
             f"Subscription: {sub_name}\n"
             f"ID: {self._azure_subscription.get('id', 'N/A')}"
         )
+
+        # Save Azure credentials to deployment_config for state persistence
+        if hasattr(self, '_azure_subscription') and self._azure_subscription:
+            self.deployment_config['azure_subscription_id'] = self._azure_subscription.get('id', '')
+            self.deployment_config['azure_subscription_name'] = self._azure_subscription.get('name', '')
+            self.deployment_config['azure_tenant_id'] = self._azure_subscription.get('tenant_id', '')
+            # Immediately save state so credentials persist
+            self.save_state()
+            self._log_activity(f"Saved Azure credentials to state: {self._azure_subscription.get('name')}")
 
         # Change button to allow re-authentication
         self.azure_auth_btn.setText("🔄 Change Subscription")
@@ -7267,16 +7340,31 @@ output "{device_name}_private_ip" {{
             # Check if cloud deployment is enabled but not completed
             if self.deployment_config.get('deploy_cloud_resources', False):
                 if not hasattr(self, '_terraform_deployed') or not self._terraform_deployed:
-                    reply = QMessageBox.question(
-                        self,
-                        "Cloud Resources Not Deployed",
-                        "Cloud resource deployment is enabled but Terraform has not been deployed yet.\n\n"
-                        "Your Azure infrastructure (VNet, subnets, VMs) will not be created.\n\n"
-                        "Do you want to continue anyway?",
-                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                        QMessageBox.StandardButton.No
+                    # Use styled warning dialog (red border like push confirmation)
+                    msg_box = QMessageBox(self)
+                    msg_box.setIcon(QMessageBox.Icon.Warning)
+                    msg_box.setWindowTitle("⚠️ Cloud Resources Not Deployed")
+                    msg_box.setText("<b>Terraform has not been deployed yet!</b>")
+                    msg_box.setInformativeText(
+                        "Cloud resource deployment is enabled but you haven't deployed Terraform.\n\n"
+                        "Your Azure infrastructure (VNet, subnets, VMs) will NOT be created.\n\n"
+                        "Do you want to continue anyway?"
                     )
-                    if reply != QMessageBox.StandardButton.Yes:
+                    msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                    msg_box.setDefaultButton(QMessageBox.StandardButton.No)
+
+                    # Style with red border like push confirmation dialog
+                    msg_box.setStyleSheet("""
+                        QMessageBox {
+                            border: 3px solid #f44336;
+                            background-color: #fff3f3;
+                        }
+                        QLabel {
+                            color: #d32f2f;
+                        }
+                    """)
+
+                    if msg_box.exec() != QMessageBox.StandardButton.Yes:
                         return  # User chose not to continue
 
         # Save current state before moving to next tab
