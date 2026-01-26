@@ -10076,17 +10076,33 @@ output "{device_name}_private_ip" {{
         """Deploy security policies to SCM."""
         policies = self._deployment_context.get('custom_policies', {}).get('policies', [])
 
-        self.pov_deploy_results.append_text(f"\n  Deploying {len(policies)} security policies...")
+        # Filter to only dict policies (actual rule configs, not UI description strings)
+        rule_policies = [p for p in policies if isinstance(p, dict)]
+        string_policies = [p for p in policies if isinstance(p, str)]
+
+        if string_policies and not rule_policies:
+            # Only have description strings, not actual rule configs
+            self.pov_deploy_results.append_text(f"\n  {len(string_policies)} policy descriptions configured:")
+            for desc in string_policies[:5]:
+                self.pov_deploy_results.append_text(f"\n    • {desc}")
+            if len(string_policies) > 5:
+                self.pov_deploy_results.append_text(f"\n    ... and {len(string_policies) - 5} more")
+            self.pov_deploy_results.append_text("\n  [INFO] Policy descriptions are for reference only.")
+            self.pov_deploy_results.append_text("\n  [INFO] Configure actual security rules in Strata Cloud Manager.")
+            self._advance_to_next_phase(True, f"{len(string_policies)} policy descriptions noted")
+            return
+
+        self.pov_deploy_results.append_text(f"\n  Deploying {len(rule_policies)} security policies...")
 
         # Get deploy tenant API client
         deploy_api_client = self._get_deploy_api_client()
 
-        if deploy_api_client and policies:
+        if deploy_api_client and rule_policies:
             try:
                 created_rules = 0
                 skipped_rules = 0
 
-                for policy in policies:
+                for policy in rule_policies:
                     try:
                         policy_name = policy.get('name', 'unnamed')
                         # Remove 'id' and 'folder' if present (will use target folder)
@@ -10110,9 +10126,9 @@ output "{device_name}_private_ip" {{
                 self._log_activity(f"Failed to deploy security policies: {e}", "error")
                 self.pov_deploy_results.append_text(f"\n  [ERROR] {str(e)}")
                 self._advance_to_next_phase(False, str(e))
-        elif not policies:
-            self.pov_deploy_results.append_text("\n  [OK] No security policies to deploy")
-            self._advance_to_next_phase(True, "No policies to deploy")
+        elif not rule_policies:
+            self.pov_deploy_results.append_text("\n  [OK] No security rule configs to deploy")
+            self._advance_to_next_phase(True, "No rule configs to deploy")
         else:
             self.pov_deploy_results.append_text("\n  [SKIP] No deploy tenant connected")
             self._advance_to_next_phase(True, "Skipped - no deploy tenant")

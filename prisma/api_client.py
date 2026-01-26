@@ -285,12 +285,15 @@ class PrismaAccessAPIClient:
             # Parse response
             result = response.json() if response.content else {}
             logger.debug(f"Response parsed successfully")
-            
-            if 'data' in result:
-                logger.detail(f"Response contains {len(result['data'])} data items")
-                logger.detail(f"First data item keys: {list(result['data'][0].keys()) if result['data'] else 'none'}")
-            else:
-                logger.debug(f"Response keys: {list(result.keys())}")
+
+            if isinstance(result, list):
+                logger.debug(f"Response is a list with {len(result)} items")
+            elif isinstance(result, dict):
+                if 'data' in result:
+                    logger.detail(f"Response contains {len(result['data'])} data items")
+                    logger.detail(f"First data item keys: {list(result['data'][0].keys()) if result['data'] else 'none'}")
+                else:
+                    logger.debug(f"Response keys: {list(result.keys())}")
             
             # Validate response if item_type provided (for GET requests)
             if method.upper() == "GET" and item_type:
