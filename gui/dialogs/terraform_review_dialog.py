@@ -127,7 +127,7 @@ class TerraformReviewDialog(QDialog):
             return
 
         for filename in os.listdir(self.terraform_dir):
-            if filename.endswith('.tf') or filename.endswith('.tfvars'):
+            if filename.endswith('.tf') or filename.endswith('.tfvars') or filename.endswith('.json'):
                 filepath = os.path.join(self.terraform_dir, filename)
                 try:
                     with open(filepath, 'r') as f:

@@ -21,3 +21,6 @@ bandit>=1.7.0
 PyQt6>=6.6.0
 setuptools==80.8.0
 urllib3==2.4.0
+azure-identity>=1.15.0
+azure-mgmt-resource>=23.0.0
+azure-mgmt-subscription>=3.1.0

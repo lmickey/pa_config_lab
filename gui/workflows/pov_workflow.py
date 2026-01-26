@@ -119,12 +119,21 @@ class POVWorkflowWidget(QWidget):
         self.use_case_configs = {
             'mobile_users': {'enabled': True},  # Default enabled
             'prisma_browser': {'enabled': False},
-            'private_app': {'enabled': False},
+            'private_app': {'enabled': True},  # Default enabled
             'remote_branch': {'enabled': False},
             'aiops_adem': {'enabled': False},
             'app_accel': {'enabled': False},
             'rbi': {'enabled': False},
-            'pab': {'enabled': False},
+            'custom_policies': {'enabled': True, 'policies': []},  # Replaces PAB
+        }
+
+        # Deployment configuration state tracking
+        self.deployment_config = {
+            'management_type': 'scm',
+            'infrastructure_configured': False,
+            'infrastructure_source': None,  # 'default', 'tenant', or 'existing'
+            'panorama_placeholder': None,
+            'deploy_cloud_resources': False,  # Default to not deploying cloud resources
         }
 
         self._init_ui()
@@ -277,166 +286,98 @@ class POVWorkflowWidget(QWidget):
         layout.addWidget(customer_group)
 
         # =====================================================================
-        # Existing Resources Section
+        # Infrastructure Configuration Section
         # =====================================================================
-        self.resources_group = QGroupBox("Existing Resources")
-        resources_layout = QVBoxLayout()
+        self.infra_group = QGroupBox("Infrastructure Configuration")
+        infra_layout = QVBoxLayout()
 
-        resources_label = QLabel("Do you have any firewall or Panorama resources already deployed?")
-        resources_label.setStyleSheet("font-weight: bold;")
-        resources_layout.addWidget(resources_label)
+        infra_label = QLabel("Configure Prisma Access infrastructure settings (network, BGP, ZTNA subnets, etc.)")
+        infra_label.setStyleSheet("color: #555; margin-bottom: 10px;")
+        infra_layout.addWidget(infra_label)
 
-        resources_radio_layout = QHBoxLayout()
-        self.resources_no_radio = QRadioButton("No, starting fresh")
-        self.resources_no_radio.setChecked(True)
-        self.resources_no_radio.toggled.connect(self._on_existing_resources_changed)
-        resources_radio_layout.addWidget(self.resources_no_radio)
+        # Three buttons in a row
+        buttons_layout = QHBoxLayout()
+        buttons_layout.setSpacing(15)
 
-        self.resources_yes_radio = QRadioButton("Yes, I have existing resources")
-        self.resources_yes_radio.toggled.connect(self._on_existing_resources_changed)
-        resources_radio_layout.addWidget(self.resources_yes_radio)
-        resources_radio_layout.addStretch()
-        resources_layout.addLayout(resources_radio_layout)
-
-        # --- Existing Resources: Two-column layout (credentials + device list) ---
-        self.existing_creds_widget = QWidget()
-        creds_main_layout = QHBoxLayout(self.existing_creds_widget)
-        creds_main_layout.setContentsMargins(10, 10, 10, 0)
-
-        # Left side: Compact credentials form
-        left_widget = QWidget()
-        left_layout = QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(0, 0, 10, 0)
-
-        creds_info = QLabel("Add existing device:")
-        creds_info.setStyleSheet("color: #333; font-weight: bold; margin-bottom: 5px;")
-        left_layout.addWidget(creds_info)
-
-        # Device Type dropdown
-        type_row = QHBoxLayout()
-        type_label = QLabel("Type:")
-        type_label.setStyleSheet("font-size: 11px; color: #555; min-width: 50px;")
-        type_row.addWidget(type_label)
-        self.existing_device_type = QComboBox()
-        self.existing_device_type.addItems([
-            "Firewall",
-            "Panorama",
-            "ServerVM",
-            "UserVM",
-        ])
-        self.existing_device_type.setMaximumWidth(140)
-        self.existing_device_type.setStyleSheet(
-            "QComboBox { padding: 3px 6px; border: 1px solid #ccc; border-radius: 3px; }"
+        # Button 1: Infrastructure Configuration (Default) - Blue
+        default_config_btn = QPushButton("⚙️ Infrastructure Configuration (Default)")
+        default_config_btn.setMinimumHeight(50)
+        default_config_btn.setStyleSheet(
+            "QPushButton { "
+            "  background-color: #2196F3; color: white; padding: 12px 20px; "
+            "  font-weight: bold; border-radius: 6px; font-size: 12px; "
+            "  border: 1px solid #1976D2; border-bottom: 3px solid #1565C0; "
+            "}"
+            "QPushButton:hover { background-color: #1E88E5; border-bottom: 3px solid #0D47A1; }"
+            "QPushButton:pressed { background-color: #1976D2; border-bottom: 1px solid #1565C0; }"
         )
-        self.existing_device_type.currentTextChanged.connect(self._on_existing_device_type_changed)
-        type_row.addWidget(self.existing_device_type)
-        left_layout.addLayout(type_row)
+        default_config_btn.clicked.connect(self._show_infrastructure_config_dialog)
+        buttons_layout.addWidget(default_config_btn)
 
-        # Services (for ServerVM/UserVM) - hidden by default
-        self.existing_services_widget = QWidget()
-        services_layout = QVBoxLayout(self.existing_services_widget)
-        services_layout.setContentsMargins(0, 5, 0, 0)
-        services_label = QLabel("Services/Role:")
-        services_label.setStyleSheet("font-size: 11px; color: #555;")
-        services_layout.addWidget(services_label)
-        self.existing_services_input = QLineEdit()
-        self.existing_services_input.setPlaceholderText("e.g., DNS, Web, AD")
-        self.existing_services_input.setMaximumWidth(200)
-        self.existing_services_input.setStyleSheet(
-            "QLineEdit { padding: 3px 6px; border: 1px solid #ccc; border-radius: 3px; }"
+        # Button 2: Load Infrastructure Config from Tenant - Purple
+        load_tenant_btn = QPushButton("☁️ Load Infrastructure Config from Tenant")
+        load_tenant_btn.setMinimumHeight(50)
+        load_tenant_btn.setStyleSheet(
+            "QPushButton { "
+            "  background-color: #9C27B0; color: white; padding: 12px 20px; "
+            "  font-weight: bold; border-radius: 6px; font-size: 12px; "
+            "  border: 1px solid #7B1FA2; border-bottom: 3px solid #6A1B9A; "
+            "}"
+            "QPushButton:hover { background-color: #8E24AA; border-bottom: 3px solid #4A148C; }"
+            "QPushButton:pressed { background-color: #7B1FA2; border-bottom: 1px solid #6A1B9A; }"
         )
-        services_layout.addWidget(self.existing_services_input)
-        self.existing_services_widget.setVisible(False)
-        left_layout.addWidget(self.existing_services_widget)
+        load_tenant_btn.clicked.connect(self._load_infrastructure_from_tenant)
+        buttons_layout.addWidget(load_tenant_btn)
 
-        # Credentials section (for Firewall/Panorama) - visible by default
-        self.existing_creds_fields = QWidget()
-        creds_fields_layout = QVBoxLayout(self.existing_creds_fields)
-        creds_fields_layout.setContentsMargins(0, 5, 0, 0)
-
-        self.existing_mgmt_ip_input = QLineEdit()
-        self.existing_mgmt_ip_input.setPlaceholderText("IP or hostname")
-        self.existing_mgmt_ip_input.setMaximumWidth(200)
-        self.existing_mgmt_ip_input.setStyleSheet(
-            "QLineEdit { padding: 3px 6px; border: 1px solid #ccc; border-radius: 3px; }"
+        # Button 3: Import Existing Deployed Systems - Orange
+        import_btn = QPushButton("📥 Import Existing Deployed Systems")
+        import_btn.setMinimumHeight(50)
+        import_btn.setStyleSheet(
+            "QPushButton { "
+            "  background-color: #FF9800; color: white; padding: 12px 20px; "
+            "  font-weight: bold; border-radius: 6px; font-size: 12px; "
+            "  border: 1px solid #F57C00; border-bottom: 3px solid #E65100; "
+            "}"
+            "QPushButton:hover { background-color: #FB8C00; border-bottom: 3px solid #BF360C; }"
+            "QPushButton:pressed { background-color: #F57C00; border-bottom: 1px solid #E65100; }"
         )
-        creds_fields_layout.addWidget(self.existing_mgmt_ip_input)
+        import_btn.clicked.connect(self._import_existing_systems)
+        buttons_layout.addWidget(import_btn)
 
-        self.existing_username_input = QLineEdit()
-        self.existing_username_input.setPlaceholderText("Username")
-        self.existing_username_input.setMaximumWidth(200)
-        self.existing_username_input.setStyleSheet(
-            "QLineEdit { padding: 3px 6px; border: 1px solid #ccc; border-radius: 3px; }"
-        )
-        creds_fields_layout.addWidget(self.existing_username_input)
+        infra_layout.addLayout(buttons_layout)
 
-        self.existing_password_input = QLineEdit()
-        self.existing_password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.existing_password_input.setPlaceholderText("Password/API Key")
-        self.existing_password_input.setMaximumWidth(200)
-        self.existing_password_input.setStyleSheet(
-            "QLineEdit { padding: 3px 6px; border: 1px solid #ccc; border-radius: 3px; }"
-        )
-        creds_fields_layout.addWidget(self.existing_password_input)
-        left_layout.addWidget(self.existing_creds_fields)
+        # Status display for infrastructure config
+        self.infra_status_label = QLabel("Status: Using default configuration")
+        self.infra_status_label.setStyleSheet("color: #666; font-style: italic; margin-top: 10px;")
+        infra_layout.addWidget(self.infra_status_label)
 
-        # Add button
-        self.add_device_btn = QPushButton("+ Add Device")
-        self.add_device_btn.setMaximumWidth(200)
-        self.add_device_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; padding: 6px 12px; "
-            "font-weight: bold; border-radius: 4px; }"
-            "QPushButton:hover { background-color: #45a049; }"
-        )
-        self.add_device_btn.clicked.connect(self._add_existing_device)
-        left_layout.addWidget(self.add_device_btn)
+        # Initialize infrastructure config with defaults
+        self.cloud_resource_configs['infrastructure'] = {
+            'configured': False,
+            'source': 'default',
+            'network': {
+                'infrastructure_subnet': '10.255.0.0/16',
+                'infrastructure_bgp_as': '65534',
+                'ipv6_enabled': False,
+            },
+            'dns': {
+                'primary': '8.8.8.8',
+                'secondary': '8.8.4.4',
+            },
+            'internal_dns': {
+                'server1': '',
+                'server2': '',
+                'forward_domains': [],
+            },
+            'ztna': {
+                'application_networks': ['192.168.0.0/16'],
+                'controller_networks': ['10.0.0.0/8'],
+            },
+        }
 
-        left_layout.addStretch()
-        creds_main_layout.addWidget(left_widget)
-
-        # Separator line
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.VLine)
-        separator.setStyleSheet("background-color: #ccc;")
-        creds_main_layout.addWidget(separator)
-
-        # Right side: Device list
-        right_widget = QWidget()
-        right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(10, 0, 0, 0)
-
-        devices_label = QLabel("Existing devices:")
-        devices_label.setStyleSheet("color: #333; font-weight: bold; margin-bottom: 5px;")
-        right_layout.addWidget(devices_label)
-
-        self.existing_devices_list = QListWidget()
-        self.existing_devices_list.setMinimumHeight(120)
-        self.existing_devices_list.setStyleSheet(
-            "QListWidget { border: 1px solid #ccc; border-radius: 4px; background-color: white; }"
-            "QListWidget::item { padding: 4px; color: #333; }"
-            "QListWidget::item:selected { background-color: #e3f2fd; color: #333; }"
-        )
-        right_layout.addWidget(self.existing_devices_list)
-
-        # Remove button
-        self.remove_device_btn = QPushButton("- Remove Selected")
-        self.remove_device_btn.setStyleSheet(
-            "QPushButton { background-color: #f44336; color: white; padding: 6px 12px; "
-            "font-weight: bold; border-radius: 4px; }"
-            "QPushButton:hover { background-color: #d32f2f; }"
-            "QPushButton:disabled { background-color: #ccc; }"
-        )
-        self.remove_device_btn.clicked.connect(self._remove_existing_device)
-        right_layout.addWidget(self.remove_device_btn)
-
-        creds_main_layout.addWidget(right_widget, 1)
-
-        self.existing_creds_widget.setVisible(False)
-        resources_layout.addWidget(self.existing_creds_widget)
-
-        resources_layout.addStretch()
-        self.resources_group.setLayout(resources_layout)
-        layout.addWidget(self.resources_group)
+        infra_layout.addStretch()
+        self.infra_group.setLayout(infra_layout)
+        layout.addWidget(self.infra_group)
 
         layout.addStretch()
 
@@ -509,6 +450,35 @@ class POVWorkflowWidget(QWidget):
         info.setWordWrap(True)
         info.setStyleSheet("color: gray; margin-bottom: 10px;")
         layout.addWidget(info)
+
+        # Deploy toggle at top
+        deploy_container = QWidget()
+        deploy_layout = QHBoxLayout(deploy_container)
+        deploy_layout.setContentsMargins(10, 5, 10, 10)
+
+        self.deploy_cloud_checkbox = QCheckBox("Deploy Cloud Resources")
+        self.deploy_cloud_checkbox.setStyleSheet("""
+            QCheckBox {
+                font-size: 14px;
+                font-weight: bold;
+                padding: 8px;
+            }
+            QCheckBox::indicator {
+                width: 20px;
+                height: 20px;
+            }
+        """)
+        self.deploy_cloud_checkbox.setChecked(False)  # Default OFF
+        self.deploy_cloud_checkbox.stateChanged.connect(self._on_deploy_cloud_changed)
+
+        deploy_hint = QLabel("Enable to deploy Azure infrastructure for this POV")
+        deploy_hint.setStyleSheet("color: #666; font-style: italic;")
+
+        deploy_layout.addWidget(self.deploy_cloud_checkbox)
+        deploy_layout.addWidget(deploy_hint)
+        deploy_layout.addStretch()
+
+        layout.addWidget(deploy_container)
 
         # Helper to create a standard resource card with enabled configure button
         def create_resource_card(icon, title_text, bullet_points, attr_name):
@@ -1419,6 +1389,11 @@ class POVWorkflowWidget(QWidget):
         scroll_layout.addLayout(grid)
         scroll_layout.addStretch()
         scroll.setWidget(scroll_widget)
+
+        # Store reference and initially disable (deploy toggle is OFF by default)
+        self.cloud_resources_scroll = scroll
+        self.cloud_resources_scroll.setEnabled(False)
+
         layout.addWidget(scroll, 1)
 
         # Navigation
@@ -1517,6 +1492,7 @@ class POVWorkflowWidget(QWidget):
             top_row = QHBoxLayout()
 
             self.mobile_users_enable = QCheckBox()
+            self.mobile_users_enable.setChecked(True)  # Default enabled
             self.mobile_users_enable.setStyleSheet("margin-right: 4px;")
             self.mobile_users_enable.stateChanged.connect(self._on_mobile_users_changed)
             top_row.addWidget(self.mobile_users_enable)
@@ -1589,6 +1565,12 @@ class POVWorkflowWidget(QWidget):
             self.mobile_locations_list.itemSelectionChanged.connect(self._on_mobile_users_changed)
             card_layout.addWidget(self.mobile_locations_list)
 
+            # Auto-select default locations (US East, US West)
+            for i in range(self.mobile_locations_list.count()):
+                item = self.mobile_locations_list.item(i)
+                if item.text() in ['US East', 'US West']:
+                    item.setSelected(True)
+
             # Explicit Proxy checkbox
             self.mobile_explicit_proxy = QCheckBox("Enable Explicit Proxy")
             self.mobile_explicit_proxy.setStyleSheet(checkbox_style)
@@ -1601,12 +1583,12 @@ class POVWorkflowWidget(QWidget):
             self.explicit_proxy_hint.setWordWrap(True)
             card_layout.addWidget(self.explicit_proxy_hint)
 
-            # Initialize config
+            # Initialize config with defaults
             self.use_case_configs['mobile_users'] = {
-                'enabled': False,
+                'enabled': True,
                 'portal_name': '',
                 'vpn_mode': 'On Demand',
-                'locations': [],
+                'locations': ['US East', 'US West'],  # Default locations
                 'explicit_proxy': False,
             }
 
@@ -1709,6 +1691,7 @@ class POVWorkflowWidget(QWidget):
             top_row = QHBoxLayout()
 
             self.private_app_enable = QCheckBox()
+            self.private_app_enable.setChecked(True)  # Default enabled
             self.private_app_enable.setStyleSheet("margin-right: 4px;")
             self.private_app_enable.stateChanged.connect(self._on_private_app_changed)
             top_row.addWidget(self.private_app_enable)
@@ -1784,9 +1767,9 @@ class POVWorkflowWidget(QWidget):
             ztna_note.setWordWrap(True)
             card_layout.addWidget(ztna_note)
 
-            # Initialize config
+            # Initialize config with default enabled
             self.use_case_configs['private_app'] = {
-                'enabled': False,
+                'enabled': True,
                 'connections': [],  # List of {name, type, connection_type: 'service_connection'|'ztna'|'remote_network'}
                 'custom_ztna': [],  # List of custom ZTNA connectors added by user
             }
@@ -2215,8 +2198,10 @@ class POVWorkflowWidget(QWidget):
             card_layout.addStretch()
             return card
 
-        # ========== PAB CARD ==========
-        def create_pab_card():
+        # ========== CUSTOM SECURITY POLICIES CARD ==========
+        def create_custom_policies_card():
+            from PyQt6.QtWidgets import QListWidget, QListWidgetItem
+
             card = QFrame()
             card.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Raised)
             card.setStyleSheet(
@@ -2230,52 +2215,77 @@ class POVWorkflowWidget(QWidget):
             # Top row
             top_row = QHBoxLayout()
 
-            self.pab_enable = QCheckBox()
-            self.pab_enable.setStyleSheet("margin-right: 4px;")
-            self.pab_enable.stateChanged.connect(self._on_pab_changed)
-            top_row.addWidget(self.pab_enable)
+            self.custom_policies_enable = QCheckBox()
+            self.custom_policies_enable.setChecked(True)  # Default enabled
+            self.custom_policies_enable.setStyleSheet("margin-right: 4px;")
+            self.custom_policies_enable.stateChanged.connect(self._on_custom_policies_changed)
+            top_row.addWidget(self.custom_policies_enable)
 
-            title_label = QLabel("<b>🖥️ Prisma Access Browser</b>")
+            title_label = QLabel("<b>🔒 Custom Security Policies</b>")
             title_label.setStyleSheet("font-size: 13px; color: #333;")
             top_row.addWidget(title_label)
 
-            self.pab_status = QLabel("")
-            self.pab_status.setStyleSheet("color: #4CAF50; font-size: 11px;")
-            top_row.addWidget(self.pab_status)
+            self.custom_policies_status = QLabel("")
+            self.custom_policies_status.setStyleSheet("color: #4CAF50; font-size: 11px;")
+            top_row.addWidget(self.custom_policies_status)
             top_row.addStretch()
             card_layout.addLayout(top_row)
 
-            # Security options row
-            opts_row = QHBoxLayout()
-            opts_row.setSpacing(8)
+            # Description
+            desc = QLabel("Configure basic firewall rules for this POV")
+            desc.setStyleSheet("font-size: 10px; color: #666; margin-left: 20px;")
+            card_layout.addWidget(desc)
 
-            self.pab_dlp = QCheckBox("DLP")
-            self.pab_dlp.setChecked(True)
-            self.pab_dlp.setStyleSheet(checkbox_style)
-            self.pab_dlp.stateChanged.connect(self._on_pab_changed)
-            opts_row.addWidget(self.pab_dlp)
+            # Policies list with checkboxes
+            self.custom_policies_list = QListWidget()
+            self.custom_policies_list.setMaximumHeight(120)
+            self.custom_policies_list.setStyleSheet(
+                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 10px; }"
+                "QListWidget::item { padding: 2px; }"
+            )
 
-            self.pab_threat = QCheckBox("Threat Prevention")
-            self.pab_threat.setChecked(True)
-            self.pab_threat.setStyleSheet(checkbox_style)
-            self.pab_threat.stateChanged.connect(self._on_pab_changed)
-            opts_row.addWidget(self.pab_threat)
+            # Default policies
+            default_policies = [
+                "Allow internet access from Mobile Users",
+                "Allow internal DNS queries",
+                "Block high-risk URL categories",
+                "Allow SaaS applications",
+                "Deny and log unknown applications",
+            ]
 
-            self.pab_compliance = QCheckBox("Compliance")
-            self.pab_compliance.setChecked(True)
-            self.pab_compliance.setStyleSheet(checkbox_style)
-            self.pab_compliance.stateChanged.connect(self._on_pab_changed)
-            opts_row.addWidget(self.pab_compliance)
+            for policy in default_policies:
+                item = QListWidgetItem(policy)
+                item.setCheckState(Qt.CheckState.Checked)
+                self.custom_policies_list.addItem(item)
 
-            opts_row.addStretch()
-            card_layout.addLayout(opts_row)
+            self.custom_policies_list.itemChanged.connect(self._on_custom_policies_changed)
+            card_layout.addWidget(self.custom_policies_list)
 
-            # Initialize config
-            self.use_case_configs['pab'] = {
-                'enabled': False,
-                'enable_dlp': True,
-                'enable_threat_prevention': True,
-                'enable_compliance': True,
+            # Add custom policy row
+            add_row = QHBoxLayout()
+            add_row.setSpacing(4)
+
+            self.custom_policy_input = QLineEdit()
+            self.custom_policy_input.setPlaceholderText("Add custom policy description...")
+            self.custom_policy_input.setStyleSheet(input_style)
+            add_row.addWidget(self.custom_policy_input)
+
+            add_btn = QPushButton("+")
+            add_btn.setFixedSize(24, 24)
+            add_btn.setStyleSheet(
+                "QPushButton { background-color: #4CAF50; color: white; font-weight: bold; "
+                "border-radius: 4px; font-size: 14px; }"
+                "QPushButton:hover { background-color: #45a049; }"
+            )
+            add_btn.clicked.connect(self._add_custom_policy)
+            add_row.addWidget(add_btn)
+
+            card_layout.addLayout(add_row)
+
+            # Initialize config with default policies
+            self.use_case_configs['custom_policies'] = {
+                'enabled': True,
+                'policies': default_policies.copy(),
             }
 
             card_layout.addStretch()
@@ -2306,7 +2316,7 @@ class POVWorkflowWidget(QWidget):
 
         # Row 3
         grid.addWidget(create_rbi_card(), 3, 0)
-        grid.addWidget(create_pab_card(), 3, 1)
+        grid.addWidget(create_custom_policies_card(), 3, 1)
 
         scroll_layout.addLayout(grid)
         scroll_layout.addStretch()
@@ -2452,7 +2462,7 @@ class POVWorkflowWidget(QWidget):
             "QPushButton:hover { background-color: #106EBE; border-bottom: 3px solid #003C5A; }"
             "QPushButton:pressed { background-color: #005A9E; border-bottom: 1px solid #004578; }"
         )
-        self.azure_auth_btn.setToolTip("Coming soon: Azure authentication integration")
+        self.azure_auth_btn.setToolTip("Sign in with your Microsoft account to deploy Azure resources")
         self.azure_auth_btn.clicked.connect(self._authenticate_azure)
         auth_row.addWidget(self.azure_auth_btn)
 
@@ -2787,6 +2797,42 @@ class POVWorkflowWidget(QWidget):
         is_scm = self.scm_managed_radio.isChecked()
         self.management_type = "scm" if is_scm else "panorama"
 
+        # Update deployment_config tracking
+        self.deployment_config['management_type'] = self.management_type
+
+        # Handle Panorama placeholder based on management type
+        if is_scm:
+            # Remove Panorama placeholder if exists
+            if self.deployment_config.get('panorama_placeholder'):
+                self.deployment_config['panorama_placeholder'] = None
+                # Remove placeholder from existing_devices
+                existing = self.cloud_resource_configs.get('existing_devices', [])
+                self.cloud_resource_configs['existing_devices'] = [
+                    d for d in existing if not d.get('placeholder')
+                ]
+        else:
+            # Create Panorama placeholder for Panorama Managed mode
+            self.deployment_config['panorama_placeholder'] = {
+                'device_type': 'Panorama',
+                'placeholder': True,
+                'mgmt_ip': '',
+                'username': '',
+                'password': '',
+                'scannable': True,
+            }
+            # Add to existing_devices for visibility
+            if 'existing_devices' not in self.cloud_resource_configs:
+                self.cloud_resource_configs['existing_devices'] = []
+            # Check if placeholder already exists
+            has_placeholder = any(
+                d.get('placeholder') and d.get('device_type') == 'Panorama'
+                for d in self.cloud_resource_configs['existing_devices']
+            )
+            if not has_placeholder:
+                self.cloud_resource_configs['existing_devices'].append(
+                    self.deployment_config['panorama_placeholder']
+                )
+
         # Update tenant selector visibility/title
         if is_scm:
             self.tenant_selector.group_box.setTitle("SCM Tenant (Required)")
@@ -2794,6 +2840,15 @@ class POVWorkflowWidget(QWidget):
         else:
             self.tenant_selector.group_box.setTitle("SCM Tenant (Optional for Hybrid)")
             self.tenant_selector.setEnabled(True)  # Still allow optional SCM for hybrid
+
+        # Update infrastructure status to reflect Panorama requirement
+        if hasattr(self, 'infra_status_label'):
+            existing_count = len(self.cloud_resource_configs.get('existing_devices', []))
+            if not is_scm and existing_count > 0:
+                placeholder_count = sum(1 for d in self.cloud_resource_configs.get('existing_devices', []) if d.get('placeholder'))
+                if placeholder_count > 0:
+                    self.infra_status_label.setText(f"Status: Panorama configuration required ({existing_count} system(s))")
+                    self.infra_status_label.setStyleSheet("color: #FF9800; font-weight: bold;")
 
         # Update Panorama visibility in Tab 5
         self._update_panorama_visibility()
@@ -2858,130 +2913,666 @@ class POVWorkflowWidget(QWidget):
             self.cloud_resource_configs['customer_info'] = {}
         self.cloud_resource_configs['customer_info']['industry'] = industry
 
-    def _on_existing_resources_changed(self):
-        """Handle existing resources radio button change."""
-        has_existing = self.resources_yes_radio.isChecked()
-        self.existing_creds_widget.setVisible(has_existing)
+    def _show_infrastructure_config_dialog(self):
+        """Show dialog to configure/validate Prisma Access infrastructure settings."""
+        from PyQt6.QtWidgets import (
+            QDialog, QFormLayout, QDialogButtonBox, QTabWidget,
+            QTextEdit, QGroupBox
+        )
 
-    def _on_existing_device_type_changed(self, device_type: str):
-        """Handle device type change - show/hide relevant fields."""
-        is_scannable = device_type in ("Firewall", "Panorama")
-        self.existing_creds_fields.setVisible(is_scannable)
-        self.existing_services_widget.setVisible(not is_scannable)
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Infrastructure Configuration")
+        dialog.setMinimumSize(550, 500)
 
-    def _add_existing_device(self):
-        """Add an existing device to the list."""
-        device_type = self.existing_device_type.currentText()
-        is_scannable = device_type in ("Firewall", "Panorama")
+        layout = QVBoxLayout(dialog)
 
-        if is_scannable:
-            # Firewall/Panorama require credentials
-            mgmt_ip = self.existing_mgmt_ip_input.text().strip()
-            username = self.existing_username_input.text().strip()
-            password = self.existing_password_input.text()
+        info_label = QLabel("Configure Prisma Access infrastructure settings. These will be used during deployment.")
+        info_label.setStyleSheet("color: #555; margin-bottom: 10px;")
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label)
 
-            if not mgmt_ip or not username or not password:
+        # Tabs for different config sections
+        tabs = QTabWidget()
+
+        config = self.cloud_resource_configs.get('infrastructure', {})
+
+        # === Network Tab ===
+        network_tab = QWidget()
+        network_layout = QVBoxLayout(network_tab)
+
+        # Basic network settings
+        basic_group = QGroupBox("Network Settings")
+        basic_form = QFormLayout(basic_group)
+        basic_form.setSpacing(8)
+
+        self._infra_subnet = QLineEdit(config.get('network', {}).get('infrastructure_subnet', '10.255.0.0/16'))
+        basic_form.addRow("Infrastructure Subnet:", self._infra_subnet)
+
+        self._infra_bgp_as = QLineEdit(config.get('network', {}).get('infrastructure_bgp_as', '65534'))
+        basic_form.addRow("Infrastructure BGP AS:", self._infra_bgp_as)
+
+        self._infra_ipv6 = QCheckBox("Enable IPv6")
+        self._infra_ipv6.setChecked(config.get('network', {}).get('ipv6_enabled', False))
+        basic_form.addRow("IPv6:", self._infra_ipv6)
+
+        network_layout.addWidget(basic_group)
+
+        # Public DNS settings
+        dns_group = QGroupBox("Public DNS Servers")
+        dns_form = QFormLayout(dns_group)
+        dns_form.setSpacing(8)
+
+        self._dns_primary = QLineEdit(config.get('dns', {}).get('primary', '8.8.8.8'))
+        dns_form.addRow("Primary DNS:", self._dns_primary)
+
+        self._dns_secondary = QLineEdit(config.get('dns', {}).get('secondary', '8.8.4.4'))
+        dns_form.addRow("Secondary DNS:", self._dns_secondary)
+
+        network_layout.addWidget(dns_group)
+
+        # Internal DNS settings
+        internal_dns_group = QGroupBox("Internal DNS (Domain Forwarding)")
+        internal_dns_layout = QVBoxLayout(internal_dns_group)
+
+        int_dns_form = QFormLayout()
+        int_dns_form.setSpacing(8)
+
+        self._internal_dns1 = QLineEdit(config.get('internal_dns', {}).get('server1', ''))
+        self._internal_dns1.setPlaceholderText("e.g., 10.0.0.53")
+        int_dns_form.addRow("Internal DNS 1:", self._internal_dns1)
+
+        self._internal_dns2 = QLineEdit(config.get('internal_dns', {}).get('server2', ''))
+        self._internal_dns2.setPlaceholderText("e.g., 10.0.0.54")
+        int_dns_form.addRow("Internal DNS 2:", self._internal_dns2)
+
+        internal_dns_layout.addLayout(int_dns_form)
+
+        domains_label = QLabel("Forward Domains (one per line):")
+        domains_label.setStyleSheet("margin-top: 5px;")
+        internal_dns_layout.addWidget(domains_label)
+
+        domains_hint = QLabel(
+            "<small>Formats: <code>domain.com</code>, <code>^.domain.com</code> (single subdomain), "
+            "<code>*.domain.com</code> (all subdomains), <code>^sub.domain.com</code>, <code>*sub.domain.com</code></small>"
+        )
+        domains_hint.setStyleSheet("color: #666; margin-bottom: 5px;")
+        domains_hint.setWordWrap(True)
+        internal_dns_layout.addWidget(domains_hint)
+
+        self._internal_dns_domains = QTextEdit()
+        self._internal_dns_domains.setMaximumHeight(80)
+        self._internal_dns_domains.setPlaceholderText("corp.example.com\n^.internal.example.com\n*.servers.example.com")
+        # Load existing domains
+        existing_domains = config.get('internal_dns', {}).get('forward_domains', [])
+        if existing_domains:
+            self._internal_dns_domains.setPlainText('\n'.join(existing_domains))
+        internal_dns_layout.addWidget(self._internal_dns_domains)
+
+        network_layout.addWidget(internal_dns_group)
+        network_layout.addStretch()
+
+        tabs.addTab(network_tab, "Network")
+
+        # === ZTNA Tab ===
+        ztna_tab = QWidget()
+        ztna_layout = QVBoxLayout(ztna_tab)
+
+        # Application Network (formerly Trusted)
+        app_network_group = QGroupBox("Application Network")
+        app_network_layout = QVBoxLayout(app_network_group)
+
+        app_hint = QLabel("<small>Networks where ZTNA-protected applications reside (one per line, CIDR format)</small>")
+        app_hint.setStyleSheet("color: #666;")
+        app_network_layout.addWidget(app_hint)
+
+        self._ztna_app_networks = QTextEdit()
+        self._ztna_app_networks.setMaximumHeight(80)
+        self._ztna_app_networks.setPlaceholderText("192.168.0.0/16\n10.10.0.0/16")
+        # Load existing app networks
+        existing_app = config.get('ztna', {}).get('application_networks', [])
+        if not existing_app:
+            # Fallback to old trusted_network for backward compat
+            old_trusted = config.get('ztna', {}).get('trusted_network', '')
+            if old_trusted:
+                existing_app = [old_trusted]
+        if existing_app:
+            self._ztna_app_networks.setPlainText('\n'.join(existing_app))
+        app_network_layout.addWidget(self._ztna_app_networks)
+
+        ztna_layout.addWidget(app_network_group)
+
+        # Controller Network (formerly Untrusted)
+        ctrl_network_group = QGroupBox("Controller Network")
+        ctrl_network_layout = QVBoxLayout(ctrl_network_group)
+
+        ctrl_hint = QLabel("<small>Networks where ZTNA connectors/controllers are deployed (one per line, CIDR format)</small>")
+        ctrl_hint.setStyleSheet("color: #666;")
+        ctrl_network_layout.addWidget(ctrl_hint)
+
+        self._ztna_ctrl_networks = QTextEdit()
+        self._ztna_ctrl_networks.setMaximumHeight(80)
+        self._ztna_ctrl_networks.setPlaceholderText("10.0.0.0/8\n172.16.0.0/12")
+        # Load existing controller networks
+        existing_ctrl = config.get('ztna', {}).get('controller_networks', [])
+        if not existing_ctrl:
+            # Fallback to old untrusted_network for backward compat
+            old_untrusted = config.get('ztna', {}).get('untrusted_network', '')
+            if old_untrusted:
+                existing_ctrl = [old_untrusted]
+        if existing_ctrl:
+            self._ztna_ctrl_networks.setPlainText('\n'.join(existing_ctrl))
+        ctrl_network_layout.addWidget(self._ztna_ctrl_networks)
+
+        ztna_layout.addWidget(ctrl_network_group)
+        ztna_layout.addStretch()
+
+        tabs.addTab(ztna_tab, "ZTNA")
+
+        layout.addWidget(tabs)
+
+        # Buttons
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+
+        if dialog.exec():
+            # Validate and parse internal DNS domains
+            domains_text = self._internal_dns_domains.toPlainText().strip()
+            forward_domains = []
+            validation_errors = []
+
+            if domains_text:
+                for line in domains_text.split('\n'):
+                    line = line.strip()
+                    if not line:
+                        continue
+
+                    is_valid, error = self._validate_dns_forward_domain(line)
+                    if is_valid:
+                        forward_domains.append(line)
+                    else:
+                        validation_errors.append(f"'{line}': {error}")
+
+            if validation_errors:
                 QMessageBox.warning(
-                    self, "Missing Information",
-                    "Please fill in all fields (IP, username, and password)."
+                    dialog, "Invalid Domain Format",
+                    "The following domains have invalid formats:\n\n" + '\n'.join(validation_errors)
                 )
                 return
 
-            device_id = mgmt_ip
-            display_text = f"🔥 {device_type}: {mgmt_ip} ({username})" if device_type == "Firewall" else f"🌐 {device_type}: {mgmt_ip} ({username})"
+            # Parse and validate ZTNA networks
+            app_networks_text = self._ztna_app_networks.toPlainText().strip()
+            app_networks = []
+            ctrl_networks_text = self._ztna_ctrl_networks.toPlainText().strip()
+            ctrl_networks = []
+            network_errors = []
 
-            device_data = {
-                'device_type': device_type,
-                'mgmt_ip': mgmt_ip,
-                'username': username,
-                'password': password,
-                'scannable': True,
+            for line in app_networks_text.split('\n'):
+                line = line.strip()
+                if line:
+                    is_valid, error = self._validate_cidr_network(line)
+                    if is_valid:
+                        app_networks.append(line)
+                    else:
+                        network_errors.append(f"Application Network '{line}': {error}")
+
+            for line in ctrl_networks_text.split('\n'):
+                line = line.strip()
+                if line:
+                    is_valid, error = self._validate_cidr_network(line)
+                    if is_valid:
+                        ctrl_networks.append(line)
+                    else:
+                        network_errors.append(f"Controller Network '{line}': {error}")
+
+            if network_errors:
+                QMessageBox.warning(
+                    dialog, "Invalid Network Format",
+                    "The following networks have invalid formats:\n\n" + '\n'.join(network_errors)
+                )
+                return
+
+            # Save configuration
+            self.cloud_resource_configs['infrastructure'] = {
+                'configured': True,
+                'source': 'manual',
+                'network': {
+                    'infrastructure_subnet': self._infra_subnet.text(),
+                    'infrastructure_bgp_as': self._infra_bgp_as.text(),
+                    'ipv6_enabled': self._infra_ipv6.isChecked(),
+                },
+                'dns': {
+                    'primary': self._dns_primary.text(),
+                    'secondary': self._dns_secondary.text(),
+                },
+                'internal_dns': {
+                    'server1': self._internal_dns1.text().strip(),
+                    'server2': self._internal_dns2.text().strip(),
+                    'forward_domains': forward_domains,
+                },
+                'ztna': {
+                    'application_networks': app_networks,
+                    'controller_networks': ctrl_networks,
+                },
             }
+
+            # Update deployment config state
+            self.deployment_config['infrastructure_configured'] = True
+            self.deployment_config['infrastructure_source'] = 'manual'
+
+            self.infra_status_label.setText("Status: ✓ Configured manually")
+            self.infra_status_label.setStyleSheet("color: #4CAF50; font-weight: bold; margin-top: 10px;")
+            logger.info("Infrastructure configuration saved")
+
+    def _validate_dns_forward_domain(self, domain: str) -> tuple:
+        """
+        Validate a DNS forward domain entry.
+
+        Valid formats:
+        - domain.suffix (e.g., mydomain.com)
+        - ^.domain.suffix (single subdomain wildcard)
+        - *.domain.suffix (multi-subdomain wildcard)
+        - ^sub.domain.suffix (single level wildcard at subdomain)
+        - *sub.domain.suffix (multi-level wildcard at subdomain)
+
+        Rules:
+        - Must have at least domain.suffix
+        - Only one ^ or * allowed per entry
+        - Wildcards must be at the start
+
+        Returns (is_valid: bool, error_message: str or None)
+        """
+        import re
+
+        if not domain:
+            return False, "Empty domain"
+
+        # Check for multiple wildcards
+        wildcard_count = domain.count('^') + domain.count('*')
+        if wildcard_count > 1:
+            return False, "Only one wildcard (^ or *) allowed per domain"
+
+        # Check wildcard is at the start if present
+        if ('^' in domain or '*' in domain) and not (domain.startswith('^') or domain.startswith('*')):
+            return False, "Wildcard (^ or *) must be at the start of the domain"
+
+        # Remove wildcard prefix for base domain validation
+        base_domain = domain
+        if domain.startswith('^.') or domain.startswith('*.'):
+            base_domain = domain[2:]
+        elif domain.startswith('^') or domain.startswith('*'):
+            base_domain = domain[1:]
+
+        # Validate base domain format
+        # Must have at least one dot (domain.suffix)
+        if '.' not in base_domain:
+            return False, "Must have at least domain.suffix format (e.g., example.com)"
+
+        # Check that it doesn't start or end with a dot
+        if base_domain.startswith('.') or base_domain.endswith('.'):
+            return False, "Domain cannot start or end with a dot"
+
+        # Check for valid domain characters
+        # Valid: a-z, A-Z, 0-9, hyphen (but not at start/end of label), dots
+        domain_pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*$'
+        if not re.match(domain_pattern, base_domain):
+            return False, "Invalid characters in domain (use a-z, 0-9, hyphens, dots)"
+
+        # Check TLD exists and is valid (at least 2 chars)
+        parts = base_domain.split('.')
+        if len(parts[-1]) < 2:
+            return False, "TLD must be at least 2 characters"
+
+        return True, None
+
+    def _validate_cidr_network(self, network: str) -> tuple:
+        """
+        Validate a CIDR network address.
+
+        Valid formats:
+        - IPv4: 192.168.0.0/16, 10.0.0.0/8
+        - IPv6: 2001:db8::/32, fd00::/8
+
+        Returns (is_valid: bool, error_message: str or None)
+        """
+        import re
+
+        if not network:
+            return False, "Empty network"
+
+        # Check for CIDR notation
+        if '/' not in network:
+            return False, "Must include CIDR prefix (e.g., /24)"
+
+        parts = network.split('/')
+        if len(parts) != 2:
+            return False, "Invalid CIDR format"
+
+        ip_part, prefix_part = parts
+
+        # Validate prefix is a number
+        try:
+            prefix = int(prefix_part)
+        except ValueError:
+            return False, "Prefix must be a number"
+
+        # Check if IPv4 or IPv6
+        if ':' in ip_part:
+            # IPv6 validation
+            if prefix < 0 or prefix > 128:
+                return False, "IPv6 prefix must be 0-128"
+            # Basic IPv6 format check
+            ipv6_pattern = r'^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$|^::$|^::1$'
+            if not re.match(ipv6_pattern, ip_part):
+                return False, "Invalid IPv6 address format"
         else:
-            # ServerVM/UserVM just need services info
-            services = self.existing_services_input.text().strip()
-            if not services:
-                QMessageBox.warning(
-                    self, "Missing Information",
-                    "Please enter the services or role for this VM."
-                )
-                return
+            # IPv4 validation
+            if prefix < 0 or prefix > 32:
+                return False, "IPv4 prefix must be 0-32"
+            # Check IPv4 format
+            ipv4_pattern = r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$'
+            match = re.match(ipv4_pattern, ip_part)
+            if not match:
+                return False, "Invalid IPv4 address format"
+            # Check each octet is 0-255
+            for octet in match.groups():
+                if int(octet) > 255:
+                    return False, "IPv4 octets must be 0-255"
 
-            device_id = f"{device_type}_{services}"
-            icon = "🖥️" if device_type == "ServerVM" else "💻"
-            display_text = f"{icon} {device_type}: {services}"
+        return True, None
 
-            device_data = {
-                'device_type': device_type,
-                'services': services,
-                'scannable': False,
-            }
+    def _load_infrastructure_from_tenant(self):
+        """Load infrastructure configuration from connected SCM tenant."""
+        from PyQt6.QtWidgets import QApplication
 
-        # Check for duplicates
-        if 'existing_devices' not in self.cloud_resource_configs:
-            self.cloud_resource_configs['existing_devices'] = []
-
-        for device in self.cloud_resource_configs['existing_devices']:
-            existing_id = device.get('mgmt_ip') or f"{device.get('device_type')}_{device.get('services')}"
-            if existing_id == device_id:
-                QMessageBox.warning(
-                    self, "Duplicate Device",
-                    f"This device is already in the list."
-                )
-                return
-
-        # Add to config
-        self.cloud_resource_configs['existing_devices'].append(device_data)
-
-        # Add to list widget
-        self.existing_devices_list.addItem(display_text)
-
-        # Clear input fields
-        self.existing_mgmt_ip_input.clear()
-        self.existing_username_input.clear()
-        self.existing_password_input.clear()
-        self.existing_services_input.clear()
-
-        logger.info(f"Added {device_type} to existing devices list")
-
-    def _remove_existing_device(self):
-        """Remove the selected device from the list."""
-        current_item = self.existing_devices_list.currentItem()
-        if not current_item:
-            QMessageBox.information(
-                self, "No Selection",
-                "Please select a device to remove."
+        # Check if tenant is connected
+        if not self.api_client:
+            QMessageBox.warning(
+                self, "No Tenant Connected",
+                "Please connect to an SCM tenant using the tenant selector above "
+                "before loading configuration."
             )
             return
 
-        # Get the index and remove from list widget
-        row = self.existing_devices_list.row(current_item)
-        self.existing_devices_list.takeItem(row)
+        # Show loading indicator
+        self.infra_status_label.setText("Loading from tenant...")
+        self.infra_status_label.setStyleSheet("color: #2196F3; font-style: italic;")
+        QApplication.processEvents()
 
-        # Remove from config
-        if 'existing_devices' in self.cloud_resource_configs:
-            if row < len(self.cloud_resource_configs['existing_devices']):
-                removed = self.cloud_resource_configs['existing_devices'].pop(row)
-                logger.info(f"Removed device from existing devices list: {removed}")
+        try:
+            # TODO: Implement actual API call to fetch infrastructure config
+            # For now, use defaults as placeholder until API integration is complete
+            # infrastructure = self.api_client.get_infrastructure_config()
 
-    def _refresh_existing_devices_list(self):
-        """Refresh the existing devices list widget from config."""
-        self.existing_devices_list.clear()
-        devices = self.cloud_resource_configs.get('existing_devices', [])
-        for device in devices:
-            device_type = device.get('device_type', 'Firewall')
-            if device.get('scannable', True):
-                # Firewall or Panorama
-                icon = "🔥" if device_type == "Firewall" else "🌐"
-                mgmt_ip = device.get('mgmt_ip', 'Unknown')
-                username = device.get('username', '')
-                display = f"{icon} {device_type}: {mgmt_ip} ({username})"
+            # Populate with defaults (placeholder until API implemented)
+            self.cloud_resource_configs['infrastructure'] = {
+                'configured': True,
+                'source': 'tenant',
+                'tenant_name': self.connection_name,
+                'network': {
+                    'infrastructure_subnet': '10.255.0.0/16',
+                    'infrastructure_bgp_as': '65534',
+                    'ipv6_enabled': False,
+                },
+                'dns': {
+                    'primary': '8.8.8.8',
+                    'secondary': '8.8.4.4',
+                },
+                'internal_dns': {
+                    'server1': '',
+                    'server2': '',
+                    'forward_domains': [],
+                },
+                'ztna': {
+                    'application_networks': [],
+                    'controller_networks': [],
+                },
+            }
+
+            # Update deployment config state
+            self.deployment_config['infrastructure_configured'] = True
+            self.deployment_config['infrastructure_source'] = 'tenant'
+
+            self.infra_status_label.setText(f"Status: ✓ Loaded from {self.connection_name}")
+            self.infra_status_label.setStyleSheet("color: #9C27B0; font-weight: bold;")
+
+            QMessageBox.information(
+                self, "Configuration Loaded",
+                f"Infrastructure configuration loaded from {self.connection_name}.\n\n"
+                "You can click 'Infrastructure Configuration (Default)' to review and modify."
+            )
+
+            logger.info(f"Infrastructure config loaded from tenant: {self.connection_name}")
+
+        except Exception as e:
+            logger.error(f"Failed to load infrastructure from tenant: {e}")
+            self.infra_status_label.setText("Status: Failed to load from tenant")
+            self.infra_status_label.setStyleSheet("color: #F44336;")
+            QMessageBox.critical(
+                self, "Load Failed",
+                f"Failed to load infrastructure configuration:\n{str(e)}"
+            )
+
+    def _apply_default_infrastructure(self):
+        """Apply default infrastructure configuration without showing dialog.
+
+        Called automatically when user clicks 'Next' without configuring infrastructure.
+        """
+        if 'infrastructure' not in self.cloud_resource_configs:
+            self.cloud_resource_configs['infrastructure'] = {}
+
+        # Only apply if not already configured
+        if not self.cloud_resource_configs['infrastructure'].get('configured'):
+            self.cloud_resource_configs['infrastructure'] = {
+                'configured': True,
+                'source': 'default',
+                'network': {
+                    'infrastructure_subnet': '10.255.0.0/16',
+                    'infrastructure_bgp_as': '65534',
+                    'ipv6_enabled': False,
+                },
+                'dns': {
+                    'primary': '8.8.8.8',
+                    'secondary': '8.8.4.4',
+                },
+                'internal_dns': {
+                    'server1': '',
+                    'server2': '',
+                    'forward_domains': [],
+                },
+                'ztna': {
+                    'application_networks': ['192.168.0.0/16'],
+                    'controller_networks': ['10.0.0.0/8'],
+                },
+            }
+
+        self.deployment_config['infrastructure_configured'] = True
+        self.deployment_config['infrastructure_source'] = 'default'
+
+        if hasattr(self, 'infra_status_label'):
+            self.infra_status_label.setText("Status: Using default configuration")
+            self.infra_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+
+    def _import_existing_systems(self):
+        """Show dialog to add existing deployed cloud resources or physical hardware."""
+        from PyQt6.QtWidgets import QDialog, QFormLayout, QDialogButtonBox
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Import Existing Deployed Systems")
+        dialog.setMinimumSize(500, 400)
+
+        layout = QVBoxLayout(dialog)
+
+        info_label = QLabel("Add existing deployed resources (firewalls, Panorama, servers, VMs) that should be integrated with this deployment.")
+        info_label.setStyleSheet("color: #555; margin-bottom: 10px;")
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label)
+
+        # Two-column layout
+        main_layout = QHBoxLayout()
+
+        # Left: Add device form
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 10, 0)
+
+        add_label = QLabel("<b>Add Device:</b>")
+        left_layout.addWidget(add_label)
+
+        form = QFormLayout()
+        form.setSpacing(8)
+
+        device_type_combo = QComboBox()
+        device_type_combo.addItems(["Firewall", "Panorama", "ServerVM", "UserVM"])
+        form.addRow("Type:", device_type_combo)
+
+        # Credentials fields (for Firewall/Panorama)
+        creds_widget = QWidget()
+        creds_layout = QFormLayout(creds_widget)
+        creds_layout.setContentsMargins(0, 0, 0, 0)
+
+        mgmt_ip_input = QLineEdit()
+        mgmt_ip_input.setPlaceholderText("IP or hostname")
+        creds_layout.addRow("Management IP:", mgmt_ip_input)
+
+        username_input = QLineEdit()
+        username_input.setPlaceholderText("admin")
+        creds_layout.addRow("Username:", username_input)
+
+        password_input = QLineEdit()
+        password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        password_input.setPlaceholderText("Password or API key")
+        creds_layout.addRow("Password:", password_input)
+
+        # Services field (for ServerVM/UserVM)
+        services_widget = QWidget()
+        services_layout = QFormLayout(services_widget)
+        services_layout.setContentsMargins(0, 0, 0, 0)
+
+        services_input = QLineEdit()
+        services_input.setPlaceholderText("e.g., DNS, Web, AD")
+        services_layout.addRow("Services/Role:", services_input)
+        services_widget.setVisible(False)
+
+        def on_type_changed(device_type):
+            is_scannable = device_type in ("Firewall", "Panorama")
+            creds_widget.setVisible(is_scannable)
+            services_widget.setVisible(not is_scannable)
+
+        device_type_combo.currentTextChanged.connect(on_type_changed)
+
+        left_layout.addLayout(form)
+        left_layout.addWidget(creds_widget)
+        left_layout.addWidget(services_widget)
+
+        add_btn = QPushButton("+ Add Device")
+        add_btn.setStyleSheet(
+            "QPushButton { background-color: #4CAF50; color: white; padding: 8px; "
+            "font-weight: bold; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #45a049; }"
+        )
+        left_layout.addWidget(add_btn)
+        left_layout.addStretch()
+
+        main_layout.addWidget(left_widget)
+
+        # Right: Device list
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(10, 0, 0, 0)
+
+        list_label = QLabel("<b>Existing Systems:</b>")
+        right_layout.addWidget(list_label)
+
+        devices_list = QListWidget()
+        devices_list.setMinimumHeight(200)
+        devices_list.setStyleSheet(
+            "QListWidget { border: 1px solid #ccc; border-radius: 4px; background-color: white; }"
+            "QListWidget::item { padding: 4px; color: #333; }"
+            "QListWidget::item:selected { background-color: #e3f2fd; color: #333; }"
+        )
+
+        # Populate from existing config
+        existing = self.cloud_resource_configs.get('existing_devices', [])
+        for dev in existing:
+            dtype = dev.get('device_type', 'Unknown')
+            if dev.get('scannable', True):
+                icon = "🔥" if dtype == "Firewall" else "🌐"
+                devices_list.addItem(f"{icon} {dtype}: {dev.get('mgmt_ip', '?')}")
             else:
-                # ServerVM or UserVM
-                icon = "🖥️" if device_type == "ServerVM" else "💻"
-                services = device.get('services', 'Unknown')
-                display = f"{icon} {device_type}: {services}"
-            self.existing_devices_list.addItem(display)
+                icon = "🖥️" if dtype == "ServerVM" else "💻"
+                devices_list.addItem(f"{icon} {dtype}: {dev.get('services', '?')}")
+
+        right_layout.addWidget(devices_list)
+
+        remove_btn = QPushButton("- Remove Selected")
+        remove_btn.setStyleSheet(
+            "QPushButton { background-color: #f44336; color: white; padding: 8px; "
+            "font-weight: bold; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #d32f2f; }"
+        )
+        right_layout.addWidget(remove_btn)
+
+        main_layout.addWidget(right_widget, 1)
+        layout.addLayout(main_layout)
+
+        # Local device list for dialog
+        dialog_devices = list(existing)
+
+        def add_device():
+            dtype = device_type_combo.currentText()
+            is_scannable = dtype in ("Firewall", "Panorama")
+
+            if is_scannable:
+                ip = mgmt_ip_input.text().strip()
+                user = username_input.text().strip()
+                pwd = password_input.text()
+                if not ip or not user or not pwd:
+                    QMessageBox.warning(dialog, "Missing Info", "Please fill in all credential fields.")
+                    return
+                device = {'device_type': dtype, 'mgmt_ip': ip, 'username': user, 'password': pwd, 'scannable': True}
+                icon = "🔥" if dtype == "Firewall" else "🌐"
+                devices_list.addItem(f"{icon} {dtype}: {ip}")
+                mgmt_ip_input.clear()
+                username_input.clear()
+                password_input.clear()
+            else:
+                services = services_input.text().strip()
+                if not services:
+                    QMessageBox.warning(dialog, "Missing Info", "Please enter services/role.")
+                    return
+                device = {'device_type': dtype, 'services': services, 'scannable': False}
+                icon = "🖥️" if dtype == "ServerVM" else "💻"
+                devices_list.addItem(f"{icon} {dtype}: {services}")
+                services_input.clear()
+
+            dialog_devices.append(device)
+
+        def remove_device():
+            row = devices_list.currentRow()
+            if row >= 0:
+                devices_list.takeItem(row)
+                if row < len(dialog_devices):
+                    dialog_devices.pop(row)
+
+        add_btn.clicked.connect(add_device)
+        remove_btn.clicked.connect(remove_device)
+
+        # Buttons
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+
+        if dialog.exec():
+            # Save to config
+            self.cloud_resource_configs['existing_devices'] = dialog_devices
+            count = len(dialog_devices)
+            if count > 0:
+                self.infra_status_label.setText(f"Status: ✓ {count} existing system(s) configured")
+                self.infra_status_label.setStyleSheet("color: #FF9800; font-weight: bold; margin-top: 10px;")
+            logger.info(f"Configured {count} existing systems")
 
     def _on_tenant_connection_changed(self, api_client, tenant_name: str):
         """Handle tenant connection changes from the selector."""
@@ -3001,10 +3592,9 @@ class POVWorkflowWidget(QWidget):
 
     def _gather_deployment_config(self) -> Dict[str, Any]:
         """Gather deployment configuration from the UI selections."""
-        # Check if existing resources checkbox exists
-        has_existing = False
-        if hasattr(self, 'resources_yes_radio'):
-            has_existing = self.resources_yes_radio.isChecked()
+        # Check for existing devices
+        existing_devices = self.cloud_resource_configs.get('existing_devices', [])
+        has_existing = len(existing_devices) > 0
 
         config = {
             "management_type": self.management_type,
@@ -3043,20 +3633,22 @@ class POVWorkflowWidget(QWidget):
         return config
 
     def _get_firewall_credentials(self) -> Optional[Dict[str, str]]:
-        """Get firewall credentials from the UI (from Tenant Info existing resources section)."""
-        if not hasattr(self, 'existing_mgmt_ip_input'):
-            return None
+        """Get firewall credentials from the existing devices config."""
+        existing_devices = self.cloud_resource_configs.get('existing_devices', [])
 
-        fw_ip = self.existing_mgmt_ip_input.text().strip()
-        fw_user = self.existing_username_input.text().strip()
-        fw_pass = self.existing_password_input.text()
+        # Find first firewall with credentials
+        for device in existing_devices:
+            if device.get('device_type') == 'Firewall' and device.get('scannable'):
+                mgmt_ip = device.get('mgmt_ip', '')
+                username = device.get('username', '')
+                password = device.get('password', '')
 
-        if fw_ip and fw_user and fw_pass:
-            return {
-                "mgmt_ip": fw_ip,
-                "username": fw_user,
-                "password": fw_pass,
-            }
+                if mgmt_ip and username and password:
+                    return {
+                        "mgmt_ip": mgmt_ip,
+                        "username": username,
+                        "password": password,
+                    }
         return None
 
     def _merge_configs(
@@ -3432,6 +4024,77 @@ class POVWorkflowWidget(QWidget):
         if hasattr(self, 'cloud_security_source_ips'):
             if not self.cloud_security_source_ips.text():
                 self.cloud_security_source_ips.setText("0.0.0.0/0")
+
+    def _on_deploy_cloud_changed(self, state):
+        """Handle deploy cloud resources toggle change."""
+        from PyQt6.QtCore import Qt
+
+        is_enabled = state == Qt.CheckState.Checked.value
+
+        # Enable/disable all cards in the scroll area
+        if hasattr(self, 'cloud_resources_scroll'):
+            self.cloud_resources_scroll.setEnabled(is_enabled)
+
+        # Update deployment_config
+        self.deployment_config['deploy_cloud_resources'] = is_enabled
+
+        logger.info(f"Cloud deployment {'enabled' if is_enabled else 'disabled'}")
+
+    def _validate_cloud_resources_tab(self) -> bool:
+        """Validate Cloud Resources tab before proceeding to next tab.
+
+        Returns True if validation passes, False if blocked.
+        """
+        deploy_enabled = self.deployment_config.get('deploy_cloud_resources', False)
+
+        # If deploying cloud resources, no special validation needed
+        if deploy_enabled:
+            # Cloud resource configs are already populated via inline editing
+            logger.info("Cloud deployment enabled - including cloud resources in config")
+            return True
+
+        # Not deploying cloud resources - check Panorama requirements
+        if self.management_type == 'panorama':
+            # Check if Panorama exists in existing_devices (not a placeholder)
+            existing_devices = self.cloud_resource_configs.get('existing_devices', [])
+            has_panorama = any(
+                d.get('device_type') == 'Panorama' and not d.get('placeholder', False)
+                for d in existing_devices
+            )
+
+            if not has_panorama:
+                # No Panorama and not deploying cloud resources - error
+                QMessageBox.warning(
+                    self, "Panorama Required",
+                    "Panorama Managed deployment requires either:\n\n"
+                    "• An existing Panorama system (configure in Tab 1: Import Existing Systems)\n"
+                    "• Cloud deployment enabled to deploy a new Panorama\n\n"
+                    "Please enable 'Deploy Cloud Resources' or add an existing Panorama."
+                )
+                return False
+
+            # Has existing Panorama - can proceed without cloud deployment
+            logger.info("Panorama Managed with existing Panorama - skipping cloud deployment")
+        else:
+            # SCM Managed - can proceed without cloud deployment
+            logger.info("SCM Managed - cloud deployment optional, skipping")
+
+        # Clear cloud resource configs since not deploying
+        self._clear_cloud_resource_configs()
+        return True
+
+    def _clear_cloud_resource_configs(self):
+        """Clear cloud resource configs when not deploying cloud infrastructure."""
+        # Keep customer_info, infrastructure, existing_devices
+        # Clear deployment-specific configs
+        self.cloud_resource_configs['cloud_deployment'] = {}
+        self.cloud_resource_configs['cloud_security'] = {}
+        self.cloud_resource_configs['device_config'] = {}
+        self.cloud_resource_configs['policy_objects'] = {}
+        self.cloud_resource_configs['locations'] = {'branches': [], 'datacenters': []}
+        self.cloud_resource_configs['trust_devices'] = {'devices': []}
+
+        logger.info("Cleared cloud resource configurations (deployment disabled)")
 
     def _on_cloud_security_changed(self):
         """Handle cloud security configuration changes (auto-save)."""
@@ -3909,7 +4572,7 @@ class POVWorkflowWidget(QWidget):
             'aiops_adem': 'AIOPS-ADEM',
             'app_accel': 'App Acceleration',
             'rbi': 'Remote Browser Isolation',
-            'pab': 'Prisma Access Browser (Legacy)',
+            'custom_policies': 'Custom Security Policies',
         }
 
         preview = "Selected Use Cases:\n\n"
@@ -3998,6 +4661,10 @@ class POVWorkflowWidget(QWidget):
 
     def _on_mobile_users_changed(self):
         """Handle Mobile Users inline field changes."""
+        # Guard against being called during widget initialization
+        if not hasattr(self, 'mobile_explicit_proxy'):
+            return
+
         # Get selected locations
         selected_locations = []
         for i in range(self.mobile_locations_list.count()):
@@ -4644,15 +5311,228 @@ class POVWorkflowWidget(QWidget):
         }
         self._update_use_case_status('rbi')
 
-    def _on_pab_changed(self):
-        """Handle PAB inline field changes."""
-        self.use_case_configs['pab'] = {
-            'enabled': self.pab_enable.isChecked(),
-            'enable_dlp': self.pab_dlp.isChecked(),
-            'enable_threat_prevention': self.pab_threat.isChecked(),
-            'enable_compliance': self.pab_compliance.isChecked(),
+    def _on_custom_policies_changed(self):
+        """Handle Custom Security Policies inline field changes."""
+        # Guard against being called during widget initialization
+        if not hasattr(self, 'custom_policies_list'):
+            return
+
+        # Gather enabled policies from list
+        enabled_policies = []
+        for i in range(self.custom_policies_list.count()):
+            item = self.custom_policies_list.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                enabled_policies.append(item.text())
+
+        # Preserve staged_objects if they exist
+        existing = self.use_case_configs.get('custom_policies', {})
+        staged = existing.get('staged_objects', {})
+
+        self.use_case_configs['custom_policies'] = {
+            'enabled': self.custom_policies_enable.isChecked(),
+            'policies': enabled_policies,
+            'staged_objects': staged,
+            'customer_prefix': existing.get('customer_prefix', ''),
+            'source_tenant': existing.get('source_tenant', ''),
+            'generated_at': existing.get('generated_at', ''),
         }
-        self._update_use_case_status('pab')
+        self._update_use_case_status('custom_policies')
+
+    def _add_custom_policy(self):
+        """Add a custom policy to the list."""
+        from PyQt6.QtWidgets import QListWidgetItem
+
+        policy_text = self.custom_policy_input.text().strip()
+        if not policy_text:
+            return
+
+        # Add to list with checkbox
+        item = QListWidgetItem(policy_text)
+        item.setCheckState(Qt.CheckState.Checked)
+        self.custom_policies_list.addItem(item)
+
+        # Clear input
+        self.custom_policy_input.clear()
+
+        # Update config
+        self._on_custom_policies_changed()
+
+    def _sync_use_cases_from_cloud_resources(self):
+        """Sync use case defaults based on cloud resources configuration.
+
+        Called when entering Tab 3 (POV Use Cases) to auto-enable use cases
+        based on what was configured in Tab 2 (Cloud Resources).
+        """
+        # Enable Remote Branch if any branches were configured
+        branches = self.cloud_resource_configs.get('locations', {}).get('branches', [])
+        if branches and hasattr(self, 'remote_branch_enable'):
+            if not self.remote_branch_enable.isChecked():
+                self.remote_branch_enable.setChecked(True)
+                self._on_remote_branch_changed()
+                logger.info(f"Auto-enabled Remote Branch use case - {len(branches)} branches configured")
+
+    def _populate_adem_defaults(self):
+        """Populate ADEM with default test entries.
+
+        Adds default entries for common collaboration tools and
+        unique base domains from internal DNS forward_domains.
+        """
+        # Only populate if ADEM list is empty
+        current_tests = self.use_case_configs.get('aiops_adem', {}).get('tests', [])
+        if current_tests:
+            return  # Don't override existing entries
+
+        # Default entries for collaboration tools
+        default_entries = ['teams.microsoft.com', 'zoom.us']
+
+        # Add unique base domains from internal DNS forward_domains
+        internal_dns = self.cloud_resource_configs.get('infrastructure', {}).get('internal_dns', {})
+        forward_domains = internal_dns.get('forward_domains', [])
+
+        for domain in forward_domains:
+            # Extract base domain (remove wildcard prefixes)
+            base = domain
+            if base.startswith('^.') or base.startswith('*.'):
+                base = base[2:]
+            elif base.startswith('^') or base.startswith('*'):
+                base = base[1:]
+
+            # Get base domain (last two parts for typical domains)
+            parts = base.split('.')
+            if len(parts) >= 2:
+                base_domain = '.'.join(parts[-2:])
+                if base_domain not in default_entries and base_domain != domain:
+                    default_entries.append(base_domain)
+
+        # Add entries to ADEM list
+        for entry in default_entries:
+            self._add_adem_entry(entry)
+
+        if default_entries:
+            logger.info(f"Populated ADEM with {len(default_entries)} default entries")
+
+    def _add_adem_entry(self, target: str):
+        """Add an ADEM test entry programmatically.
+
+        Args:
+            target: IP address or domain name to test
+        """
+        from PyQt6.QtWidgets import QListWidgetItem
+
+        # Check if entry already exists
+        for i in range(self.adem_tests_list.count()):
+            item = self.adem_tests_list.item(i)
+            if target in item.text():
+                return  # Already exists
+
+        test = {
+            'target': target,
+            'on_vpn': True,  # Always true
+            'in_office': False,
+            'not_on_vpn': False,
+        }
+
+        # Add to config
+        if 'tests' not in self.use_case_configs.get('aiops_adem', {}):
+            self.use_case_configs['aiops_adem'] = {'enabled': False, 'tests': []}
+        self.use_case_configs['aiops_adem']['tests'].append(test)
+
+        # Add to list display
+        display_text = f"{target} (VPN)"
+        self.adem_tests_list.addItem(display_text)
+
+    def _auto_generate_security_objects(self):
+        """Automatically generate security objects from POV configuration.
+
+        This runs silently in the background when entering Tab 3.
+        Generates address objects from infrastructure config and clones
+        security profiles from the connected tenant if available.
+        """
+        from datetime import datetime
+        from gui.workflows.pov_security_objects import generate_staged_objects
+
+        # Get customer prefix
+        customer_info = self.cloud_resource_configs.get('customer_info', {})
+        prefix = customer_info.get('customer_name_sanitized', '')
+
+        if not prefix:
+            # No customer name yet, skip generation
+            return
+
+        # Check if we need to regenerate
+        custom_policies = self.use_case_configs.get('custom_policies', {})
+        staged = custom_policies.get('staged_objects', {})
+        existing_prefix = custom_policies.get('customer_prefix', '')
+
+        # Skip if already generated with same prefix and has objects
+        if (staged.get('address_objects') and existing_prefix == prefix):
+            # Already generated, check if profiles need cloning
+            if self.api_client and not staged.get('profiles'):
+                # Tenant connected but no profiles - try to clone
+                self._clone_profiles_to_staged(prefix)
+            return
+
+        try:
+            # Generate all security objects
+            staged_objects = generate_staged_objects(
+                customer_prefix=prefix,
+                cloud_resource_configs=self.cloud_resource_configs,
+                use_case_configs=self.use_case_configs,
+                api_client=self.api_client,
+            )
+
+            # Update config
+            self.use_case_configs['custom_policies']['staged_objects'] = staged_objects
+            self.use_case_configs['custom_policies']['customer_prefix'] = prefix
+            self.use_case_configs['custom_policies']['generated_at'] = datetime.now().isoformat()
+
+            if self.api_client:
+                self.use_case_configs['custom_policies']['source_tenant'] = self.connection_name
+
+            # Log activity
+            addr_count = len(staged_objects.get('address_objects', []))
+            profile_count = sum(len(v) for v in staged_objects.get('profiles', {}).values())
+            logger.info(
+                f"Auto-generated security objects: {addr_count} addresses, "
+                f"{profile_count} profiles"
+            )
+
+        except Exception as e:
+            logger.warning(f"Failed to auto-generate security objects: {e}")
+
+    def _clone_profiles_to_staged(self, prefix: str):
+        """Clone profiles from tenant to staged objects.
+
+        Called when tenant connects and we already have address objects generated.
+        """
+        from datetime import datetime
+        from gui.workflows.pov_security_objects import ProfileCloner
+
+        if not self.api_client:
+            return
+
+        try:
+            cloner = ProfileCloner(
+                api_client=self.api_client,
+                customer_prefix=prefix,
+            )
+            cloned_profiles = cloner.clone_all_profiles()
+            profile_group = cloner.create_profile_group(cloned_profiles)
+
+            # Update staged objects
+            staged = self.use_case_configs['custom_policies'].get('staged_objects', {})
+            staged['profiles'] = cloned_profiles
+            staged['profile_groups'] = [profile_group] if any(cloned_profiles.values()) else []
+
+            self.use_case_configs['custom_policies']['staged_objects'] = staged
+            self.use_case_configs['custom_policies']['source_tenant'] = self.connection_name
+            self.use_case_configs['custom_policies']['profiles_cloned_at'] = datetime.now().isoformat()
+
+            profile_count = sum(len(v) for v in cloned_profiles.values())
+            logger.info(f"Cloned {profile_count} security profiles from tenant")
+
+        except Exception as e:
+            logger.warning(f"Failed to clone profiles: {e}")
 
     def _refresh_private_app_connections(self):
         """Refresh the Private App connections list based on Locations tab data.
@@ -4818,71 +5698,203 @@ class POVWorkflowWidget(QWidget):
             if index in (1, 2):
                 self._update_all_status_indicators()
 
-            # Refresh Private App connections when entering Use Cases tab
+            # Sync use cases and refresh connections when entering POV Use Cases tab
             if index == 2:
+                self._sync_use_cases_from_cloud_resources()
+                self._populate_adem_defaults()
                 self._refresh_private_app_connections()
+                self._auto_generate_security_objects()
 
     # ============================================================================
     # EVENT HANDLERS - CLOUD DEPLOYMENT TAB (Tab 4)
     # ============================================================================
 
     def _authenticate_azure(self):
-        """Authenticate with Azure and generate Terraform configuration."""
+        """Authenticate with Azure using Interactive Browser OAuth."""
+        import sys
         import os
-        import tempfile
 
-        self._log_activity("Starting Azure authentication and Terraform generation...")
+        self._log_activity("Starting Azure authentication...")
+        self.azure_auth_btn.setEnabled(False)
+        self.azure_auth_status.setText("🔄 Authenticating...")
+        self.azure_auth_status.setStyleSheet("font-weight: bold; color: #FF9800;")
 
-        # Check if we have deployment configuration
-        deployment_config = self._gather_deployment_config()
-        if not deployment_config.get('firewalls'):
-            self._log_activity("No firewalls configured - aborting", "warning")
-            QMessageBox.warning(
-                self,
-                "No Firewalls Configured",
-                "Please configure firewall deployment options in Step 1 before proceeding."
-            )
-            return
+        # Process events to update UI before blocking browser auth
+        from PyQt6.QtWidgets import QApplication
+        QApplication.processEvents()
 
-        # Get output directory
-        self._terraform_output_dir = os.path.join(
-            tempfile.gettempdir(),
-            "pa_config_lab_terraform"
-        )
-        os.makedirs(self._terraform_output_dir, exist_ok=True)
-        self._log_activity(f"Terraform output directory: {self._terraform_output_dir}")
-
-        # Build CloudConfig from UI selections
         try:
-            cloud_config = self._build_cloud_config()
-            self._log_activity("Cloud configuration built successfully")
-        except Exception as e:
-            self._log_activity(f"Failed to build cloud configuration: {str(e)}", "error")
+            from azure.identity import InteractiveBrowserCredential
+            from azure.mgmt.subscription import SubscriptionClient
+
+            self._log_activity("Opening browser for Azure sign-in...")
+
+            # Suppress browser subprocess stderr (Chrome warnings)
+            # Save original stderr
+            original_stderr = sys.stderr
+            try:
+                # Redirect stderr to devnull during browser launch
+                sys.stderr = open(os.devnull, 'w')
+
+                # Create credential with interactive browser authentication
+                credential = InteractiveBrowserCredential(
+                    redirect_uri="http://localhost:8400",
+                )
+
+                # Trigger authentication (this opens browser)
+                # We call get_token to force the auth flow
+                credential.get_token("https://management.azure.com/.default")
+
+            finally:
+                # Restore stderr
+                if sys.stderr != original_stderr:
+                    sys.stderr.close()
+                sys.stderr = original_stderr
+
+            # Test the credential by listing subscriptions
+            self._log_activity("Fetching Azure subscriptions...")
+            subscription_client = SubscriptionClient(credential)
+            subscriptions = list(subscription_client.subscriptions.list())
+
+            if not subscriptions:
+                raise Exception("No Azure subscriptions found for this account")
+
+            self._log_activity(f"Found {len(subscriptions)} subscription(s)")
+
+            # Store credential for later use
+            self._azure_credential = credential
+
+            # Show subscription selection dialog
+            selected_sub = self._show_subscription_dialog(subscriptions)
+
+            if selected_sub:
+                self._azure_subscription = selected_sub
+                self._log_activity(f"Selected subscription: {selected_sub['name']}")
+                self._on_azure_auth_success()
+            else:
+                # User cancelled
+                self._log_activity("Azure authentication cancelled", "warning")
+                self.azure_auth_status.setText("🔴 Not authenticated")
+                self.azure_auth_status.setStyleSheet("font-weight: bold; color: #F44336;")
+                self._azure_credential = None
+
+        except ImportError as e:
+            self._log_activity(f"Azure SDK not installed: {e}", "error")
             QMessageBox.critical(
                 self,
-                "Configuration Error",
-                f"Failed to build cloud configuration:\n{str(e)}"
+                "Azure SDK Missing",
+                "Azure SDK packages are not installed.\n\n"
+                "Please run: pip install azure-identity azure-mgmt-subscription azure-mgmt-resource"
             )
-            return
+            self.azure_auth_status.setText("🔴 SDK missing")
+            self.azure_auth_status.setStyleSheet("font-weight: bold; color: #F44336;")
 
-        # Start Terraform generation worker
-        from gui.workers import TerraformWorker
+        except Exception as e:
+            self._log_activity(f"Azure authentication failed: {e}", "error")
+            QMessageBox.critical(
+                self,
+                "Authentication Failed",
+                f"Failed to authenticate with Azure:\n\n{str(e)}"
+            )
+            self.azure_auth_status.setText("🔴 Auth failed")
+            self.azure_auth_status.setStyleSheet("font-weight: bold; color: #F44336;")
+            self._azure_credential = None
 
-        self._log_activity("Starting Terraform generation worker...")
-        self._terraform_worker = TerraformWorker(
-            operation="generate",
-            config=cloud_config,
-            output_dir=self._terraform_output_dir,
+        finally:
+            self.azure_auth_btn.setEnabled(True)
+
+    def _show_subscription_dialog(self, subscriptions: list) -> dict:
+        """Show dialog to select an Azure subscription.
+
+        Args:
+            subscriptions: List of Azure subscription objects
+
+        Returns:
+            Selected subscription dict with 'id' and 'name', or None if cancelled
+        """
+        from PyQt6.QtWidgets import QDialog, QTableWidget, QTableWidgetItem, QHeaderView
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Select Azure Subscription")
+        dialog.setMinimumSize(600, 350)
+
+        layout = QVBoxLayout(dialog)
+
+        info_label = QLabel(
+            "Select the Azure subscription to use for POV resource deployment."
         )
-        self._terraform_worker.progress.connect(self._on_terraform_progress)
-        self._terraform_worker.finished.connect(self._on_terraform_generated)
-        self._terraform_worker.error.connect(self._on_terraform_error)
-        self._terraform_worker.start()
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: #666; margin-bottom: 10px;")
+        layout.addWidget(info_label)
 
-        # Update UI
-        self.azure_auth_btn.setEnabled(False)
-        self.terraform_status_widget.setVisible(True)
-        self.terraform_gen_status.setText("⏳ Generating Terraform configuration...")
+        # Table of subscriptions
+        table = QTableWidget()
+        table.setColumnCount(3)
+        table.setHorizontalHeaderLabels(["Subscription Name", "Subscription ID", "State"])
+        table.setRowCount(len(subscriptions))
+        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+
+        for row, sub in enumerate(subscriptions):
+            table.setItem(row, 0, QTableWidgetItem(sub.display_name))
+            table.setItem(row, 1, QTableWidgetItem(sub.subscription_id))
+            table.setItem(row, 2, QTableWidgetItem(sub.state.value if sub.state else "Unknown"))
+
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(table)
+
+        # Auto-select first row
+        if subscriptions:
+            table.selectRow(0)
+
+        # Button row
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setStyleSheet(
+            "QPushButton { background-color: #757575; color: white; padding: 8px 16px; "
+            "font-weight: bold; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #616161; }"
+        )
+        cancel_btn.clicked.connect(dialog.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        select_btn = QPushButton("Select Subscription")
+        select_btn.setStyleSheet(
+            "QPushButton { background-color: #0078D4; color: white; padding: 8px 16px; "
+            "font-weight: bold; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #106EBE; }"
+        )
+
+        def on_select():
+            selected = table.selectedItems()
+            if selected:
+                dialog.accept()
+            else:
+                QMessageBox.warning(dialog, "No Selection", "Please select a subscription.")
+
+        select_btn.clicked.connect(on_select)
+        btn_layout.addWidget(select_btn)
+
+        layout.addLayout(btn_layout)
+
+        # Store subscriptions for retrieval
+        dialog.subscriptions = subscriptions
+        dialog.table = table
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            selected_row = table.currentRow()
+            if selected_row >= 0:
+                sub = subscriptions[selected_row]
+                return {
+                    'id': sub.subscription_id,
+                    'name': sub.display_name,
+                    'state': sub.state.value if sub.state else "Unknown",
+                }
+
+        return None
 
     def _build_cloud_config(self) -> dict:
         """Build CloudConfig dictionary from UI selections."""
@@ -4965,15 +5977,416 @@ class POVWorkflowWidget(QWidget):
     def _on_azure_auth_success(self):
         """Handle successful Azure authentication."""
         self._log_activity("Azure authentication successful")
-        self.azure_auth_status.setText("🟢 Authenticated")
+
+        # Update status with subscription info
+        sub_name = self._azure_subscription.get('name', 'Unknown') if hasattr(self, '_azure_subscription') else 'Unknown'
+        self.azure_auth_status.setText(f"🟢 {sub_name}")
         self.azure_auth_status.setStyleSheet("font-weight: bold; color: #4CAF50;")
+        self.azure_auth_status.setToolTip(
+            f"Subscription: {sub_name}\n"
+            f"ID: {self._azure_subscription.get('id', 'N/A')}"
+        )
+
+        # Change button to allow re-authentication
+        self.azure_auth_btn.setText("🔄 Change Subscription")
 
         # Show terraform generation status
         self.terraform_status_widget.setVisible(True)
 
-        # Simulate terraform generation (in real implementation, this would be background task)
-        # For now, just enable the buttons
-        self._on_terraform_ready()
+        # Generate Terraform configuration
+        self._generate_terraform_from_pov()
+
+    def _generate_terraform_from_pov(self):
+        """Generate Terraform configuration from POV settings."""
+        import os
+        import tempfile
+        from datetime import datetime
+
+        self._log_activity("Generating Terraform configuration...")
+        self.terraform_gen_status.setText("⏳ Generating Terraform configuration...")
+
+        try:
+            # Get customer info
+            customer_info = self.cloud_resource_configs.get('customer_info', {})
+            customer_name = customer_info.get('customer_name_sanitized', 'pov')
+
+            # Get first datacenter for location info
+            locations = self.cloud_resource_configs.get('locations', {})
+            datacenters = locations.get('datacenters', [])
+
+            # Determine Azure region from datacenter or default
+            azure_region = 'eastus'
+            if datacenters:
+                azure_region = datacenters[0].get('region', 'eastus')
+
+            # Get subscription info from Azure auth
+            subscription_id = ''
+            tenant_id = ''
+            if hasattr(self, '_azure_subscription') and self._azure_subscription:
+                subscription_id = self._azure_subscription.get('id', '')
+                tenant_id = self._azure_subscription.get('tenant_id', '')
+
+            # Get cloud deployment settings
+            cloud_deployment = self.cloud_resource_configs.get('cloud_deployment', {})
+            admin_username = cloud_deployment.get('admin_username', f'{customer_name}admin')
+            admin_password = cloud_deployment.get('admin_password', '')
+
+            # Get security settings
+            cloud_security = self.cloud_resource_configs.get('cloud_security', {})
+            source_ips = cloud_security.get('source_ips', '')
+
+            # Create output directory
+            output_base = os.path.join(
+                os.path.expanduser('~'),
+                '.pa_config_lab',
+                'terraform',
+                customer_name
+            )
+            os.makedirs(output_base, exist_ok=True)
+
+            # Create terraform subdirectory
+            terraform_dir = os.path.join(output_base, 'terraform')
+            os.makedirs(terraform_dir, exist_ok=True)
+
+            # Generate terraform.tfvars.json directly (simpler approach without full CloudConfig)
+            tfvars = {
+                '_metadata': {
+                    'generated_at': datetime.utcnow().isoformat(),
+                    'generator': 'pov_workflow',
+                    'customer': customer_name,
+                },
+                'customer_name': customer_name,
+                'location': azure_region,
+                'subscription_id': subscription_id,
+                'tenant_id': tenant_id,
+                'admin_username': admin_username,
+                'admin_password': admin_password,
+                'source_ips': [ip.strip() for ip in source_ips.split(',') if ip.strip()] if source_ips else [],
+                'allow_ssh': cloud_security.get('allow_ssh', True),
+                'allow_https': cloud_security.get('allow_https', True),
+                'datacenters': datacenters,
+                'branches': locations.get('branches', []),
+                'trust_devices': self.cloud_resource_configs.get('trust_devices', {}).get('devices', []),
+            }
+
+            # Write tfvars
+            import json
+            tfvars_path = os.path.join(terraform_dir, 'terraform.tfvars.json')
+            with open(tfvars_path, 'w') as f:
+                json.dump(tfvars, f, indent=2)
+
+            # Generate main.tf with basic Azure resources
+            main_tf_content = self._generate_main_tf(tfvars)
+            with open(os.path.join(terraform_dir, 'main.tf'), 'w') as f:
+                f.write(main_tf_content)
+
+            # Generate variables.tf
+            variables_tf_content = self._generate_variables_tf()
+            with open(os.path.join(terraform_dir, 'variables.tf'), 'w') as f:
+                f.write(variables_tf_content)
+
+            # Generate provider.tf
+            provider_tf_content = self._generate_provider_tf(subscription_id, tenant_id)
+            with open(os.path.join(terraform_dir, 'provider.tf'), 'w') as f:
+                f.write(provider_tf_content)
+
+            # Generate outputs.tf
+            outputs_tf_content = self._generate_outputs_tf(tfvars)
+            with open(os.path.join(terraform_dir, 'outputs.tf'), 'w') as f:
+                f.write(outputs_tf_content)
+
+            # Set the terraform output directory for review
+            self._terraform_output_dir = output_base
+
+            self._log_activity(f"Terraform configuration generated: {terraform_dir}")
+            self._on_terraform_ready()
+
+        except Exception as e:
+            self._log_activity(f"Terraform generation failed: {e}", "error")
+            self.terraform_gen_status.setText(f"✗ Generation failed: {str(e)}")
+            self.terraform_gen_status.setStyleSheet(
+                "color: #C62828; padding: 10px; background-color: #FFEBEE; "
+                "border-radius: 5px;"
+            )
+            import traceback
+            logger.error(f"Terraform generation error: {traceback.format_exc()}")
+
+    def _generate_main_tf(self, tfvars: dict) -> str:
+        """Generate main.tf content for POV deployment."""
+        customer = tfvars.get('customer_name', 'pov')
+        location = tfvars.get('location', 'eastus')
+
+        content = f'''# POV Deployment - {customer}
+# Generated by PA Config Lab POV Builder
+
+# Resource Group
+resource "azurerm_resource_group" "pov" {{
+  name     = "{customer}-{location}-pov-rg"
+  location = var.location
+
+  tags = {{
+    environment = "pov"
+    customer    = "{customer}"
+    managed_by  = "pa_config_lab"
+  }}
+}}
+
+# Virtual Network
+resource "azurerm_virtual_network" "pov" {{
+  name                = "{customer}-pov-vnet"
+  address_space       = ["10.100.0.0/16"]
+  location            = azurerm_resource_group.pov.location
+  resource_group_name = azurerm_resource_group.pov.name
+
+  tags = azurerm_resource_group.pov.tags
+}}
+
+# Management Subnet
+resource "azurerm_subnet" "management" {{
+  name                 = "management"
+  resource_group_name  = azurerm_resource_group.pov.name
+  virtual_network_name = azurerm_virtual_network.pov.name
+  address_prefixes     = ["10.100.0.0/24"]
+}}
+
+# Untrust Subnet
+resource "azurerm_subnet" "untrust" {{
+  name                 = "untrust"
+  resource_group_name  = azurerm_resource_group.pov.name
+  virtual_network_name = azurerm_virtual_network.pov.name
+  address_prefixes     = ["10.100.1.0/24"]
+}}
+
+# Trust Subnet
+resource "azurerm_subnet" "trust" {{
+  name                 = "trust"
+  resource_group_name  = azurerm_resource_group.pov.name
+  virtual_network_name = azurerm_virtual_network.pov.name
+  address_prefixes     = ["10.100.2.0/24"]
+}}
+
+# Network Security Group for Management
+resource "azurerm_network_security_group" "management" {{
+  name                = "{customer}-mgmt-nsg"
+  location            = azurerm_resource_group.pov.location
+  resource_group_name = azurerm_resource_group.pov.name
+
+  tags = azurerm_resource_group.pov.tags
+}}
+'''
+
+        # Add NSG rules based on security settings
+        source_ips = tfvars.get('source_ips', [])
+        source_ips_str = ', '.join([f'"{ip}"' for ip in source_ips]) if source_ips else '"*"'
+
+        if tfvars.get('allow_https', True):
+            content += f'''
+resource "azurerm_network_security_rule" "allow_https" {{
+  name                        = "Allow-HTTPS"
+  priority                    = 100
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "443"
+  source_address_prefixes     = [{source_ips_str}]
+  destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.pov.name
+  network_security_group_name = azurerm_network_security_group.management.name
+}}
+'''
+
+        if tfvars.get('allow_ssh', True):
+            content += f'''
+resource "azurerm_network_security_rule" "allow_ssh" {{
+  name                        = "Allow-SSH"
+  priority                    = 110
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "22"
+  source_address_prefixes     = [{source_ips_str}]
+  destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.pov.name
+  network_security_group_name = azurerm_network_security_group.management.name
+}}
+'''
+
+        # Add subnet NSG association
+        content += '''
+resource "azurerm_subnet_network_security_group_association" "management" {
+  subnet_id                 = azurerm_subnet.management.id
+  network_security_group_id = azurerm_network_security_group.management.id
+}
+'''
+
+        # Add trust devices (VMs)
+        trust_devices = tfvars.get('trust_devices', [])
+        for device in trust_devices:
+            device_name = device.get('name', 'vm').lower().replace(' ', '-').replace('_', '-')
+            device_type = device.get('device_type', 'ServerVM')
+            subtype = device.get('subtype', 'Linux')
+
+            # Determine VM image
+            if subtype == 'Windows':
+                publisher = 'MicrosoftWindowsServer'
+                offer = 'WindowsServer'
+                sku = '2022-datacenter-g2'
+            else:
+                publisher = 'Canonical'
+                offer = '0001-com-ubuntu-server-jammy'
+                sku = '22_04-lts-gen2'
+
+            content += f'''
+# {device.get('name', 'VM')} - {device_type}
+resource "azurerm_network_interface" "nic_{device_name}" {{
+  name                = "{device_name}-nic"
+  location            = azurerm_resource_group.pov.location
+  resource_group_name = azurerm_resource_group.pov.name
+
+  ip_configuration {{
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.trust.id
+    private_ip_address_allocation = "Dynamic"
+  }}
+
+  tags = azurerm_resource_group.pov.tags
+}}
+
+resource "azurerm_linux_virtual_machine" "vm_{device_name}" {{
+  name                = "{device_name}"
+  resource_group_name = azurerm_resource_group.pov.name
+  location            = azurerm_resource_group.pov.location
+  size                = "Standard_B2s"
+  admin_username      = var.admin_username
+
+  network_interface_ids = [
+    azurerm_network_interface.nic_{device_name}.id,
+  ]
+
+  admin_ssh_key {{
+    username   = var.admin_username
+    public_key = file("~/.ssh/id_rsa.pub")
+  }}
+
+  os_disk {{
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  }}
+
+  source_image_reference {{
+    publisher = "{publisher}"
+    offer     = "{offer}"
+    sku       = "{sku}"
+    version   = "latest"
+  }}
+
+  tags = azurerm_resource_group.pov.tags
+}}
+'''
+
+        return content
+
+    def _generate_variables_tf(self) -> str:
+        """Generate variables.tf content."""
+        return '''# Variables for POV Deployment
+
+variable "location" {
+  description = "Azure region for deployment"
+  type        = string
+  default     = "eastus"
+}
+
+variable "admin_username" {
+  description = "Admin username for VMs"
+  type        = string
+  default     = "povadmin"
+}
+
+variable "admin_password" {
+  description = "Admin password for VMs"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "subscription_id" {
+  description = "Azure subscription ID"
+  type        = string
+  default     = ""
+}
+
+variable "tenant_id" {
+  description = "Azure tenant ID"
+  type        = string
+  default     = ""
+}
+'''
+
+    def _generate_provider_tf(self, subscription_id: str, tenant_id: str) -> str:
+        """Generate provider.tf content."""
+        return f'''# Azure Provider Configuration
+
+terraform {{
+  required_providers {{
+    azurerm = {{
+      source  = "hashicorp/azurerm"
+      version = "~> 3.0"
+    }}
+  }}
+}}
+
+provider "azurerm" {{
+  features {{}}
+
+  subscription_id = "{subscription_id}"
+  tenant_id       = "{tenant_id}"
+}}
+'''
+
+    def _generate_outputs_tf(self, tfvars: dict) -> str:
+        """Generate outputs.tf content."""
+        content = '''# Outputs for POV Deployment
+
+output "resource_group_name" {
+  description = "Name of the resource group"
+  value       = azurerm_resource_group.pov.name
+}
+
+output "virtual_network_name" {
+  description = "Name of the virtual network"
+  value       = azurerm_virtual_network.pov.name
+}
+
+output "management_subnet_id" {
+  description = "ID of the management subnet"
+  value       = azurerm_subnet.management.id
+}
+
+output "trust_subnet_id" {
+  description = "ID of the trust subnet"
+  value       = azurerm_subnet.trust.id
+}
+
+output "untrust_subnet_id" {
+  description = "ID of the untrust subnet"
+  value       = azurerm_subnet.untrust.id
+}
+'''
+
+        # Add outputs for trust devices
+        trust_devices = tfvars.get('trust_devices', [])
+        for device in trust_devices:
+            device_name = device.get('name', 'vm').lower().replace(' ', '-').replace('_', '-')
+            content += f'''
+output "{device_name}_private_ip" {{
+  description = "Private IP of {device.get('name', 'VM')}"
+  value       = azurerm_network_interface.nic_{device_name}.private_ip_address
+}}
+'''
+
+        return content
 
     def _on_terraform_ready(self):
         """Handle terraform configuration ready."""
@@ -5564,8 +6977,24 @@ class POVWorkflowWidget(QWidget):
 
     def _next_tab(self, tab_index: int):
         """Navigate to the next tab after saving state."""
+        current_tab = tab_index - 1
+
+        # Special handling for Tab 1 -> Tab 2 transition
+        if current_tab == 0:
+            # Ensure infrastructure is configured before proceeding
+            if not self.deployment_config.get('infrastructure_configured', False):
+                # Auto-apply defaults
+                self._apply_default_infrastructure()
+                logger.info("Applied default infrastructure configuration on tab navigation")
+
+        # Special handling for Tab 2 -> Tab 3 transition
+        if current_tab == 1:
+            # Validate cloud resources requirements
+            if not self._validate_cloud_resources_tab():
+                return  # Validation failed, don't proceed
+
         # Save current state before moving to next tab
-        self.save_state(tab_index - 1)  # Save the tab we're leaving
+        self.save_state(current_tab)  # Save the tab we're leaving
         # Switch to the requested tab
         self.tabs.setCurrentIndex(tab_index)
 
@@ -5602,6 +7031,7 @@ class POVWorkflowWidget(QWidget):
             'cloud_resource_configs': self.cloud_resource_configs,
             'use_case_configs': getattr(self, 'use_case_configs', {}),
             'config_data': self.config_data,
+            'deployment_config': self.deployment_config,
         }
 
         # Save to file (overwrites existing)
@@ -5626,6 +7056,14 @@ class POVWorkflowWidget(QWidget):
             self.connection_name = state.get('connection_name')
             self.cloud_resource_configs = state.get('cloud_resource_configs', {})
             self.config_data = state.get('config_data', {})
+
+            # Restore deployment_config with defaults if not present
+            self.deployment_config = state.get('deployment_config', {
+                'management_type': self.management_type,
+                'infrastructure_configured': False,
+                'infrastructure_source': None,
+                'panorama_placeholder': None,
+            })
 
             if hasattr(self, 'use_case_configs'):
                 self.use_case_configs = state.get('use_case_configs', {})
@@ -5668,11 +7106,28 @@ class POVWorkflowWidget(QWidget):
             if index >= 0:
                 self.customer_industry_combo.setCurrentIndex(index)
 
-        # Restore existing devices
+        # Restore infrastructure configuration status
+        infra_config = self.cloud_resource_configs.get('infrastructure', {})
         existing_devices = self.cloud_resource_configs.get('existing_devices', [])
-        if existing_devices:
-            self.resources_yes_radio.setChecked(True)
-            self._refresh_existing_devices_list()
+        if hasattr(self, 'infra_status_label'):
+            if infra_config.get('configured'):
+                source = infra_config.get('source', 'manual')
+                if existing_devices:
+                    self.infra_status_label.setText(f"Status: ✓ Configured ({source}) + {len(existing_devices)} system(s)")
+                else:
+                    self.infra_status_label.setText(f"Status: ✓ Configured ({source})")
+                self.infra_status_label.setStyleSheet("color: #4CAF50; font-weight: bold; margin-top: 10px;")
+            elif existing_devices:
+                self.infra_status_label.setText(f"Status: {len(existing_devices)} existing system(s)")
+                self.infra_status_label.setStyleSheet("color: #FF9800; font-weight: bold; margin-top: 10px;")
+
+        # Restore deploy cloud resources checkbox
+        if hasattr(self, 'deploy_cloud_checkbox'):
+            deploy_enabled = self.deployment_config.get('deploy_cloud_resources', False)
+            self.deploy_cloud_checkbox.setChecked(deploy_enabled)
+            # Also update the scroll widget state
+            if hasattr(self, 'cloud_resources_scroll'):
+                self.cloud_resources_scroll.setEnabled(deploy_enabled)
 
         # Restore tenant connection status display - show saved tenant but note reconnection needed
         if hasattr(self, 'load_status') and self.connection_name:
@@ -5806,6 +7261,10 @@ class POVWorkflowWidget(QWidget):
         table.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(table)
 
+        # Auto-select the first row
+        if states:
+            table.selectRow(0)
+
         # Store states for later access
         dialog.states = states
 
@@ -5917,26 +7376,9 @@ class POVWorkflowWidget(QWidget):
             self.customer_name_input.clear()
         if hasattr(self, 'customer_industry_combo'):
             self.customer_industry_combo.setCurrentIndex(0)
-        if hasattr(self, 'resources_no_radio'):
-            self.resources_no_radio.setChecked(True)
-        if hasattr(self, 'existing_creds_widget'):
-            self.existing_creds_widget.setVisible(False)
-        if hasattr(self, 'existing_device_type'):
-            self.existing_device_type.setCurrentIndex(0)
-        if hasattr(self, 'existing_creds_fields'):
-            self.existing_creds_fields.setVisible(True)
-        if hasattr(self, 'existing_services_widget'):
-            self.existing_services_widget.setVisible(False)
-        if hasattr(self, 'existing_mgmt_ip_input'):
-            self.existing_mgmt_ip_input.clear()
-        if hasattr(self, 'existing_username_input'):
-            self.existing_username_input.clear()
-        if hasattr(self, 'existing_password_input'):
-            self.existing_password_input.clear()
-        if hasattr(self, 'existing_services_input'):
-            self.existing_services_input.clear()
-        if hasattr(self, 'existing_devices_list'):
-            self.existing_devices_list.clear()
+        if hasattr(self, 'infra_status_label'):
+            self.infra_status_label.setText("Using default infrastructure settings")
+            self.infra_status_label.setStyleSheet("color: #555; font-style: italic;")
 
         # Reset Cloud Resources configs
         self.cloud_resource_configs = {
@@ -5947,6 +7389,8 @@ class POVWorkflowWidget(QWidget):
             'locations': {'branches': [], 'datacenters': []},
             'trust_devices': {'devices': []},
             'customer_info': {},
+            'infrastructure_config': {},
+            'existing_devices': [],
         }
 
         # Reset UI elements
