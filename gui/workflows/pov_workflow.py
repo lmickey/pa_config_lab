@@ -3641,7 +3641,37 @@ class POVWorkflowWidget(QWidget):
         config["cloud_deployment"] = self.cloud_resource_configs.get('cloud_deployment', {})
 
         # Add locations (branches and datacenters)
-        config["locations"] = self.cloud_resource_configs.get('locations', {})
+        locations = self.cloud_resource_configs.get('locations', {})
+        config["locations"] = locations
+
+        # Generate firewalls list from locations
+        # Each datacenter with service_connection needs a firewall
+        # Each branch (remote_network) needs a firewall
+        firewalls = []
+        fw_index = 1
+
+        # Firewalls for datacenters with service connections
+        for dc in locations.get('datacenters', []):
+            if dc.get('connection_type') == 'service_connection':
+                firewalls.append({
+                    'name': f"fw-{dc['name'].lower().replace(' ', '-')}",
+                    'type': 'service_connection',
+                    'location': dc['name'],
+                    'region': dc.get('region', 'eastus'),
+                })
+                fw_index += 1
+
+        # Firewalls for branches (remote networks)
+        for branch in locations.get('branches', []):
+            firewalls.append({
+                'name': f"fw-{branch['name'].lower().replace(' ', '-')}",
+                'type': 'remote_network',
+                'location': branch['name'],
+                'region': branch.get('region', 'eastus'),
+            })
+            fw_index += 1
+
+        config["firewalls"] = firewalls
 
         # Add trust devices configuration
         config["trust_devices"] = self.cloud_resource_configs.get('trust_devices', {})
@@ -6620,6 +6650,27 @@ class POVWorkflowWidget(QWidget):
             terraform_dir = os.path.join(output_base, 'terraform')
             os.makedirs(terraform_dir, exist_ok=True)
 
+            # Generate firewalls list from locations
+            # Each datacenter with service_connection needs a firewall
+            # Each branch (remote_network) needs a firewall
+            firewalls = []
+            for dc in datacenters:
+                if dc.get('connection_type') == 'service_connection':
+                    firewalls.append({
+                        'name': f"fw-{dc['name'].lower().replace(' ', '-')}",
+                        'type': 'service_connection',
+                        'location_name': dc['name'],
+                        'region': dc.get('region', azure_region),
+                    })
+
+            for branch in locations.get('branches', []):
+                firewalls.append({
+                    'name': f"fw-{branch['name'].lower().replace(' ', '-')}",
+                    'type': 'remote_network',
+                    'location_name': branch['name'],
+                    'region': branch.get('region', azure_region),
+                })
+
             # Generate terraform.tfvars.json directly (simpler approach without full CloudConfig)
             tfvars = {
                 '_metadata': {
@@ -6638,6 +6689,7 @@ class POVWorkflowWidget(QWidget):
                 'allow_https': cloud_security.get('allow_https', True),
                 'datacenters': datacenters,
                 'branches': locations.get('branches', []),
+                'firewalls': firewalls,
                 'trust_devices': self.cloud_resource_configs.get('trust_devices', {}).get('devices', []),
             }
 
@@ -6793,6 +6845,112 @@ resource "azurerm_subnet_network_security_group_association" "management" {
 }
 '''
 
+        # Add firewalls (VM-Series)
+        firewalls = tfvars.get('firewalls', [])
+        for fw in firewalls:
+            fw_name = fw.get('name', 'fw').lower().replace(' ', '-').replace('_', '-')
+            fw_type = fw.get('type', 'service_connection')
+            location_name = fw.get('location_name', 'Datacenter')
+
+            content += f'''
+# Firewall: {fw_name} ({fw_type}) for {location_name}
+# Public IP for management access
+resource "azurerm_public_ip" "pip_{fw_name}" {{
+  name                = "{fw_name}-pip"
+  location            = azurerm_resource_group.pov.location
+  resource_group_name = azurerm_resource_group.pov.name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+
+  tags = azurerm_resource_group.pov.tags
+}}
+
+# Management NIC
+resource "azurerm_network_interface" "nic_{fw_name}_mgmt" {{
+  name                = "{fw_name}-mgmt-nic"
+  location            = azurerm_resource_group.pov.location
+  resource_group_name = azurerm_resource_group.pov.name
+
+  ip_configuration {{
+    name                          = "mgmt"
+    subnet_id                     = azurerm_subnet.management.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.pip_{fw_name}.id
+  }}
+
+  tags = azurerm_resource_group.pov.tags
+}}
+
+# Untrust NIC
+resource "azurerm_network_interface" "nic_{fw_name}_untrust" {{
+  name                 = "{fw_name}-untrust-nic"
+  location             = azurerm_resource_group.pov.location
+  resource_group_name  = azurerm_resource_group.pov.name
+  enable_ip_forwarding = true
+
+  ip_configuration {{
+    name                          = "untrust"
+    subnet_id                     = azurerm_subnet.untrust.id
+    private_ip_address_allocation = "Dynamic"
+  }}
+
+  tags = azurerm_resource_group.pov.tags
+}}
+
+# Trust NIC
+resource "azurerm_network_interface" "nic_{fw_name}_trust" {{
+  name                 = "{fw_name}-trust-nic"
+  location             = azurerm_resource_group.pov.location
+  resource_group_name  = azurerm_resource_group.pov.name
+  enable_ip_forwarding = true
+
+  ip_configuration {{
+    name                          = "trust"
+    subnet_id                     = azurerm_subnet.trust.id
+    private_ip_address_allocation = "Dynamic"
+  }}
+
+  tags = azurerm_resource_group.pov.tags
+}}
+
+# VM-Series Firewall
+resource "azurerm_linux_virtual_machine" "fw_{fw_name}" {{
+  name                            = "{fw_name}"
+  resource_group_name             = azurerm_resource_group.pov.name
+  location                        = azurerm_resource_group.pov.location
+  size                            = "Standard_DS3_v2"
+  admin_username                  = var.admin_username
+  admin_password                  = var.admin_password
+  disable_password_authentication = false
+
+  network_interface_ids = [
+    azurerm_network_interface.nic_{fw_name}_mgmt.id,
+    azurerm_network_interface.nic_{fw_name}_untrust.id,
+    azurerm_network_interface.nic_{fw_name}_trust.id,
+  ]
+
+  os_disk {{
+    caching              = "ReadWrite"
+    storage_account_type = "Premium_LRS"
+  }}
+
+  plan {{
+    name      = "byol"
+    publisher = "paloaltonetworks"
+    product   = "vmseries-flex"
+  }}
+
+  source_image_reference {{
+    publisher = "paloaltonetworks"
+    offer     = "vmseries-flex"
+    sku       = "byol"
+    version   = "latest"
+  }}
+
+  tags = azurerm_resource_group.pov.tags
+}}
+'''
+
         # Add trust devices (VMs)
         trust_devices = tfvars.get('trust_devices', [])
         for device in trust_devices:
@@ -6942,6 +7100,22 @@ output "untrust_subnet_id" {
   description = "ID of the untrust subnet"
   value       = azurerm_subnet.untrust.id
 }
+'''
+
+        # Add outputs for firewalls
+        firewalls = tfvars.get('firewalls', [])
+        for fw in firewalls:
+            fw_name = fw.get('name', 'fw').lower().replace(' ', '-').replace('_', '-')
+            content += f'''
+output "{fw_name}_public_ip" {{
+  description = "Public IP of firewall {fw_name}"
+  value       = azurerm_public_ip.pip_{fw_name}.ip_address
+}}
+
+output "{fw_name}_mgmt_private_ip" {{
+  description = "Management private IP of firewall {fw_name}"
+  value       = azurerm_network_interface.nic_{fw_name}_mgmt.private_ip_address
+}}
 '''
 
         # Add outputs for trust devices
