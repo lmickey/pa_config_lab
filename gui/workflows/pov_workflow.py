@@ -5777,7 +5777,15 @@ class POVWorkflowWidget(QWidget):
             try:
                 subscription_client = SubscriptionClient(credential)
                 self._log_activity("[DEBUG] SubscriptionClient created, calling subscriptions.list()...", "debug")
-                self._log_activity(f"[DEBUG] API base URL: {subscription_client._config.base_url}", "debug")
+
+                # Try to log API base URL (attribute name varies by SDK version)
+                try:
+                    base_url = getattr(subscription_client._config, 'base_url', None) or \
+                               getattr(subscription_client._config, 'endpoint', None) or \
+                               'https://management.azure.com'
+                    self._log_activity(f"[DEBUG] API base URL: {base_url}", "debug")
+                except Exception:
+                    self._log_activity("[DEBUG] API base URL: https://management.azure.com (default)", "debug")
 
                 # Get subscriptions as iterator first to see if there are any issues
                 sub_iterator = subscription_client.subscriptions.list()
