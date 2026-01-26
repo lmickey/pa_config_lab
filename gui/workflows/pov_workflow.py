@@ -5751,6 +5751,7 @@ class POVWorkflowWidget(QWidget):
         try:
             from azure.identity import InteractiveBrowserCredential
             from azure.mgmt.subscription import SubscriptionClient
+            import requests
 
             # Log SDK versions for debugging
             try:
@@ -5760,86 +5761,126 @@ class POVWorkflowWidget(QWidget):
             except Exception as ver_err:
                 self._log_activity(f"Could not get SDK versions: {ver_err}", "warning")
 
-            # Check if tenant ID was specified
-            tenant_id = None
+            # Check if tenant ID was specified in the input field
+            specified_tenant_id = None
             if hasattr(self, 'azure_tenant_input') and self.azure_tenant_input.text().strip():
-                tenant_id = self.azure_tenant_input.text().strip()
-                self._log_activity(f"Using specified tenant: {tenant_id}")
-            else:
-                self._log_activity("No tenant specified, using default (organizations)")
+                specified_tenant_id = self.azure_tenant_input.text().strip()
+                self._log_activity(f"Using specified tenant: {specified_tenant_id}")
 
             self._log_activity("Opening browser for Azure sign-in...")
 
             # Suppress browser subprocess stderr (Chrome warnings)
-            # Save original stderr
             original_stderr = sys.stderr
             try:
-                # Redirect stderr to devnull during browser launch
                 sys.stderr = open(os.devnull, 'w')
 
-                # Create credential with interactive browser authentication
-                # If tenant_id is specified, use it; otherwise use 'organizations' (multi-tenant)
-                if tenant_id:
+                # Step 1: Initial authentication (multi-tenant if no tenant specified)
+                if specified_tenant_id:
                     credential = InteractiveBrowserCredential(
                         redirect_uri="http://localhost:8400",
-                        tenant_id=tenant_id,
+                        tenant_id=specified_tenant_id,
                     )
                 else:
                     credential = InteractiveBrowserCredential(
                         redirect_uri="http://localhost:8400",
                     )
 
-                # Trigger authentication (this opens browser)
-                # We call get_token to force the auth flow
                 self._log_activity("Requesting token for Azure Management API...")
                 token = credential.get_token("https://management.azure.com/.default")
-                self._log_activity(f"Token acquired successfully (expires: {token.expires_on})")
-
-                # Decode token to get tenant info (JWT is base64 encoded)
-                try:
-                    import base64
-                    import json
-                    # JWT format: header.payload.signature
-                    payload = token.token.split('.')[1]
-                    # Add padding if needed
-                    payload += '=' * (4 - len(payload) % 4)
-                    decoded = json.loads(base64.b64decode(payload))
-                    tenant_id = decoded.get('tid', 'unknown')
-                    upn = decoded.get('upn', decoded.get('unique_name', 'unknown'))
-                    self._log_activity(f"Authenticated as: {upn}")
-                    self._log_activity(f"Tenant ID: {tenant_id}")
-                except Exception as decode_err:
-                    self._log_activity(f"Could not decode token details: {decode_err}", "warning")
+                self._log_activity(f"Token acquired successfully")
 
             finally:
-                # Restore stderr
                 if sys.stderr != original_stderr:
                     sys.stderr.close()
                 sys.stderr = original_stderr
 
-            # Test the credential by listing subscriptions
+            # Decode token to get user info
+            authenticated_user = "unknown"
+            home_tenant_id = None
+            try:
+                import base64
+                import json
+                payload = token.token.split('.')[1]
+                payload += '=' * (4 - len(payload) % 4)
+                decoded = json.loads(base64.b64decode(payload))
+                home_tenant_id = decoded.get('tid', 'unknown')
+                authenticated_user = decoded.get('upn', decoded.get('unique_name', 'unknown'))
+                self._log_activity(f"Authenticated as: {authenticated_user}")
+            except Exception as decode_err:
+                self._log_activity(f"Could not decode token details: {decode_err}", "warning")
+
+            # Step 2: If no tenant specified, list available tenants and let user choose
+            selected_tenant_id = specified_tenant_id
+            if not specified_tenant_id:
+                self._log_activity("Fetching available directories/tenants...")
+                try:
+                    # Call Azure REST API to list tenants
+                    headers = {"Authorization": f"Bearer {token.token}"}
+                    response = requests.get(
+                        "https://management.azure.com/tenants?api-version=2020-01-01",
+                        headers=headers
+                    )
+                    response.raise_for_status()
+                    tenants_data = response.json()
+                    tenants = tenants_data.get('value', [])
+
+                    self._log_activity(f"Found {len(tenants)} directory/tenant(s)")
+                    for t in tenants:
+                        self._log_activity(f"  - {t.get('displayName', 'Unknown')} ({t.get('tenantId')})")
+
+                    if len(tenants) > 1:
+                        # Show tenant selection dialog
+                        selected_tenant = self._show_tenant_selection_dialog(tenants, home_tenant_id)
+                        if selected_tenant:
+                            selected_tenant_id = selected_tenant['tenantId']
+                            self._log_activity(f"Selected directory: {selected_tenant.get('displayName')} ({selected_tenant_id})")
+                        else:
+                            self._log_activity("Tenant selection cancelled", "warning")
+                            self.azure_auth_status.setText("🔴 Not authenticated")
+                            self.azure_auth_status.setStyleSheet("font-weight: bold; color: #F44336;")
+                            return
+                    elif len(tenants) == 1:
+                        selected_tenant_id = tenants[0].get('tenantId')
+                        self._log_activity(f"Using only available directory: {tenants[0].get('displayName')}")
+                    else:
+                        raise Exception("No Azure directories found for this account")
+
+                except requests.exceptions.RequestException as e:
+                    self._log_activity(f"Failed to list tenants: {e}", "error")
+                    raise Exception(f"Failed to list Azure directories: {e}")
+
+            # Step 3: If we selected a different tenant, re-authenticate to that tenant
+            if selected_tenant_id and selected_tenant_id != home_tenant_id:
+                self._log_activity(f"Re-authenticating to selected directory...")
+                original_stderr = sys.stderr
+                try:
+                    sys.stderr = open(os.devnull, 'w')
+                    credential = InteractiveBrowserCredential(
+                        redirect_uri="http://localhost:8400",
+                        tenant_id=selected_tenant_id,
+                    )
+                    token = credential.get_token("https://management.azure.com/.default")
+                    self._log_activity(f"Token acquired for selected directory")
+                finally:
+                    if sys.stderr != original_stderr:
+                        sys.stderr.close()
+                    sys.stderr = original_stderr
+
+            # Step 4: List subscriptions from the selected tenant
             self._log_activity("Fetching Azure subscriptions...")
             try:
                 subscription_client = SubscriptionClient(credential)
-                self._log_activity("SubscriptionClient created, listing subscriptions...")
-
-                # Get subscriptions as iterator first to see if there are any issues
                 sub_iterator = subscription_client.subscriptions.list()
-                self._log_activity("Iterating subscription results...")
 
                 subscriptions = []
-                sub_count = 0
                 for sub in sub_iterator:
-                    sub_count += 1
-                    self._log_activity(f"  Found: {sub.display_name} ({sub.subscription_id}) state={sub.state}")
+                    self._log_activity(f"  Found: {sub.display_name} ({sub.subscription_id})")
                     subscriptions.append(sub)
 
-                self._log_activity(f"Subscription iteration complete. Found {sub_count} subscription(s).")
+                self._log_activity(f"Found {len(subscriptions)} subscription(s)")
 
             except Exception as sub_error:
                 self._log_activity(f"Subscription list error: {type(sub_error).__name__}: {sub_error}", "error")
-                import traceback
-                self._log_activity(f"Traceback: {traceback.format_exc()}", "error")
                 raise Exception(
                     f"Failed to list Azure subscriptions: {sub_error}\n\n"
                     "This may be due to:\n"
@@ -5848,13 +5889,11 @@ class POVWorkflowWidget(QWidget):
                     "- Network/firewall blocking Azure management API"
                 )
 
-            self._log_activity(f"[DEBUG] Total subscriptions found: {len(subscriptions)}", "debug")
-
             if not subscriptions:
                 raise Exception(
-                    "No Azure subscriptions found for this account.\n\n"
+                    "No Azure subscriptions found in the selected directory.\n\n"
                     "Please verify:\n"
-                    "- You signed in with the correct Azure account\n"
+                    "- You selected the correct directory/tenant\n"
                     "- Your account has access to at least one subscription\n"
                     "- You have Reader role or higher on the subscription"
                 )
@@ -5902,6 +5941,126 @@ class POVWorkflowWidget(QWidget):
 
         finally:
             self.azure_auth_btn.setEnabled(True)
+
+    def _show_tenant_selection_dialog(self, tenants: list, current_tenant_id: str = None) -> dict:
+        """Show dialog to select an Azure directory/tenant.
+
+        Args:
+            tenants: List of tenant dicts from Azure API
+            current_tenant_id: The currently authenticated tenant ID (to highlight)
+
+        Returns:
+            Selected tenant dict, or None if cancelled
+        """
+        from PyQt6.QtWidgets import QDialog, QTableWidget, QTableWidgetItem, QHeaderView
+        from PyQt6.QtGui import QFont
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Select Azure Directory")
+        dialog.setMinimumSize(650, 350)
+
+        layout = QVBoxLayout(dialog)
+
+        info_label = QLabel(
+            "Your Azure account has access to multiple directories (tenants).\n"
+            "Select the directory that contains your Azure subscriptions."
+        )
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: #666; margin-bottom: 10px;")
+        layout.addWidget(info_label)
+
+        # Table of tenants
+        table = QTableWidget()
+        table.setColumnCount(3)
+        table.setHorizontalHeaderLabels(["Directory Name", "Tenant ID", "Type"])
+        table.setRowCount(len(tenants))
+        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        table.setStyleSheet("QTableWidget { background-color: white; }")
+
+        default_row = 0
+        for row, tenant in enumerate(tenants):
+            tenant_id = tenant.get('tenantId', 'Unknown')
+            display_name = tenant.get('displayName', 'Unknown')
+            tenant_type = tenant.get('tenantType', 'Unknown')
+
+            name_item = QTableWidgetItem(display_name)
+            id_item = QTableWidgetItem(tenant_id)
+            type_item = QTableWidgetItem(tenant_type)
+
+            # Highlight current tenant
+            if tenant_id == current_tenant_id:
+                name_item.setText(f"{display_name} (current)")
+                font = QFont()
+                font.setItalic(True)
+                name_item.setFont(font)
+                id_item.setFont(font)
+                type_item.setFont(font)
+            else:
+                # Select first non-current tenant as default (likely has subscriptions)
+                if default_row == 0 or (current_tenant_id and tenant_id != current_tenant_id and default_row == 0):
+                    default_row = row
+
+            table.setItem(row, 0, name_item)
+            table.setItem(row, 1, id_item)
+            table.setItem(row, 2, type_item)
+
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        layout.addWidget(table)
+
+        # Auto-select (prefer a non-current tenant since current has no subscriptions)
+        if tenants:
+            # Find a tenant that's not the current one
+            for i, t in enumerate(tenants):
+                if t.get('tenantId') != current_tenant_id:
+                    table.selectRow(i)
+                    break
+            else:
+                table.selectRow(0)
+
+        # Button row
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setStyleSheet(
+            "QPushButton { background-color: #757575; color: white; padding: 8px 16px; "
+            "font-weight: bold; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #616161; }"
+        )
+        cancel_btn.clicked.connect(dialog.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        select_btn = QPushButton("Select Directory")
+        select_btn.setStyleSheet(
+            "QPushButton { background-color: #0078D4; color: white; padding: 8px 16px; "
+            "font-weight: bold; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #106EBE; }"
+        )
+
+        def on_select():
+            selected = table.selectedItems()
+            if selected:
+                dialog.accept()
+            else:
+                QMessageBox.warning(dialog, "No Selection", "Please select a directory.")
+
+        select_btn.clicked.connect(on_select)
+        btn_layout.addWidget(select_btn)
+
+        layout.addLayout(btn_layout)
+
+        # Store tenants for retrieval
+        dialog.tenants = tenants
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            selected_row = table.currentRow()
+            if selected_row >= 0:
+                return tenants[selected_row]
+
+        return None
 
     def _show_subscription_dialog(self, subscriptions: list) -> dict:
         """Show dialog to select an Azure subscription.
