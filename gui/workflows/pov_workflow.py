@@ -2443,6 +2443,23 @@ class POVWorkflowWidget(QWidget):
         auth_info.setStyleSheet("color: #666; margin-bottom: 10px;")
         azure_auth_layout.addWidget(auth_info)
 
+        # Tenant ID input (optional - needed if subscriptions are in a different tenant)
+        tenant_row = QHBoxLayout()
+        tenant_label = QLabel("Tenant ID (optional):")
+        tenant_label.setStyleSheet("color: #666;")
+        tenant_row.addWidget(tenant_label)
+
+        self.azure_tenant_input = QLineEdit()
+        self.azure_tenant_input.setPlaceholderText("Leave blank for default, or enter tenant ID/domain")
+        self.azure_tenant_input.setToolTip(
+            "Optional: Enter your Azure tenant ID (GUID) or domain (e.g., contoso.onmicrosoft.com).\n"
+            "Find this in Azure Portal > Microsoft Entra ID > Overview > Tenant ID.\n"
+            "Leave blank to use your default/home tenant."
+        )
+        self.azure_tenant_input.setStyleSheet("padding: 5px; background-color: white;")
+        tenant_row.addWidget(self.azure_tenant_input)
+        azure_auth_layout.addLayout(tenant_row)
+
         # Auth status and button row
         auth_row = QHBoxLayout()
 
@@ -5743,6 +5760,14 @@ class POVWorkflowWidget(QWidget):
             except Exception as ver_err:
                 self._log_activity(f"Could not get SDK versions: {ver_err}", "warning")
 
+            # Check if tenant ID was specified
+            tenant_id = None
+            if hasattr(self, 'azure_tenant_input') and self.azure_tenant_input.text().strip():
+                tenant_id = self.azure_tenant_input.text().strip()
+                self._log_activity(f"Using specified tenant: {tenant_id}")
+            else:
+                self._log_activity("No tenant specified, using default (organizations)")
+
             self._log_activity("Opening browser for Azure sign-in...")
 
             # Suppress browser subprocess stderr (Chrome warnings)
@@ -5753,9 +5778,16 @@ class POVWorkflowWidget(QWidget):
                 sys.stderr = open(os.devnull, 'w')
 
                 # Create credential with interactive browser authentication
-                credential = InteractiveBrowserCredential(
-                    redirect_uri="http://localhost:8400",
-                )
+                # If tenant_id is specified, use it; otherwise use 'organizations' (multi-tenant)
+                if tenant_id:
+                    credential = InteractiveBrowserCredential(
+                        redirect_uri="http://localhost:8400",
+                        tenant_id=tenant_id,
+                    )
+                else:
+                    credential = InteractiveBrowserCredential(
+                        redirect_uri="http://localhost:8400",
+                    )
 
                 # Trigger authentication (this opens browser)
                 # We call get_token to force the auth flow
