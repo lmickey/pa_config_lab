@@ -600,11 +600,20 @@ class FirewallAPIClient:
         try:
             if sync:
                 # Synchronous commit with wait
-                result = self._firewall.commit(
-                    sync=True,
-                    timeout=timeout,
-                    description=description,
-                )
+                # Note: pan-os-python commit() doesn't accept timeout directly
+                # The timeout is set on the device object via self._firewall.timeout
+                original_timeout = getattr(self._firewall, 'timeout', None)
+                if timeout:
+                    self._firewall.timeout = timeout
+
+                try:
+                    result = self._firewall.commit(
+                        sync=True,
+                    )
+                finally:
+                    # Restore original timeout
+                    if original_timeout is not None:
+                        self._firewall.timeout = original_timeout
 
                 # The result is typically None on success or raises on error
                 return CommitResult(
@@ -615,7 +624,6 @@ class FirewallAPIClient:
                 # Async commit - returns job ID
                 result = self._firewall.commit(
                     sync=False,
-                    description=description,
                 )
 
                 return CommitResult(
