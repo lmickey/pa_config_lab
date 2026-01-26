@@ -4024,24 +4024,91 @@ class POVWorkflowWidget(QWidget):
     def _fetch_and_set_public_ip(self):
         """Fetch user's public IP and set it in the Cloud Security card."""
         import subprocess
+        import sys
+
+        self._log_activity("Detecting public IP address...")
+
+        # Method 1: Try curl (available on Linux, macOS, Windows 10+)
         try:
+            self._log_activity("Trying curl method...")
             result = subprocess.run(
-                ['curl', '-s', 'https://ipinfo.io/ip'],
-                capture_output=True, text=True, timeout=5
+                ['curl', '-s', '--connect-timeout', '5', 'https://ipinfo.io/ip'],
+                capture_output=True, text=True, timeout=10
             )
+            self._log_activity(f"curl returncode: {result.returncode}")
             if result.returncode == 0:
                 ip = result.stdout.strip()
-                if ip and hasattr(self, 'cloud_security_source_ips'):
-                    self.cloud_security_source_ips.setText(f"{ip}/32")
-                    logger.info(f"Detected public IP: {ip}")
-                    return
+                if ip and self._is_valid_ip(ip):
+                    if hasattr(self, 'cloud_security_source_ips'):
+                        self.cloud_security_source_ips.setText(f"{ip}/32")
+                        self._log_activity(f"Detected public IP via curl: {ip}")
+                        logger.info(f"Detected public IP: {ip}")
+                        return
+                else:
+                    self._log_activity(f"curl returned invalid IP: '{ip}'", "warning")
+            else:
+                self._log_activity(f"curl failed: {result.stderr}", "warning")
+        except FileNotFoundError:
+            self._log_activity("curl not found, trying alternative methods...", "warning")
         except Exception as e:
-            logger.debug(f"Failed to fetch public IP: {e}")
+            self._log_activity(f"curl method failed: {type(e).__name__}: {e}", "warning")
 
-        # Fallback
+        # Method 2: Try PowerShell (Windows)
+        if sys.platform == 'win32':
+            try:
+                self._log_activity("Trying PowerShell method...")
+                ps_cmd = "(Invoke-WebRequest -Uri 'https://ipinfo.io/ip' -UseBasicParsing -TimeoutSec 5).Content.Trim()"
+                result = subprocess.run(
+                    ['powershell', '-Command', ps_cmd],
+                    capture_output=True, text=True, timeout=15
+                )
+                self._log_activity(f"PowerShell returncode: {result.returncode}")
+                if result.returncode == 0:
+                    ip = result.stdout.strip()
+                    if ip and self._is_valid_ip(ip):
+                        if hasattr(self, 'cloud_security_source_ips'):
+                            self.cloud_security_source_ips.setText(f"{ip}/32")
+                            self._log_activity(f"Detected public IP via PowerShell: {ip}")
+                            logger.info(f"Detected public IP: {ip}")
+                            return
+                    else:
+                        self._log_activity(f"PowerShell returned invalid IP: '{ip}'", "warning")
+                else:
+                    self._log_activity(f"PowerShell failed: {result.stderr}", "warning")
+            except Exception as e:
+                self._log_activity(f"PowerShell method failed: {type(e).__name__}: {e}", "warning")
+
+        # Method 3: Try Python urllib (cross-platform fallback)
+        try:
+            self._log_activity("Trying Python urllib method...")
+            import urllib.request
+            with urllib.request.urlopen('https://ipinfo.io/ip', timeout=5) as response:
+                ip = response.read().decode('utf-8').strip()
+                if ip and self._is_valid_ip(ip):
+                    if hasattr(self, 'cloud_security_source_ips'):
+                        self.cloud_security_source_ips.setText(f"{ip}/32")
+                        self._log_activity(f"Detected public IP via urllib: {ip}")
+                        logger.info(f"Detected public IP: {ip}")
+                        return
+                else:
+                    self._log_activity(f"urllib returned invalid IP: '{ip}'", "warning")
+        except Exception as e:
+            self._log_activity(f"urllib method failed: {type(e).__name__}: {e}", "warning")
+
+        # Fallback - set to 0.0.0.0/0 with warning
+        self._log_activity("All IP detection methods failed, using 0.0.0.0/0", "warning")
         if hasattr(self, 'cloud_security_source_ips'):
             if not self.cloud_security_source_ips.text():
                 self.cloud_security_source_ips.setText("0.0.0.0/0")
+
+    def _is_valid_ip(self, ip: str) -> bool:
+        """Check if string is a valid IPv4 address."""
+        import re
+        pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+        if not re.match(pattern, ip):
+            return False
+        parts = ip.split('.')
+        return all(0 <= int(p) <= 255 for p in parts)
 
     def _on_deploy_cloud_changed(self, state):
         """Handle deploy cloud resources toggle change."""
