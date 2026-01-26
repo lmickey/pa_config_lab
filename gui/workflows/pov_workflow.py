@@ -6809,6 +6809,8 @@ output "{device_name}_private_ip" {{
             self._log_activity("Infrastructure deployment completed successfully")
             # Store outputs for later use
             self._terraform_outputs = outputs
+            # Mark Terraform as deployed for navigation validation
+            self._terraform_deployed = True
 
             result_text = "✓ Deployment Successful!\n\n"
             if outputs:
@@ -7259,6 +7261,23 @@ output "{device_name}_private_ip" {{
             # Validate cloud resources requirements
             if not self._validate_cloud_resources_tab():
                 return  # Validation failed, don't proceed
+
+        # Special handling for Tab 3 -> Tab 4 transition (Cloud Deployment -> Deploy POV Config)
+        if current_tab == 3:
+            # Check if cloud deployment is enabled but not completed
+            if self.deployment_config.get('deploy_cloud_resources', False):
+                if not hasattr(self, '_terraform_deployed') or not self._terraform_deployed:
+                    reply = QMessageBox.question(
+                        self,
+                        "Cloud Resources Not Deployed",
+                        "Cloud resource deployment is enabled but Terraform has not been deployed yet.\n\n"
+                        "Your Azure infrastructure (VNet, subnets, VMs) will not be created.\n\n"
+                        "Do you want to continue anyway?",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                        QMessageBox.StandardButton.No
+                    )
+                    if reply != QMessageBox.StandardButton.Yes:
+                        return  # User chose not to continue
 
         # Save current state before moving to next tab
         self.save_state(current_tab)  # Save the tab we're leaving
