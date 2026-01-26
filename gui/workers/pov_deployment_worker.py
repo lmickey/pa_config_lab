@@ -160,6 +160,7 @@ class TerraformWorker(QThread):
     def _apply(self):
         """Run terraform apply."""
         from terraform import TerraformExecutor
+        import re
 
         self.phase_changed.emit("applying")
         self.progress.emit("Running terraform apply...", 10)
@@ -169,23 +170,72 @@ class TerraformWorker(QThread):
 
         var_file = self._create_var_file()
 
+        # Track resource creation progress
+        self._resources_created = 0
+        self._current_resource = ""
+
+        def progress_callback(line: str):
+            """Process terraform output lines for progress updates."""
+            # Strip ANSI escape codes for cleaner output
+            clean_line = re.sub(r'\x1b\[[0-9;]*m', '', line)
+
+            # Parse resource creation messages
+            # Example: "azurerm_resource_group.pov: Creating..."
+            # Example: "azurerm_resource_group.pov: Creation complete after 2s [id=...]"
+            if ": Creating..." in clean_line:
+                match = re.match(r'(\S+): Creating\.\.\.', clean_line)
+                if match:
+                    self._current_resource = match.group(1)
+                    self.log_message.emit(f"Creating: {self._current_resource}")
+                    # Update progress (30-85% range during apply)
+                    progress = min(30 + (self._resources_created * 5), 85)
+                    self.progress.emit(f"Creating {self._current_resource}...", progress)
+
+            elif ": Creation complete" in clean_line or ": Modifications complete" in clean_line:
+                self._resources_created += 1
+                match = re.match(r'(\S+): (?:Creation|Modifications) complete', clean_line)
+                if match:
+                    resource_name = match.group(1)
+                    self.log_message.emit(f"Created: {resource_name}")
+                    progress = min(30 + (self._resources_created * 5), 85)
+                    self.progress.emit(f"Created {resource_name}", progress)
+
+            elif "Apply complete!" in clean_line:
+                self.log_message.emit(clean_line)
+                self.progress.emit("Apply complete!", 90)
+
+            elif "Error:" in clean_line:
+                self.log_message.emit(f"ERROR: {clean_line}")
+
+            elif clean_line.strip() and not clean_line.startswith("  "):
+                # Log other significant lines (not indented detail)
+                self.log_message.emit(clean_line)
+
         self.progress.emit("Deploying infrastructure...", 30)
-        result = executor.apply(var_file=var_file, auto_approve=self.auto_approve)
+        result = executor.apply(
+            var_file=var_file,
+            auto_approve=self.auto_approve,
+            progress_callback=progress_callback
+        )
 
         if self._cancelled:
             self.finished.emit(False, "Operation cancelled", {})
             return
 
         if result.success:
-            self.progress.emit("Getting outputs...", 90)
+            self.progress.emit("Getting outputs...", 95)
             output_result = executor.output()
             outputs = output_result.outputs if output_result.success else {}
 
             self.progress.emit("Deployment complete", 100)
+            self.log_message.emit(f"Deployment complete! Created {self._resources_created} resources.")
             self.finished.emit(True, "Infrastructure deployed successfully", outputs)
         else:
-            self.error.emit(result.error_message or "Apply failed")
-            self.finished.emit(False, result.error_message or "Apply failed", {})
+            # Clean up error message (remove ANSI codes)
+            error_msg = result.error_message or "Apply failed"
+            clean_error = re.sub(r'\x1b\[[0-9;]*m', '', error_msg)
+            self.error.emit(clean_error)
+            self.finished.emit(False, clean_error, {})
 
     def _destroy(self):
         """Run terraform destroy."""
@@ -258,6 +308,7 @@ class TerraformWorker(QThread):
     def _init_only(self) -> bool:
         """Run init without emitting finished."""
         from terraform import TerraformExecutor, check_terraform_installed
+        import re
 
         if not check_terraform_installed():
             self.error.emit("Terraform not installed")
@@ -266,29 +317,65 @@ class TerraformWorker(QThread):
 
         terraform_dir = os.path.join(self.output_dir, "terraform")
         executor = TerraformExecutor(terraform_dir)
-        result = executor.init()
+
+        def init_callback(line: str):
+            """Process init output."""
+            clean_line = re.sub(r'\x1b\[[0-9;]*m', '', line).strip()
+            if clean_line and not clean_line.startswith("-"):
+                self.log_message.emit(clean_line)
+                if "Initializing" in clean_line:
+                    self.progress.emit(clean_line, 30)
+                elif "Installing" in clean_line:
+                    self.progress.emit(clean_line, 35)
+
+        result = executor.init(progress_callback=init_callback)
 
         if not result.success:
-            self.error.emit(result.error_message or "Init failed")
-            self.finished.emit(False, result.error_message or "Init failed", {})
+            # Clean ANSI codes from error
+            error_msg = result.error_message or "Init failed"
+            clean_error = re.sub(r'\x1b\[[0-9;]*m', '', error_msg)
+            self.error.emit(clean_error)
+            self.finished.emit(False, clean_error, {})
             return False
 
+        self.log_message.emit("Terraform initialized successfully")
         return True
 
     def _plan_only(self) -> bool:
         """Run plan without emitting finished."""
         from terraform import TerraformExecutor
+        import re
 
         terraform_dir = os.path.join(self.output_dir, "terraform")
         executor = TerraformExecutor(terraform_dir)
         var_file = self._create_var_file()
 
-        result = executor.plan(var_file=var_file)
+        def plan_callback(line: str):
+            """Process plan output."""
+            clean_line = re.sub(r'\x1b\[[0-9;]*m', '', line).strip()
+            if clean_line:
+                # Log resource plan lines
+                if "will be created" in clean_line or "will be updated" in clean_line:
+                    self.log_message.emit(clean_line)
+                elif "Plan:" in clean_line:
+                    self.log_message.emit(clean_line)
+                    self.progress.emit(clean_line, 55)
+
+        result = executor.plan(var_file=var_file, progress_callback=plan_callback)
 
         if not result.success:
-            self.error.emit(result.error_message or "Plan failed")
-            self.finished.emit(False, result.error_message or "Plan failed", {})
+            # Clean ANSI codes from error
+            error_msg = result.error_message or "Plan failed"
+            clean_error = re.sub(r'\x1b\[[0-9;]*m', '', error_msg)
+            self.error.emit(clean_error)
+            self.finished.emit(False, clean_error, {})
             return False
+
+        # Log plan summary
+        changes = result.changes
+        if changes:
+            summary = f"Plan: {changes.get('add', 0)} to add, {changes.get('change', 0)} to change, {changes.get('destroy', 0)} to destroy"
+            self.log_message.emit(summary)
 
         return True
 

@@ -2536,8 +2536,27 @@ class POVWorkflowWidget(QWidget):
         self.review_terraform_btn.clicked.connect(self._review_terraform)
         actions_row.addWidget(self.review_terraform_btn)
 
-        self.deploy_terraform_btn = QPushButton("🚀 Deploy Terraform")
-        self.deploy_terraform_btn.setMinimumWidth(160)
+        # Edit Terraform button - opens directory in file manager
+        self.edit_terraform_btn = QPushButton("📝 Edit Terraform")
+        self.edit_terraform_btn.setMinimumWidth(160)
+        self.edit_terraform_btn.setEnabled(False)
+        self.edit_terraform_btn.setToolTip("Open Terraform files directory for manual editing")
+        self.edit_terraform_btn.setStyleSheet(
+            "QPushButton { "
+            "  background-color: #9C27B0; color: white; padding: 10px 20px; "
+            "  font-weight: bold; border-radius: 5px; "
+            "  border: 1px solid #7B1FA2; border-bottom: 3px solid #6A1B9A; "
+            "}"
+            "QPushButton:hover { background-color: #8E24AA; border-bottom: 3px solid #4A148C; }"
+            "QPushButton:pressed { background-color: #7B1FA2; border-bottom: 1px solid #6A1B9A; }"
+            "QPushButton:disabled { background-color: #BDBDBD; color: #9E9E9E; border: 1px solid #9E9E9E; border-bottom: 3px solid #757575; }"
+        )
+        self.edit_terraform_btn.clicked.connect(self._edit_terraform)
+        actions_row.addWidget(self.edit_terraform_btn)
+
+        # Deploy button - text changes based on deployment state ("Deploy" or "Redeploy")
+        self.deploy_terraform_btn = QPushButton("🚀 Deploy")
+        self.deploy_terraform_btn.setMinimumWidth(140)
         self.deploy_terraform_btn.setEnabled(False)
         self.deploy_terraform_btn.setToolTip("Deploy resources to Azure using Terraform")
         self.deploy_terraform_btn.setStyleSheet(
@@ -6246,6 +6265,213 @@ class POVWorkflowWidget(QWidget):
 
         return dialog.exec() == QDialog.DialogCode.Accepted
 
+    def _show_deploy_confirmation_dialog(self, is_update: bool) -> bool:
+        """Show a custom styled confirmation dialog for Terraform deployment.
+
+        Args:
+            is_update: True if this is updating an existing deployment
+
+        Returns:
+            True if user confirms, False to cancel
+        """
+        from PyQt6.QtWidgets import QDialog
+        from PyQt6.QtGui import QPalette, QColor
+
+        dialog = QDialog(self)
+        dialog.setMinimumWidth(550)
+        dialog.setModal(True)
+
+        # Use amber/orange palette for caution (different from red error)
+        if is_update:
+            dialog.setWindowTitle("⚠️ Redeploy Terraform")
+            header_color = "#FF9800"  # Orange for update
+            header_text = "Redeploy to Azure"
+            icon_text = "🔄"
+        else:
+            dialog.setWindowTitle("🚀 Deploy Terraform")
+            header_color = "#FF9800"  # Orange for deploy
+            header_text = "Deploy to Azure"
+            icon_text = "🚀"
+
+        # Use palette for background color (Windows compatible)
+        palette = dialog.palette()
+        palette.setColor(QPalette.ColorRole.Window, QColor("#fff8e1"))
+        dialog.setPalette(palette)
+        dialog.setAutoFillBackground(True)
+
+        # Main layout
+        main_layout = QVBoxLayout(dialog)
+        main_layout.setSpacing(0)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Orange header bar
+        header_widget = QWidget()
+        header_widget.setAutoFillBackground(True)
+        header_palette = header_widget.palette()
+        header_palette.setColor(QPalette.ColorRole.Window, QColor(header_color))
+        header_widget.setPalette(header_palette)
+        header_widget.setMinimumHeight(60)
+
+        header_layout = QHBoxLayout(header_widget)
+        header_layout.setContentsMargins(20, 10, 20, 10)
+
+        header_icon = QLabel(icon_text)
+        header_icon.setStyleSheet("font-size: 28px;")
+        header_layout.addWidget(header_icon)
+
+        title = QLabel(header_text)
+        title.setStyleSheet("font-size: 18px; font-weight: bold; color: white;")
+        header_layout.addWidget(title)
+        header_layout.addStretch()
+
+        main_layout.addWidget(header_widget)
+
+        # Content area
+        content_widget = QWidget()
+        content_widget.setAutoFillBackground(True)
+        content_palette = content_widget.palette()
+        content_palette.setColor(QPalette.ColorRole.Window, QColor("#fff8e1"))
+        content_widget.setPalette(content_palette)
+
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setSpacing(15)
+        content_layout.setContentsMargins(20, 20, 20, 20)
+
+        # Main message
+        if is_update:
+            message_text = (
+                "<b>This will regenerate Terraform files and update Azure resources.</b>"
+            )
+        else:
+            message_text = (
+                "<b>This will create cloud resources in your Azure subscription.</b>"
+            )
+        message = QLabel(message_text)
+        message.setWordWrap(True)
+        message.setStyleSheet("color: #333; font-size: 13px;")
+        content_layout.addWidget(message)
+
+        # What will happen list
+        list_frame = QFrame()
+        list_frame.setFrameShape(QFrame.Shape.Box)
+        list_frame.setAutoFillBackground(True)
+        list_palette = list_frame.palette()
+        list_palette.setColor(QPalette.ColorRole.Window, QColor("#ffffff"))
+        list_frame.setPalette(list_palette)
+        list_frame.setStyleSheet("QFrame { border: 1px solid #ddd; border-radius: 4px; }")
+
+        list_layout = QVBoxLayout(list_frame)
+        list_layout.setContentsMargins(15, 15, 15, 15)
+
+        list_title = QLabel("<b>This operation will:</b>")
+        list_title.setStyleSheet("color: #333; font-size: 12px;")
+        list_layout.addWidget(list_title)
+
+        if is_update:
+            items = [
+                "• Regenerate .tf files from current POV configuration",
+                "• Compare with existing deployed resources",
+                "• Apply updates (add/modify/remove resources)",
+            ]
+        else:
+            items = [
+                "• Initialize Terraform providers",
+                "• Create a deployment plan",
+                "• Deploy VNet, subnets, NSGs, and VMs to Azure",
+            ]
+
+        for item in items:
+            item_label = QLabel(item)
+            item_label.setStyleSheet("color: #555; font-size: 12px; margin-left: 10px;")
+            list_layout.addWidget(item_label)
+
+        content_layout.addWidget(list_frame)
+
+        # Warning box for updates
+        if is_update:
+            warning_frame = QFrame()
+            warning_frame.setFrameShape(QFrame.Shape.Box)
+            warning_frame.setAutoFillBackground(True)
+            warning_palette = warning_frame.palette()
+            warning_palette.setColor(QPalette.ColorRole.Window, QColor("#fff3e0"))
+            warning_frame.setPalette(warning_palette)
+            warning_frame.setStyleSheet("QFrame { border: 2px solid #FF9800; border-radius: 4px; }")
+
+            warning_layout = QVBoxLayout(warning_frame)
+            warning_layout.setContentsMargins(15, 10, 15, 10)
+            warning_label = QLabel(
+                "⚠️ <b>Note:</b> Manual edits to .tf files will be overwritten."
+            )
+            warning_label.setWordWrap(True)
+            warning_label.setStyleSheet("color: #e65100; font-size: 12px;")
+            warning_layout.addWidget(warning_label)
+            content_layout.addWidget(warning_frame)
+
+        # Cost warning
+        cost_label = QLabel(
+            "💰 <i>Azure resources will incur costs. Review the Terraform plan before proceeding.</i>"
+        )
+        cost_label.setWordWrap(True)
+        cost_label.setStyleSheet("color: #666; font-size: 11px;")
+        content_layout.addWidget(cost_label)
+
+        content_layout.addStretch()
+
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setMinimumWidth(100)
+        cancel_btn.setMinimumHeight(36)
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #9E9E9E;
+                color: white;
+                padding: 8px 16px;
+                font-weight: bold;
+                font-size: 12px;
+                border-radius: 4px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #757575;
+            }
+        """)
+        cancel_btn.clicked.connect(dialog.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        if is_update:
+            confirm_text = "🔄 Redeploy"
+        else:
+            confirm_text = "🚀 Deploy"
+
+        confirm_btn = QPushButton(confirm_text)
+        confirm_btn.setMinimumWidth(120)
+        confirm_btn.setMinimumHeight(36)
+        confirm_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: white;
+                padding: 8px 16px;
+                font-weight: bold;
+                font-size: 12px;
+                border-radius: 4px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #F57C00;
+            }
+        """)
+        confirm_btn.clicked.connect(dialog.accept)
+        confirm_btn.setDefault(True)
+        btn_layout.addWidget(confirm_btn)
+
+        content_layout.addLayout(btn_layout)
+        main_layout.addWidget(content_widget)
+
+        return dialog.exec() == QDialog.DialogCode.Accepted
+
     def _show_tenant_selection_dialog(self, tenants: list, current_tenant_id: str = None) -> dict:
         """Show dialog to select an Azure directory/tenant.
 
@@ -6598,8 +6824,12 @@ class POVWorkflowWidget(QWidget):
         # Generate Terraform configuration
         self._generate_terraform_from_pov()
 
-    def _generate_terraform_from_pov(self):
-        """Generate Terraform configuration from POV settings."""
+    def _generate_terraform_from_pov(self, force_regenerate: bool = False):
+        """Generate Terraform configuration from POV settings.
+
+        Args:
+            force_regenerate: If True, skip the prompt for existing files
+        """
         import os
         import tempfile
         from datetime import datetime
@@ -6649,6 +6879,40 @@ class POVWorkflowWidget(QWidget):
             # Create terraform subdirectory
             terraform_dir = os.path.join(output_base, 'terraform')
             os.makedirs(terraform_dir, exist_ok=True)
+
+            # Check if terraform files already exist
+            main_tf_exists = os.path.exists(os.path.join(terraform_dir, 'main.tf'))
+            state_exists = os.path.exists(os.path.join(terraform_dir, 'terraform.tfstate'))
+
+            if main_tf_exists and not force_regenerate:
+                # Files exist - prompt user for action
+                state_note = ""
+                if state_exists:
+                    state_note = (
+                        "\n\nNote: Terraform state file exists, indicating resources may "
+                        "have been deployed. Regenerating files and rerunning 'terraform apply' "
+                        "will update existing resources to match the new configuration."
+                    )
+
+                reply = QMessageBox.question(
+                    self,
+                    "Terraform Configuration Exists",
+                    f"Terraform configuration already exists for this customer.\n\n"
+                    f"Directory: {terraform_dir}\n\n"
+                    "Choose an action:\n\n"
+                    "• YES - Regenerate files (overwrites any manual edits)\n"
+                    "• NO - Keep existing files (use current configuration)"
+                    f"{state_note}",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No
+                )
+
+                if reply != QMessageBox.StandardButton.Yes:
+                    # User chose to keep existing files
+                    self._log_activity("Using existing Terraform configuration")
+                    self._terraform_output_dir = output_base
+                    self._on_terraform_ready()
+                    return
 
             # Generate firewalls list from locations
             # Each datacenter with service_connection needs a firewall
@@ -6847,6 +7111,18 @@ resource "azurerm_subnet_network_security_group_association" "management" {
 
         # Add firewalls (VM-Series)
         firewalls = tfvars.get('firewalls', [])
+
+        # Add marketplace agreement for VM-Series (required before first deployment)
+        if firewalls:
+            content += '''
+# Accept Palo Alto Networks VM-Series Marketplace Agreement
+# This is required before deploying VM-Series firewalls
+resource "azurerm_marketplace_agreement" "paloalto_vmseries" {
+  publisher = "paloaltonetworks"
+  offer     = "vmseries-flex"
+  plan      = "byol"
+}
+'''
         for fw in firewalls:
             fw_name = fw.get('name', 'fw').lower().replace(' ', '-').replace('_', '-')
             fw_type = fw.get('type', 'service_connection')
@@ -6948,6 +7224,9 @@ resource "azurerm_linux_virtual_machine" "fw_{fw_name}" {{
   }}
 
   tags = azurerm_resource_group.pov.tags
+
+  # Wait for marketplace agreement to be accepted
+  depends_on = [azurerm_marketplace_agreement.paloalto_vmseries]
 }}
 '''
 
@@ -7142,7 +7421,112 @@ output "{device_name}_private_ip" {{
 
         # Enable terraform action buttons
         self.review_terraform_btn.setEnabled(True)
+        self.edit_terraform_btn.setEnabled(True)
         self.deploy_terraform_btn.setEnabled(True)
+
+        # Update deploy button text based on whether terraform has been deployed before
+        self._update_deploy_button_state()
+
+    def _update_deploy_button_state(self):
+        """Update deploy button text based on terraform deployment state."""
+        import os
+
+        # Check if terraform state file exists (indicates previous deployment)
+        is_deployed = False
+        if hasattr(self, '_terraform_output_dir') and self._terraform_output_dir:
+            terraform_dir = os.path.join(self._terraform_output_dir, "terraform")
+            state_file = os.path.join(terraform_dir, "terraform.tfstate")
+            is_deployed = os.path.exists(state_file)
+
+        # Also check the runtime flag
+        if hasattr(self, '_terraform_deployed') and self._terraform_deployed:
+            is_deployed = True
+
+        if is_deployed:
+            self.deploy_terraform_btn.setText("🔄 Redeploy")
+            self.deploy_terraform_btn.setToolTip(
+                "Regenerate Terraform files from POV config and update Azure resources"
+            )
+        else:
+            self.deploy_terraform_btn.setText("🚀 Deploy")
+            self.deploy_terraform_btn.setToolTip(
+                "Deploy resources to Azure using Terraform"
+            )
+
+    def _edit_terraform(self):
+        """Open Terraform directory in system file manager for manual editing."""
+        import os
+        import subprocess
+        import sys
+
+        if not hasattr(self, '_terraform_output_dir') or not self._terraform_output_dir:
+            QMessageBox.warning(
+                self,
+                "No Configuration",
+                "Please generate Terraform configuration first."
+            )
+            return
+
+        terraform_dir = os.path.join(self._terraform_output_dir, "terraform")
+        if not os.path.exists(terraform_dir):
+            QMessageBox.warning(
+                self,
+                "Configuration Not Found",
+                f"Terraform directory not found:\n{terraform_dir}"
+            )
+            return
+
+        self._log_activity(f"Opening Terraform directory: {terraform_dir}")
+
+        try:
+            # Open directory in system file manager
+            if sys.platform == 'win32':
+                os.startfile(terraform_dir)
+            elif sys.platform == 'darwin':
+                subprocess.Popen(['open', terraform_dir])
+            else:
+                # Linux - try xdg-open, then fall back to common file managers
+                try:
+                    subprocess.Popen(['xdg-open', terraform_dir])
+                except FileNotFoundError:
+                    # Try common file managers
+                    for fm in ['nautilus', 'dolphin', 'nemo', 'thunar', 'pcmanfm']:
+                        try:
+                            subprocess.Popen([fm, terraform_dir])
+                            break
+                        except FileNotFoundError:
+                            continue
+                    else:
+                        QMessageBox.information(
+                            self,
+                            "Directory Path",
+                            f"Please open this directory manually:\n\n{terraform_dir}"
+                        )
+
+            self._log_activity("Terraform directory opened for editing")
+
+        except Exception as e:
+            logger.error(f"Failed to open terraform directory: {e}")
+            QMessageBox.information(
+                self,
+                "Directory Path",
+                f"Please open this directory manually:\n\n{terraform_dir}"
+            )
+
+    def _regenerate_terraform_files(self):
+        """Regenerate Terraform configuration files (internal helper).
+
+        Called by _deploy_terraform when redeploying to update files from POV config.
+        """
+        self._log_activity("Regenerating Terraform configuration...")
+        self.terraform_gen_status.setText("⏳ Regenerating Terraform configuration...")
+        self.terraform_gen_status.setStyleSheet(
+            "color: #1565C0; padding: 10px; background-color: #E3F2FD; "
+            "border-radius: 5px;"
+        )
+
+        # Regenerate (force=True to skip the existing file check)
+        self._generate_terraform_from_pov(force_regenerate=True)
 
     def _review_terraform(self):
         """Review generated Terraform configuration."""
@@ -7206,20 +7590,20 @@ output "{device_name}_private_ip" {{
             )
             return
 
-        reply = QMessageBox.question(
-            self,
-            "Deploy Terraform",
-            "This will deploy cloud resources to Azure using Terraform.\n\n"
-            "This operation will:\n"
-            "  • Initialize Terraform\n"
-            "  • Create a deployment plan\n"
-            "  • Apply the configuration\n\n"
-            "Continue?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
+        # Check if terraform state exists (previous deployment)
+        import os
+        terraform_dir = os.path.join(self._terraform_output_dir, "terraform")
+        state_file = os.path.join(terraform_dir, "terraform.tfstate")
+        is_update = os.path.exists(state_file)
 
-        if reply != QMessageBox.StandardButton.Yes:
-            return
+        # Show custom styled confirmation dialog
+        if not self._show_deploy_confirmation_dialog(is_update):
+            return  # User cancelled
+
+        # If redeploying, regenerate terraform files first
+        if is_update:
+            self._log_activity("Regenerating Terraform files for redeploy...")
+            self._generate_terraform_from_pov(force_regenerate=True)
 
         # Get credentials
         credentials = self._get_terraform_credentials()
@@ -7243,12 +7627,18 @@ output "{device_name}_private_ip" {{
         self._terraform_deploy_worker.log_message.connect(self._on_deploy_log)
         self._terraform_deploy_worker.start()
 
-        # Update UI
+        # Update UI - disable all terraform action buttons during deployment
         self.deploy_terraform_btn.setEnabled(False)
         self.review_terraform_btn.setEnabled(False)
+        self.edit_terraform_btn.setEnabled(False)
         self.cloud_deploy_progress.setVisible(True)
         self.cloud_deploy_progress.setValue(0)
-        self.cloud_deploy_results.set_text("Starting Terraform deployment...")
+
+        # Show appropriate starting message
+        if is_update:
+            self.cloud_deploy_results.set_text("Starting Terraform update deployment...")
+        else:
+            self.cloud_deploy_results.set_text("Starting Terraform deployment...")
 
     def _get_terraform_credentials(self) -> dict:
         """Get credentials for Terraform deployment."""
@@ -7277,9 +7667,14 @@ output "{device_name}_private_ip" {{
 
     def _on_deploy_finished(self, success: bool, message: str, outputs: dict):
         """Handle deployment completion."""
+        # Re-enable all terraform action buttons
         self.deploy_terraform_btn.setEnabled(True)
         self.review_terraform_btn.setEnabled(True)
+        self.edit_terraform_btn.setEnabled(True)
         self.cloud_deploy_progress.setVisible(False)
+
+        # Update deploy button text (will show "Redeploy" after successful deployment)
+        self._update_deploy_button_state()
 
         if success:
             self._log_activity("Infrastructure deployment completed successfully")
@@ -7784,6 +8179,9 @@ output "{device_name}_private_ip" {{
             'use_case_configs': getattr(self, 'use_case_configs', {}),
             'config_data': self.config_data,
             'deployment_config': self.deployment_config,
+            # Terraform state tracking
+            'terraform_output_dir': getattr(self, '_terraform_output_dir', None),
+            'terraform_deployed': getattr(self, '_terraform_deployed', False),
         }
 
         # Save to file (overwrites existing)
@@ -7819,6 +8217,10 @@ output "{device_name}_private_ip" {{
 
             if hasattr(self, 'use_case_configs'):
                 self.use_case_configs = state.get('use_case_configs', {})
+
+            # Restore terraform state
+            self._terraform_output_dir = state.get('terraform_output_dir')
+            self._terraform_deployed = state.get('terraform_deployed', False)
 
             # Restore UI state
             self._restore_ui_from_state(state)
@@ -7930,6 +8332,54 @@ output "{device_name}_private_ip" {{
             self._update_private_app_limits()
         if hasattr(self, '_refresh_remote_branch_lists'):
             self._refresh_remote_branch_lists()
+
+        # Restore terraform UI state
+        self._restore_terraform_ui_state(state)
+
+    def _restore_terraform_ui_state(self, state: Dict[str, Any]):
+        """Restore terraform-related UI state."""
+        import os
+
+        # Check if terraform files exist for this customer
+        terraform_output_dir = state.get('terraform_output_dir')
+        terraform_deployed = state.get('terraform_deployed', False)
+
+        if terraform_output_dir:
+            terraform_dir = os.path.join(terraform_output_dir, 'terraform')
+            main_tf_exists = os.path.exists(os.path.join(terraform_dir, 'main.tf'))
+            state_exists = os.path.exists(os.path.join(terraform_dir, 'terraform.tfstate'))
+
+            if main_tf_exists:
+                # Terraform files exist - enable buttons
+                if hasattr(self, 'review_terraform_btn'):
+                    self.review_terraform_btn.setEnabled(True)
+                if hasattr(self, 'edit_terraform_btn'):
+                    self.edit_terraform_btn.setEnabled(True)
+                if hasattr(self, 'deploy_terraform_btn'):
+                    self.deploy_terraform_btn.setEnabled(True)
+
+                # Update generation status
+                if hasattr(self, 'terraform_gen_status'):
+                    if state_exists or terraform_deployed:
+                        self.terraform_gen_status.setText("✓ Terraform deployed - ready for updates")
+                    else:
+                        self.terraform_gen_status.setText("✓ Terraform configuration ready")
+                    self.terraform_gen_status.setStyleSheet(
+                        "color: #2E7D32; padding: 10px; background-color: #E8F5E9; "
+                        "border-radius: 5px;"
+                    )
+                    if hasattr(self, 'terraform_status_widget'):
+                        self.terraform_status_widget.setVisible(True)
+
+                # Update deploy button text
+                if hasattr(self, '_update_deploy_button_state'):
+                    self._update_deploy_button_state()
+
+                # Update Next button state
+                if hasattr(self, 'cloud_deploy_next_btn'):
+                    if terraform_deployed or state_exists:
+                        self.cloud_deploy_next_btn.setEnabled(True)
+                        self.cloud_deploy_next_btn.setToolTip("Proceed to deploy POV configuration")
 
     def _get_saved_states(self) -> List[Dict[str, Any]]:
         """Get list of saved POV states with metadata."""
