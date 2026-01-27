@@ -9682,46 +9682,65 @@ output "{device_name}_private_ip" {{
                 'firewall': fw,
             })
 
-        # Phase 2: Service Connections
-        # PA side must be configured FIRST to get endpoint IPs for FW side IPsec tunnel
+        # Collect PA-side and FW-side phases separately
+        # PA side configs must be committed before FW side can use the endpoint IPs
+        pa_side_phases = []
+        fw_side_phases = []
+        folders_to_commit = set()
+
+        # Phase 2: Service Connections (PA side first, then commit, then FW side)
         sc_datacenters = [dc for dc in ctx.get('datacenters', [])
                         if dc.get('connection_type') == 'service_connection']
         for dc in sc_datacenters:
-            # Find the firewall for this datacenter
             fw = self._find_firewall_for_location(dc.get('name'))
-            # PA side first - creates Service Connection in Prisma Access, returns endpoint IPs
-            phases.append({
+            # PA side - creates Service Connection in Prisma Access
+            pa_side_phases.append({
                 'name': f"Service Connection: {dc['name']} (PA side)",
                 'type': 'service_connection_pa',
                 'datacenter': dc,
             })
+            folders_to_commit.add('Service Connections')
             if fw:
-                # FW side second - configures IPsec tunnel using endpoint IPs from PA
-                phases.append({
+                # FW side - configures IPsec tunnel using endpoint IPs from committed PA config
+                fw_side_phases.append({
                     'name': f"Service Connection: {dc['name']} (FW side)",
                     'type': 'service_connection_fw',
                     'datacenter': dc,
                     'firewall': fw,
                 })
 
-        # Phase 3: Remote Networks
-        # PA side must be configured FIRST to get endpoint IPs for FW side IPsec tunnel
+        # Phase 3: Remote Networks (PA side first, then commit, then FW side)
         for branch in ctx.get('branches', []):
             fw = self._find_firewall_for_location(branch.get('name'))
-            # PA side first - creates Remote Network in Prisma Access, returns endpoint IPs
-            phases.append({
+            # PA side - creates Remote Network in Prisma Access
+            pa_side_phases.append({
                 'name': f"Remote Network: {branch['name']} (PA side)",
                 'type': 'remote_network_pa',
                 'branch': branch,
             })
+            folders_to_commit.add('Remote Networks')
             if fw:
-                # FW side second - configures IPsec tunnel using endpoint IPs from PA
-                phases.append({
+                # FW side - configures IPsec tunnel using endpoint IPs from committed PA config
+                fw_side_phases.append({
                     'name': f"Remote Network: {branch['name']} (FW side)",
                     'type': 'remote_network_fw',
                     'branch': branch,
                     'firewall': fw,
                 })
+
+        # Add PA side phases first
+        phases.extend(pa_side_phases)
+
+        # Add SCM commit phase if there are PA-side phases to commit
+        if pa_side_phases and folders_to_commit:
+            phases.append({
+                'name': 'SCM Commit (Activate Configuration)',
+                'type': 'scm_commit',
+                'folders': list(folders_to_commit),
+            })
+
+        # Add FW side phases after commit
+        phases.extend(fw_side_phases)
 
         # Phase 4: Prisma Access configuration
         use_cases = ctx.get('use_cases', {})
@@ -9807,6 +9826,8 @@ output "{device_name}_private_ip" {{
             self._execute_service_connection_fw_phase(phase)
         elif phase_type == 'service_connection_pa':
             self._execute_service_connection_pa_phase(phase)
+        elif phase_type == 'scm_commit':
+            self._execute_scm_commit_phase(phase)
         elif phase_type == 'remote_network_fw':
             self._execute_remote_network_fw_phase(phase)
         elif phase_type == 'remote_network_pa':
@@ -10133,6 +10154,131 @@ output "{device_name}_private_ip" {{
         else:
             self.pov_deploy_results.append_text("\n  [SKIP] No deploy tenant connected - connect on Tab 5 first")
             self._advance_to_next_phase(False, "No deploy tenant connected")
+
+    def _execute_scm_commit_phase(self, phase: dict):
+        """Commit SCM candidate configuration to activate changes.
+
+        This is required after PA-side configs to:
+        1. Activate the service connections/remote networks
+        2. Get the endpoint IPs assigned by Prisma Access
+        """
+        folders = phase.get('folders', ['Service Connections'])
+        self.pov_deploy_results.append_text(f"\n  Committing configuration to SCM...")
+        self.pov_deploy_results.append_text(f"\n  - Folders: {', '.join(folders)}")
+
+        deploy_api_client = self._get_deploy_api_client()
+
+        if deploy_api_client:
+            try:
+                # Push the candidate configuration
+                self.pov_deploy_results.append_text("\n  Pushing candidate config...")
+                push_result = deploy_api_client.push_candidate_config(
+                    folders=folders,
+                    description="POV Builder deployment"
+                )
+
+                # Get job ID from result
+                job_id = push_result.get('id') or push_result.get('job_id')
+                if not job_id:
+                    # Check if it's nested in result
+                    if isinstance(push_result.get('result'), dict):
+                        job_id = push_result['result'].get('id')
+                    elif isinstance(push_result.get('data'), list) and push_result['data']:
+                        job_id = push_result['data'][0].get('id')
+
+                if job_id:
+                    self.pov_deploy_results.append_text(f"\n  - Job ID: {job_id}")
+                    self.pov_deploy_results.append_text("\n  Waiting for commit to complete...")
+
+                    # Wait for job completion
+                    def progress_cb(percent, msg):
+                        self.pov_deploy_results.append_text(f"\n    {percent}% - {msg}")
+
+                    deploy_api_client.wait_for_job_completion(
+                        job_id,
+                        timeout_seconds=300,
+                        poll_interval=10,
+                        progress_callback=progress_cb
+                    )
+                    self.pov_deploy_results.append_text("\n  [OK] Configuration committed successfully")
+
+                    # After commit, refresh service connection details to get endpoint IPs
+                    self._refresh_service_connection_endpoints(deploy_api_client)
+
+                else:
+                    # No job ID - might mean changes were already committed or nothing to commit
+                    self.pov_deploy_results.append_text("\n  [OK] No pending changes to commit (already active)")
+                    # Still try to get endpoint IPs
+                    self._refresh_service_connection_endpoints(deploy_api_client)
+
+                self._advance_to_next_phase(True, "SCM commit completed")
+
+            except TimeoutError as e:
+                self._log_activity(f"SCM commit timed out: {e}", "error")
+                self.pov_deploy_results.append_text(f"\n  [ERROR] Commit timed out: {e}")
+                self._advance_to_next_phase(False, str(e))
+            except Exception as e:
+                self._log_activity(f"SCM commit failed: {e}", "error")
+                self.pov_deploy_results.append_text(f"\n  [ERROR] {str(e)}")
+                self._advance_to_next_phase(False, str(e))
+        else:
+            self.pov_deploy_results.append_text("\n  [SKIP] No deploy tenant connected")
+            self._advance_to_next_phase(False, "No deploy tenant connected")
+
+    def _refresh_service_connection_endpoints(self, api_client):
+        """Refresh service connection details to get endpoint IPs after commit."""
+        try:
+            self.pov_deploy_results.append_text("\n  Retrieving endpoint IPs...")
+            service_connections = api_client.get_all_service_connections()
+
+            if not hasattr(self, '_pa_endpoints'):
+                self._pa_endpoints = {}
+
+            for sc in service_connections:
+                sc_name = sc.get('name', '')
+                # Try to match to a datacenter by name
+                for dc in self._deployment_context.get('datacenters', []):
+                    expected_sc_name = f"SC-{dc['name'].replace(' ', '-')}"
+                    if sc_name == expected_sc_name:
+                        # Get endpoint details
+                        # Service connections have 'protocol' -> 'bgp' -> 'peer_ip_address'
+                        # or 'details' -> 'service_ip_address' after commit
+                        endpoint_ip = None
+
+                        # Check various locations for the endpoint IP
+                        if 'protocol' in sc and 'bgp' in sc['protocol']:
+                            endpoint_ip = sc['protocol']['bgp'].get('peer_ip_address')
+
+                        # Also check for service_ip in details
+                        details = sc.get('details', {})
+                        if not endpoint_ip and details:
+                            endpoint_ip = details.get('service_ip_address')
+
+                        # Check for fqdn_list which has the endpoint FQDNs
+                        fqdn_list = sc.get('fqdn_list', [])
+                        fqdn = fqdn_list[0] if fqdn_list else None
+
+                        if endpoint_ip or fqdn:
+                            self._pa_endpoints[dc['name']] = {
+                                'service_ip': endpoint_ip,
+                                'fqdn': fqdn,
+                                'tunnel_name': f"{sc_name}-tunnel",
+                                'ike_gateway': f"{sc_name}-ike-gw",
+                            }
+                            self.pov_deploy_results.append_text(
+                                f"\n  - {dc['name']}: {endpoint_ip or fqdn}"
+                            )
+                        break
+
+            if self._pa_endpoints:
+                self.pov_deploy_results.append_text(f"\n  [OK] Retrieved {len(self._pa_endpoints)} endpoint(s)")
+            else:
+                self.pov_deploy_results.append_text("\n  [WARN] No endpoint IPs retrieved yet")
+                self.pov_deploy_results.append_text("\n    Note: Endpoints may take time to provision")
+
+        except Exception as e:
+            self._log_activity(f"Failed to refresh endpoints: {e}", "warning")
+            self.pov_deploy_results.append_text(f"\n  [WARN] Could not retrieve endpoints: {e}")
 
     def _execute_remote_network_fw_phase(self, phase: dict):
         """Configure IPsec tunnel on firewall for remote network."""

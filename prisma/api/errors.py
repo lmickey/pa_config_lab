@@ -134,7 +134,7 @@ class ResourceNotFoundError(PrismaAPIError):
 
 class ResourceConflictError(PrismaAPIError):
     """Resource conflict - name already exists, concurrent modification, etc."""
-    
+
     def __init__(
         self,
         message: str,
@@ -143,6 +143,26 @@ class ResourceConflictError(PrismaAPIError):
     ):
         super().__init__(message, **kwargs)
         self.conflicting_name = conflicting_name
+
+
+class ObjectExistsError(PrismaAPIError):
+    """Object already exists - not a real error, just indicates object was already created."""
+
+    def __init__(
+        self,
+        message: str,
+        object_name: Optional[str] = None,
+        object_type: Optional[str] = None,
+        **kwargs
+    ):
+        super().__init__(message, **kwargs)
+        self.object_name = object_name
+        self.object_type = object_type
+
+    def __str__(self) -> str:
+        if self.object_name:
+            return f"Object already exists: {self.object_name}"
+        return "Object already exists"
 
 
 class ResponseParsingError(PrismaAPIError):
@@ -275,6 +295,37 @@ def parse_api_error(
         )
     
     elif 400 <= status_code < 500:
+        # Check for "Object already exists" error (OBJECT_ALREADY_EXISTS)
+        # This is a 400 error but should be treated as informational, not a real error
+        is_exists_error = False
+        object_name = None
+        if 'errors' in details:
+            for err in details.get('errors', []):
+                if isinstance(err, dict):
+                    err_details = err.get('details', {})
+                    inner_errors = err_details.get('errors', [])
+                    for inner_err in inner_errors:
+                        if isinstance(inner_err, dict) and inner_err.get('type') == 'OBJECT_ALREADY_EXISTS':
+                            is_exists_error = True
+                            # Try to extract object name from message
+                            inner_msg = inner_err.get('message', '')
+                            if 'entry[@name=' in inner_msg:
+                                try:
+                                    object_name = inner_msg.split("entry[@name='")[1].split("']")[0]
+                                except (IndexError, ValueError):
+                                    pass
+                            break
+                if is_exists_error:
+                    break
+
+        if is_exists_error:
+            return ObjectExistsError(
+                message,
+                object_name=object_name,
+                error_code=error_code,
+                details=details
+            )
+
         # Other client error
         return ValidationError(message, error_code=error_code, details=details)
     
@@ -292,6 +343,7 @@ __all__ = [
     'ValidationError',
     'ResourceNotFoundError',
     'ResourceConflictError',
+    'ObjectExistsError',
     'ResponseParsingError',
     'SchemaValidationError',
     'parse_api_error',

@@ -259,15 +259,21 @@ class PrismaAccessAPIClient:
                 try:
                     # Try to parse error with our structured error handler
                     error = parse_api_error(response, response.status_code, url)
-                    
+
                     # Handle rate limiting with retry
                     if isinstance(error, RateLimitError) and error.retry_after:
                         logger.warning(f"Rate limited. Retrying after {error.retry_after}s")
                         import time
                         time.sleep(error.retry_after)
                         return self._make_request(method, url, params, data, use_cache, item_type)
-                    
-                    # Log and raise
+
+                    # Handle "object already exists" - not a real error, just informational
+                    from .api.errors import ObjectExistsError
+                    if isinstance(error, ObjectExistsError):
+                        logger.info(f"Object already exists: {error.object_name or 'unknown'}")
+                        raise error
+
+                    # Log and raise other errors
                     logger.error(f"API request failed: {error}")
                     raise error
                     
@@ -3238,7 +3244,98 @@ class PrismaAccessAPIClient:
         """Delete an IPsec crypto profile."""
         url = APIEndpoints.ipsec_crypto_profile(profile_id)
         return self._make_request("DELETE", url, use_cache=False)
-    
+
+    # Configuration Management - Push/Commit
+
+    def push_candidate_config(self, folders: List[str], description: str = "POV deployment") -> Dict[str, Any]:
+        """
+        Push candidate configuration to make changes active.
+
+        This commits the candidate config and creates a job to apply it.
+        Service connections need this to get their endpoint IPs assigned.
+
+        Args:
+            folders: List of folders to push (e.g., ['Service Connections', 'Mobile Users'])
+            description: Description for the push job
+
+        Returns:
+            Job information dict with 'id' for tracking
+        """
+        url = APIEndpoints.CONFIG_PUSH
+        data = {
+            'folders': folders,
+            'description': description,
+        }
+        logger.info(f"Pushing candidate config for folders: {folders}")
+        return self._make_request("POST", url, data=data, use_cache=False)
+
+    def get_job_status(self, job_id: str) -> Dict[str, Any]:
+        """
+        Get the status of a configuration job.
+
+        Args:
+            job_id: The job ID returned from push_candidate_config
+
+        Returns:
+            Job status dict with 'data' containing job details
+        """
+        url = APIEndpoints.job(job_id)
+        return self._make_request("GET", url, use_cache=False)
+
+    def wait_for_job_completion(
+        self,
+        job_id: str,
+        timeout_seconds: int = 300,
+        poll_interval: int = 5,
+        progress_callback=None
+    ) -> Dict[str, Any]:
+        """
+        Wait for a job to complete.
+
+        Args:
+            job_id: The job ID to wait for
+            timeout_seconds: Maximum time to wait (default 5 minutes)
+            poll_interval: Seconds between status checks
+            progress_callback: Optional callback(percent, status_message)
+
+        Returns:
+            Final job status
+
+        Raises:
+            TimeoutError: If job doesn't complete within timeout
+            RuntimeError: If job fails
+        """
+        import time
+        start_time = time.time()
+
+        while True:
+            elapsed = time.time() - start_time
+            if elapsed > timeout_seconds:
+                raise TimeoutError(f"Job {job_id} did not complete within {timeout_seconds}s")
+
+            status = self.get_job_status(job_id)
+            job_data = status.get('data', [{}])[0] if status.get('data') else status
+
+            job_status = job_data.get('status_str', job_data.get('status', 'UNKNOWN'))
+            percent = job_data.get('percent', 0)
+            result_str = job_data.get('result_str', '')
+
+            logger.debug(f"Job {job_id} status: {job_status} ({percent}%)")
+
+            if progress_callback:
+                progress_callback(percent, f"Job status: {job_status}")
+
+            if job_status in ('FIN', 'OK', 'COMPLETED'):
+                logger.info(f"Job {job_id} completed successfully")
+                return status
+
+            if job_status in ('FAIL', 'FAILED', 'ERR', 'ERROR'):
+                error_msg = result_str or f"Job {job_id} failed"
+                logger.error(f"Job failed: {error_msg}")
+                raise RuntimeError(error_msg)
+
+            time.sleep(poll_interval)
+
     # ==================== End CREATE/UPDATE/DELETE Methods ====================
 
     def clear_cache(self):
