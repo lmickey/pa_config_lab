@@ -659,26 +659,29 @@ class PrismaConfigMainWindow(QMainWindow):
 
     def _resume_pov_deployment(self):
         """Open the Resume POV Deployment dialog."""
-        # Switch to POV Builder workflow if not already active
-        if hasattr(self, 'workflow_selector'):
-            # Find the POV Builder option
-            for i in range(self.workflow_selector.count()):
-                if "POV" in self.workflow_selector.itemText(i):
-                    self.workflow_selector.setCurrentIndex(i)
-                    break
+        # POV Builder is at index 1 in the workflow list
+        # (0=Home, 1=POV Builder, 2=Migration, 3=Logs)
+        pov_builder_index = 1
 
-        # Get the current workflow widget
-        current_widget = self.stacked_widget.currentWidget()
+        # Switch to POV Builder workflow if not already active
+        if hasattr(self, 'workflow_list'):
+            current_index = self.workflow_list.currentRow()
+            if current_index != pov_builder_index:
+                # Switch to POV Builder - this triggers _on_workflow_changed
+                self.workflow_list.setCurrentRow(pov_builder_index)
+
+        # Get the POV Builder widget directly from stacked widget
+        pov_widget = self.stacked_widget.widget(pov_builder_index)
 
         # Check if it has the resume dialog method
-        if hasattr(current_widget, '_show_resume_pov_dialog'):
-            current_widget._show_resume_pov_dialog()
+        if pov_widget and hasattr(pov_widget, '_show_resume_pov_dialog'):
+            pov_widget._show_resume_pov_dialog()
         else:
             from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.information(
+            QMessageBox.warning(
                 self,
-                "POV Builder Required",
-                "Please switch to the POV Builder workflow to resume a POV deployment."
+                "POV Builder Not Available",
+                "The POV Builder workflow could not be loaded."
             )
 
     def _convert_dict_to_configuration(self, config_data: dict, logger=None):

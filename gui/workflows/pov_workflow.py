@@ -4088,6 +4088,16 @@ class POVWorkflowWidget(QWidget):
                     fw_ip = value
                     break
 
+        # Find firewall FQDN (DNS name)
+        fw_fqdn = None
+        for key, value in outputs.items():
+            if not value:
+                continue
+            key_lower = key.lower()
+            if 'fqdn' in key_lower and ('firewall' in key_lower or 'fw' in key_lower or key_lower.endswith('_fqdn')):
+                fw_fqdn = value
+                break
+
         # Find server/VM IPs
         vm_ips = []
         for key, value in outputs.items():
@@ -4103,6 +4113,7 @@ class POVWorkflowWidget(QWidget):
         self._deployed_credentials = {
             'firewall': {
                 'ip': fw_ip or "Not found",
+                'fqdn': fw_fqdn or "",
                 'username': admin_username or "admin",
                 'password': admin_password or "",
             },
@@ -4167,24 +4178,41 @@ class POVWorkflowWidget(QWidget):
         fw_ip_copy.clicked.connect(lambda: self._copy_to_clipboard(creds['firewall']['ip'], "Firewall IP"))
         fw_grid.addWidget(fw_ip_copy, 0, 2)
 
+        # Firewall FQDN (DNS Name)
+        row_offset = 1
+        fw_fqdn = creds['firewall'].get('fqdn', '')
+        if fw_fqdn:
+            fw_grid.addWidget(QLabel("DNS Name:"), row_offset, 0)
+            fw_fqdn_field = QLineEdit(fw_fqdn)
+            fw_fqdn_field.setReadOnly(True)
+            fw_fqdn_field.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
+            fw_fqdn_field.setToolTip("Use this DNS name instead of IP address for stable access")
+            fw_grid.addWidget(fw_fqdn_field, row_offset, 1)
+            fw_fqdn_copy = QPushButton("Copy")
+            fw_fqdn_copy.setFixedWidth(60)
+            fw_fqdn_copy.clicked.connect(lambda: self._copy_to_clipboard(fw_fqdn, "DNS Name"))
+            fw_grid.addWidget(fw_fqdn_copy, row_offset, 2)
+            row_offset += 1
+
         # Firewall Username
-        fw_grid.addWidget(QLabel("Username:"), 1, 0)
+        fw_grid.addWidget(QLabel("Username:"), row_offset, 0)
         fw_user_field = QLineEdit(creds['firewall']['username'])
         fw_user_field.setReadOnly(True)
         fw_user_field.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
-        fw_grid.addWidget(fw_user_field, 1, 1)
+        fw_grid.addWidget(fw_user_field, row_offset, 1)
         fw_user_copy = QPushButton("Copy")
         fw_user_copy.setFixedWidth(60)
         fw_user_copy.clicked.connect(lambda: self._copy_to_clipboard(creds['firewall']['username'], "Username"))
-        fw_grid.addWidget(fw_user_copy, 1, 2)
+        fw_grid.addWidget(fw_user_copy, row_offset, 2)
+        row_offset += 1
 
         # Firewall Password
-        fw_grid.addWidget(QLabel("Password:"), 2, 0)
+        fw_grid.addWidget(QLabel("Password:"), row_offset, 0)
         fw_pwd_field = QLineEdit(creds['firewall']['password'])
         fw_pwd_field.setReadOnly(True)
         fw_pwd_field.setEchoMode(QLineEdit.EchoMode.Password)
         fw_pwd_field.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
-        fw_grid.addWidget(fw_pwd_field, 2, 1)
+        fw_grid.addWidget(fw_pwd_field, row_offset, 1)
 
         fw_pwd_btns = QHBoxLayout()
         fw_show_btn = QPushButton("Show")
@@ -4198,7 +4226,7 @@ class POVWorkflowWidget(QWidget):
         fw_pwd_copy.setFixedWidth(60)
         fw_pwd_copy.clicked.connect(lambda: self._copy_to_clipboard(creds['firewall']['password'], "Password"))
         fw_pwd_btns.addWidget(fw_pwd_copy)
-        fw_grid.addLayout(fw_pwd_btns, 2, 2)
+        fw_grid.addLayout(fw_pwd_btns, row_offset, 2)
 
         layout.addLayout(fw_grid)
 
@@ -7931,7 +7959,7 @@ resource "azurerm_resource_group" "pov" {{
 
 # Virtual Network
 resource "azurerm_virtual_network" "pov" {{
-  name                = "{customer}-pov-vnet"
+  name                = "{customer}-{location}-vnet"
   address_space       = ["10.100.0.0/16"]
   location            = azurerm_resource_group.pov.location
   resource_group_name = azurerm_resource_group.pov.name
@@ -7968,7 +7996,7 @@ resource "azurerm_subnet" "trust" {{
 
 # Network Security Group for Management
 resource "azurerm_network_security_group" "management" {{
-  name                = "{customer}-mgmt-nsg"
+  name                = "{customer}-{location}-mgmt-nsg"
   location            = azurerm_resource_group.pov.location
   resource_group_name = azurerm_resource_group.pov.name
 
@@ -7977,8 +8005,12 @@ resource "azurerm_network_security_group" "management" {{
 '''
 
         # Add NSG rules based on security settings
+        # Note: source_address_prefix (singular) is used for "*", source_address_prefixes (plural) for specific IPs
         source_ips = tfvars.get('source_ips', [])
-        source_ips_str = ', '.join([f'"{ip}"' for ip in source_ips]) if source_ips else '"*"'
+        if source_ips:
+            source_line = f'source_address_prefixes     = [{", ".join([f\'"{ip}"\' for ip in source_ips])}]'
+        else:
+            source_line = 'source_address_prefix       = "*"'
 
         if tfvars.get('allow_https', True):
             content += f'''
@@ -7990,7 +8022,7 @@ resource "azurerm_network_security_rule" "allow_https" {{
   protocol                    = "Tcp"
   source_port_range           = "*"
   destination_port_range      = "443"
-  source_address_prefixes     = [{source_ips_str}]
+  {source_line}
   destination_address_prefix  = "*"
   resource_group_name         = azurerm_resource_group.pov.name
   network_security_group_name = azurerm_network_security_group.management.name
@@ -8007,7 +8039,7 @@ resource "azurerm_network_security_rule" "allow_ssh" {{
   protocol                    = "Tcp"
   source_port_range           = "*"
   destination_port_range      = "22"
-  source_address_prefixes     = [{source_ips_str}]
+  {source_line}
   destination_address_prefix  = "*"
   resource_group_name         = azurerm_resource_group.pov.name
   network_security_group_name = azurerm_network_security_group.management.name
@@ -8027,8 +8059,10 @@ resource "azurerm_subnet_network_security_group_association" "management" {
 
         # Add bootstrap storage and marketplace agreement for VM-Series
         if firewalls:
-            # Storage account for bootstrap (name must be globally unique, lowercase, no special chars)
-            storage_name = f"{customer.lower().replace('-', '').replace('_', '')[:16]}bootstrap"
+            # Storage account for bootstrap (name must be globally unique, lowercase, no special chars, max 24 chars)
+            # Format: {customer}{location}boot (truncated to fit)
+            storage_base = f"{customer}{location}".lower().replace('-', '').replace('_', '')[:19]
+            storage_name = f"{storage_base}boot"
 
             # Generate password hash in Python (works cross-platform)
             admin_password = tfvars.get('admin_password', 'PaloAlto123!')
@@ -8082,7 +8116,7 @@ type=dhcp-client
 ip-address=
 default-gateway=
 netmask=
-hostname={customer}-fw
+hostname={customer}-{location}-DC-fw
 dns-primary=8.8.8.8
 dns-secondary=8.8.4.4
 op-command-modes=mgmt-interface-swap
@@ -8160,22 +8194,34 @@ EOF
             fw_type = fw.get('type', 'service_connection')
             location_name = fw.get('location_name', 'Datacenter')
 
+            # Determine site prefix: DC for datacenter/service_connection, BR for branch
+            site_prefix = "DC" if fw_type == 'service_connection' else "BR"
+
+            # Resource naming: {customer}-{location}-{site}-{fw_name}-{part}-{detail}
+            resource_prefix = f"{customer}-{location}-{site_prefix}-{fw_name}"
+
+            # DNS label must be lowercase, alphanumeric and hyphens only
+            dns_label = f"{resource_prefix}-mgmt".lower()
+
             content += f'''
 # Firewall: {fw_name} ({fw_type}) for {location_name}
 # Public IP for management access
 resource "azurerm_public_ip" "pip_{fw_name}" {{
-  name                = "{fw_name}-pip"
+  name                = "{resource_prefix}-IP-public"
   location            = azurerm_resource_group.pov.location
   resource_group_name = azurerm_resource_group.pov.name
   allocation_method   = "Static"
   sku                 = "Standard"
+
+  # DNS label creates FQDN: {dns_label}.{{region}}.cloudapp.azure.com
+  domain_name_label   = "{dns_label}"
 
   tags = azurerm_resource_group.pov.tags
 }}
 
 # Management NIC
 resource "azurerm_network_interface" "nic_{fw_name}_mgmt" {{
-  name                = "{fw_name}-mgmt-nic"
+  name                = "{resource_prefix}-nic-mgmt"
   location            = azurerm_resource_group.pov.location
   resource_group_name = azurerm_resource_group.pov.name
 
@@ -8191,7 +8237,7 @@ resource "azurerm_network_interface" "nic_{fw_name}_mgmt" {{
 
 # Untrust NIC
 resource "azurerm_network_interface" "nic_{fw_name}_untrust" {{
-  name                 = "{fw_name}-untrust-nic"
+  name                 = "{resource_prefix}-nic-untrust"
   location             = azurerm_resource_group.pov.location
   resource_group_name  = azurerm_resource_group.pov.name
   enable_ip_forwarding = true
@@ -8207,7 +8253,7 @@ resource "azurerm_network_interface" "nic_{fw_name}_untrust" {{
 
 # Trust NIC
 resource "azurerm_network_interface" "nic_{fw_name}_trust" {{
-  name                 = "{fw_name}-trust-nic"
+  name                 = "{resource_prefix}-nic-trust"
   location             = azurerm_resource_group.pov.location
   resource_group_name  = azurerm_resource_group.pov.name
   enable_ip_forwarding = true
@@ -8223,7 +8269,7 @@ resource "azurerm_network_interface" "nic_{fw_name}_trust" {{
 
 # VM-Series Firewall
 resource "azurerm_linux_virtual_machine" "fw_{fw_name}" {{
-  name                            = "{fw_name}"
+  name                            = "{resource_prefix}"
   resource_group_name             = azurerm_resource_group.pov.name
   location                        = azurerm_resource_group.pov.location
   size                            = "Standard_DS3_v2"
@@ -8280,6 +8326,13 @@ resource "azurerm_linux_virtual_machine" "fw_{fw_name}" {{
             device_type = device.get('device_type', 'ServerVM')
             subtype = device.get('subtype', 'Linux')
 
+            # Determine site prefix based on device location (default to DC for trust devices)
+            device_site = device.get('site', 'datacenter')
+            site_prefix = "DC" if device_site in ('datacenter', 'service_connection') else "BR"
+
+            # Resource naming: {customer}-{location}-{site}-{device_name}
+            vm_resource_prefix = f"{customer}-{location}-{site_prefix}-{device_name}"
+
             # Determine VM image
             if subtype == 'Windows':
                 publisher = 'MicrosoftWindowsServer'
@@ -8293,7 +8346,7 @@ resource "azurerm_linux_virtual_machine" "fw_{fw_name}" {{
             content += f'''
 # {device.get('name', 'VM')} - {device_type}
 resource "azurerm_network_interface" "nic_{device_name}" {{
-  name                = "{device_name}-nic"
+  name                = "{vm_resource_prefix}-nic"
   location            = azurerm_resource_group.pov.location
   resource_group_name = azurerm_resource_group.pov.name
 
@@ -8307,7 +8360,7 @@ resource "azurerm_network_interface" "nic_{device_name}" {{
 }}
 
 resource "azurerm_linux_virtual_machine" "vm_{device_name}" {{
-  name                            = "{device_name}"
+  name                            = "{vm_resource_prefix}"
   resource_group_name             = azurerm_resource_group.pov.name
   location                        = azurerm_resource_group.pov.location
   size                            = "Standard_B2s"
@@ -8432,6 +8485,11 @@ output "untrust_subnet_id" {
 output "{fw_name}_public_ip" {{
   description = "Public IP of firewall {fw_name}"
   value       = azurerm_public_ip.pip_{fw_name}.ip_address
+}}
+
+output "{fw_name}_fqdn" {{
+  description = "DNS name for firewall {fw_name} management"
+  value       = azurerm_public_ip.pip_{fw_name}.fqdn
 }}
 
 output "{fw_name}_mgmt_private_ip" {{
@@ -8762,9 +8820,41 @@ output "{device_name}_private_ip" {{
         self.cloud_deploy_results.append_text(f"\n[ERROR] {error}")
 
     def _on_deploy_log(self, message: str):
-        """Handle deployment log message."""
+        """Handle deployment log message.
+
+        Only shows error/failure messages in the results window.
+        All messages are logged to the activity log.
+        """
         logger.debug(f"Deploy log: {message}")
-        self.cloud_deploy_results.append_text(f"\n{message}")
+
+        # Check if this is an error/failure message that should be shown in results
+        error_indicators = [
+            'Error:', 'error:', 'ERROR:',
+            'failed', 'Failed', 'FAILED',
+            'Error applying plan',
+            'Error creating',
+            'Error deleting',
+            'Error reading',
+            'Cannot ',
+            'could not',
+            'Could not',
+            'Unable to',
+            'unable to',
+            'Unauthorized',
+            'unauthorized',
+            'Access denied',
+            'access denied',
+            '403 Forbidden',
+            '401 Unauthorized',
+            '404 Not Found',
+            'timed out',
+            'timeout',
+        ]
+
+        is_error = any(indicator in message for indicator in error_indicators)
+
+        if is_error:
+            self.cloud_deploy_results.append_text(f"\n[ERROR] {message}")
 
     # ============================================================================
     # EVENT HANDLERS - DEPLOY POV CONFIG TAB (Tab 5)
