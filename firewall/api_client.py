@@ -31,7 +31,7 @@ try:
         TunnelInterface,
     )
     from panos.policies import Rulebase, SecurityRule, NatRule
-    from panos.objects import AddressObject, ServiceObject, Tag
+    from panos.objects import AddressObject, AddressGroup, ServiceObject, Tag
     PANOS_AVAILABLE = True
 except ImportError:
     PANOS_AVAILABLE = False
@@ -469,6 +469,124 @@ class FirewallAPIClient:
         route.apply()
 
         logger.info(f"Created static route {name}: {destination} via {nexthop}")
+
+    # ========== Address Objects ==========
+
+    def create_address_object(
+        self,
+        name: str,
+        value: str,
+        address_type: str = "ip-netmask",
+        description: str = "",
+        tags: List[str] = None,
+    ):
+        """
+        Create an address object.
+
+        Args:
+            name: Object name
+            value: Address value (IP, CIDR, FQDN depending on type)
+            address_type: Type of address (ip-netmask, ip-range, fqdn)
+            description: Optional description
+            tags: Optional list of tags
+        """
+        self._ensure_connected()
+
+        addr = AddressObject(name=name, description=description)
+
+        if address_type == "ip-netmask":
+            addr.value = value
+        elif address_type == "ip-range":
+            addr.type = "ip-range"
+            addr.value = value
+        elif address_type == "fqdn":
+            addr.type = "fqdn"
+            addr.value = value
+        else:
+            addr.value = value
+
+        if tags:
+            addr.tag = tags
+
+        self._firewall.add(addr)
+        addr.apply()
+
+        logger.info(f"Created address object {name}: {value}")
+
+    def create_address_group(
+        self,
+        name: str,
+        static_members: List[str] = None,
+        dynamic_filter: str = None,
+        description: str = "",
+        tags: List[str] = None,
+    ):
+        """
+        Create an address group.
+
+        Args:
+            name: Group name
+            static_members: List of address object names for static group
+            dynamic_filter: Filter string for dynamic group (e.g., "'tag1' and 'tag2'")
+            description: Optional description
+            tags: Optional list of tags
+        """
+        self._ensure_connected()
+
+        group = AddressGroup(name=name, description=description)
+
+        if static_members:
+            group.static_value = static_members
+        elif dynamic_filter:
+            group.dynamic_value = dynamic_filter
+
+        if tags:
+            group.tag = tags
+
+        self._firewall.add(group)
+        group.apply()
+
+        logger.info(f"Created address group {name}")
+
+    def create_service_object(
+        self,
+        name: str,
+        protocol: str,
+        destination_port: str,
+        source_port: str = None,
+        description: str = "",
+        tags: List[str] = None,
+    ):
+        """
+        Create a service object.
+
+        Args:
+            name: Object name
+            protocol: tcp or udp
+            destination_port: Destination port or range (e.g., "80", "8080-8090")
+            source_port: Optional source port or range
+            description: Optional description
+            tags: Optional list of tags
+        """
+        self._ensure_connected()
+
+        svc = ServiceObject(
+            name=name,
+            protocol=protocol,
+            destination_port=destination_port,
+            description=description,
+        )
+
+        if source_port:
+            svc.source_port = source_port
+
+        if tags:
+            svc.tag = tags
+
+        self._firewall.add(svc)
+        svc.apply()
+
+        logger.info(f"Created service object {name}: {protocol}/{destination_port}")
 
     # ========== Security Policy ==========
 

@@ -9779,6 +9779,15 @@ output "{device_name}_private_ip" {{
         # Add FW-side phases AFTER commit (they need endpoint IPs)
         phases.extend(fw_side_phases)
 
+        # Add Firewall Objects & Rules phase for each firewall
+        # This pushes address objects and security rules to the firewall
+        for fw in ctx.get('firewalls', []):
+            phases.append({
+                'name': f"Firewall Objects & Rules: {fw['name']}",
+                'type': 'firewall_objects_rules',
+                'firewall': fw,
+            })
+
         return phases
 
     def _find_firewall_for_location(self, location_name: str) -> Optional[dict]:
@@ -9848,6 +9857,8 @@ output "{device_name}_private_ip" {{
             self._execute_security_policies_phase(phase)
         elif phase_type == 'adem':
             self._execute_adem_phase(phase)
+        elif phase_type == 'firewall_objects_rules':
+            self._execute_firewall_objects_rules_phase(phase)
         else:
             self._log_activity(f"Unknown phase type: {phase_type}", "warning")
             self._advance_to_next_phase(True, "Skipped unknown phase type")
@@ -9983,6 +9994,206 @@ output "{device_name}_private_ip" {{
 
         except Exception as e:
             self._log_activity(f"Failed to configure firewall IPsec: {e}", "error")
+            self.pov_deploy_results.append_text(f"\n  [ERROR] {str(e)}")
+            self._advance_to_next_phase(False, str(e))
+
+    def _execute_firewall_objects_rules_phase(self, phase: dict):
+        """Push address objects and security rules to the firewall.
+
+        Creates:
+        - Address objects for trust/untrust networks
+        - Address objects for servers in datacenters/branches
+        - Security rules allowing outbound access (DNS, web, etc.)
+        """
+        fw = phase['firewall']
+        fw_name = fw['name']
+
+        self.pov_deploy_results.append_text(f"\n  Configuring objects and rules on {fw_name}...")
+
+        # Get firewall connection info
+        fw_ip = fw.get('management_ip')
+        if not fw_ip:
+            # Try to get from terraform outputs
+            tf_outputs = getattr(self, '_terraform_outputs', {})
+            for key, value in tf_outputs.items():
+                if 'management_ip' in key.lower() or 'mgmt_ip' in key.lower():
+                    fw_ip = value
+                    break
+
+        if not fw_ip:
+            self.pov_deploy_results.append_text("\n  [SKIP] No firewall management IP available")
+            self._advance_to_next_phase(True, "No firewall IP - skipping objects/rules")
+            return
+
+        # Get credentials
+        cloud_deployment = self.cloud_resource_configs.get('cloud_deployment', {})
+        customer_info = self.cloud_resource_configs.get('customer_info', {})
+        customer_name = customer_info.get('customer_name_sanitized', 'pov')
+        admin_username = cloud_deployment.get('admin_username', f'{customer_name}admin')
+        admin_password = cloud_deployment.get('admin_password', '')
+
+        try:
+            from firewall.api_client import FirewallAPIClient
+
+            self.pov_deploy_results.append_text(f"\n  Connecting to firewall at {fw_ip}...")
+            client = FirewallAPIClient(
+                hostname=fw_ip,
+                username=admin_username,
+                password=admin_password,
+            )
+            client.connect()
+
+            # Get network info from context
+            infra = self._deployment_context.get('infrastructure', {})
+            network = infra.get('network', {})
+            trust_subnet = network.get('trust_subnet', '10.100.2.0/24')
+            untrust_subnet = network.get('untrust_subnet', '10.100.1.0/24')
+
+            # Create address objects
+            self.pov_deploy_results.append_text("\n  Creating address objects...")
+
+            # Trust and untrust network objects
+            try:
+                client.create_address_object(
+                    name=f"{customer_name}-trust-network",
+                    value=trust_subnet,
+                    description="Trust network CIDR"
+                )
+                self.pov_deploy_results.append_text(f"\n    - {customer_name}-trust-network: {trust_subnet}")
+            except Exception as e:
+                if 'already exists' in str(e).lower():
+                    self.pov_deploy_results.append_text(f"\n    - {customer_name}-trust-network [EXISTS]")
+                else:
+                    logger.warning(f"Failed to create trust network object: {e}")
+
+            try:
+                client.create_address_object(
+                    name=f"{customer_name}-untrust-network",
+                    value=untrust_subnet,
+                    description="Untrust network CIDR"
+                )
+                self.pov_deploy_results.append_text(f"\n    - {customer_name}-untrust-network: {untrust_subnet}")
+            except Exception as e:
+                if 'already exists' in str(e).lower():
+                    self.pov_deploy_results.append_text(f"\n    - {customer_name}-untrust-network [EXISTS]")
+                else:
+                    logger.warning(f"Failed to create untrust network object: {e}")
+
+            # Create objects for datacenters/branches with servers
+            for dc in self._deployment_context.get('datacenters', []):
+                dc_name = dc['name'].replace(' ', '-').lower()
+                dc_subnet = dc.get('subnet', dc.get('subnets', ['10.100.10.0/24'])[0] if dc.get('subnets') else '10.100.10.0/24')
+                try:
+                    client.create_address_object(
+                        name=f"{customer_name}-{dc_name}-servers",
+                        value=dc_subnet,
+                        description=f"Server network for {dc['name']}"
+                    )
+                    self.pov_deploy_results.append_text(f"\n    - {customer_name}-{dc_name}-servers: {dc_subnet}")
+                except Exception as e:
+                    if 'already exists' in str(e).lower():
+                        self.pov_deploy_results.append_text(f"\n    - {customer_name}-{dc_name}-servers [EXISTS]")
+                    else:
+                        logger.warning(f"Failed to create DC server object: {e}")
+
+            for branch in self._deployment_context.get('branches', []):
+                branch_name = branch['name'].replace(' ', '-').lower()
+                branch_subnet = branch.get('subnet', branch.get('subnets', ['10.100.20.0/24'])[0] if branch.get('subnets') else '10.100.20.0/24')
+                try:
+                    client.create_address_object(
+                        name=f"{customer_name}-{branch_name}-servers",
+                        value=branch_subnet,
+                        description=f"Server network for {branch['name']}"
+                    )
+                    self.pov_deploy_results.append_text(f"\n    - {customer_name}-{branch_name}-servers: {branch_subnet}")
+                except Exception as e:
+                    if 'already exists' in str(e).lower():
+                        self.pov_deploy_results.append_text(f"\n    - {customer_name}-{branch_name}-servers [EXISTS]")
+                    else:
+                        logger.warning(f"Failed to create branch server object: {e}")
+
+            # Create security rules
+            self.pov_deploy_results.append_text("\n  Creating security rules...")
+
+            # Rule 1: Allow DNS to servers
+            try:
+                client.create_security_rule(
+                    name=f"{customer_name}-allow-dns-outbound",
+                    source_zone=['trust'],
+                    destination_zone=['untrust', 'trust'],
+                    source=['any'],
+                    destination=['any'],
+                    application=['dns'],
+                    service=['application-default'],
+                    action='allow',
+                    description="Allow DNS queries outbound"
+                )
+                self.pov_deploy_results.append_text(f"\n    - {customer_name}-allow-dns-outbound [OK]")
+            except Exception as e:
+                if 'already exists' in str(e).lower():
+                    self.pov_deploy_results.append_text(f"\n    - {customer_name}-allow-dns-outbound [EXISTS]")
+                else:
+                    logger.warning(f"Failed to create DNS rule: {e}")
+
+            # Rule 2: Allow web (HTTP/HTTPS) outbound
+            try:
+                client.create_security_rule(
+                    name=f"{customer_name}-allow-web-outbound",
+                    source_zone=['trust'],
+                    destination_zone=['untrust'],
+                    source=['any'],
+                    destination=['any'],
+                    application=['web-browsing', 'ssl'],
+                    service=['application-default'],
+                    action='allow',
+                    description="Allow web browsing outbound"
+                )
+                self.pov_deploy_results.append_text(f"\n    - {customer_name}-allow-web-outbound [OK]")
+            except Exception as e:
+                if 'already exists' in str(e).lower():
+                    self.pov_deploy_results.append_text(f"\n    - {customer_name}-allow-web-outbound [EXISTS]")
+                else:
+                    logger.warning(f"Failed to create web rule: {e}")
+
+            # Rule 3: Allow inbound to servers (from Prisma Access/tunnel)
+            try:
+                client.create_security_rule(
+                    name=f"{customer_name}-allow-inbound-servers",
+                    source_zone=['untrust'],
+                    destination_zone=['trust'],
+                    source=['any'],
+                    destination=[f"{customer_name}-trust-network"],
+                    application=['any'],
+                    service=['any'],
+                    action='allow',
+                    description="Allow inbound to servers from tunnel"
+                )
+                self.pov_deploy_results.append_text(f"\n    - {customer_name}-allow-inbound-servers [OK]")
+            except Exception as e:
+                if 'already exists' in str(e).lower():
+                    self.pov_deploy_results.append_text(f"\n    - {customer_name}-allow-inbound-servers [EXISTS]")
+                else:
+                    logger.warning(f"Failed to create inbound rule: {e}")
+
+            # Commit the configuration
+            self.pov_deploy_results.append_text("\n  Committing configuration...")
+            commit_result = client.commit(
+                description=f"POV objects and rules for {customer_name}",
+                sync=True,
+                timeout=300,
+            )
+
+            client.disconnect()
+
+            if commit_result.success:
+                self.pov_deploy_results.append_text("\n  [OK] Firewall objects and rules configured")
+                self._advance_to_next_phase(True, f"Firewall objects/rules configured on {fw_name}")
+            else:
+                self.pov_deploy_results.append_text(f"\n  [ERROR] Commit: {commit_result.message}")
+                self._advance_to_next_phase(False, f"Commit failed: {commit_result.message}")
+
+        except Exception as e:
+            self._log_activity(f"Failed to configure firewall objects/rules: {e}", "error")
             self.pov_deploy_results.append_text(f"\n  [ERROR] {str(e)}")
             self._advance_to_next_phase(False, str(e))
 
