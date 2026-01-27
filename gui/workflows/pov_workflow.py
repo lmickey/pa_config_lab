@@ -7945,6 +7945,9 @@ resource "azurerm_subnet" "management" {{
   resource_group_name  = azurerm_resource_group.pov.name
   virtual_network_name = azurerm_virtual_network.pov.name
   address_prefixes     = ["10.100.0.0/24"]
+
+  # Service endpoint required for storage account network rules
+  service_endpoints    = ["Microsoft.Storage"]
 }}
 
 # Untrust Subnet
@@ -10946,6 +10949,9 @@ output "{device_name}_private_ip" {{
         # Restore ADEM configuration
         self._restore_adem_ui_state()
 
+        # Restore Azure credentials from saved state
+        self._restore_azure_credentials_ui_state()
+
         # Restore terraform UI state
         self._restore_terraform_ui_state(state)
 
@@ -10981,6 +10987,60 @@ output "{device_name}_private_ip" {{
 
         # Update status label
         self._update_use_case_status('aiops_adem')
+
+    def _restore_azure_credentials_ui_state(self):
+        """Restore Azure credentials UI from saved deployment_config."""
+        # Check if we have saved Azure credentials
+        saved_sub_id = self.deployment_config.get('azure_subscription_id', '')
+        saved_sub_name = self.deployment_config.get('azure_subscription_name', '')
+        saved_tenant_id = self.deployment_config.get('azure_tenant_id', '')
+
+        if saved_sub_id and saved_tenant_id:
+            # Restore the _azure_subscription object for use by terraform generation
+            self._azure_subscription = {
+                'id': saved_sub_id,
+                'name': saved_sub_name,
+                'tenant_id': saved_tenant_id,
+            }
+
+            # Populate the tenant ID field with cached indicator
+            if hasattr(self, 'azure_tenant_input'):
+                self.azure_tenant_input.setText(f"{saved_tenant_id} (cached credential)")
+                self.azure_tenant_input.setStyleSheet(
+                    "padding: 5px; background-color: #E8F5E9; color: #2E7D32;"
+                )
+
+            # Update auth status to show cached credentials
+            if hasattr(self, 'azure_auth_status'):
+                self.azure_auth_status.setText(f"🟢 {saved_sub_name} (cached)")
+                self.azure_auth_status.setStyleSheet("font-weight: bold; color: #4CAF50;")
+                self.azure_auth_status.setToolTip(
+                    f"Subscription: {saved_sub_name}\n"
+                    f"ID: {saved_sub_id}\n"
+                    f"Tenant: {saved_tenant_id}\n\n"
+                    "Using cached credentials from previous session.\n"
+                    "Click 'Change Subscription' to re-authenticate."
+                )
+
+            # Update auth button to show change option
+            if hasattr(self, 'azure_auth_btn'):
+                self.azure_auth_btn.setText("🔄 Change Subscription")
+                self.azure_auth_btn.setStyleSheet(
+                    "padding: 10px 20px; font-size: 14px; "
+                    "background-color: #E3F2FD; color: #1565C0; "
+                    "border: 1px solid #1565C0; border-radius: 5px;"
+                )
+                self.azure_auth_btn.setToolTip(
+                    "Click to re-authenticate or select a different subscription"
+                )
+
+            # Enable terraform buttons since we have credentials
+            if hasattr(self, 'generate_terraform_btn'):
+                self.generate_terraform_btn.setEnabled(True)
+
+            self._log_activity(
+                f"Restored Azure credentials from cache: {saved_sub_name} (tenant: {saved_tenant_id})"
+            )
 
     def _restore_terraform_ui_state(self, state: Dict[str, Any]):
         """Restore terraform-related UI state."""
