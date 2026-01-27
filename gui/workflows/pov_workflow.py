@@ -6,6 +6,9 @@ with flexible source loading, management type selection, and default injection.
 """
 
 import logging
+import hashlib
+import base64
+import secrets
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 from PyQt6.QtWidgets import (
@@ -7817,6 +7820,95 @@ class POVWorkflowWidget(QWidget):
             import traceback
             logger.error(f"Terraform generation error: {traceback.format_exc()}")
 
+    def _generate_md5_crypt_hash(self, password: str, salt: str = None) -> str:
+        """
+        Generate MD5 crypt hash for PAN-OS bootstrap.
+
+        PAN-OS uses the MD5-crypt format: $1$<salt>$<hash>
+        This implements the MD5-crypt algorithm compatible with PAN-OS phash.
+        """
+        if salt is None:
+            # Generate 8-character salt from alphanumeric characters
+            import string
+            salt_chars = string.ascii_letters + string.digits + './'
+            salt = ''.join(secrets.choice(salt_chars) for _ in range(8))
+
+        # MD5-crypt algorithm implementation
+        def md5_crypt(password: str, salt: str) -> str:
+            # Ensure salt is max 8 chars
+            salt = salt[:8]
+
+            # Initial hash: password + magic + salt + password
+            ctx = hashlib.md5()
+            ctx.update(password.encode())
+            ctx.update(b'$1$')
+            ctx.update(salt.encode())
+
+            # Alternate hash: just password + salt + password
+            ctx_alt = hashlib.md5()
+            ctx_alt.update(password.encode())
+            ctx_alt.update(salt.encode())
+            ctx_alt.update(password.encode())
+            alt_result = ctx_alt.digest()
+
+            # Add alternating hash to main hash
+            pw_len = len(password)
+            i = pw_len
+            while i > 0:
+                ctx.update(alt_result[:min(i, 16)])
+                i -= 16
+
+            # Add bits from password length
+            i = pw_len
+            while i:
+                if i & 1:
+                    ctx.update(b'\x00')
+                else:
+                    ctx.update(password[0:1].encode())
+                i >>= 1
+
+            result = ctx.digest()
+
+            # 1000 rounds of MD5
+            for i in range(1000):
+                ctx = hashlib.md5()
+                if i & 1:
+                    ctx.update(password.encode())
+                else:
+                    ctx.update(result)
+                if i % 3:
+                    ctx.update(salt.encode())
+                if i % 7:
+                    ctx.update(password.encode())
+                if i & 1:
+                    ctx.update(result)
+                else:
+                    ctx.update(password.encode())
+                result = ctx.digest()
+
+            # Convert to base64-like encoding
+            itoa64 = './0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+
+            def to64(v, n):
+                ret = ''
+                while n > 0:
+                    ret += itoa64[v & 0x3f]
+                    v >>= 6
+                    n -= 1
+                return ret
+
+            final = ''
+            final += to64((result[0] << 16) | (result[6] << 8) | result[12], 4)
+            final += to64((result[1] << 16) | (result[7] << 8) | result[13], 4)
+            final += to64((result[2] << 16) | (result[8] << 8) | result[14], 4)
+            final += to64((result[3] << 16) | (result[9] << 8) | result[15], 4)
+            final += to64((result[4] << 16) | (result[10] << 8) | result[5], 4)
+            final += to64(result[11], 2)
+
+            return f'$1${salt}${final}'
+
+        return md5_crypt(password, salt)
+
     def _generate_main_tf(self, tfvars: dict) -> str:
         """Generate main.tf content for POV deployment."""
         customer = tfvars.get('customer_name', 'pov')
@@ -7934,6 +8026,12 @@ resource "azurerm_subnet_network_security_group_association" "management" {
         if firewalls:
             # Storage account for bootstrap (name must be globally unique, lowercase, no special chars)
             storage_name = f"{customer.lower().replace('-', '').replace('_', '')[:16]}bootstrap"
+
+            # Generate password hash in Python (works cross-platform)
+            admin_password = tfvars.get('admin_password', 'PaloAlto123!')
+            admin_username = tfvars.get('admin_username', f'{customer}admin')
+            password_hash = self._generate_md5_crypt_hash(admin_password)
+
             content += f'''
 # =============================================================================
 # VM-Series Bootstrap Configuration
@@ -7948,6 +8046,14 @@ resource "azurerm_storage_account" "bootstrap" {{
   account_replication_type = "LRS"
   min_tls_version          = "TLS1_2"
 
+  # Network rules to comply with Azure policy
+  network_rules {{
+    default_action             = "Deny"
+    bypass                     = ["AzureServices"]
+    virtual_network_subnet_ids = [azurerm_subnet.management.id]
+    ip_rules                   = []
+  }}
+
   tags = azurerm_resource_group.pov.tags
 }}
 
@@ -7956,31 +8062,6 @@ resource "azurerm_storage_container" "bootstrap" {{
   name                  = "bootstrap"
   storage_account_name  = azurerm_storage_account.bootstrap.name
   container_access_type = "private"
-}}
-
-# Generate password hash for PAN-OS bootstrap
-# PAN-OS uses MD5 crypt format ($1$salt$hash)
-resource "random_id" "password_salt" {{
-  byte_length = 8
-}}
-
-# Use null_resource to generate MD5 crypt hash (compatible with PAN-OS phash)
-resource "null_resource" "password_hash" {{
-  triggers = {{
-    password = var.admin_password
-    salt     = random_id.password_salt.hex
-  }}
-
-  provisioner "local-exec" {{
-    command = "echo ${{var.admin_password}} | openssl passwd -1 -stdin -salt ${{random_id.password_salt.hex}} > ${{path.module}}/password_hash.txt"
-    interpreter = ["bash", "-c"]
-  }}
-}}
-
-# Read the generated hash
-data "local_file" "password_hash" {{
-  filename   = "${{path.module}}/password_hash.txt"
-  depends_on = [null_resource.password_hash]
 }}
 
 # init-cfg.txt - Basic bootstrap configuration
@@ -8008,6 +8089,7 @@ EOF
 }}
 
 # bootstrap.xml - PAN-OS configuration with admin user credentials
+# Password hash generated by Python MD5-crypt implementation
 resource "azurerm_storage_blob" "bootstrap_xml" {{
   name                   = "config/bootstrap.xml"
   storage_account_name   = azurerm_storage_account.bootstrap.name
@@ -8018,8 +8100,8 @@ resource "azurerm_storage_blob" "bootstrap_xml" {{
 <config version="10.2.0" urldb="paloaltonetworks">
   <mgt-config>
     <users>
-      <entry name="${{var.admin_username}}">
-        <phash>${{trimspace(data.local_file.password_hash.content)}}</phash>
+      <entry name="{admin_username}">
+        <phash>{password_hash}</phash>
         <permissions><role-based><superuser>yes</superuser></role-based></permissions>
       </entry>
     </users>
@@ -8058,7 +8140,7 @@ resource "azurerm_storage_blob" "bootstrap_xml" {{
 </config>
 EOF
 
-  depends_on = [azurerm_storage_container.bootstrap, null_resource.password_hash]
+  depends_on = [azurerm_storage_container.bootstrap]
 }}
 
 # Accept Palo Alto Networks VM-Series Marketplace Agreement
@@ -8298,18 +8380,6 @@ terraform {{
       source  = "hashicorp/azurerm"
       version = "~> 3.0"
     }}
-    null = {{
-      source  = "hashicorp/null"
-      version = "~> 3.0"
-    }}
-    random = {{
-      source  = "hashicorp/random"
-      version = "~> 3.0"
-    }}
-    local = {{
-      source  = "hashicorp/local"
-      version = "~> 2.0"
-    }}
   }}
 }}
 
@@ -8319,10 +8389,6 @@ provider "azurerm" {{
   subscription_id = "{subscription_id}"
   tenant_id       = "{tenant_id}"
 }}
-
-provider "null" {{}}
-provider "random" {{}}
-provider "local" {{}}
 '''
 
     def _generate_outputs_tf(self, tfvars: dict) -> str:
