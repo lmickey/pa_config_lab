@@ -7930,16 +7930,144 @@ resource "azurerm_subnet_network_security_group_association" "management" {
         # Add firewalls (VM-Series)
         firewalls = tfvars.get('firewalls', [])
 
-        # Add marketplace agreement for VM-Series (required before first deployment)
+        # Add bootstrap storage and marketplace agreement for VM-Series
         if firewalls:
-            content += '''
+            # Storage account for bootstrap (name must be globally unique, lowercase, no special chars)
+            storage_name = f"{customer.lower().replace('-', '').replace('_', '')[:16]}bootstrap"
+            content += f'''
+# =============================================================================
+# VM-Series Bootstrap Configuration
+# =============================================================================
+
+# Storage account for VM-Series bootstrap files
+resource "azurerm_storage_account" "bootstrap" {{
+  name                     = "{storage_name}"
+  resource_group_name      = azurerm_resource_group.pov.name
+  location                 = azurerm_resource_group.pov.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+  min_tls_version          = "TLS1_2"
+
+  tags = azurerm_resource_group.pov.tags
+}}
+
+# Bootstrap container
+resource "azurerm_storage_container" "bootstrap" {{
+  name                  = "bootstrap"
+  storage_account_name  = azurerm_storage_account.bootstrap.name
+  container_access_type = "private"
+}}
+
+# Generate password hash for PAN-OS bootstrap
+# PAN-OS uses MD5 crypt format ($1$salt$hash)
+resource "random_id" "password_salt" {{
+  byte_length = 8
+}}
+
+# Use null_resource to generate MD5 crypt hash (compatible with PAN-OS phash)
+resource "null_resource" "password_hash" {{
+  triggers = {{
+    password = var.admin_password
+    salt     = random_id.password_salt.hex
+  }}
+
+  provisioner "local-exec" {{
+    command = "echo ${{var.admin_password}} | openssl passwd -1 -stdin -salt ${{random_id.password_salt.hex}} > ${{path.module}}/password_hash.txt"
+    interpreter = ["bash", "-c"]
+  }}
+}}
+
+# Read the generated hash
+data "local_file" "password_hash" {{
+  filename   = "${{path.module}}/password_hash.txt"
+  depends_on = [null_resource.password_hash]
+}}
+
+# init-cfg.txt - Basic bootstrap configuration
+resource "azurerm_storage_blob" "init_cfg" {{
+  name                   = "config/init-cfg.txt"
+  storage_account_name   = azurerm_storage_account.bootstrap.name
+  storage_container_name = azurerm_storage_container.bootstrap.name
+  type                   = "Block"
+  source_content         = <<-EOF
+type=dhcp-client
+ip-address=
+default-gateway=
+netmask=
+hostname={customer}-fw
+dns-primary=8.8.8.8
+dns-secondary=8.8.4.4
+op-command-modes=mgmt-interface-swap
+dhcp-send-hostname=yes
+dhcp-send-client-id=yes
+dhcp-accept-server-hostname=yes
+dhcp-accept-server-domain=yes
+EOF
+
+  depends_on = [azurerm_storage_container.bootstrap]
+}}
+
+# bootstrap.xml - PAN-OS configuration with admin user credentials
+resource "azurerm_storage_blob" "bootstrap_xml" {{
+  name                   = "config/bootstrap.xml"
+  storage_account_name   = azurerm_storage_account.bootstrap.name
+  storage_container_name = azurerm_storage_container.bootstrap.name
+  type                   = "Block"
+  source_content         = <<-EOF
+<?xml version="1.0"?>
+<config version="10.2.0" urldb="paloaltonetworks">
+  <mgt-config>
+    <users>
+      <entry name="${{var.admin_username}}">
+        <phash>${{trimspace(data.local_file.password_hash.content)}}</phash>
+        <permissions><role-based><superuser>yes</superuser></role-based></permissions>
+      </entry>
+    </users>
+  </mgt-config>
+  <shared>
+    <admin-role>
+      <entry name="superuser">
+        <role>
+          <device><superuser>yes</superuser></device>
+        </role>
+      </entry>
+    </admin-role>
+  </shared>
+  <devices>
+    <entry name="localhost.localdomain">
+      <deviceconfig>
+        <system>
+          <type>
+            <dhcp-client>
+              <send-hostname>yes</send-hostname>
+              <send-client-id>yes</send-client-id>
+              <accept-dhcp-hostname>yes</accept-dhcp-hostname>
+              <accept-dhcp-domain>yes</accept-dhcp-domain>
+            </dhcp-client>
+          </type>
+          <dns-setting>
+            <servers>
+              <primary>8.8.8.8</primary>
+              <secondary>8.8.4.4</secondary>
+            </servers>
+          </dns-setting>
+        </system>
+      </deviceconfig>
+    </entry>
+  </devices>
+</config>
+EOF
+
+  depends_on = [azurerm_storage_container.bootstrap, null_resource.password_hash]
+}}
+
 # Accept Palo Alto Networks VM-Series Marketplace Agreement
 # This is required before deploying VM-Series firewalls
-resource "azurerm_marketplace_agreement" "paloalto_vmseries" {
+resource "azurerm_marketplace_agreement" "paloalto_vmseries" {{
   publisher = "paloaltonetworks"
   offer     = "vmseries-flex"
   plan      = "byol"
-}
+}}
 '''
         for fw in firewalls:
             fw_name = fw.get('name', 'fw').lower().replace(' ', '-').replace('_', '-')
@@ -8017,6 +8145,14 @@ resource "azurerm_linux_virtual_machine" "fw_{fw_name}" {{
   admin_password                  = var.admin_password
   disable_password_authentication = false
 
+  # Bootstrap configuration - points to storage account with PAN-OS config
+  custom_data = base64encode(join("", [
+    "storage-account=", azurerm_storage_account.bootstrap.name,
+    ",access-key=", azurerm_storage_account.bootstrap.primary_access_key,
+    ",file-share=bootstrap",
+    ",share-directory="
+  ]))
+
   network_interface_ids = [
     azurerm_network_interface.nic_{fw_name}_mgmt.id,
     azurerm_network_interface.nic_{fw_name}_untrust.id,
@@ -8043,8 +8179,12 @@ resource "azurerm_linux_virtual_machine" "fw_{fw_name}" {{
 
   tags = azurerm_resource_group.pov.tags
 
-  # Wait for marketplace agreement to be accepted
-  depends_on = [azurerm_marketplace_agreement.paloalto_vmseries]
+  # Wait for marketplace agreement and bootstrap files
+  depends_on = [
+    azurerm_marketplace_agreement.paloalto_vmseries,
+    azurerm_storage_blob.init_cfg,
+    azurerm_storage_blob.bootstrap_xml
+  ]
 }}
 '''
 
@@ -8158,6 +8298,18 @@ terraform {{
       source  = "hashicorp/azurerm"
       version = "~> 3.0"
     }}
+    null = {{
+      source  = "hashicorp/null"
+      version = "~> 3.0"
+    }}
+    random = {{
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }}
+    local = {{
+      source  = "hashicorp/local"
+      version = "~> 2.0"
+    }}
   }}
 }}
 
@@ -8167,6 +8319,10 @@ provider "azurerm" {{
   subscription_id = "{subscription_id}"
   tenant_id       = "{tenant_id}"
 }}
+
+provider "null" {{}}
+provider "random" {{}}
+provider "local" {{}}
 '''
 
     def _generate_outputs_tf(self, tfvars: dict) -> str:
