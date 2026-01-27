@@ -9670,7 +9670,15 @@ output "{device_name}_private_ip" {{
         self._execute_next_deploy_phase()
 
     def _build_deployment_phases(self) -> list:
-        """Build the list of deployment phases based on configuration."""
+        """Build the list of deployment phases based on configuration.
+
+        Phase order:
+        1. Firewall base config
+        2. All PA/SCM configuration (service connections PA, remote networks PA,
+           mobile users, address objects, security policies, ADEM)
+        3. ONE SCM commit to activate all config at once
+        4. FW-side IPsec config (needs endpoint IPs from committed PA config)
+        """
         phases = []
         ctx = self._deployment_context
 
@@ -9682,26 +9690,23 @@ output "{device_name}_private_ip" {{
                 'firewall': fw,
             })
 
-        # Collect PA-side and FW-side phases separately
-        # PA side configs must be committed before FW side can use the endpoint IPs
-        pa_side_phases = []
+        # Collect all SCM phases and FW-side phases separately
+        scm_phases = []
         fw_side_phases = []
         folders_to_commit = set()
 
-        # Phase 2: Service Connections (PA side first, then commit, then FW side)
+        # Service Connections (PA side goes to SCM, FW side goes after commit)
         sc_datacenters = [dc for dc in ctx.get('datacenters', [])
                         if dc.get('connection_type') == 'service_connection']
         for dc in sc_datacenters:
             fw = self._find_firewall_for_location(dc.get('name'))
-            # PA side - creates Service Connection in Prisma Access
-            pa_side_phases.append({
+            scm_phases.append({
                 'name': f"Service Connection: {dc['name']} (PA side)",
                 'type': 'service_connection_pa',
                 'datacenter': dc,
             })
             folders_to_commit.add('Service Connections')
             if fw:
-                # FW side - configures IPsec tunnel using endpoint IPs from committed PA config
                 fw_side_phases.append({
                     'name': f"Service Connection: {dc['name']} (FW side)",
                     'type': 'service_connection_fw',
@@ -9709,18 +9714,16 @@ output "{device_name}_private_ip" {{
                     'firewall': fw,
                 })
 
-        # Phase 3: Remote Networks (PA side first, then commit, then FW side)
+        # Remote Networks (PA side goes to SCM, FW side goes after commit)
         for branch in ctx.get('branches', []):
             fw = self._find_firewall_for_location(branch.get('name'))
-            # PA side - creates Remote Network in Prisma Access
-            pa_side_phases.append({
+            scm_phases.append({
                 'name': f"Remote Network: {branch['name']} (PA side)",
                 'type': 'remote_network_pa',
                 'branch': branch,
             })
             folders_to_commit.add('Remote Networks')
             if fw:
-                # FW side - configures IPsec tunnel using endpoint IPs from committed PA config
                 fw_side_phases.append({
                     'name': f"Remote Network: {branch['name']} (FW side)",
                     'type': 'remote_network_fw',
@@ -9728,48 +9731,53 @@ output "{device_name}_private_ip" {{
                     'firewall': fw,
                 })
 
-        # Add PA side phases first
-        phases.extend(pa_side_phases)
+        # Mobile Users Configuration (SCM config)
+        use_cases = ctx.get('use_cases', {})
+        if use_cases.get('mobile_users', {}).get('enabled'):
+            scm_phases.append({
+                'name': 'Mobile Users Configuration',
+                'type': 'mobile_users',
+            })
+            folders_to_commit.add('Mobile Users')
 
-        # Add SCM commit phase if there are PA-side phases to commit
-        if pa_side_phases and folders_to_commit:
+        # Address Objects & Groups (SCM config)
+        custom_policies = ctx.get('custom_policies', {})
+        staged = custom_policies.get('staged_objects', {})
+        if staged.get('address_objects') or staged.get('address_groups'):
+            scm_phases.append({
+                'name': 'Address Objects & Groups',
+                'type': 'policy_objects',
+            })
+            folders_to_commit.add('Mobile Users')  # Objects typically go to Mobile Users folder
+
+        # Security Policies (SCM config)
+        if custom_policies.get('policies'):
+            scm_phases.append({
+                'name': 'Security Policies',
+                'type': 'security_policies',
+            })
+            folders_to_commit.add('Mobile Users')
+
+        # ADEM Configuration (SCM config)
+        if use_cases.get('aiops_adem', {}).get('enabled'):
+            scm_phases.append({
+                'name': 'ADEM Configuration',
+                'type': 'adem',
+            })
+
+        # Add all SCM config phases
+        phases.extend(scm_phases)
+
+        # Add ONE SCM commit phase to activate all config at once
+        if scm_phases and folders_to_commit:
             phases.append({
-                'name': 'SCM Commit (Activate Configuration)',
+                'name': 'SCM Commit (Activate All Configuration)',
                 'type': 'scm_commit',
                 'folders': list(folders_to_commit),
             })
 
-        # Add FW side phases after commit
+        # Add FW-side phases AFTER commit (they need endpoint IPs)
         phases.extend(fw_side_phases)
-
-        # Phase 4: Prisma Access configuration
-        use_cases = ctx.get('use_cases', {})
-
-        if use_cases.get('mobile_users', {}).get('enabled'):
-            phases.append({
-                'name': 'Mobile Users Configuration',
-                'type': 'mobile_users',
-            })
-
-        custom_policies = ctx.get('custom_policies', {})
-        staged = custom_policies.get('staged_objects', {})
-        if staged.get('address_objects') or staged.get('address_groups'):
-            phases.append({
-                'name': 'Address Objects & Groups',
-                'type': 'policy_objects',
-            })
-
-        if custom_policies.get('policies'):
-            phases.append({
-                'name': 'Security Policies',
-                'type': 'security_policies',
-            })
-
-        if use_cases.get('aiops_adem', {}).get('enabled'):
-            phases.append({
-                'name': 'ADEM Configuration',
-                'type': 'adem',
-            })
 
         return phases
 
