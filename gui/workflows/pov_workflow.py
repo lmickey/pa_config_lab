@@ -9931,19 +9931,25 @@ output "{device_name}_private_ip" {{
 
         self.pov_deploy_results.append_text(f"\n  - PA Endpoint: {pa_endpoint_ip}")
 
-        # Get firewall connection info
-        fw_ip = fw.get('management_ip')
+        # Get firewall connection info - note: firewall dict uses 'ip' not 'management_ip'
+        fw_ip = fw.get('ip') or fw.get('management_ip')
         if not fw_ip:
             self.pov_deploy_results.append_text("\n  [ERROR] No firewall management IP")
             self._advance_to_next_phase(False, "No firewall management IP")
             return
 
-        # Get credentials
-        cloud_deployment = self.cloud_resource_configs.get('cloud_deployment', {})
-        customer_info = self.cloud_resource_configs.get('customer_info', {})
-        customer_name = customer_info.get('customer_name_sanitized', 'pov')
-        admin_username = cloud_deployment.get('admin_username', f'{customer_name}admin')
-        admin_password = cloud_deployment.get('admin_password', '')
+        # Get credentials from firewall dict (set during deployment context build)
+        fw_credentials = fw.get('credentials', {})
+        admin_username = fw_credentials.get('username', '')
+        admin_password = fw_credentials.get('password', '')
+
+        # Fallback to cloud deployment config if not in firewall dict
+        if not admin_username or not admin_password:
+            cloud_deployment = self.cloud_resource_configs.get('cloud_deployment', {})
+            customer_info = self.cloud_resource_configs.get('customer_info', {})
+            customer_name = customer_info.get('customer_name_sanitized', 'pov')
+            admin_username = admin_username or cloud_deployment.get('admin_username', f'{customer_name}admin')
+            admin_password = admin_password or cloud_deployment.get('admin_password', '')
 
         try:
             from firewall.api_client import FirewallAPIClient
@@ -10010,27 +10016,40 @@ output "{device_name}_private_ip" {{
 
         self.pov_deploy_results.append_text(f"\n  Configuring objects and rules on {fw_name}...")
 
-        # Get firewall connection info
-        fw_ip = fw.get('management_ip')
+        # Get firewall connection info - note: firewall dict uses 'ip' not 'management_ip'
+        fw_ip = fw.get('ip') or fw.get('management_ip')
         if not fw_ip:
-            # Try to get from terraform outputs
+            # Try to get from terraform outputs as fallback
             tf_outputs = getattr(self, '_terraform_outputs', {})
             for key, value in tf_outputs.items():
-                if 'management_ip' in key.lower() or 'mgmt_ip' in key.lower():
+                key_lower = key.lower()
+                if ('firewall' in key_lower or 'fw' in key_lower) and 'public' in key_lower:
                     fw_ip = value
                     break
+                if 'management_ip' in key_lower or 'mgmt_ip' in key_lower:
+                    if 'private' not in key_lower:
+                        fw_ip = value
+                        break
 
         if not fw_ip:
             self.pov_deploy_results.append_text("\n  [SKIP] No firewall management IP available")
             self._advance_to_next_phase(True, "No firewall IP - skipping objects/rules")
             return
 
-        # Get credentials
-        cloud_deployment = self.cloud_resource_configs.get('cloud_deployment', {})
-        customer_info = self.cloud_resource_configs.get('customer_info', {})
-        customer_name = customer_info.get('customer_name_sanitized', 'pov')
-        admin_username = cloud_deployment.get('admin_username', f'{customer_name}admin')
-        admin_password = cloud_deployment.get('admin_password', '')
+        self.pov_deploy_results.append_text(f"\n  - Management IP: {fw_ip}")
+
+        # Get credentials from firewall dict (set during deployment context build)
+        fw_credentials = fw.get('credentials', {})
+        admin_username = fw_credentials.get('username', '')
+        admin_password = fw_credentials.get('password', '')
+
+        # Fallback to cloud deployment config if not in firewall dict
+        if not admin_username or not admin_password:
+            cloud_deployment = self.cloud_resource_configs.get('cloud_deployment', {})
+            customer_info = self.cloud_resource_configs.get('customer_info', {})
+            customer_name = customer_info.get('customer_name_sanitized', 'pov')
+            admin_username = admin_username or cloud_deployment.get('admin_username', f'{customer_name}admin')
+            admin_password = admin_password or cloud_deployment.get('admin_password', '')
 
         try:
             from firewall.api_client import FirewallAPIClient
@@ -10413,22 +10432,51 @@ output "{device_name}_private_ip" {{
                     def progress_cb(percent, msg):
                         self.pov_deploy_results.append_text(f"\n    {percent}% - {msg}")
 
-                    deploy_api_client.wait_for_job_completion(
-                        job_id,
-                        timeout_seconds=300,
-                        poll_interval=10,
-                        progress_callback=progress_cb
-                    )
-                    self.pov_deploy_results.append_text("\n  [OK] Configuration committed successfully")
+                    try:
+                        job_result = deploy_api_client.wait_for_job_completion(
+                            job_id,
+                            timeout_seconds=300,
+                            poll_interval=10,
+                            progress_callback=progress_cb
+                        )
+                        # Check job result for actual success
+                        job_data = job_result.get('data', [{}])[0] if job_result.get('data') else job_result
+                        result_str = job_data.get('result_str', '')
+                        if result_str and 'fail' in result_str.lower():
+                            self.pov_deploy_results.append_text(f"\n  [ERROR] Job completed with failure: {result_str}")
+                            self._advance_to_next_phase(False, f"SCM push failed: {result_str}")
+                            return
+                        self.pov_deploy_results.append_text("\n  [OK] Configuration committed successfully")
+                    except RuntimeError as e:
+                        # Job explicitly failed
+                        self._log_activity(f"SCM push job failed: {e}", "error")
+                        self.pov_deploy_results.append_text(f"\n  [ERROR] Push job failed: {e}")
+                        self._advance_to_next_phase(False, f"SCM push failed: {e}")
+                        return
 
                     # After commit, refresh service connection details to get endpoint IPs
-                    self._refresh_service_connection_endpoints(deploy_api_client)
+                    endpoints_found = self._refresh_service_connection_endpoints(deploy_api_client)
+
+                    # CRITICAL: If no endpoints found, fail the phase - FW side can't proceed without them
+                    if not endpoints_found:
+                        self.pov_deploy_results.append_text("\n  [ERROR] No service endpoint IPs retrieved")
+                        self.pov_deploy_results.append_text("\n  FW-side configuration cannot proceed without endpoint IPs")
+                        self.pov_deploy_results.append_text("\n  Check SCM > Service Connections for provisioning status")
+                        self._advance_to_next_phase(False, "No endpoint IPs - FW config cannot proceed")
+                        return
 
                 else:
                     # No job ID - might mean changes were already committed or nothing to commit
                     self.pov_deploy_results.append_text("\n  [OK] No pending changes to commit (already active)")
                     # Still try to get endpoint IPs
-                    self._refresh_service_connection_endpoints(deploy_api_client)
+                    endpoints_found = self._refresh_service_connection_endpoints(deploy_api_client)
+
+                    # Even if already committed, we need endpoints for FW side
+                    if not endpoints_found:
+                        self.pov_deploy_results.append_text("\n  [ERROR] No service endpoint IPs found")
+                        self.pov_deploy_results.append_text("\n  Service connections may not be provisioned yet")
+                        self._advance_to_next_phase(False, "No endpoint IPs available")
+                        return
 
                 self._advance_to_next_phase(True, "SCM commit completed")
 
@@ -10444,8 +10492,12 @@ output "{device_name}_private_ip" {{
             self.pov_deploy_results.append_text("\n  [SKIP] No deploy tenant connected")
             self._advance_to_next_phase(False, "No deploy tenant connected")
 
-    def _refresh_service_connection_endpoints(self, api_client):
-        """Refresh service connection details to get endpoint IPs after commit."""
+    def _refresh_service_connection_endpoints(self, api_client) -> bool:
+        """Refresh service connection details to get endpoint IPs after commit.
+
+        Returns:
+            True if at least one endpoint IP was found, False otherwise.
+        """
         try:
             self.pov_deploy_results.append_text("\n  Retrieving endpoint IPs...")
             service_connections = api_client.get_all_service_connections()
@@ -10491,13 +10543,16 @@ output "{device_name}_private_ip" {{
 
             if self._pa_endpoints:
                 self.pov_deploy_results.append_text(f"\n  [OK] Retrieved {len(self._pa_endpoints)} endpoint(s)")
+                return True
             else:
                 self.pov_deploy_results.append_text("\n  [WARN] No endpoint IPs retrieved yet")
                 self.pov_deploy_results.append_text("\n    Note: Endpoints may take time to provision")
+                return False
 
         except Exception as e:
             self._log_activity(f"Failed to refresh endpoints: {e}", "warning")
             self.pov_deploy_results.append_text(f"\n  [WARN] Could not retrieve endpoints: {e}")
+            return False
 
     def _execute_remote_network_fw_phase(self, phase: dict):
         """Configure IPsec tunnel on firewall for remote network."""
@@ -10913,16 +10968,14 @@ output "{device_name}_private_ip" {{
         rule_policies = [p for p in policies if isinstance(p, dict)]
         string_policies = [p for p in policies if isinstance(p, str)]
 
+        # If we only have description strings, build actual rule configs from them
         if string_policies and not rule_policies:
-            # Only have description strings, not actual rule configs
-            self.pov_deploy_results.append_text(f"\n  {len(string_policies)} policy descriptions configured:")
-            for desc in string_policies[:5]:
-                self.pov_deploy_results.append_text(f"\n    • {desc}")
-            if len(string_policies) > 5:
-                self.pov_deploy_results.append_text(f"\n    ... and {len(string_policies) - 5} more")
-            self.pov_deploy_results.append_text("\n  [INFO] Policy descriptions are for reference only.")
-            self.pov_deploy_results.append_text("\n  [INFO] Configure actual security rules in Strata Cloud Manager.")
-            self._advance_to_next_phase(True, f"{len(string_policies)} policy descriptions noted")
+            self.pov_deploy_results.append_text(f"\n  Building {len(string_policies)} security rules from policy descriptions...")
+            rule_policies = self._build_default_security_rules(string_policies)
+
+        if not rule_policies:
+            self.pov_deploy_results.append_text("\n  [OK] No security policies to deploy")
+            self._advance_to_next_phase(True, "No policies to deploy")
             return
 
         self.pov_deploy_results.append_text(f"\n  Deploying {len(rule_policies)} security policies...")
@@ -10965,6 +11018,131 @@ output "{device_name}_private_ip" {{
         else:
             self.pov_deploy_results.append_text("\n  [SKIP] No deploy tenant connected")
             self._advance_to_next_phase(True, "Skipped - no deploy tenant")
+
+    def _build_default_security_rules(self, policy_descriptions: list) -> list:
+        """Build actual security rule configurations from policy descriptions.
+
+        Interprets common policy descriptions and creates proper SCM security rule
+        configs. These are the default POV security policies.
+
+        Args:
+            policy_descriptions: List of policy description strings
+
+        Returns:
+            List of security rule config dicts ready for SCM API
+        """
+        rules = []
+
+        # Map common descriptions to actual rule configs
+        for desc in policy_descriptions:
+            desc_lower = desc.lower()
+
+            # Rule: Trust to Untrust (internet access)
+            if 'trust' in desc_lower and 'untrust' in desc_lower and ('internet' in desc_lower or 'outbound' in desc_lower):
+                rules.append({
+                    'name': 'allow-trust-to-untrust',
+                    'source': ['any'],
+                    'destination': ['any'],
+                    'source_user': ['any'],
+                    'application': ['any'],
+                    'service': ['application-default'],
+                    'action': 'allow',
+                    'from': ['trust'],
+                    'to': ['untrust'],
+                    'log_end': True,
+                    'description': desc,
+                })
+
+            # Rule: Trust to Trust (inter-datacenter/inter-zone)
+            elif 'trust' in desc_lower and ('inter' in desc_lower or 'between' in desc_lower or 'datacenter' in desc_lower):
+                rules.append({
+                    'name': 'allow-trust-to-trust',
+                    'source': ['any'],
+                    'destination': ['any'],
+                    'source_user': ['any'],
+                    'application': ['any'],
+                    'service': ['application-default'],
+                    'action': 'allow',
+                    'from': ['trust'],
+                    'to': ['trust'],
+                    'log_end': True,
+                    'description': desc,
+                })
+
+            # Rule: Untrust to Trust (inbound from Prisma Access / GlobalProtect users)
+            elif 'untrust' in desc_lower and 'trust' in desc_lower and ('inbound' in desc_lower or 'prisma' in desc_lower or 'globalprotect' in desc_lower or 'user' in desc_lower):
+                rules.append({
+                    'name': 'allow-prisma-access-inbound',
+                    'source': ['any'],
+                    'destination': ['any'],
+                    'source_user': ['any'],
+                    'application': ['any'],
+                    'service': ['application-default'],
+                    'action': 'allow',
+                    'from': ['untrust'],
+                    'to': ['trust'],
+                    'log_end': True,
+                    'description': desc,
+                })
+
+            # Rule: DNS access
+            elif 'dns' in desc_lower:
+                rules.append({
+                    'name': 'allow-dns',
+                    'source': ['any'],
+                    'destination': ['any'],
+                    'source_user': ['any'],
+                    'application': ['dns'],
+                    'service': ['application-default'],
+                    'action': 'allow',
+                    'from': ['any'],
+                    'to': ['any'],
+                    'log_end': True,
+                    'description': desc,
+                })
+
+            # Rule: Web/HTTP/HTTPS access
+            elif 'web' in desc_lower or 'http' in desc_lower or 'ssl' in desc_lower or 'internet' in desc_lower:
+                rules.append({
+                    'name': 'allow-web-browsing',
+                    'source': ['any'],
+                    'destination': ['any'],
+                    'source_user': ['any'],
+                    'application': ['web-browsing', 'ssl'],
+                    'service': ['application-default'],
+                    'action': 'allow',
+                    'from': ['trust'],
+                    'to': ['untrust'],
+                    'log_end': True,
+                    'description': desc,
+                })
+
+            # Generic allow rule for unrecognized descriptions
+            else:
+                # Create a sanitized name from the description
+                rule_name = desc.lower().replace(' ', '-')[:30]
+                # Remove non-alphanumeric characters except hyphens
+                import re
+                rule_name = re.sub(r'[^a-z0-9-]', '', rule_name)
+                rule_name = re.sub(r'-+', '-', rule_name).strip('-')
+                if not rule_name:
+                    rule_name = f'custom-rule-{len(rules)+1}'
+
+                rules.append({
+                    'name': rule_name,
+                    'source': ['any'],
+                    'destination': ['any'],
+                    'source_user': ['any'],
+                    'application': ['any'],
+                    'service': ['application-default'],
+                    'action': 'allow',
+                    'from': ['any'],
+                    'to': ['any'],
+                    'log_end': True,
+                    'description': desc,
+                })
+
+        return rules
 
     def _execute_adem_phase(self, phase: dict):
         """Configure ADEM synthetic tests.
