@@ -2786,6 +2786,21 @@ class POVWorkflowWidget(QWidget):
         self.deploy_config_btn.clicked.connect(self._handle_deploy_config_click)
         actions_row.addWidget(self.deploy_config_btn)
 
+        # Restart Deployment button - for starting fresh after partial deployment
+        self.restart_deploy_btn = QPushButton("🔄 Restart")
+        self.restart_deploy_btn.setMinimumWidth(100)
+        self.restart_deploy_btn.setToolTip("Clear completed phases and start deployment from the beginning")
+        self.restart_deploy_btn.setVisible(False)  # Hidden until there are completed phases
+        self.restart_deploy_btn.setStyleSheet(
+            "QPushButton { background-color: #FF9800; color: white; font-weight: bold; "
+            "border: 1px solid #F57C00; border-radius: 4px; padding: 8px 16px; "
+            "border-bottom: 3px solid #E65100; }"
+            "QPushButton:hover { background-color: #FFB74D; }"
+            "QPushButton:pressed { background-color: #F57C00; border-bottom: 1px solid #E65100; }"
+        )
+        self.restart_deploy_btn.clicked.connect(self._restart_deployment)
+        actions_row.addWidget(self.restart_deploy_btn)
+
         layout.addLayout(actions_row)
 
         # Progress bar
@@ -4196,20 +4211,22 @@ class POVWorkflowWidget(QWidget):
         fw_ip_copy.clicked.connect(lambda: self._copy_to_clipboard(creds['firewall']['ip'], "Firewall IP"))
         fw_grid.addWidget(fw_ip_copy, 0, 2)
 
-        # Firewall FQDN (DNS Name)
+        # Firewall Management URL (HTTPS)
         row_offset = 1
         fw_fqdn = creds['firewall'].get('fqdn', '')
         if fw_fqdn:
-            fw_grid.addWidget(QLabel("DNS Name:"), row_offset, 0)
-            fw_fqdn_field = QLineEdit(fw_fqdn)
-            fw_fqdn_field.setReadOnly(True)
-            fw_fqdn_field.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
-            fw_fqdn_field.setToolTip("Use this DNS name instead of IP address for stable access")
-            fw_grid.addWidget(fw_fqdn_field, row_offset, 1)
-            fw_fqdn_copy = QPushButton("Copy")
-            fw_fqdn_copy.setFixedWidth(60)
-            fw_fqdn_copy.clicked.connect(lambda: self._copy_to_clipboard(fw_fqdn, "DNS Name"))
-            fw_grid.addWidget(fw_fqdn_copy, row_offset, 2)
+            # Create full HTTPS URL for management access
+            fw_url = f"https://{fw_fqdn}"
+            fw_grid.addWidget(QLabel("Management URL:"), row_offset, 0)
+            fw_url_field = QLineEdit(fw_url)
+            fw_url_field.setReadOnly(True)
+            fw_url_field.setStyleSheet("background-color: #f5f5f5; padding: 5px;")
+            fw_url_field.setToolTip("HTTPS management URL - use this for browser access")
+            fw_grid.addWidget(fw_url_field, row_offset, 1)
+            fw_url_copy = QPushButton("Copy")
+            fw_url_copy.setFixedWidth(60)
+            fw_url_copy.clicked.connect(lambda: self._copy_to_clipboard(fw_url, "Management URL"))
+            fw_grid.addWidget(fw_url_copy, row_offset, 2)
             row_offset += 1
 
         # Firewall Username
@@ -8918,6 +8935,12 @@ output "{device_name}_private_ip" {{
         Args:
             state: One of 'deploy', 'cancel', 'resume'
         """
+        # Show/hide restart button based on whether there are completed phases
+        has_completed_phases = bool(self._pov_deployment_phases_completed)
+        if hasattr(self, 'restart_deploy_btn'):
+            # Show restart button when resuming or when there are completed phases and not actively deploying
+            self.restart_deploy_btn.setVisible(has_completed_phases and state != "cancel")
+
         if state == "cancel":
             self.deploy_config_btn.setText("Cancel Push")
             self.deploy_config_btn.setStyleSheet(
@@ -8981,6 +9004,43 @@ output "{device_name}_private_ip" {{
 
             # Start deployment
             self._deploy_pov_config()
+
+    def _restart_deployment(self):
+        """Restart deployment from the beginning, clearing all completed phases."""
+        if self._pov_deployment_in_progress:
+            QMessageBox.warning(
+                self,
+                "Deployment In Progress",
+                "Cannot restart while a deployment is in progress.\n\n"
+                "Please cancel the current deployment first."
+            )
+            return
+
+        # Confirm restart
+        completed_count = len(self._pov_deployment_phases_completed)
+        reply = QMessageBox.question(
+            self,
+            "Restart Deployment?",
+            f"This will clear {completed_count} completed phase(s) and start fresh.\n\n"
+            "Are you sure you want to restart from the beginning?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        # Clear completed phases
+        self._pov_deployment_phases_completed = []
+        self._log_activity("Cleared deployment progress - ready for fresh start")
+
+        # Update button states
+        self._update_deploy_config_button_style("deploy")
+        self.restart_deploy_btn.setVisible(False)
+
+        # Clear results panel
+        self.pov_deploy_results.set_text("Deployment progress cleared. Click 'Deploy Configuration' to start fresh.")
+
+        # Save state
+        self.save_state()
 
     def _cancel_pov_deployment(self):
         """Cancel the current POV deployment."""
