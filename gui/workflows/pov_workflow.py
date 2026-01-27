@@ -8076,8 +8076,7 @@ resource "azurerm_subnet_network_security_group_association" "management" {
 # =============================================================================
 
 # Storage account for VM-Series bootstrap files
-# Note: Network rules use "Allow" initially to permit Terraform access during bootstrap
-# The VM accesses via Azure services bypass, and the storage is for bootstrap only
+# Network rules restrict access to management subnet and Azure services only
 resource "azurerm_storage_account" "bootstrap" {{
   name                     = "{storage_name}"
   resource_group_name      = azurerm_resource_group.pov.name
@@ -8086,17 +8085,21 @@ resource "azurerm_storage_account" "bootstrap" {{
   account_replication_type = "LRS"
   min_tls_version          = "TLS1_2"
 
-  # Allow public access for Terraform, but restrict with network rules
-  # Azure services (like VM bootstrap) bypass the rules
-  public_network_access_enabled = true
+  # Restrict network access per Azure policy requirements
+  public_network_access_enabled   = true
   allow_nested_items_to_be_public = false
 
+  # Network rules: Deny by default, allow management subnet and Azure services
   network_rules {{
-    default_action = "Allow"
-    bypass         = ["AzureServices"]
+    default_action             = "Deny"
+    bypass                     = ["AzureServices"]
+    virtual_network_subnet_ids = [azurerm_subnet.management.id]
   }}
 
   tags = azurerm_resource_group.pov.tags
+
+  # Ensure subnet exists with service endpoint before creating storage account
+  depends_on = [azurerm_subnet.management]
 }}
 
 # Bootstrap container
@@ -8831,31 +8834,92 @@ output "{device_name}_private_ip" {{
         # Check if this is an error/failure message that should be shown in results
         error_indicators = [
             'Error:', 'error:', 'ERROR:',
-            'failed', 'Failed', 'FAILED',
             'Error applying plan',
             'Error creating',
             'Error deleting',
             'Error reading',
+            'RequestDisallowedByPolicy',
+            'AuthorizationFailed',
+            'ResourceNotFound',
             'Cannot ',
             'could not',
             'Could not',
             'Unable to',
             'unable to',
             'Unauthorized',
-            'unauthorized',
-            'Access denied',
-            'access denied',
             '403 Forbidden',
             '401 Unauthorized',
             '404 Not Found',
-            'timed out',
-            'timeout',
         ]
 
         is_error = any(indicator in message for indicator in error_indicators)
 
         if is_error:
-            self.cloud_deploy_results.append_text(f"\n[ERROR] {message}")
+            # Clean up the message for user-friendly display
+            clean_msg = self._clean_terraform_error(message)
+            if clean_msg:
+                self.cloud_deploy_results.append_text(f"\n{clean_msg}")
+
+    def _clean_terraform_error(self, message: str) -> str:
+        """Clean up terraform error message for user-friendly display.
+
+        Args:
+            message: Raw terraform error message
+
+        Returns:
+            Cleaned up error message, or empty string if message should be skipped
+        """
+        import re
+
+        # Remove terraform box-drawing characters and formatting
+        clean = message
+        # Remove box characters (│ ╷ ╵ etc)
+        clean = re.sub(r'[│╷╵╶╴┌┐└┘├┤┬┴┼─]', '', clean)
+        # Also remove the corrupted versions of these characters
+        clean = re.sub(r'â"[‚ƒ„†‡ˆ‰Š‹ŒŽ''""•–—˜™]', '', clean)
+        clean = re.sub(r'â"', '', clean)
+
+        # Remove leading/trailing whitespace from each line
+        lines = [line.strip() for line in clean.split('\n')]
+        clean = ' '.join(line for line in lines if line)
+
+        # Skip certain non-informative lines
+        skip_patterns = [
+            r'^on main\.tf line \d+',
+            r'^\d+:',
+            r'^resource "',
+            r'^with azurerm_',
+            r'^Error:$',
+        ]
+        for pattern in skip_patterns:
+            if re.match(pattern, clean.strip()):
+                return ""
+
+        # Extract the key error information
+        # Look for policy errors
+        policy_match = re.search(r"Resource '([^']+)' was disallowed by policy.*?\"name\":\"([^\"]+)\"", clean)
+        if policy_match:
+            resource = policy_match.group(1)
+            policy = policy_match.group(2)
+            return f"[POLICY] Resource '{resource}' blocked by Azure policy: {policy}"
+
+        # Look for general Azure errors
+        azure_match = re.search(r'(creating|deleting|reading|updating) ([^:]+): (.+?)(?:\.|$)', clean, re.IGNORECASE)
+        if azure_match:
+            action = azure_match.group(1)
+            resource = azure_match.group(2)
+            reason = azure_match.group(3)[:100]  # Truncate long reasons
+            return f"[AZURE] Error {action} {resource}: {reason}"
+
+        # If message is too long, truncate it
+        if len(clean) > 150:
+            clean = clean[:147] + "..."
+
+        # Only return if there's meaningful content
+        if len(clean.strip()) > 10:
+            return f"[ERROR] {clean.strip()}"
+
+        return ""
 
     # ============================================================================
     # EVENT HANDLERS - DEPLOY POV CONFIG TAB (Tab 5)
