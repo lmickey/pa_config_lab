@@ -10055,27 +10055,27 @@ output "{device_name}_private_ip" {{
             # Trust and untrust network objects
             try:
                 client.create_address_object(
-                    name=f"{customer_name}-trust-network",
+                    name="trust-network",
                     value=trust_subnet,
                     description="Trust network CIDR"
                 )
-                self.pov_deploy_results.append_text(f"\n    - {customer_name}-trust-network: {trust_subnet}")
+                self.pov_deploy_results.append_text(f"\n    - trust-network: {trust_subnet}")
             except Exception as e:
                 if 'already exists' in str(e).lower():
-                    self.pov_deploy_results.append_text(f"\n    - {customer_name}-trust-network [EXISTS]")
+                    self.pov_deploy_results.append_text("\n    - trust-network [EXISTS]")
                 else:
                     logger.warning(f"Failed to create trust network object: {e}")
 
             try:
                 client.create_address_object(
-                    name=f"{customer_name}-untrust-network",
+                    name="untrust-network",
                     value=untrust_subnet,
                     description="Untrust network CIDR"
                 )
-                self.pov_deploy_results.append_text(f"\n    - {customer_name}-untrust-network: {untrust_subnet}")
+                self.pov_deploy_results.append_text(f"\n    - untrust-network: {untrust_subnet}")
             except Exception as e:
                 if 'already exists' in str(e).lower():
-                    self.pov_deploy_results.append_text(f"\n    - {customer_name}-untrust-network [EXISTS]")
+                    self.pov_deploy_results.append_text("\n    - untrust-network [EXISTS]")
                 else:
                     logger.warning(f"Failed to create untrust network object: {e}")
 
@@ -10085,14 +10085,14 @@ output "{device_name}_private_ip" {{
                 dc_subnet = dc.get('subnet', dc.get('subnets', ['10.100.10.0/24'])[0] if dc.get('subnets') else '10.100.10.0/24')
                 try:
                     client.create_address_object(
-                        name=f"{customer_name}-{dc_name}-servers",
+                        name=f"{dc_name}-servers",
                         value=dc_subnet,
                         description=f"Server network for {dc['name']}"
                     )
-                    self.pov_deploy_results.append_text(f"\n    - {customer_name}-{dc_name}-servers: {dc_subnet}")
+                    self.pov_deploy_results.append_text(f"\n    - {dc_name}-servers: {dc_subnet}")
                 except Exception as e:
                     if 'already exists' in str(e).lower():
-                        self.pov_deploy_results.append_text(f"\n    - {customer_name}-{dc_name}-servers [EXISTS]")
+                        self.pov_deploy_results.append_text(f"\n    - {dc_name}-servers [EXISTS]")
                     else:
                         logger.warning(f"Failed to create DC server object: {e}")
 
@@ -10101,14 +10101,14 @@ output "{device_name}_private_ip" {{
                 branch_subnet = branch.get('subnet', branch.get('subnets', ['10.100.20.0/24'])[0] if branch.get('subnets') else '10.100.20.0/24')
                 try:
                     client.create_address_object(
-                        name=f"{customer_name}-{branch_name}-servers",
+                        name=f"{branch_name}-servers",
                         value=branch_subnet,
                         description=f"Server network for {branch['name']}"
                     )
-                    self.pov_deploy_results.append_text(f"\n    - {customer_name}-{branch_name}-servers: {branch_subnet}")
+                    self.pov_deploy_results.append_text(f"\n    - {branch_name}-servers: {branch_subnet}")
                 except Exception as e:
                     if 'already exists' in str(e).lower():
-                        self.pov_deploy_results.append_text(f"\n    - {customer_name}-{branch_name}-servers [EXISTS]")
+                        self.pov_deploy_results.append_text(f"\n    - {branch_name}-servers [EXISTS]")
                     else:
                         logger.warning(f"Failed to create branch server object: {e}")
 
@@ -10118,7 +10118,7 @@ output "{device_name}_private_ip" {{
             # Rule 1: Allow DNS to servers
             try:
                 client.create_security_rule(
-                    name=f"{customer_name}-allow-dns-outbound",
+                    name="allow-dns-outbound",
                     source_zone=['trust'],
                     destination_zone=['untrust', 'trust'],
                     source=['any'],
@@ -10128,17 +10128,17 @@ output "{device_name}_private_ip" {{
                     action='allow',
                     description="Allow DNS queries outbound"
                 )
-                self.pov_deploy_results.append_text(f"\n    - {customer_name}-allow-dns-outbound [OK]")
+                self.pov_deploy_results.append_text(f"\n    - allow-dns-outbound [OK]")
             except Exception as e:
                 if 'already exists' in str(e).lower():
-                    self.pov_deploy_results.append_text(f"\n    - {customer_name}-allow-dns-outbound [EXISTS]")
+                    self.pov_deploy_results.append_text(f"\n    - allow-dns-outbound [EXISTS]")
                 else:
                     logger.warning(f"Failed to create DNS rule: {e}")
 
             # Rule 2: Allow web (HTTP/HTTPS) outbound
             try:
                 client.create_security_rule(
-                    name=f"{customer_name}-allow-web-outbound",
+                    name="allow-web-outbound",
                     source_zone=['trust'],
                     destination_zone=['untrust'],
                     source=['any'],
@@ -10148,30 +10148,30 @@ output "{device_name}_private_ip" {{
                     action='allow',
                     description="Allow web browsing outbound"
                 )
-                self.pov_deploy_results.append_text(f"\n    - {customer_name}-allow-web-outbound [OK]")
+                self.pov_deploy_results.append_text(f"\n    - allow-web-outbound [OK]")
             except Exception as e:
                 if 'already exists' in str(e).lower():
-                    self.pov_deploy_results.append_text(f"\n    - {customer_name}-allow-web-outbound [EXISTS]")
+                    self.pov_deploy_results.append_text(f"\n    - allow-web-outbound [EXISTS]")
                 else:
                     logger.warning(f"Failed to create web rule: {e}")
 
             # Rule 3: Allow inbound to servers (from Prisma Access/tunnel)
             try:
                 client.create_security_rule(
-                    name=f"{customer_name}-allow-inbound-servers",
+                    name="allow-inbound-servers",
                     source_zone=['untrust'],
                     destination_zone=['trust'],
                     source=['any'],
-                    destination=[f"{customer_name}-trust-network"],
+                    destination=["trust-network"],
                     application=['any'],
                     service=['any'],
                     action='allow',
                     description="Allow inbound to servers from tunnel"
                 )
-                self.pov_deploy_results.append_text(f"\n    - {customer_name}-allow-inbound-servers [OK]")
+                self.pov_deploy_results.append_text(f"\n    - allow-inbound-servers [OK]")
             except Exception as e:
                 if 'already exists' in str(e).lower():
-                    self.pov_deploy_results.append_text(f"\n    - {customer_name}-allow-inbound-servers [EXISTS]")
+                    self.pov_deploy_results.append_text(f"\n    - allow-inbound-servers [EXISTS]")
                 else:
                     logger.warning(f"Failed to create inbound rule: {e}")
 
