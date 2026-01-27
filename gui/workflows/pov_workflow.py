@@ -8194,10 +8194,13 @@ EOF
   depends_on = [azurerm_storage_container.bootstrap]
 }}
 
-# Note: Palo Alto Networks VM-Series Marketplace Agreement must be accepted
-# before deploying. If you haven't accepted it yet, run this Azure CLI command:
-# az vm image terms accept --publisher paloaltonetworks --offer vmseries-flex --plan byol
-# The agreement only needs to be accepted once per subscription.
+# Accept Palo Alto Networks VM-Series Marketplace Agreement
+# This is required before deploying VM-Series firewalls
+resource "azurerm_marketplace_agreement" "paloalto" {{
+  publisher = "paloaltonetworks"
+  offer     = "vmseries-flex"
+  plan      = "byol"
+}}
 '''
         for fw in firewalls:
             fw_name = fw.get('name', 'fw').lower().replace(' ', '-').replace('_', '-')
@@ -8321,8 +8324,9 @@ resource "azurerm_linux_virtual_machine" "fw_{fw_name}" {{
 
   tags = azurerm_resource_group.pov.tags
 
-  # Wait for bootstrap files to be ready
+  # Wait for marketplace agreement and bootstrap files
   depends_on = [
+    azurerm_marketplace_agreement.paloalto,
     azurerm_storage_blob.init_cfg,
     azurerm_storage_blob.bootstrap_xml
   ]
