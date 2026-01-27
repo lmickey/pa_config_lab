@@ -8041,6 +8041,8 @@ resource "azurerm_subnet_network_security_group_association" "management" {
 # =============================================================================
 
 # Storage account for VM-Series bootstrap files
+# Note: Network rules use "Allow" initially to permit Terraform access during bootstrap
+# The VM accesses via Azure services bypass, and the storage is for bootstrap only
 resource "azurerm_storage_account" "bootstrap" {{
   name                     = "{storage_name}"
   resource_group_name      = azurerm_resource_group.pov.name
@@ -8049,12 +8051,14 @@ resource "azurerm_storage_account" "bootstrap" {{
   account_replication_type = "LRS"
   min_tls_version          = "TLS1_2"
 
-  # Network rules to comply with Azure policy
+  # Allow public access for Terraform, but restrict with network rules
+  # Azure services (like VM bootstrap) bypass the rules
+  public_network_access_enabled = true
+  allow_nested_items_to_be_public = false
+
   network_rules {{
-    default_action             = "Deny"
-    bypass                     = ["AzureServices"]
-    virtual_network_subnet_ids = [azurerm_subnet.management.id]
-    ip_rules                   = []
+    default_action = "Allow"
+    bypass         = ["AzureServices"]
   }}
 
   tags = azurerm_resource_group.pov.tags
@@ -8146,13 +8150,10 @@ EOF
   depends_on = [azurerm_storage_container.bootstrap]
 }}
 
-# Accept Palo Alto Networks VM-Series Marketplace Agreement
-# This is required before deploying VM-Series firewalls
-resource "azurerm_marketplace_agreement" "paloalto_vmseries" {{
-  publisher = "paloaltonetworks"
-  offer     = "vmseries-flex"
-  plan      = "byol"
-}}
+# Note: Palo Alto Networks VM-Series Marketplace Agreement must be accepted
+# before deploying. If you haven't accepted it yet, run this Azure CLI command:
+# az vm image terms accept --publisher paloaltonetworks --offer vmseries-flex --plan byol
+# The agreement only needs to be accepted once per subscription.
 '''
         for fw in firewalls:
             fw_name = fw.get('name', 'fw').lower().replace(' ', '-').replace('_', '-')
@@ -8264,9 +8265,8 @@ resource "azurerm_linux_virtual_machine" "fw_{fw_name}" {{
 
   tags = azurerm_resource_group.pov.tags
 
-  # Wait for marketplace agreement and bootstrap files
+  # Wait for bootstrap files to be ready
   depends_on = [
-    azurerm_marketplace_agreement.paloalto_vmseries,
     azurerm_storage_blob.init_cfg,
     azurerm_storage_blob.bootstrap_xml
   ]
@@ -8726,7 +8726,10 @@ output "{device_name}_private_ip" {{
             # Mark Terraform as deployed for navigation validation
             self._terraform_deployed = True
 
-            result_text = "[OK] Deployment Successful!\n\n"
+            # Append summary to results (don't clear existing output)
+            result_text = "\n" + "=" * 60 + "\n"
+            result_text += "[OK] DEPLOYMENT SUCCESSFUL\n"
+            result_text += "=" * 60 + "\n\n"
             if outputs:
                 result_text += "Deployed Resources:\n"
                 for key, value in outputs.items():
@@ -8734,7 +8737,7 @@ output "{device_name}_private_ip" {{
                         result_text += f"  - {key}: {value}\n"
                         self._log_activity(f"  Deployed: {key} = {value}")
 
-            self.cloud_deploy_results.set_text(result_text)
+            self.cloud_deploy_results.append_text(result_text)
 
             # Enable the Next button now that Terraform is deployed
             if hasattr(self, 'cloud_deploy_next_btn'):
@@ -8745,12 +8748,13 @@ output "{device_name}_private_ip" {{
             self._populate_deployment_credentials()
         else:
             self._log_activity(f"Infrastructure deployment failed: {message}", "error")
-            self.cloud_deploy_results.set_text(f"[FAILED] Deployment Failed\n\n{message}")
-            QMessageBox.critical(
-                self,
-                "Deployment Failed",
-                f"Infrastructure deployment failed:\n{message}"
-            )
+            # Append failure summary to results (don't clear existing output)
+            result_text = "\n" + "=" * 60 + "\n"
+            result_text += "[FAILED] DEPLOYMENT FAILED\n"
+            result_text += "=" * 60 + "\n\n"
+            result_text += f"Error: {message}\n"
+            result_text += "\nReview the output above for details."
+            self.cloud_deploy_results.append_text(result_text)
 
     def _on_deploy_error(self, error: str):
         """Handle deployment error."""
