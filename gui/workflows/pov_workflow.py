@@ -8460,10 +8460,10 @@ output "{device_name}_private_ip" {{
 
     def _get_terraform_credentials(self) -> dict:
         """Get credentials for Terraform deployment."""
-        # For now, use a placeholder password
-        # In production, this would prompt user or use tenant manager
+        cloud_deployment = self.cloud_resource_configs.get('cloud_deployment', {})
         return {
-            'admin_password': 'PaloAlto123!',  # Default for POV
+            'admin_username': cloud_deployment.get('admin_username', ''),
+            'admin_password': cloud_deployment.get('admin_password', ''),
         }
 
     def _on_deploy_progress(self, message: str, percentage: int):
@@ -9123,8 +9123,12 @@ output "{device_name}_private_ip" {{
                 self._sanitize_customer_name(customer_info.get('customer_name', 'pov'))
             )
             # Build admin username: {customer}admin (e.g., "acmeadmin")
-            admin_username = f"{customer_name_sanitized}admin"
-            admin_password = 'PaloAlto123!'  # Default POV password
+            cloud_deployment = self.cloud_resource_configs.get('cloud_deployment', {})
+            admin_username = cloud_deployment.get('admin_username', f"{customer_name_sanitized}admin")
+            admin_password = cloud_deployment.get('admin_password', '')
+
+            if not admin_password:
+                self._log_activity("Warning: No admin password found in config - firewall login may fail", "warning")
 
             self._log_activity(f"Using firewall credentials: {admin_username}")
 
@@ -10356,14 +10360,6 @@ output "{device_name}_private_ip" {{
                 "  - Prisma Access Config: Deployed"
             )
             self.complete_btn.setEnabled(True)
-
-            QMessageBox.information(
-                self,
-                "Deployment Complete",
-                f"POV deployment completed successfully!\n\n"
-                f"All {successes} phases completed.\n"
-                "You can now complete the POV setup."
-            )
         else:
             self._log_activity(f"Deployment completed with {failures} failures, {skipped} skipped", "warning")
             # Keep button as "Resume Deployment" if there were failures
@@ -10380,16 +10376,6 @@ output "{device_name}_private_ip" {{
             summary_text += "\nClick 'Resume Deployment' to retry failed phases."
 
             self.pov_deploy_results.append_text(summary_text)
-
-            QMessageBox.warning(
-                self,
-                "Deployment Completed with Errors",
-                f"POV deployment completed with some errors.\n\n"
-                f"Successful: {successes}\n"
-                f"Failed: {failures}\n\n"
-                "Please review the deployment log for details."
-            )
-
 
     def _sync_tenant_to_deploy_tab(self):
         """Sync the tenant from Tab 1 to Tab 5."""
@@ -10703,6 +10689,19 @@ output "{device_name}_private_ip" {{
             self.deploy_tenant_selector.status_label.setStyleSheet(
                 "color: #1565C0; padding: 8px; margin-top: 5px; font-style: italic;"
             )
+
+        # Restore admin credentials in UI
+        cloud_deployment = self.cloud_resource_configs.get('cloud_deployment', {})
+        if hasattr(self, 'cloud_admin_username') and cloud_deployment.get('admin_username'):
+            self.cloud_admin_username.setText(cloud_deployment['admin_username'])
+        if hasattr(self, 'cloud_admin_password') and cloud_deployment.get('admin_password'):
+            # Block signals to avoid triggering password change handler
+            self.cloud_admin_password.blockSignals(True)
+            self.cloud_admin_password.setText(cloud_deployment['admin_password'])
+            self.cloud_admin_password.blockSignals(False)
+            # Update password strength indicator
+            if hasattr(self, '_update_password_strength'):
+                self._update_password_strength()
 
         # Refresh other UI elements
         if hasattr(self, '_update_cloud_rg_preview'):
