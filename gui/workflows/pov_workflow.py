@@ -8008,7 +8008,8 @@ resource "azurerm_network_security_group" "management" {{
         # Note: source_address_prefix (singular) is used for "*", source_address_prefixes (plural) for specific IPs
         source_ips = tfvars.get('source_ips', [])
         if source_ips:
-            source_line = f'source_address_prefixes     = [{", ".join([f\'"{ip}"\' for ip in source_ips])}]'
+            quoted_ips = ', '.join(f'"{ip}"' for ip in source_ips)
+            source_line = f'source_address_prefixes     = [{quoted_ips}]'
         else:
             source_line = 'source_address_prefix       = "*"'
 
