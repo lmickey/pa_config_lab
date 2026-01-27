@@ -11038,13 +11038,53 @@ output "{device_name}_private_ip" {{
                     "Click to re-authenticate or select a different subscription"
                 )
 
-            # Enable terraform buttons since we have credentials
-            if hasattr(self, 'generate_terraform_btn'):
-                self.generate_terraform_btn.setEnabled(True)
-
             self._log_activity(
                 f"Restored Azure credentials from cache: {saved_sub_name} (tenant: {saved_tenant_id})"
             )
+
+            # Show terraform status widget and trigger generation if needed
+            if hasattr(self, 'terraform_status_widget'):
+                self.terraform_status_widget.setVisible(True)
+
+            # Check if terraform files exist and enable buttons accordingly
+            terraform_output_dir = self.deployment_config.get('terraform_output_dir') or \
+                                   getattr(self, '_terraform_output_dir', None)
+            if terraform_output_dir:
+                import os
+                terraform_dir = os.path.join(terraform_output_dir, 'terraform') if 'terraform' not in terraform_output_dir else terraform_output_dir
+                main_tf_exists = os.path.exists(os.path.join(terraform_dir, 'main.tf'))
+
+                if main_tf_exists:
+                    # Terraform files exist - enable action buttons
+                    if hasattr(self, 'review_terraform_btn'):
+                        self.review_terraform_btn.setEnabled(True)
+                    if hasattr(self, 'edit_terraform_btn'):
+                        self.edit_terraform_btn.setEnabled(True)
+                    if hasattr(self, 'deploy_terraform_btn'):
+                        self.deploy_terraform_btn.setEnabled(True)
+
+                    if hasattr(self, 'terraform_gen_status'):
+                        self.terraform_gen_status.setText("✓ Terraform configuration ready (from cache)")
+                        self.terraform_gen_status.setStyleSheet(
+                            "color: #2E7D32; padding: 10px; background-color: #E8F5E9; "
+                            "border-radius: 5px;"
+                        )
+                else:
+                    # Need to regenerate terraform files
+                    if hasattr(self, 'terraform_gen_status'):
+                        self.terraform_gen_status.setText("⚠️ Click to regenerate Terraform configuration")
+                        self.terraform_gen_status.setStyleSheet(
+                            "color: #FF9800; padding: 10px; background-color: #FFF3E0; "
+                            "border-radius: 5px; cursor: pointer;"
+                        )
+            else:
+                # No terraform output dir - prompt to generate
+                if hasattr(self, 'terraform_gen_status'):
+                    self.terraform_gen_status.setText("⚠️ Terraform not generated - authenticate to generate")
+                    self.terraform_gen_status.setStyleSheet(
+                        "color: #FF9800; padding: 10px; background-color: #FFF3E0; "
+                        "border-radius: 5px;"
+                    )
 
     def _restore_terraform_ui_state(self, state: Dict[str, Any]):
         """Restore terraform-related UI state."""
