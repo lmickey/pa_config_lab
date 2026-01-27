@@ -124,6 +124,12 @@ class TerraformWorker(QThread):
         terraform_dir = os.path.join(self.output_dir, "terraform")
         executor = TerraformExecutor(terraform_dir)
 
+        # Clean up any stale locks before init
+        if not executor.cleanup_locks():
+            self.error.emit("State file is locked by another process")
+            self.finished.emit(False, "State file locked", {})
+            return
+
         self.progress.emit("Running terraform init...", 30)
         result = executor.init()
 
@@ -317,6 +323,13 @@ class TerraformWorker(QThread):
 
         terraform_dir = os.path.join(self.output_dir, "terraform")
         executor = TerraformExecutor(terraform_dir)
+
+        # Clean up any stale locks before init
+        self.log_message.emit("Checking for stale locks...")
+        if not executor.cleanup_locks():
+            self.error.emit("State file is locked by another process. Please close any editors or wait.")
+            self.finished.emit(False, "State file locked", {})
+            return False
 
         def init_callback(line: str):
             """Process init output."""

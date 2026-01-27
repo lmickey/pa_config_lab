@@ -203,6 +203,49 @@ class TerraformExecutor:
         """Get Terraform version."""
         return self._run_command(["version", "-json"])
 
+    def cleanup_locks(self) -> bool:
+        """
+        Clean up any stale lock files before running terraform commands.
+
+        This helps resolve issues where a previous terraform process didn't
+        exit cleanly and left lock files behind.
+
+        Returns:
+            True if cleanup was successful or no cleanup needed
+        """
+        import time
+
+        lock_file = self.working_dir / ".terraform.tfstate.lock.info"
+        state_file = self.working_dir / "terraform.tfstate"
+
+        # Remove terraform lock info file if it exists
+        if lock_file.exists():
+            try:
+                lock_file.unlink()
+                logger.info(f"Removed stale lock file: {lock_file}")
+            except Exception as e:
+                logger.warning(f"Failed to remove lock file: {e}")
+
+        # Check if state file is accessible (not locked by another process)
+        if state_file.exists():
+            for attempt in range(3):
+                try:
+                    # Try to open the file for reading to check if it's locked
+                    with open(state_file, 'r') as f:
+                        f.read(1)  # Read just 1 byte to test access
+                    return True
+                except PermissionError:
+                    logger.warning(f"State file locked, waiting... (attempt {attempt + 1}/3)")
+                    time.sleep(2)
+                except Exception as e:
+                    logger.debug(f"State file check error: {e}")
+                    return True  # File might not exist yet, which is fine
+
+            logger.error("State file remains locked after retries")
+            return False
+
+        return True
+
     def init(
         self,
         upgrade: bool = False,
