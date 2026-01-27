@@ -4804,18 +4804,21 @@ class POVWorkflowWidget(QWidget):
 
         new_devices = []
 
-        # Add Panorama if panorama managed is selected
+        # Add Panorama if panorama managed is selected - associate with default datacenter
         if hasattr(self, 'management_type') and self.management_type == 'panorama':
             panorama_name = "Panorama"
             auto_device_names.add(panorama_name)
             # Check if Panorama already exists
             if not any(d['name'] == panorama_name for d in current_devices):
-                primary_region = self.cloud_region_combo.currentText() if hasattr(self, 'cloud_region_combo') else "eastus"
+                # Associate Panorama with the default (first) datacenter
+                datacenters = loc_config.get('datacenters', [])
+                default_dc = datacenters[0] if datacenters else None
+                dc_name = default_dc['name'] if default_dc else 'Datacenter'
                 new_devices.append({
                     'id': str(uuid.uuid4()),
                     'name': panorama_name,
-                    'location': f"Primary ({primary_region})",
-                    'location_type': 'primary',
+                    'location': dc_name,
+                    'location_type': 'datacenter',
                     'device_type': 'Panorama',
                     'subtype': 'Management',
                     'services': [],
@@ -5273,7 +5276,17 @@ class POVWorkflowWidget(QWidget):
             return
 
         # Handle datacenters: toggle SC <-> ZTNA
-        if conn.get('locked', False) or loc_type != 'datacenter':
+        if loc_type != 'datacenter':
+            return
+
+        # Check if locked (e.g., has Panorama associated)
+        if conn.get('locked', False):
+            if conn.get('has_panorama', False):
+                QMessageBox.information(
+                    self, "Panorama Datacenter",
+                    f"'{conn['name']}' cannot be converted to ZTNA because it has Panorama associated.\n\n"
+                    "Panorama requires a Service Connection for management connectivity."
+                )
             return
 
         # Count current SC and ZTNA
@@ -5432,7 +5445,14 @@ class POVWorkflowWidget(QWidget):
             else:
                 icon = "🏛️"
                 type_display = "Service Connection"
-                suffix = " (required)" if is_locked else ""
+                # Show Panorama association if present
+                has_panorama = conn.get('has_panorama', False)
+                if has_panorama:
+                    suffix = " + Panorama (locked)"
+                elif is_locked:
+                    suffix = " (required)"
+                else:
+                    suffix = ""
 
             self.private_app_connections_list.addItem(f"{icon} {name} → {type_display}{suffix}")
 
@@ -6056,25 +6076,28 @@ class POVWorkflowWidget(QWidget):
         sc_count = 0
         ztna_count = 0
 
-        # Add Panorama if panorama managed (must be Service Connection, counts toward limit)
-        if self.management_type == 'panorama':
-            conn = {
-                'name': 'Panorama',
-                'type': 'datacenter',
-                'connection_type': 'service_connection',
-                'locked': True,  # Cannot change
-                'custom': False,
-            }
-            connections.append(conn)
-            sc_count += 1
+        # Note: Panorama is NOT a "site" - it's a trust device associated with the default datacenter
+        # It does not appear in the private app connections list
+        # However, if Panorama is enabled, the default datacenter MUST be Service Connection (locked)
+        datacenters = locations.get('datacenters', [])
+        default_dc_name = datacenters[0]['name'] if datacenters else None
+        panorama_enabled = hasattr(self, 'management_type') and self.management_type == 'panorama'
 
         # Add datacenters - preserve user's type if set, otherwise assign based on limits
-        for dc in locations.get('datacenters', []):
+        for dc in datacenters:
             existing = existing_connections.get(dc['name'])
 
-            if existing:
+            # Check if this datacenter has Panorama associated (default DC when Panorama enabled)
+            has_panorama = panorama_enabled and dc['name'] == default_dc_name
+
+            if has_panorama:
+                # Datacenter with Panorama MUST be Service Connection - cannot be ZTNA
+                conn_type = 'service_connection'
+                is_locked = True
+            elif existing:
                 # Preserve user's choice
                 conn_type = existing.get('connection_type', 'service_connection')
+                is_locked = False
             else:
                 # New datacenter - assign type based on limits
                 # First 5 get SC, next 10 get ZTNA, rest are skipped
@@ -6085,6 +6108,7 @@ class POVWorkflowWidget(QWidget):
                 else:
                     # Skip this datacenter - limits reached
                     continue
+                is_locked = False
 
             # Update counts
             if conn_type == 'service_connection':
@@ -6096,8 +6120,9 @@ class POVWorkflowWidget(QWidget):
                 'name': dc['name'],
                 'type': 'datacenter',
                 'connection_type': conn_type,
-                'locked': False,
+                'locked': is_locked,
                 'custom': False,
+                'has_panorama': has_panorama,  # Track Panorama association
             }
             connections.append(conn)
 
