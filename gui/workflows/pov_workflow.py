@@ -2530,6 +2530,24 @@ class POVWorkflowWidget(QWidget):
         actions_row = QHBoxLayout()
         actions_row.addStretch()
 
+        # Regenerate Terraform button - regenerates files from current POV config
+        self.regen_terraform_btn = QPushButton("🔄 Regenerate")
+        self.regen_terraform_btn.setMinimumWidth(140)
+        self.regen_terraform_btn.setEnabled(False)
+        self.regen_terraform_btn.setToolTip("Regenerate Terraform files from current POV configuration")
+        self.regen_terraform_btn.setStyleSheet(
+            "QPushButton { "
+            "  background-color: #2196F3; color: white; padding: 10px 20px; "
+            "  font-weight: bold; border-radius: 5px; "
+            "  border: 1px solid #1976D2; border-bottom: 3px solid #1565C0; "
+            "}"
+            "QPushButton:hover { background-color: #42A5F5; border-bottom: 3px solid #0D47A1; }"
+            "QPushButton:pressed { background-color: #1976D2; border-bottom: 1px solid #1565C0; }"
+            "QPushButton:disabled { background-color: #BDBDBD; color: #9E9E9E; border: 1px solid #9E9E9E; border-bottom: 3px solid #757575; }"
+        )
+        self.regen_terraform_btn.clicked.connect(self._regenerate_terraform)
+        actions_row.addWidget(self.regen_terraform_btn)
+
         self.review_terraform_btn = QPushButton("📄 Review Terraform")
         self.review_terraform_btn.setMinimumWidth(160)
         self.review_terraform_btn.setEnabled(False)
@@ -8539,6 +8557,7 @@ output "{device_name}_private_ip" {{
         )
 
         # Enable terraform action buttons
+        self.regen_terraform_btn.setEnabled(True)
         self.review_terraform_btn.setEnabled(True)
         self.edit_terraform_btn.setEnabled(True)
         self.deploy_terraform_btn.setEnabled(True)
@@ -8571,6 +8590,41 @@ output "{device_name}_private_ip" {{
             self.deploy_terraform_btn.setToolTip(
                 "Deploy resources to Azure using Terraform"
             )
+
+    def _regenerate_terraform(self):
+        """Regenerate Terraform files from current POV configuration."""
+        # Check if we have Azure credentials
+        if not hasattr(self, '_azure_subscription') or not self._azure_subscription:
+            QMessageBox.warning(
+                self,
+                "Azure Not Authenticated",
+                "Please authenticate with Azure first before regenerating Terraform files."
+            )
+            return
+
+        # Confirm regeneration
+        reply = QMessageBox.question(
+            self,
+            "Regenerate Terraform?",
+            "This will regenerate all Terraform files from the current POV configuration.\n\n"
+            "Any manual changes to the Terraform files will be overwritten.\n\n"
+            "Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
+
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        self._log_activity("Regenerating Terraform configuration...")
+        self.terraform_gen_status.setText("⏳ Regenerating Terraform configuration...")
+        self.terraform_gen_status.setStyleSheet(
+            "color: #1565C0; padding: 10px; background-color: #E3F2FD; "
+            "border-radius: 5px;"
+        )
+
+        # Force regenerate
+        self._generate_terraform_from_pov(force_regenerate=True)
 
     def _edit_terraform(self):
         """Open Terraform directory in system file manager for manual editing."""
@@ -8748,6 +8802,7 @@ output "{device_name}_private_ip" {{
         self._terraform_deploy_worker.start()
 
         # Update UI - disable all terraform action buttons during deployment
+        self.regen_terraform_btn.setEnabled(False)
         self.deploy_terraform_btn.setEnabled(False)
         self.review_terraform_btn.setEnabled(False)
         self.edit_terraform_btn.setEnabled(False)
@@ -8788,6 +8843,7 @@ output "{device_name}_private_ip" {{
     def _on_deploy_finished(self, success: bool, message: str, outputs: dict):
         """Handle deployment completion."""
         # Re-enable all terraform action buttons
+        self.regen_terraform_btn.setEnabled(True)
         self.deploy_terraform_btn.setEnabled(True)
         self.review_terraform_btn.setEnabled(True)
         self.edit_terraform_btn.setEnabled(True)
@@ -11142,6 +11198,8 @@ output "{device_name}_private_ip" {{
 
                 if main_tf_exists:
                     # Terraform files exist - enable action buttons
+                    if hasattr(self, 'regen_terraform_btn'):
+                        self.regen_terraform_btn.setEnabled(True)
                     if hasattr(self, 'review_terraform_btn'):
                         self.review_terraform_btn.setEnabled(True)
                     if hasattr(self, 'edit_terraform_btn'):
@@ -11187,6 +11245,8 @@ output "{device_name}_private_ip" {{
 
             if main_tf_exists:
                 # Terraform files exist - enable buttons
+                if hasattr(self, 'regen_terraform_btn'):
+                    self.regen_terraform_btn.setEnabled(True)
                 if hasattr(self, 'review_terraform_btn'):
                     self.review_terraform_btn.setEnabled(True)
                 if hasattr(self, 'edit_terraform_btn'):
