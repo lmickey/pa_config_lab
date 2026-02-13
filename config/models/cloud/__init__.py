@@ -19,6 +19,12 @@ from .firewall import (
     NetworkInterfaceConfig,
     DeviceConfig,
 )
+from .ion_device import (
+    IONDevice,
+    IONVMSettings,
+    IONImageConfig,
+    IONInterfaceConfig,
+)
 from .panorama import CloudPanorama, LicensingStatus, PluginConfig
 from .supporting_vms import (
     SupportingVM,
@@ -53,6 +59,12 @@ __all__ = [
     'VMImageConfig',
     'NetworkInterfaceConfig',
     'DeviceConfig',
+
+    # ION Device
+    'IONDevice',
+    'IONVMSettings',
+    'IONImageConfig',
+    'IONInterfaceConfig',
 
     # Panorama
     'CloudPanorama',

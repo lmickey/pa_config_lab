@@ -116,6 +116,17 @@ class POVWorkflowWidget(QWidget):
             'policy_objects': {},
             'locations': {'branches': [], 'datacenters': []},
             'trust_devices': {'devices': []},
+            'services': {
+                'domain': '',
+                'applications': [],
+                'pki': {
+                    'server_cert': True,
+                    'device_certs': True,
+                    'user_certs': True,
+                    'decryption_ca': True,
+                },
+                'employees': [],
+            },
         }
 
         # Use Cases configuration storage
@@ -1173,6 +1184,13 @@ class POVWorkflowWidget(QWidget):
             )
             dc_add_row.addWidget(self.dc_region_combo)
 
+            self.dc_style_combo = QComboBox()
+            self.dc_style_combo.addItems(["Traditional (Firewall)", "SD-WAN (ION)"])
+            self.dc_style_combo.setStyleSheet(
+                "QComboBox { padding: 3px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; }"
+            )
+            dc_add_row.addWidget(self.dc_style_combo)
+
             add_dc_btn = QPushButton("+")
             add_dc_btn.setFixedSize(24, 24)
             add_dc_btn.setStyleSheet(
@@ -1219,6 +1237,7 @@ class POVWorkflowWidget(QWidget):
                         'name': 'Datacenter',
                         'cloud': 'Azure',
                         'region': default_region,
+                        'style': 'traditional',
                         'bgp_enabled': True,
                         'default_gateway': False,
                         'connection_type': 'service_connection',
@@ -1372,6 +1391,115 @@ class POVWorkflowWidget(QWidget):
 
             return card
 
+        # Create Services & Applications card
+        def create_services_card():
+            from gui.workflows.pov_services import DEFAULT_APPLICATIONS
+
+            card = QFrame()
+            card.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Raised)
+            card.setStyleSheet(
+                "QFrame { background-color: #fafafa; border: 1px solid #ddd; "
+                "border-radius: 8px; padding: 12px; }"
+            )
+            card_layout = QVBoxLayout(card)
+            card_layout.setSpacing(6)
+            card_layout.setContentsMargins(12, 10, 12, 12)
+
+            # Top row: Title and status
+            top_row = QHBoxLayout()
+            title_label = QLabel("<b>🌐 Services & Applications</b>")
+            title_label.setStyleSheet("font-size: 13px; color: #333;")
+            top_row.addWidget(title_label)
+
+            status_label = QLabel("")
+            status_label.setStyleSheet("color: #4CAF50; font-size: 11px;")
+            self.services_status = status_label
+            top_row.addWidget(status_label)
+            top_row.addStretch()
+            card_layout.addLayout(top_row)
+
+            # Domain input
+            domain_row = QHBoxLayout()
+            domain_label = QLabel("Domain:")
+            domain_label.setStyleSheet("font-size: 11px; color: #555; font-weight: bold;")
+            domain_row.addWidget(domain_label)
+
+            self.services_domain_input = QLineEdit()
+            self.services_domain_input.setPlaceholderText("acme.com")
+            self.services_domain_input.setStyleSheet(
+                "QLineEdit { padding: 3px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; }"
+            )
+            self.services_domain_input.textChanged.connect(self._update_services_status)
+            domain_row.addWidget(self.services_domain_input)
+            card_layout.addLayout(domain_row)
+
+            # Applications list (read-only display)
+            apps_label = QLabel(f"<b>Applications</b> ({len(DEFAULT_APPLICATIONS)} included)")
+            apps_label.setStyleSheet("font-size: 11px; color: #555; margin-top: 2px;")
+            card_layout.addWidget(apps_label)
+
+            self.services_apps_list = QListWidget()
+            self.services_apps_list.setMaximumHeight(80)
+            self.services_apps_list.setStyleSheet(
+                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 10px; background-color: white; }"
+                "QListWidget::item { padding: 1px; }"
+            )
+            for app in DEFAULT_APPLICATIONS:
+                from PyQt6.QtWidgets import QListWidgetItem
+                item = QListWidgetItem(f"  {app['subdomain']:12s} {app['name']} ({app['category']})")
+                self.services_apps_list.addItem(item)
+            card_layout.addWidget(self.services_apps_list)
+
+            # PKI options
+            pki_label = QLabel("<b>PKI Certificates</b>")
+            pki_label.setStyleSheet("font-size: 11px; color: #555; margin-top: 2px;")
+            card_layout.addWidget(pki_label)
+
+            pki_row = QHBoxLayout()
+            self.pki_server_cert_cb = QCheckBox("Server")
+            self.pki_server_cert_cb.setChecked(True)
+            self.pki_server_cert_cb.setStyleSheet("font-size: 10px;")
+            self.pki_server_cert_cb.stateChanged.connect(self._update_services_status)
+            pki_row.addWidget(self.pki_server_cert_cb)
+
+            self.pki_device_certs_cb = QCheckBox("Device")
+            self.pki_device_certs_cb.setChecked(True)
+            self.pki_device_certs_cb.setStyleSheet("font-size: 10px;")
+            self.pki_device_certs_cb.stateChanged.connect(self._update_services_status)
+            pki_row.addWidget(self.pki_device_certs_cb)
+
+            self.pki_user_certs_cb = QCheckBox("User")
+            self.pki_user_certs_cb.setChecked(True)
+            self.pki_user_certs_cb.setStyleSheet("font-size: 10px;")
+            self.pki_user_certs_cb.stateChanged.connect(self._update_services_status)
+            pki_row.addWidget(self.pki_user_certs_cb)
+
+            self.pki_decryption_ca_cb = QCheckBox("Decryption")
+            self.pki_decryption_ca_cb.setChecked(True)
+            self.pki_decryption_ca_cb.setStyleSheet("font-size: 10px;")
+            self.pki_decryption_ca_cb.stateChanged.connect(self._update_services_status)
+            pki_row.addWidget(self.pki_decryption_ca_cb)
+
+            card_layout.addLayout(pki_row)
+
+            # Summary
+            summary_frame = QFrame()
+            summary_frame.setStyleSheet(
+                "QFrame { background-color: #E3F2FD; border: 1px solid #90CAF9; "
+                "border-radius: 4px; padding: 4px; margin-top: 4px; }"
+            )
+            summary_layout = QHBoxLayout(summary_frame)
+            summary_layout.setContentsMargins(6, 2, 6, 2)
+
+            self.services_summary = QLabel("Enter a domain to enable services")
+            self.services_summary.setStyleSheet("color: #1565C0; font-size: 10px;")
+            summary_layout.addWidget(self.services_summary)
+
+            card_layout.addWidget(summary_frame)
+
+            card_layout.addStretch()
+            return card
+
         # Scrollable area for cards
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -1379,7 +1507,7 @@ class POVWorkflowWidget(QWidget):
         scroll_widget = QWidget()
         scroll_layout = QVBoxLayout(scroll_widget)
 
-        # 2x3 Grid layout
+        # Grid layout
         grid = QGridLayout()
         grid.setSpacing(12)
 
@@ -1394,6 +1522,9 @@ class POVWorkflowWidget(QWidget):
         # Row 2: Locations, Trust Network Devices
         grid.addWidget(create_locations_card(), 2, 0)
         grid.addWidget(create_trust_devices_card(), 2, 1)
+
+        # Row 3: Services & Applications (spans both columns)
+        grid.addWidget(create_services_card(), 3, 0, 1, 2)
 
         scroll_layout.addLayout(grid)
         scroll_layout.addStretch()
@@ -3722,21 +3853,31 @@ class POVWorkflowWidget(QWidget):
         config["locations"] = locations
 
         # Generate firewalls list from locations
-        # Each datacenter with service_connection needs a firewall
-        # Each branch (remote_network) needs a firewall
+        # Only traditional DCs get firewalls; SD-WAN DCs get ION devices
         firewalls = []
+        ion_devices = []
         fw_index = 1
 
-        # Firewalls for datacenters with service connections
+        # Firewalls/ION for datacenters with service connections
         for dc in locations.get('datacenters', []):
             if dc.get('connection_type') == 'service_connection':
-                firewalls.append({
-                    'name': f"fw-{dc['name'].lower().replace(' ', '-')}",
-                    'type': 'service_connection',
-                    'location': dc['name'],
-                    'region': dc.get('region', 'eastus'),
-                })
-                fw_index += 1
+                dc_style = dc.get('style', 'traditional')
+                if dc_style == 'sdwan':
+                    ion_devices.append({
+                        'name': f"ion-{dc['name'].lower().replace(' ', '-')}",
+                        'type': 'service_connection',
+                        'location': dc['name'],
+                        'region': dc.get('region', 'eastus'),
+                        'style': 'sdwan',
+                    })
+                else:
+                    firewalls.append({
+                        'name': f"fw-{dc['name'].lower().replace(' ', '-')}",
+                        'type': 'service_connection',
+                        'location': dc['name'],
+                        'region': dc.get('region', 'eastus'),
+                    })
+                    fw_index += 1
 
         # Firewalls for branches (remote networks)
         for branch in locations.get('branches', []):
@@ -3749,6 +3890,10 @@ class POVWorkflowWidget(QWidget):
             fw_index += 1
 
         config["firewalls"] = firewalls
+        config["ion_devices"] = ion_devices
+
+        # Add services configuration
+        config["services"] = self.cloud_resource_configs.get('services', {})
 
         # Add trust devices configuration
         config["trust_devices"] = self.cloud_resource_configs.get('trust_devices', {})
@@ -4697,11 +4842,16 @@ class POVWorkflowWidget(QWidget):
         if region == "(Primary)":
             region = self.cloud_region_combo.currentText() if hasattr(self, 'cloud_region_combo') else "eastus"
 
+        # Determine style from dropdown
+        style_text = self.dc_style_combo.currentText() if hasattr(self, 'dc_style_combo') else "Traditional (Firewall)"
+        style = 'sdwan' if 'SD-WAN' in style_text else 'traditional'
+
         # Create datacenter entry
         datacenter = {
             'name': name,
             'cloud': 'Azure',
             'region': region,
+            'style': style,
             'bgp_enabled': True,
             'default_gateway': False,  # Datacenters don't get default route
             'connection_type': 'service_connection',
@@ -4761,7 +4911,10 @@ class POVWorkflowWidget(QWidget):
         datacenters = self.cloud_resource_configs.get('locations', {}).get('datacenters', [])
 
         for dc in datacenters:
-            item = QListWidgetItem(f"🏛️ {dc['name']} ({dc['region']})")
+            style = dc.get('style', 'traditional')
+            icon = "\U0001f4e1" if style == 'sdwan' else "\U0001f525"  # 📡 or 🔥
+            style_label = "SD-WAN" if style == 'sdwan' else "FW"
+            item = QListWidgetItem(f"{icon} {dc['name']} ({dc['region']}) [{style_label}]")
             item.setData(Qt.ItemDataRole.UserRole, dc['name'])
             self.datacenters_list.addItem(item)
 
@@ -4786,6 +4939,54 @@ class POVWorkflowWidget(QWidget):
             self.locations_status.setStyleSheet("color: #4CAF50; font-size: 11px;")
         else:
             self.locations_status.setText("")
+
+    # ============================================================================
+    # SERVICES & APPLICATIONS HANDLERS
+    # ============================================================================
+
+    def _update_services_status(self):
+        """Update the Services card status and persist config."""
+        domain = self.services_domain_input.text().strip() if hasattr(self, 'services_domain_input') else ''
+
+        # Persist to config
+        services_config = self.cloud_resource_configs.get('services', {})
+        services_config['domain'] = domain
+        services_config['pki'] = {
+            'server_cert': self.pki_server_cert_cb.isChecked() if hasattr(self, 'pki_server_cert_cb') else True,
+            'device_certs': self.pki_device_certs_cb.isChecked() if hasattr(self, 'pki_device_certs_cb') else True,
+            'user_certs': self.pki_user_certs_cb.isChecked() if hasattr(self, 'pki_user_certs_cb') else True,
+            'decryption_ca': self.pki_decryption_ca_cb.isChecked() if hasattr(self, 'pki_decryption_ca_cb') else True,
+        }
+        self.cloud_resource_configs['services'] = services_config
+
+        if not domain:
+            if hasattr(self, 'services_status'):
+                self.services_status.setText("")
+            if hasattr(self, 'services_summary'):
+                self.services_summary.setText("Enter a domain to enable services")
+            return
+
+        from gui.workflows.pov_services import DEFAULT_APPLICATIONS
+        app_count = len(DEFAULT_APPLICATIONS)
+
+        # Build PKI summary
+        pki_parts = []
+        if services_config['pki'].get('server_cert'):
+            pki_parts.append('Server')
+        if services_config['pki'].get('device_certs'):
+            pki_parts.append('Device')
+        if services_config['pki'].get('user_certs'):
+            pki_parts.append('User')
+        if services_config['pki'].get('decryption_ca'):
+            pki_parts.append('Decrypt')
+        pki_label = "Full" if len(pki_parts) == 4 else ", ".join(pki_parts) if pki_parts else "None"
+
+        if hasattr(self, 'services_status'):
+            self.services_status.setText(f"✓ {domain}")
+            self.services_status.setStyleSheet("color: #4CAF50; font-size: 11px;")
+
+        if hasattr(self, 'services_summary'):
+            self.services_summary.setText(f"✓ {app_count} apps @ {domain} | DNS + HTTPS | PKI: {pki_label}")
 
     # ============================================================================
     # TRUST NETWORK DEVICES HANDLERS
@@ -4838,7 +5039,7 @@ class POVWorkflowWidget(QWidget):
                     'auto_generated': True,
                 })
 
-        # 1 Linux ServerVM (DNS/WebApp) per datacenter
+        # 1 Linux ServerVM (DNS/WebApp) per datacenter + ION device entry for SD-WAN DCs
         for dc in loc_config.get('datacenters', []):
             device_name = f"{dc['name']}-ServerVM"
             auto_device_names.add(device_name)
@@ -4853,6 +5054,23 @@ class POVWorkflowWidget(QWidget):
                     'services': ['DNS', 'WebApp'],
                     'auto_generated': True,
                 })
+
+            # For SD-WAN DCs, also create an ION device entry
+            dc_style = dc.get('style', 'traditional')
+            if dc_style == 'sdwan':
+                ion_name = f"{dc['name']}-ION"
+                auto_device_names.add(ion_name)
+                if not any(d['name'] == ion_name for d in current_devices):
+                    new_devices.append({
+                        'id': str(uuid.uuid4()),
+                        'name': ion_name,
+                        'location': dc['name'],
+                        'location_type': 'datacenter',
+                        'device_type': 'ION',
+                        'subtype': 'SD-WAN',
+                        'services': [],
+                        'auto_generated': True,
+                    })
 
         # Keep existing devices (both auto-generated that still have locations and manually added)
         for device in current_devices:
@@ -7852,6 +8070,32 @@ class POVWorkflowWidget(QWidget):
             with open(os.path.join(terraform_dir, 'main.tf'), 'w') as f:
                 f.write(main_tf_content)
 
+            # Generate cloud-init scripts for ServerVMs with services
+            services_config = self.cloud_resource_configs.get('services', {})
+            svc_domain = services_config.get('domain', '')
+            if svc_domain:
+                from gui.workflows.pov_services import CloudInitBuilder
+                trust_devs = tfvars.get('trust_devices', [])
+                customer_name_raw = tfvars.get('customer_name', 'POV')
+                server_ip_counter = 10
+                for dev in trust_devs:
+                    if dev.get('device_type') == 'ServerVM' and dev.get('subtype') == 'Linux':
+                        dev_file_name = dev.get('name', 'vm').lower().replace(' ', '-').replace('_', '-')
+                        server_ip = f"10.100.2.{server_ip_counter}"
+                        server_ip_counter += 1
+                        builder = CloudInitBuilder(
+                            domain=svc_domain,
+                            customer_name=customer_name_raw,
+                            server_ip=server_ip,
+                            pki_options=services_config.get('pki', {}),
+                            trust_devices=trust_devs,
+                        )
+                        cloud_init_script = builder.build_cloud_init()
+                        cloud_init_path = os.path.join(terraform_dir, f'cloud-init-{dev_file_name}.sh')
+                        with open(cloud_init_path, 'w') as f:
+                            f.write(cloud_init_script)
+                        self._log_activity(f"Generated cloud-init script: cloud-init-{dev_file_name}.sh")
+
             # Generate variables.tf
             variables_tf_content = self._generate_variables_tf()
             with open(os.path.join(terraform_dir, 'variables.tf'), 'w') as f:
@@ -8368,12 +8612,122 @@ resource "azurerm_linux_virtual_machine" "fw_{fw_name}" {{
 }}
 '''
 
+        # Add ION devices for SD-WAN datacenters
+        ion_devices = tfvars.get('ion_devices', [])
+        if ion_devices:
+            content += f'''
+# Accept Palo Alto Networks CloudGenix ION Marketplace Agreement
+resource "azurerm_marketplace_agreement" "ion" {{
+  publisher = "paloaltonetworks"
+  offer     = "cloudgenix_ion"
+  plan      = "byol"
+}}
+'''
+        for ion in ion_devices:
+            ion_name = ion.get('name', 'ion').lower().replace(' ', '-').replace('_', '-')
+            location_name = ion.get('location', 'Datacenter')
+            resource_prefix = f"{customer}-{location}-DC-{ion_name}"
+            dns_label = f"{resource_prefix}-wan".lower()
+
+            content += f'''
+# ION Device: {ion_name} (SD-WAN) for {location_name}
+# WAN Public IP for SD-WAN tunnels
+resource "azurerm_public_ip" "pip_{ion_name}" {{
+  name                = "{resource_prefix}-IP-public"
+  location            = azurerm_resource_group.pov.location
+  resource_group_name = azurerm_resource_group.pov.name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+  domain_name_label   = "{dns_label}"
+  tags = azurerm_resource_group.pov.tags
+}}
+
+# WAN NIC (untrust subnet, public IP, IP forwarding)
+resource "azurerm_network_interface" "nic_{ion_name}_wan" {{
+  name                 = "{resource_prefix}-nic-wan"
+  location             = azurerm_resource_group.pov.location
+  resource_group_name  = azurerm_resource_group.pov.name
+  enable_ip_forwarding = true
+
+  ip_configuration {{
+    name                          = "wan"
+    subnet_id                     = azurerm_subnet.untrust.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.pip_{ion_name}.id
+  }}
+
+  tags = azurerm_resource_group.pov.tags
+}}
+
+# LAN NIC (trust subnet, IP forwarding)
+resource "azurerm_network_interface" "nic_{ion_name}_lan" {{
+  name                 = "{resource_prefix}-nic-lan"
+  location             = azurerm_resource_group.pov.location
+  resource_group_name  = azurerm_resource_group.pov.name
+  enable_ip_forwarding = true
+
+  ip_configuration {{
+    name                          = "lan"
+    subnet_id                     = azurerm_subnet.trust.id
+    private_ip_address_allocation = "Dynamic"
+  }}
+
+  tags = azurerm_resource_group.pov.tags
+}}
+
+# SD-WAN ION Virtual Appliance
+resource "azurerm_linux_virtual_machine" "ion_{ion_name}" {{
+  name                            = "{resource_prefix}"
+  resource_group_name             = azurerm_resource_group.pov.name
+  location                        = azurerm_resource_group.pov.location
+  size                            = "Standard_DS3_v2"
+  admin_username                  = var.admin_username
+  admin_password                  = var.admin_password
+  disable_password_authentication = false
+
+  network_interface_ids = [
+    azurerm_network_interface.nic_{ion_name}_wan.id,
+    azurerm_network_interface.nic_{ion_name}_lan.id,
+  ]
+
+  os_disk {{
+    caching              = "ReadWrite"
+    storage_account_type = "Premium_LRS"
+  }}
+
+  plan {{
+    name      = "byol"
+    publisher = "paloaltonetworks"
+    product   = "cloudgenix_ion"
+  }}
+
+  source_image_reference {{
+    publisher = "paloaltonetworks"
+    offer     = "cloudgenix_ion"
+    sku       = "byol"
+    version   = "latest"
+  }}
+
+  tags = azurerm_resource_group.pov.tags
+
+  depends_on = [azurerm_marketplace_agreement.ion]
+}}
+'''
+
         # Add trust devices (VMs)
         trust_devices = tfvars.get('trust_devices', [])
+        services_config = tfvars.get('services', {})
+        domain = services_config.get('domain', '')
+        server_ip_counter = 10  # Static IPs start at 10.100.2.10
+
         for device in trust_devices:
             device_name = device.get('name', 'vm').lower().replace(' ', '-').replace('_', '-')
             device_type = device.get('device_type', 'ServerVM')
             subtype = device.get('subtype', 'Linux')
+
+            # Skip ION devices here — they are generated above
+            if device_type == 'ION':
+                continue
 
             # Determine site prefix based on device location (default to DC for trust devices)
             device_site = device.get('site', 'datacenter')
@@ -8392,6 +8746,17 @@ resource "azurerm_linux_virtual_machine" "fw_{fw_name}" {{
                 offer = '0001-com-ubuntu-server-jammy'
                 sku = '22_04-lts-gen2'
 
+            # For ServerVMs with domain configured, use static IP and cloud-init
+            is_server_with_services = (device_type == 'ServerVM' and subtype == 'Linux' and domain)
+            if is_server_with_services:
+                server_ip = f"10.100.2.{server_ip_counter}"
+                server_ip_counter += 1
+                ip_allocation = "Static"
+                ip_address_line = f'\n    private_ip_address            = "{server_ip}"'
+            else:
+                ip_allocation = "Dynamic"
+                ip_address_line = ""
+
             content += f'''
 # {device.get('name', 'VM')} - {device_type}
 resource "azurerm_network_interface" "nic_{device_name}" {{
@@ -8402,7 +8767,7 @@ resource "azurerm_network_interface" "nic_{device_name}" {{
   ip_configuration {{
     name                          = "internal"
     subnet_id                     = azurerm_subnet.trust.id
-    private_ip_address_allocation = "Dynamic"
+    private_ip_address_allocation = "{ip_allocation}"{ip_address_line}
   }}
 
   tags = azurerm_resource_group.pov.tags
@@ -8416,7 +8781,14 @@ resource "azurerm_linux_virtual_machine" "vm_{device_name}" {{
   admin_username                  = var.admin_username
   admin_password                  = var.admin_password
   disable_password_authentication = false
+'''
+            # Add cloud-init custom_data for ServerVMs with services
+            if is_server_with_services:
+                content += f'''
+  custom_data = base64encode(file("${{path.module}}/cloud-init-{device_name}.sh"))
+'''
 
+            content += f'''
   network_interface_ids = [
     azurerm_network_interface.nic_{device_name}.id,
   ]
@@ -9630,6 +10002,7 @@ output "{device_name}_private_ip" {{
             'api_client': self.api_client,
             'connection_name': self.connection_name,
             'infrastructure': self.cloud_resource_configs.get('infrastructure', {}),
+            'services': self.cloud_resource_configs.get('services', {}),
         }
 
         # Update UI for deployment
@@ -9696,23 +10069,27 @@ output "{device_name}_private_ip" {{
         folders_to_commit = set()
 
         # Service Connections (PA side goes to SCM, FW side goes after commit)
+        # SD-WAN (ION) DCs get PA side config but skip FW side (ION auto-establishes tunnels)
         sc_datacenters = [dc for dc in ctx.get('datacenters', [])
                         if dc.get('connection_type') == 'service_connection']
         for dc in sc_datacenters:
-            fw = self._find_firewall_for_location(dc.get('name'))
+            dc_style = dc.get('style', 'traditional')
             scm_phases.append({
                 'name': f"Service Connection: {dc['name']} (PA side)",
                 'type': 'service_connection_pa',
                 'datacenter': dc,
             })
             folders_to_commit.add('Service Connections')
-            if fw:
-                fw_side_phases.append({
-                    'name': f"Service Connection: {dc['name']} (FW side)",
-                    'type': 'service_connection_fw',
-                    'datacenter': dc,
-                    'firewall': fw,
-                })
+            # Only traditional (firewall) DCs need FW-side IPsec config
+            if dc_style != 'sdwan':
+                fw = self._find_firewall_for_location(dc.get('name'))
+                if fw:
+                    fw_side_phases.append({
+                        'name': f"Service Connection: {dc['name']} (FW side)",
+                        'type': 'service_connection_fw',
+                        'datacenter': dc,
+                        'firewall': fw,
+                    })
 
         # Remote Networks (PA side goes to SCM, FW side goes after commit)
         for branch in ctx.get('branches', []):
@@ -9788,6 +10165,15 @@ output "{device_name}_private_ip" {{
                 'firewall': fw,
             })
 
+        # SSL Decryption CA phase — upload decryption CA to SCM
+        services = ctx.get('services', {})
+        if services.get('domain') and services.get('pki', {}).get('decryption_ca', False):
+            phases.append({
+                'name': 'SSL Decryption CA Upload',
+                'type': 'ssl_decryption_ca',
+                'domain': services['domain'],
+            })
+
         return phases
 
     def _find_firewall_for_location(self, location_name: str) -> Optional[dict]:
@@ -9859,6 +10245,8 @@ output "{device_name}_private_ip" {{
             self._execute_adem_phase(phase)
         elif phase_type == 'firewall_objects_rules':
             self._execute_firewall_objects_rules_phase(phase)
+        elif phase_type == 'ssl_decryption_ca':
+            self._execute_ssl_decryption_ca_phase(phase)
         else:
             self._log_activity(f"Unknown phase type: {phase_type}", "warning")
             self._advance_to_next_phase(True, "Skipped unknown phase type")
@@ -10213,6 +10601,106 @@ output "{device_name}_private_ip" {{
 
         except Exception as e:
             self._log_activity(f"Failed to configure firewall objects/rules: {e}", "error")
+            self.pov_deploy_results.append_text(f"\n  [ERROR] {str(e)}")
+            self._advance_to_next_phase(False, str(e))
+
+    def _execute_ssl_decryption_ca_phase(self, phase: dict):
+        """Upload decryption CA certificate to SCM for SSL decryption."""
+        domain = phase.get('domain', '')
+        self.pov_deploy_results.append_text(f"\n  Generating decryption CA for {domain}...")
+
+        try:
+            import subprocess
+            import tempfile
+            import os
+
+            customer_info = self.cloud_resource_configs.get('customer_info', {})
+            customer_name = customer_info.get('customer_name', 'POV')
+
+            # Generate decryption CA cert locally using OpenSSL
+            with tempfile.TemporaryDirectory() as tmpdir:
+                root_key = os.path.join(tmpdir, 'root-ca.key')
+                root_crt = os.path.join(tmpdir, 'root-ca.crt')
+                dec_key = os.path.join(tmpdir, 'decryption-ca.key')
+                dec_csr = os.path.join(tmpdir, 'decryption-ca.csr')
+                dec_crt = os.path.join(tmpdir, 'decryption-ca.crt')
+
+                # Generate Root CA
+                subprocess.run([
+                    'openssl', 'genrsa', '-out', root_key, '4096'
+                ], capture_output=True, check=True)
+
+                subprocess.run([
+                    'openssl', 'req', '-new', '-x509', '-days', '3650', '-sha256',
+                    '-key', root_key, '-out', root_crt,
+                    '-subj', f'/C=US/ST=California/L=Santa Clara/O={customer_name}/OU=Security/CN={customer_name} Root CA'
+                ], capture_output=True, check=True)
+
+                # Generate Decryption CA
+                subprocess.run([
+                    'openssl', 'genrsa', '-out', dec_key, '4096'
+                ], capture_output=True, check=True)
+
+                subprocess.run([
+                    'openssl', 'req', '-new', '-sha256',
+                    '-key', dec_key, '-out', dec_csr,
+                    '-subj', f'/C=US/ST=California/L=Santa Clara/O={customer_name}/OU=Security/CN={customer_name} Decryption CA'
+                ], capture_output=True, check=True)
+
+                # Sign with Root CA
+                ext_file = os.path.join(tmpdir, 'ext.cnf')
+                with open(ext_file, 'w') as f:
+                    f.write(
+                        "basicConstraints = critical, CA:TRUE, pathlen:0\n"
+                        "keyUsage = critical, keyCertSign, cRLSign\n"
+                        "subjectKeyIdentifier = hash\n"
+                        "authorityKeyIdentifier = keyid:always, issuer\n"
+                    )
+
+                subprocess.run([
+                    'openssl', 'x509', '-req', '-days', '1825', '-sha256',
+                    '-in', dec_csr, '-CA', root_crt, '-CAkey', root_key,
+                    '-CAcreateserial', '-out', dec_crt, '-extfile', ext_file
+                ], capture_output=True, check=True)
+
+                # Read the generated certificate
+                with open(dec_crt, 'r') as f:
+                    cert_pem = f.read()
+
+                self.pov_deploy_results.append_text("\n  - Decryption CA cert generated locally")
+
+            # Upload to SCM
+            api_client = self._get_deploy_api_client()
+            if not api_client:
+                self.pov_deploy_results.append_text("\n  [SKIP] No SCM API client available")
+                self._advance_to_next_phase(True, "No API client - skipping SSL decryption CA upload")
+                return
+
+            cert_name = f"{customer_name}-Decryption-CA".replace(' ', '-')
+
+            try:
+                cert_payload = {
+                    'name': cert_name,
+                    'certificate': cert_pem,
+                    'format': 'pem',
+                    'folder': 'Shared',
+                }
+                api_client.post('/config/objects/v1/certificates', json=cert_payload)
+                self.pov_deploy_results.append_text(f"\n  - Uploaded '{cert_name}' to SCM")
+            except Exception as upload_err:
+                if 'already exists' in str(upload_err).lower():
+                    self.pov_deploy_results.append_text(f"\n  - '{cert_name}' already exists in SCM")
+                else:
+                    raise upload_err
+
+            self.pov_deploy_results.append_text("\n  [OK] SSL Decryption CA configured")
+            self._advance_to_next_phase(True, "SSL Decryption CA uploaded to SCM")
+
+        except FileNotFoundError:
+            self.pov_deploy_results.append_text("\n  [SKIP] OpenSSL not available on this system")
+            self._advance_to_next_phase(True, "OpenSSL not found - skipping decryption CA")
+        except Exception as e:
+            self._log_activity(f"SSL Decryption CA phase failed: {e}", "error")
             self.pov_deploy_results.append_text(f"\n  [ERROR] {str(e)}")
             self._advance_to_next_phase(False, str(e))
 
@@ -11676,6 +12164,22 @@ output "{device_name}_private_ip" {{
             # Update password strength indicator
             if hasattr(self, '_update_password_strength'):
                 self._update_password_strength()
+
+        # Restore services & applications card
+        services_config = self.cloud_resource_configs.get('services', {})
+        if hasattr(self, 'services_domain_input') and services_config.get('domain'):
+            self.services_domain_input.setText(services_config['domain'])
+        pki_config = services_config.get('pki', {})
+        if hasattr(self, 'pki_server_cert_cb'):
+            self.pki_server_cert_cb.setChecked(pki_config.get('server_cert', True))
+        if hasattr(self, 'pki_device_certs_cb'):
+            self.pki_device_certs_cb.setChecked(pki_config.get('device_certs', True))
+        if hasattr(self, 'pki_user_certs_cb'):
+            self.pki_user_certs_cb.setChecked(pki_config.get('user_certs', True))
+        if hasattr(self, 'pki_decryption_ca_cb'):
+            self.pki_decryption_ca_cb.setChecked(pki_config.get('decryption_ca', True))
+        if hasattr(self, '_update_services_status'):
+            self._update_services_status()
 
         # Refresh other UI elements
         if hasattr(self, '_update_cloud_rg_preview'):

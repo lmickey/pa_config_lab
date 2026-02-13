@@ -15,6 +15,7 @@ import logging
 
 from .deployment import CloudDeployment
 from .firewall import CloudFirewall
+from .ion_device import IONDevice
 from .panorama import CloudPanorama
 from .supporting_vms import ServerVM, ClientVM, ZTNAConnectorVM, SupportingVM
 from .workflow_state import WorkflowState
@@ -46,6 +47,12 @@ class CloudConfig:
         firewalls_data = raw_config.get('firewalls', [])
         self.firewalls: List[CloudFirewall] = [
             CloudFirewall.from_dict(f, self.deployment) for f in firewalls_data
+        ]
+
+        # ION devices
+        ion_data = raw_config.get('ion_devices', [])
+        self.ion_devices: List[IONDevice] = [
+            IONDevice.from_dict(d, self.deployment) for d in ion_data
         ]
 
         # Panorama (optional)
@@ -90,6 +97,8 @@ class CloudConfig:
         # Update all resources with new deployment (use set_deployment if available)
         for fw in self.firewalls:
             fw.set_deployment(deployment)
+        for ion in self.ion_devices:
+            ion.set_deployment(deployment)
         if self.panorama:
             self.panorama.set_deployment(deployment)
         for vm in self.all_supporting_vms:
@@ -140,6 +149,35 @@ class CloudConfig:
     def get_firewalls_by_type(self, firewall_type: str) -> List[CloudFirewall]:
         """Get all firewalls of a specific type"""
         return [f for f in self.firewalls if f.firewall_type == firewall_type]
+
+    # ========== ION Device Management ==========
+
+    def add_ion_device(self, ion: IONDevice):
+        """Add an ION device"""
+        same_type = [d for d in self.ion_devices if d.ion_type == ion.ion_type]
+        if same_type:
+            ion.index = len(same_type) + 1
+            if len(same_type) == 1 and same_type[0].index is None:
+                same_type[0].index = 1
+
+        if self.deployment:
+            ion.set_deployment(self.deployment)
+
+        self.ion_devices.append(ion)
+        logger.info(f"Added ION device: {ion.name}")
+
+    def remove_ion_device(self, name: str) -> bool:
+        """Remove an ION device by name"""
+        for i, ion in enumerate(self.ion_devices):
+            if ion.name == name:
+                self.ion_devices.pop(i)
+                logger.info(f"Removed ION device: {name}")
+                return True
+        return False
+
+    def get_ion_devices(self) -> List[IONDevice]:
+        """Get all ION devices"""
+        return list(self.ion_devices)
 
     # ========== Panorama Management ==========
 
@@ -218,6 +256,11 @@ class CloudConfig:
             fw_errors = fw.validate()
             errors.extend([f"Firewall '{fw.name}': {e}" for e in fw_errors])
 
+        # Validate ION devices
+        for ion in self.ion_devices:
+            ion_errors = ion.validate()
+            errors.extend([f"ION '{ion.name}': {e}" for e in ion_errors])
+
         # Validate Panorama if present
         if self.panorama:
             pan_errors = self.panorama.validate()
@@ -229,8 +272,8 @@ class CloudConfig:
             errors.extend([f"VM '{vm.name}': {e}" for e in vm_errors])
 
         # Cross-validation
-        if not self.firewalls and not self.panorama:
-            errors.append("At least one firewall or Panorama must be configured")
+        if not self.firewalls and not self.ion_devices and not self.panorama:
+            errors.append("At least one firewall, ION device, or Panorama must be configured")
 
         return errors
 
@@ -242,6 +285,7 @@ class CloudConfig:
             'item_type': self.item_type,
             'deployment': self.deployment.to_dict() if self.deployment else None,
             'firewalls': [f.to_dict() for f in self.firewalls],
+            'ion_devices': [d.to_dict() for d in self.ion_devices],
             'panorama': self.panorama.to_dict() if self.panorama else None,
             'supporting_vms': {
                 'servers': [s.to_dict() for s in self.servers],
@@ -273,6 +317,11 @@ class CloudConfig:
         for fw in self.firewalls:
             vars['firewalls'][fw.name] = fw.to_terraform_vars()
 
+        # Add ION device configs
+        vars['ion_devices'] = {}
+        for ion in self.ion_devices:
+            vars['ion_devices'][ion.name] = ion.to_terraform_vars()
+
         # Add Panorama if present
         if self.panorama:
             vars['panorama'] = self.panorama.to_terraform_vars()
@@ -301,6 +350,7 @@ class CloudConfig:
             'location': self.deployment.location if self.deployment else None,
             'management_type': self.deployment.management_type if self.deployment else None,
             'firewall_count': len(self.firewalls),
+            'ion_device_count': len(self.ion_devices),
             'datacenter_firewalls': len(self.get_firewalls_by_type('datacenter')),
             'branch_firewalls': len(self.get_firewalls_by_type('branch')),
             'has_panorama': self.panorama is not None,
@@ -313,4 +363,4 @@ class CloudConfig:
 
     def __repr__(self) -> str:
         rg = self.deployment.resource_group if self.deployment else "no-deployment"
-        return f"<CloudConfig(rg='{rg}', firewalls={len(self.firewalls)})>"
+        return f"<CloudConfig(rg='{rg}', firewalls={len(self.firewalls)}, ions={len(self.ion_devices)})>"
