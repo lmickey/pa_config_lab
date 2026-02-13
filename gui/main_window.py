@@ -86,6 +86,7 @@ class PrismaConfigMainWindow(QMainWindow):
         self.workflow_list.addItem("🏠 Home")
         self.workflow_list.addItem("🔧 POV Configuration")
         self.workflow_list.addItem("🔄 Configuration Migration")
+        self.workflow_list.addItem("📋 Generate DoR Data")
         self.workflow_list.addItem("📊 Activity Logs")
         sidebar_layout.addWidget(self.workflow_list)
 
@@ -108,6 +109,7 @@ class PrismaConfigMainWindow(QMainWindow):
         self._create_home_page()
         self._create_pov_workflow_page()
         self._create_migration_workflow_page()
+        self._create_dor_workflow_page()
         self._create_logs_page()
 
         # Now connect the signal after everything is initialized
@@ -150,6 +152,13 @@ class PrismaConfigMainWindow(QMainWindow):
         resume_pov_action.setStatusTip("Resume a saved POV deployment workflow")
         resume_pov_action.triggered.connect(self._resume_pov_deployment)
         file_menu.addAction(resume_pov_action)
+
+        # Resume DoR Questionnaire
+        resume_dor_action = QAction("Resume &DoR Questionnaire...", self)
+        resume_dor_action.setShortcut("Ctrl+D")
+        resume_dor_action.setStatusTip("Resume a saved DoR questionnaire")
+        resume_dor_action.triggered.connect(self._resume_dor_questionnaire)
+        file_menu.addAction(resume_dor_action)
 
         file_menu.addSeparator()
 
@@ -272,6 +281,18 @@ class PrismaConfigMainWindow(QMainWindow):
         )
         cards_layout.addWidget(migration_card)
 
+        # DoR Data card
+        dor_card = self._create_workflow_card(
+            "📋 Generate DoR Data",
+            "Generate Definition of Requirements\n"
+            "• Pull tenant config for analysis\n"
+            "• Answer environment questions\n"
+            "• Fill technical details\n"
+            "• Export DoR JSON",
+            lambda: self.workflow_list.setCurrentRow(3),
+        )
+        cards_layout.addWidget(dor_card)
+
         cards_layout.addStretch()
         layout.addLayout(cards_layout)
 
@@ -389,6 +410,30 @@ class PrismaConfigMainWindow(QMainWindow):
 
         self.stacked_widget.addWidget(page)
 
+    def _create_dor_workflow_page(self):
+        """Create the DoR (Definition of Requirements) workflow page."""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+
+        title = QLabel("<h2>📋 Generate DoR Data</h2>")
+        layout.addWidget(title)
+
+        subtitle = QLabel(
+            "Generate Definition of Requirements data by pulling tenant configuration\n"
+            "and answering environment and technical questions."
+        )
+        subtitle.setWordWrap(True)
+        subtitle.setStyleSheet("color: gray; margin-bottom: 20px;")
+        layout.addWidget(subtitle)
+
+        from gui.workflows.dor_workflow import DorWorkflowWidget
+
+        self.dor_workflow = DorWorkflowWidget()
+        self.dor_workflow.connection_changed.connect(self._on_workflow_connection_changed)
+        layout.addWidget(self.dor_workflow)
+
+        self.stacked_widget.addWidget(page)
+
     def _create_logs_page(self):
         """Create the logs and monitoring page."""
         page = QWidget()
@@ -456,6 +501,7 @@ class PrismaConfigMainWindow(QMainWindow):
             "Home",
             "POV Configuration",
             "Configuration Migration",
+            "Generate DoR Data",
             "Logs & Monitoring",
         ]
         
@@ -506,6 +552,7 @@ class PrismaConfigMainWindow(QMainWindow):
                     # Update workflows with connection name
                     self.migration_workflow.set_api_client(self.api_client, connection_name)
                     self.pov_workflow.set_api_client(self.api_client, connection_name)
+                    self.dor_workflow.set_api_client(self.api_client, connection_name)
 
                     # Log connection
                     self.logs_widget.log(f"Connected to {connection_name} (TSG: {tsg_id})", "success")
@@ -660,7 +707,7 @@ class PrismaConfigMainWindow(QMainWindow):
     def _resume_pov_deployment(self):
         """Open the Resume POV Deployment dialog."""
         # POV Builder is at index 1 in the workflow list
-        # (0=Home, 1=POV Builder, 2=Migration, 3=Logs)
+        # (0=Home, 1=POV Builder, 2=Migration, 3=DoR, 4=Logs)
         pov_builder_index = 1
 
         # Switch to POV Builder workflow if not already active
@@ -682,6 +729,28 @@ class PrismaConfigMainWindow(QMainWindow):
                 self,
                 "POV Builder Not Available",
                 "The POV Builder workflow could not be loaded."
+            )
+
+    def _resume_dor_questionnaire(self):
+        """Open the Resume DoR Questionnaire dialog."""
+        # DoR workflow is at index 3 in the workflow list
+        # (0=Home, 1=POV Builder, 2=Migration, 3=DoR, 4=Logs)
+        dor_index = 3
+
+        # Switch to DoR workflow if not already active
+        if hasattr(self, 'workflow_list'):
+            current_index = self.workflow_list.currentRow()
+            if current_index != dor_index:
+                self.workflow_list.setCurrentRow(dor_index)
+
+        # Show resume dialog
+        if hasattr(self, 'dor_workflow'):
+            self.dor_workflow._show_resume_dialog()
+        else:
+            QMessageBox.warning(
+                self,
+                "DoR Workflow Not Available",
+                "The DoR workflow could not be loaded."
             )
 
     def _convert_dict_to_configuration(self, config_data: dict, logger=None):
@@ -1062,15 +1131,23 @@ class PrismaConfigMainWindow(QMainWindow):
         if hasattr(self, 'migration_workflow'):
             logger.info("Updating migration workflow with loaded config")
             self.migration_workflow.load_configuration_from_main(config)
-        
+
+        # Also update DoR workflow if it exists
+        if hasattr(self, 'dor_workflow'):
+            logger.info("Updating DoR workflow with loaded config")
+            self.dor_workflow.load_configuration_from_main(config)
+
         # Show message based on current page
         current_page = self.stacked_widget.currentIndex()
         if current_page == 2:
             # Already on migration workflow
             self.status_bar.showMessage("Configuration loaded into Migration workflow")
+        elif current_page == 3:
+            # On DoR workflow
+            self.status_bar.showMessage("Configuration loaded into DoR workflow")
         elif current_page == 1:
             # On POV workflow
-            self.status_bar.showMessage("Configuration loaded - switch to Migration workflow to view")
+            self.status_bar.showMessage("Configuration loaded - switch to Migration or DoR workflow to view")
 
     def _restore_window_state(self):
         """Restore window state from settings."""

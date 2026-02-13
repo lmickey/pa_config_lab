@@ -14,6 +14,7 @@ Note: Prisma Access uses two different API bases:
 STRATA_BASE_URL = "https://api.strata.paloaltonetworks.com/config/v1"
 STRATA_SETUP_BASE_URL = "https://api.strata.paloaltonetworks.com/config/setup/v1"
 SASE_BASE_URL = "https://api.sase.paloaltonetworks.com/sse/config/v1"
+CIE_BASE_URL = "https://api.sase.paloaltonetworks.com/cie"
 
 # Authentication endpoint
 AUTH_URL = "https://auth.apps.paloaltonetworks.com/oauth2/access_token"
@@ -98,6 +99,13 @@ class APIEndpoints:
     MOBILE_AGENT_INFRASTRUCTURE = (
         f"{SASE_BASE_URL}/mobile-agent/infrastructure-settings"
     )
+
+    # License information
+    LICENSE_TYPES = f"{SASE_BASE_URL}/license-types"  # deprecated, returns 403
+    LICENSES = "https://api.sase.paloaltonetworks.com/subscription/v1/licenses"
+
+    # Cloud Identity Engine (CIE) - Directory Sync
+    CIE_DOMAINS = f"{CIE_BASE_URL}/directory-sync/v1/domains"
 
     # Service Connections and Remote Networks (SASE API)
     SERVICE_CONNECTIONS = f"{SASE_BASE_URL}/service-connections"

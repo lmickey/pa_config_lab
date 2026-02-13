@@ -262,18 +262,25 @@ class InfrastructureConfig:
     
     # Remote Networks infrastructure types
     REMOTE_NETWORK_TYPES = {
+        'remote_network',
         'ike_crypto_profile',
         'ipsec_crypto_profile',
         'ike_gateway',
         'ipsec_tunnel',
         'service_connection',
+        'qos_profile',
     }
-    
+
     # Mobile Users infrastructure types
     MOBILE_USER_TYPES = {
         'agent_profile',
         'portal',
         'gateway',
+    }
+
+    # General infrastructure types (no specific folder association)
+    GENERAL_INFRA_TYPES = {
+        'auto_tag_action',
     }
     
     def __init__(self):
@@ -293,7 +300,7 @@ class InfrastructureConfig:
         if not item.folder:
             raise ValueError(f"Infrastructure item '{item.name}' must have folder property set")
         
-        if item.item_type not in (self.REMOTE_NETWORK_TYPES | self.MOBILE_USER_TYPES):
+        if item.item_type not in (self.REMOTE_NETWORK_TYPES | self.MOBILE_USER_TYPES | self.GENERAL_INFRA_TYPES):
             raise ValueError(f"Item type '{item.item_type}' is not an infrastructure type")
         
         if item not in self.items:
@@ -1085,6 +1092,19 @@ class Configuration:
         
         return config
     
+    def generate_dor_answers(self) -> Dict[str, Any]:
+        """
+        Generate DoR (Definition of Requirements) answers from this configuration.
+
+        Analyzes the pulled configuration to automatically answer DoR questions
+        about quantities, feature detection, and infrastructure details.
+
+        Returns:
+            Dict with all config-answerable DoR data
+        """
+        from gui.workflows.dor_schema import generate_dor_from_config
+        return generate_dor_from_config(self)
+
     def push_to_destination(self, api_client) -> Dict[str, Any]:
         """
         Push configuration to destination tenant.

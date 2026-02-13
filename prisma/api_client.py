@@ -651,6 +651,68 @@ class PrismaAccessAPIClient:
         """Get shared infrastructure settings."""
         return self._make_request("GET", APIEndpoints.SHARED_INFRASTRUCTURE_SETTINGS)
 
+    def get_licenses(self) -> List[Dict[str, Any]]:
+        """
+        Get Prisma Access license/subscription information.
+
+        Uses the subscription API (/subscription/v1/licenses).
+
+        Returns:
+            List of license dicts from the API
+        """
+        response = self._make_request("GET", APIEndpoints.LICENSES)
+        if isinstance(response, list):
+            return response
+        if isinstance(response, dict):
+            # Try common wrapper keys
+            for key in ('data', 'items', 'licenses', 'license_types'):
+                val = response.get(key)
+                if isinstance(val, list):
+                    return val
+            # Single object — wrap it
+            return [response] if response else []
+        return []
+
+    def get_license_types(self) -> List[Dict[str, Any]]:
+        """
+        Get Prisma Access license information for this tenant.
+
+        Tries the subscription API first, falls back to the deprecated
+        license-types endpoint.
+
+        Returns:
+            List of license type dicts from the API
+        """
+        # Try new subscription endpoint first
+        try:
+            result = self.get_licenses()
+            if result:
+                return result
+        except Exception:
+            pass
+
+        # Fall back to deprecated endpoint
+        response = self._make_request("GET", APIEndpoints.LICENSE_TYPES)
+        if isinstance(response, list):
+            return response
+        return response.get("data", response.get("license_types", [response] if response else []))
+
+    def get_cie_domains(self) -> List[Dict[str, Any]]:
+        """
+        Get Cloud Identity Engine directory-sync domains.
+
+        Returns:
+            List of CIE domain dicts from the API
+        """
+        response = self._make_request("GET", APIEndpoints.CIE_DOMAINS)
+        if isinstance(response, list):
+            return response
+        # CIE API wraps results in {success: true, result: [...]}
+        result = response.get("result", response.get("data", []))
+        if isinstance(result, list):
+            return result
+        return [result] if result else []
+
     def get_mobile_agent_infrastructure(self) -> List[Dict[str, Any]]:
         """Get mobile agent infrastructure settings."""
         response = self._make_request("GET", APIEndpoints.MOBILE_AGENT_INFRASTRUCTURE)
