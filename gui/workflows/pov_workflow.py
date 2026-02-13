@@ -1096,10 +1096,11 @@ class POVWorkflowWidget(QWidget):
             card_layout.addWidget(branches_label)
 
             self.branches_list = QListWidget()
-            self.branches_list.setMaximumHeight(60)
+            self.branches_list.setMinimumHeight(80)
+            self.branches_list.setMaximumHeight(120)
             self.branches_list.setStyleSheet(
-                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background-color: white; }"
-                "QListWidget::item { padding: 2px; }"
+                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background-color: white; spacing: 0px; }"
+                "QListWidget::item { padding: 1px 2px; margin: 0px; }"
                 "QListWidget::item:selected { background-color: #2196F3; color: white; }"
             )
             self.branches_list.itemSelectionChanged.connect(self._on_branch_selection_changed)
@@ -1154,10 +1155,11 @@ class POVWorkflowWidget(QWidget):
             card_layout.addWidget(dc_label)
 
             self.datacenters_list = QListWidget()
-            self.datacenters_list.setMaximumHeight(60)
+            self.datacenters_list.setMinimumHeight(80)
+            self.datacenters_list.setMaximumHeight(120)
             self.datacenters_list.setStyleSheet(
-                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background-color: white; }"
-                "QListWidget::item { padding: 2px; }"
+                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background-color: white; spacing: 0px; }"
+                "QListWidget::item { padding: 1px 2px; margin: 0px; }"
                 "QListWidget::item:selected { background-color: #2196F3; color: white; }"
             )
             self.datacenters_list.itemSelectionChanged.connect(self._on_datacenter_selection_changed)
@@ -5107,6 +5109,8 @@ class POVWorkflowWidget(QWidget):
                 icon = "🔧"
             elif device['device_type'] == 'UserVM':
                 icon = "💻"
+            elif device['device_type'] == 'ION':
+                icon = "\U0001f4e1"  # 📡
             else:
                 icon = "🖥️"
 
@@ -5490,7 +5494,7 @@ class POVWorkflowWidget(QWidget):
             self._on_private_app_changed()
             return
 
-        # Handle datacenters: toggle SC <-> ZTNA
+        # Handle datacenters: toggle connection type
         if conn.get('locked', False) or loc_type != 'datacenter':
             return
 
@@ -5499,26 +5503,40 @@ class POVWorkflowWidget(QWidget):
         ztna_count = sum(1 for c in connections if c.get('connection_type') == 'ztna')
 
         current_type = conn.get('connection_type', 'service_connection')
+        is_sdwan = conn.get('style', 'traditional') == 'sdwan'
 
-        # Toggle type with limit checks
-        if current_type == 'service_connection':
-            # Switching to ZTNA - check ZTNA limit
-            if ztna_count >= 10:
-                QMessageBox.warning(
-                    self, "Limit Reached",
-                    "Maximum of 10 ZTNA Connectors allowed."
-                )
-                return
-            conn['connection_type'] = 'ztna'
+        if is_sdwan:
+            # SD-WAN (ION) DCs: toggle none <-> service_connection (no ZTNA option)
+            if current_type == 'none':
+                if sc_count >= 5:
+                    QMessageBox.warning(
+                        self, "Limit Reached",
+                        "Maximum of 5 Service Connections allowed."
+                    )
+                    return
+                conn['connection_type'] = 'service_connection'
+            else:
+                conn['connection_type'] = 'none'
         else:
-            # Switching to SC - check SC limit
-            if sc_count >= 5:
-                QMessageBox.warning(
-                    self, "Limit Reached",
-                    "Maximum of 5 Service Connections allowed."
-                )
-                return
-            conn['connection_type'] = 'service_connection'
+            # Traditional DCs: toggle SC <-> ZTNA
+            if current_type == 'service_connection':
+                # Switching to ZTNA - check ZTNA limit
+                if ztna_count >= 10:
+                    QMessageBox.warning(
+                        self, "Limit Reached",
+                        "Maximum of 10 ZTNA Connectors allowed."
+                    )
+                    return
+                conn['connection_type'] = 'ztna'
+            else:
+                # Switching to SC - check SC limit
+                if sc_count >= 5:
+                    QMessageBox.warning(
+                        self, "Limit Reached",
+                        "Maximum of 5 Service Connections allowed."
+                    )
+                    return
+                conn['connection_type'] = 'service_connection'
 
         # Refresh display and update limits label
         self._refresh_private_app_connections_display()
@@ -5643,6 +5661,10 @@ class POVWorkflowWidget(QWidget):
                 else:
                     type_display = "Remote Network"
                     suffix = " (click to add ZTNA)"
+            elif conn_type == 'none':
+                icon = "\U0001f4e1" if conn.get('style') == 'sdwan' else "🏛️"  # 📡
+                type_display = "None"
+                suffix = " (click to enable SC)"
             elif conn_type == 'ztna':
                 icon = "🔗" if is_custom else "🏛️"
                 type_display = "ZTNA Connector"
@@ -6287,14 +6309,19 @@ class POVWorkflowWidget(QWidget):
             sc_count += 1
 
         # Add datacenters - preserve user's type if set, otherwise assign based on limits
+        # ION (SD-WAN) DCs default to 'none' — user must click to enable service connection
         for dc in locations.get('datacenters', []):
             existing = existing_connections.get(dc['name'])
+            dc_style = dc.get('style', 'traditional')
 
             if existing:
                 # Preserve user's choice
                 conn_type = existing.get('connection_type', 'service_connection')
+            elif dc_style == 'sdwan':
+                # SD-WAN (ION) DCs default to no connection — click to enable
+                conn_type = 'none'
             else:
-                # New datacenter - assign type based on limits
+                # Traditional datacenter - assign type based on limits
                 # First 5 get SC, next 10 get ZTNA, rest are skipped
                 if sc_count < 5:
                     conn_type = 'service_connection'
@@ -6316,6 +6343,7 @@ class POVWorkflowWidget(QWidget):
                 'connection_type': conn_type,
                 'locked': False,
                 'custom': False,
+                'style': dc_style,
             }
             connections.append(conn)
 
