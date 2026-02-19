@@ -71,6 +71,35 @@ output "firewall_untrust_ips" {
 }
 
 # =============================================================================
+# ION Device Outputs
+# =============================================================================
+
+{% for ion in ion_devices %}
+output "{{ ion.name | replace('-', '_') }}_wan_ip" {
+  description = "WAN public IP for {{ ion.name }}"
+  value       = azurerm_public_ip.{{ ion.name | replace('-', '_') }}_wan.ip_address
+}
+
+output "{{ ion.name | replace('-', '_') }}_lan_private_ip" {
+  description = "LAN private IP for {{ ion.name }}"
+  value       = azurerm_network_interface.{{ ion.name | replace('-', '_') }}_lan.private_ip_address
+}
+
+{% endfor %}
+
+{% if ion_devices %}
+# Aggregated ION outputs
+output "ion_wan_ips" {
+  description = "Map of ION device names to WAN public IPs"
+  value = {
+{% for ion in ion_devices %}
+    "{{ ion.name }}" = azurerm_public_ip.{{ ion.name | replace('-', '_') }}_wan.ip_address
+{% endfor %}
+  }
+}
+{% endif %}
+
+# =============================================================================
 # Panorama Outputs
 # =============================================================================
 
@@ -125,6 +154,7 @@ output "deployment_summary" {
     location       = azurerm_resource_group.main.location
     vnet           = azurerm_virtual_network.main.name
     firewalls      = [{% for fw in firewalls %}"{{ fw.name }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+    ion_devices    = [{% for ion in ion_devices %}"{{ ion.name }}"{% if not loop.last %}, {% endif %}{% endfor %}]
 {% if panorama %}
     panorama       = "{{ panorama.name }}"
 {% endif %}

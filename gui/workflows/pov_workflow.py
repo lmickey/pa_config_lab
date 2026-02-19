@@ -116,6 +116,17 @@ class POVWorkflowWidget(QWidget):
             'policy_objects': {},
             'locations': {'branches': [], 'datacenters': []},
             'trust_devices': {'devices': []},
+            'services': {
+                'domain': '',
+                'applications': [],
+                'pki': {
+                    'server_cert': True,
+                    'device_certs': True,
+                    'user_certs': True,
+                    'decryption_ca': True,
+                },
+                'employees': [],
+            },
         }
 
         # Use Cases configuration storage
@@ -846,13 +857,14 @@ class POVWorkflowWidget(QWidget):
 
             card_layout.addLayout(host_row)
 
-            # Initialize config with defaults
-            self.cloud_resource_configs['device_config'] = {
-                'dns_primary': '8.8.8.8',
-                'dns_secondary': '8.8.4.4',
-                'ntp_primary': 'pool.ntp.org',
-                'ntp_secondary': 'time.google.com',
-                'hostname_prefix': 'fw',
+            # Initialize config with defaults only if not restored from state
+            if 'device_config' not in self.cloud_resource_configs:
+                self.cloud_resource_configs['device_config'] = {
+                    'dns_primary': '8.8.8.8',
+                    'dns_secondary': '8.8.4.4',
+                    'ntp_primary': 'pool.ntp.org',
+                    'ntp_secondary': 'time.google.com',
+                    'hostname_prefix': 'fw',
             }
 
             return card
@@ -923,14 +935,15 @@ class POVWorkflowWidget(QWidget):
             self.policy_outbound_nat.stateChanged.connect(self._on_policy_config_changed)
             card_layout.addWidget(self.policy_outbound_nat)
 
-            # Initialize config with defaults
-            self.cloud_resource_configs['policy_objects'] = {
-                'create_rfc1918': True,
-                'create_app_groups': True,
-                'allow_outbound': True,
-                'block_quic': True,
-                'create_outbound_nat': True,
-            }
+            # Initialize config with defaults only if not restored from state
+            if 'policy_objects' not in self.cloud_resource_configs:
+                self.cloud_resource_configs['policy_objects'] = {
+                    'create_rfc1918': True,
+                    'create_app_groups': True,
+                    'allow_outbound': True,
+                    'block_quic': True,
+                    'create_outbound_nat': True,
+                }
 
             return card
 
@@ -1035,14 +1048,15 @@ class POVWorkflowWidget(QWidget):
             ports_row.addStretch()
             card_layout.addLayout(ports_row)
 
-            # Initialize config and fetch public IP
-            self.cloud_resource_configs['cloud_security'] = {
-                'source_ips': '',
-                'allow_ssh': True,
-                'allow_https': True,
-                'create_mgmt_nsg': True,
-                'create_trust_nsg': False,
-            }
+            # Initialize config and fetch public IP only if not restored from state
+            if 'cloud_security' not in self.cloud_resource_configs:
+                self.cloud_resource_configs['cloud_security'] = {
+                    'source_ips': '',
+                    'allow_ssh': True,
+                    'allow_https': True,
+                    'create_mgmt_nsg': True,
+                    'create_trust_nsg': False,
+                }
 
             # Auto-fetch public IP on card creation
             self._fetch_and_set_public_ip()
@@ -1085,10 +1099,11 @@ class POVWorkflowWidget(QWidget):
             card_layout.addWidget(branches_label)
 
             self.branches_list = QListWidget()
-            self.branches_list.setMaximumHeight(60)
+            self.branches_list.setMinimumHeight(80)
+            self.branches_list.setMaximumHeight(120)
             self.branches_list.setStyleSheet(
-                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background-color: white; }"
-                "QListWidget::item { padding: 2px; }"
+                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background-color: white; spacing: 0px; }"
+                "QListWidget::item { padding: 1px 2px; margin: 0px; }"
                 "QListWidget::item:selected { background-color: #2196F3; color: white; }"
             )
             self.branches_list.itemSelectionChanged.connect(self._on_branch_selection_changed)
@@ -1143,10 +1158,11 @@ class POVWorkflowWidget(QWidget):
             card_layout.addWidget(dc_label)
 
             self.datacenters_list = QListWidget()
-            self.datacenters_list.setMaximumHeight(60)
+            self.datacenters_list.setMinimumHeight(80)
+            self.datacenters_list.setMaximumHeight(120)
             self.datacenters_list.setStyleSheet(
-                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background-color: white; }"
-                "QListWidget::item { padding: 2px; }"
+                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background-color: white; spacing: 0px; }"
+                "QListWidget::item { padding: 1px 2px; margin: 0px; }"
                 "QListWidget::item:selected { background-color: #2196F3; color: white; }"
             )
             self.datacenters_list.itemSelectionChanged.connect(self._on_datacenter_selection_changed)
@@ -1172,6 +1188,13 @@ class POVWorkflowWidget(QWidget):
                 "QComboBox { padding: 3px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; }"
             )
             dc_add_row.addWidget(self.dc_region_combo)
+
+            self.dc_style_combo = QComboBox()
+            self.dc_style_combo.addItems(["Traditional (Firewall)", "SD-WAN (ION)", "SD-WAN (ION HA)"])
+            self.dc_style_combo.setStyleSheet(
+                "QComboBox { padding: 3px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; }"
+            )
+            dc_add_row.addWidget(self.dc_style_combo)
 
             add_dc_btn = QPushButton("+")
             add_dc_btn.setFixedSize(24, 24)
@@ -1210,23 +1233,25 @@ class POVWorkflowWidget(QWidget):
 
             card_layout.addWidget(summary_frame)
 
-            # Initialize config with default datacenter
-            default_region = self.cloud_region_combo.currentText() if hasattr(self, 'cloud_region_combo') else "eastus"
-            self.cloud_resource_configs['locations'] = {
-                'branches': [],
-                'datacenters': [
-                    {
-                        'name': 'Datacenter',
-                        'cloud': 'Azure',
-                        'region': default_region,
-                        'bgp_enabled': True,
-                        'default_gateway': False,
-                        'connection_type': 'service_connection',
-                    }
-                ],
-            }
+            # Initialize config with default datacenter only if not restored from state
+            if 'locations' not in self.cloud_resource_configs:
+                default_region = self.cloud_region_combo.currentText() if hasattr(self, 'cloud_region_combo') else "eastus"
+                self.cloud_resource_configs['locations'] = {
+                    'branches': [],
+                    'datacenters': [
+                        {
+                            'name': 'Datacenter',
+                            'cloud': 'Azure',
+                            'region': default_region,
+                            'style': 'traditional',
+                            'bgp_enabled': True,
+                            'default_gateway': False,
+                            'connection_type': 'service_connection',
+                        }
+                    ],
+                }
 
-            # Populate the datacenters list with the default
+            # Populate the datacenters list from config
             self._refresh_datacenters_list()
             self._update_locations_status()
 
@@ -1356,20 +1381,131 @@ class POVWorkflowWidget(QWidget):
             self.trust_devices_error_label.setWordWrap(True)
             card_layout.addWidget(self.trust_devices_error_label)
 
-            # Initialize config with empty devices list (will be populated by sync)
-            self.cloud_resource_configs['trust_devices'] = {
-                'devices': [],
-            }
+            # Initialize config with empty devices list only if not restored from state
+            if 'trust_devices' not in self.cloud_resource_configs:
+                self.cloud_resource_configs['trust_devices'] = {
+                    'devices': [],
+                }
 
             # Initialize location dropdown
             self._refresh_device_location_dropdown()
 
-            # Sync devices from locations (creates default ServerVM for default Datacenter)
-            self._sync_devices_from_locations()
+            # Sync devices from locations (only adds missing devices, preserves existing)
+            if not self.cloud_resource_configs['trust_devices'].get('devices'):
+                self._sync_devices_from_locations()
 
             # Prevent vertical stretching
             card_layout.addStretch()
 
+            return card
+
+        # Create Services & Applications card
+        def create_services_card():
+            from gui.workflows.pov_services import DEFAULT_APPLICATIONS
+
+            card = QFrame()
+            card.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Raised)
+            card.setStyleSheet(
+                "QFrame { background-color: #fafafa; border: 1px solid #ddd; "
+                "border-radius: 8px; padding: 12px; }"
+            )
+            card_layout = QVBoxLayout(card)
+            card_layout.setSpacing(6)
+            card_layout.setContentsMargins(12, 10, 12, 12)
+
+            # Top row: Title and status
+            top_row = QHBoxLayout()
+            title_label = QLabel("<b>🌐 Services & Applications</b>")
+            title_label.setStyleSheet("font-size: 13px; color: #333;")
+            top_row.addWidget(title_label)
+
+            status_label = QLabel("")
+            status_label.setStyleSheet("color: #4CAF50; font-size: 11px;")
+            self.services_status = status_label
+            top_row.addWidget(status_label)
+            top_row.addStretch()
+            card_layout.addLayout(top_row)
+
+            # Domain input
+            domain_row = QHBoxLayout()
+            domain_label = QLabel("Domain:")
+            domain_label.setStyleSheet("font-size: 11px; color: #555; font-weight: bold;")
+            domain_row.addWidget(domain_label)
+
+            self.services_domain_input = QLineEdit()
+            self.services_domain_input.setPlaceholderText("acme.com")
+            self.services_domain_input.setStyleSheet(
+                "QLineEdit { padding: 3px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; }"
+            )
+            self.services_domain_input.textChanged.connect(self._update_services_status)
+            domain_row.addWidget(self.services_domain_input)
+            card_layout.addLayout(domain_row)
+
+            # Applications list (read-only display)
+            apps_label = QLabel(f"<b>Applications</b> ({len(DEFAULT_APPLICATIONS)} included)")
+            apps_label.setStyleSheet("font-size: 11px; color: #555; margin-top: 2px;")
+            card_layout.addWidget(apps_label)
+
+            self.services_apps_list = QListWidget()
+            self.services_apps_list.setMaximumHeight(80)
+            self.services_apps_list.setStyleSheet(
+                "QListWidget { border: 1px solid #ccc; border-radius: 4px; font-size: 10px; background-color: white; }"
+                "QListWidget::item { padding: 1px; }"
+            )
+            for app in DEFAULT_APPLICATIONS:
+                from PyQt6.QtWidgets import QListWidgetItem
+                item = QListWidgetItem(f"  {app['subdomain']:12s} {app['name']} ({app['category']})")
+                self.services_apps_list.addItem(item)
+            card_layout.addWidget(self.services_apps_list)
+
+            # PKI options
+            pki_label = QLabel("<b>PKI Certificates</b>")
+            pki_label.setStyleSheet("font-size: 11px; color: #555; margin-top: 2px;")
+            card_layout.addWidget(pki_label)
+
+            pki_row = QHBoxLayout()
+            self.pki_server_cert_cb = QCheckBox("Server")
+            self.pki_server_cert_cb.setChecked(True)
+            self.pki_server_cert_cb.setStyleSheet("font-size: 10px;")
+            self.pki_server_cert_cb.stateChanged.connect(self._update_services_status)
+            pki_row.addWidget(self.pki_server_cert_cb)
+
+            self.pki_device_certs_cb = QCheckBox("Device")
+            self.pki_device_certs_cb.setChecked(True)
+            self.pki_device_certs_cb.setStyleSheet("font-size: 10px;")
+            self.pki_device_certs_cb.stateChanged.connect(self._update_services_status)
+            pki_row.addWidget(self.pki_device_certs_cb)
+
+            self.pki_user_certs_cb = QCheckBox("User")
+            self.pki_user_certs_cb.setChecked(True)
+            self.pki_user_certs_cb.setStyleSheet("font-size: 10px;")
+            self.pki_user_certs_cb.stateChanged.connect(self._update_services_status)
+            pki_row.addWidget(self.pki_user_certs_cb)
+
+            self.pki_decryption_ca_cb = QCheckBox("Decryption")
+            self.pki_decryption_ca_cb.setChecked(True)
+            self.pki_decryption_ca_cb.setStyleSheet("font-size: 10px;")
+            self.pki_decryption_ca_cb.stateChanged.connect(self._update_services_status)
+            pki_row.addWidget(self.pki_decryption_ca_cb)
+
+            card_layout.addLayout(pki_row)
+
+            # Summary
+            summary_frame = QFrame()
+            summary_frame.setStyleSheet(
+                "QFrame { background-color: #E3F2FD; border: 1px solid #90CAF9; "
+                "border-radius: 4px; padding: 4px; margin-top: 4px; }"
+            )
+            summary_layout = QHBoxLayout(summary_frame)
+            summary_layout.setContentsMargins(6, 2, 6, 2)
+
+            self.services_summary = QLabel("Enter a domain to enable services")
+            self.services_summary.setStyleSheet("color: #1565C0; font-size: 10px;")
+            summary_layout.addWidget(self.services_summary)
+
+            card_layout.addWidget(summary_frame)
+
+            card_layout.addStretch()
             return card
 
         # Scrollable area for cards
@@ -1379,7 +1515,7 @@ class POVWorkflowWidget(QWidget):
         scroll_widget = QWidget()
         scroll_layout = QVBoxLayout(scroll_widget)
 
-        # 2x3 Grid layout
+        # Grid layout
         grid = QGridLayout()
         grid.setSpacing(12)
 
@@ -1394,6 +1530,9 @@ class POVWorkflowWidget(QWidget):
         # Row 2: Locations, Trust Network Devices
         grid.addWidget(create_locations_card(), 2, 0)
         grid.addWidget(create_trust_devices_card(), 2, 1)
+
+        # Row 3: Services & Applications (spans both columns)
+        grid.addWidget(create_services_card(), 3, 0, 1, 2)
 
         scroll_layout.addLayout(grid)
         scroll_layout.addStretch()
@@ -3722,21 +3861,43 @@ class POVWorkflowWidget(QWidget):
         config["locations"] = locations
 
         # Generate firewalls list from locations
-        # Each datacenter with service_connection needs a firewall
-        # Each branch (remote_network) needs a firewall
+        # Only traditional DCs get firewalls; SD-WAN DCs get ION devices
         firewalls = []
+        ion_devices = []
         fw_index = 1
 
-        # Firewalls for datacenters with service connections
+        # Firewalls/ION for datacenters with service connections
         for dc in locations.get('datacenters', []):
             if dc.get('connection_type') == 'service_connection':
-                firewalls.append({
-                    'name': f"fw-{dc['name'].lower().replace(' ', '-')}",
-                    'type': 'service_connection',
-                    'location': dc['name'],
-                    'region': dc.get('region', 'eastus'),
-                })
-                fw_index += 1
+                dc_style = dc.get('style', 'traditional')
+                if dc_style == 'sdwan_ha':
+                    # HA pair: deploy 2 IONs in separate availability zones
+                    for i in range(1, 3):
+                        ion_devices.append({
+                            'name': f"{dc['name'].lower().replace(' ', '-')}-ion{i}",
+                            'type': 'service_connection',
+                            'location': dc['name'],
+                            'region': dc.get('region', 'eastus'),
+                            'style': 'sdwan_ha',
+                            'ha_peer': i,
+                            'availability_zone': str(i),
+                        })
+                elif dc_style == 'sdwan':
+                    ion_devices.append({
+                        'name': f"{dc['name'].lower().replace(' ', '-')}-ion",
+                        'type': 'service_connection',
+                        'location': dc['name'],
+                        'region': dc.get('region', 'eastus'),
+                        'style': 'sdwan',
+                    })
+                else:
+                    firewalls.append({
+                        'name': f"fw-{dc['name'].lower().replace(' ', '-')}",
+                        'type': 'service_connection',
+                        'location': dc['name'],
+                        'region': dc.get('region', 'eastus'),
+                    })
+                    fw_index += 1
 
         # Firewalls for branches (remote networks)
         for branch in locations.get('branches', []):
@@ -3749,6 +3910,10 @@ class POVWorkflowWidget(QWidget):
             fw_index += 1
 
         config["firewalls"] = firewalls
+        config["ion_devices"] = ion_devices
+
+        # Add services configuration
+        config["services"] = self.cloud_resource_configs.get('services', {})
 
         # Add trust devices configuration
         config["trust_devices"] = self.cloud_resource_configs.get('trust_devices', {})
@@ -4697,11 +4862,21 @@ class POVWorkflowWidget(QWidget):
         if region == "(Primary)":
             region = self.cloud_region_combo.currentText() if hasattr(self, 'cloud_region_combo') else "eastus"
 
+        # Determine style from dropdown
+        style_text = self.dc_style_combo.currentText() if hasattr(self, 'dc_style_combo') else "Traditional (Firewall)"
+        if 'ION HA' in style_text:
+            style = 'sdwan_ha'
+        elif 'SD-WAN' in style_text:
+            style = 'sdwan'
+        else:
+            style = 'traditional'
+
         # Create datacenter entry
         datacenter = {
             'name': name,
             'cloud': 'Azure',
             'region': region,
+            'style': style,
             'bgp_enabled': True,
             'default_gateway': False,  # Datacenters don't get default route
             'connection_type': 'service_connection',
@@ -4761,7 +4936,10 @@ class POVWorkflowWidget(QWidget):
         datacenters = self.cloud_resource_configs.get('locations', {}).get('datacenters', [])
 
         for dc in datacenters:
-            item = QListWidgetItem(f"🏛️ {dc['name']} ({dc['region']})")
+            style = dc.get('style', 'traditional')
+            icon = "\U0001f4e1" if style in ('sdwan', 'sdwan_ha') else "\U0001f525"  # 📡 or 🔥
+            style_label = "ION-HA" if style == 'sdwan_ha' else "SD-WAN" if style == 'sdwan' else "FW"
+            item = QListWidgetItem(f"{icon} {dc['name']} ({dc['region']}) [{style_label}]")
             item.setData(Qt.ItemDataRole.UserRole, dc['name'])
             self.datacenters_list.addItem(item)
 
@@ -4786,6 +4964,54 @@ class POVWorkflowWidget(QWidget):
             self.locations_status.setStyleSheet("color: #4CAF50; font-size: 11px;")
         else:
             self.locations_status.setText("")
+
+    # ============================================================================
+    # SERVICES & APPLICATIONS HANDLERS
+    # ============================================================================
+
+    def _update_services_status(self):
+        """Update the Services card status and persist config."""
+        domain = self.services_domain_input.text().strip() if hasattr(self, 'services_domain_input') else ''
+
+        # Persist to config
+        services_config = self.cloud_resource_configs.get('services', {})
+        services_config['domain'] = domain
+        services_config['pki'] = {
+            'server_cert': self.pki_server_cert_cb.isChecked() if hasattr(self, 'pki_server_cert_cb') else True,
+            'device_certs': self.pki_device_certs_cb.isChecked() if hasattr(self, 'pki_device_certs_cb') else True,
+            'user_certs': self.pki_user_certs_cb.isChecked() if hasattr(self, 'pki_user_certs_cb') else True,
+            'decryption_ca': self.pki_decryption_ca_cb.isChecked() if hasattr(self, 'pki_decryption_ca_cb') else True,
+        }
+        self.cloud_resource_configs['services'] = services_config
+
+        if not domain:
+            if hasattr(self, 'services_status'):
+                self.services_status.setText("")
+            if hasattr(self, 'services_summary'):
+                self.services_summary.setText("Enter a domain to enable services")
+            return
+
+        from gui.workflows.pov_services import DEFAULT_APPLICATIONS
+        app_count = len(DEFAULT_APPLICATIONS)
+
+        # Build PKI summary
+        pki_parts = []
+        if services_config['pki'].get('server_cert'):
+            pki_parts.append('Server')
+        if services_config['pki'].get('device_certs'):
+            pki_parts.append('Device')
+        if services_config['pki'].get('user_certs'):
+            pki_parts.append('User')
+        if services_config['pki'].get('decryption_ca'):
+            pki_parts.append('Decrypt')
+        pki_label = "Full" if len(pki_parts) == 4 else ", ".join(pki_parts) if pki_parts else "None"
+
+        if hasattr(self, 'services_status'):
+            self.services_status.setText(f"✓ {domain}")
+            self.services_status.setStyleSheet("color: #4CAF50; font-size: 11px;")
+
+        if hasattr(self, 'services_summary'):
+            self.services_summary.setText(f"✓ {app_count} apps @ {domain} | DNS + HTTPS | PKI: {pki_label}")
 
     # ============================================================================
     # TRUST NETWORK DEVICES HANDLERS
@@ -4838,7 +5064,7 @@ class POVWorkflowWidget(QWidget):
                     'auto_generated': True,
                 })
 
-        # 1 Linux ServerVM (DNS/WebApp) per datacenter
+        # 1 Linux ServerVM (DNS/WebApp) per datacenter + ION device entry for SD-WAN DCs
         for dc in loc_config.get('datacenters', []):
             device_name = f"{dc['name']}-ServerVM"
             auto_device_names.add(device_name)
@@ -4853,6 +5079,24 @@ class POVWorkflowWidget(QWidget):
                     'services': ['DNS', 'WebApp'],
                     'auto_generated': True,
                 })
+
+            # For single SD-WAN DCs, also create an ION device entry
+            # ION HA pairs are managed at infrastructure level, not as trust devices
+            dc_style = dc.get('style', 'traditional')
+            if dc_style == 'sdwan':
+                ion_name = f"{dc['name']}-ion"
+                auto_device_names.add(ion_name)
+                if not any(d['name'] == ion_name for d in current_devices):
+                    new_devices.append({
+                        'id': str(uuid.uuid4()),
+                        'name': ion_name,
+                        'location': dc['name'],
+                        'location_type': 'datacenter',
+                        'device_type': 'ION',
+                        'subtype': 'SD-WAN',
+                        'services': [],
+                        'auto_generated': True,
+                    })
 
         # Keep existing devices (both auto-generated that still have locations and manually added)
         for device in current_devices:
@@ -4889,6 +5133,8 @@ class POVWorkflowWidget(QWidget):
                 icon = "🔧"
             elif device['device_type'] == 'UserVM':
                 icon = "💻"
+            elif device['device_type'] == 'ION':
+                icon = "\U0001f4e1"  # 📡
             else:
                 icon = "🖥️"
 
@@ -5272,7 +5518,7 @@ class POVWorkflowWidget(QWidget):
             self._on_private_app_changed()
             return
 
-        # Handle datacenters: toggle SC <-> ZTNA
+        # Handle datacenters: toggle connection type
         if conn.get('locked', False) or loc_type != 'datacenter':
             return
 
@@ -5281,26 +5527,40 @@ class POVWorkflowWidget(QWidget):
         ztna_count = sum(1 for c in connections if c.get('connection_type') == 'ztna')
 
         current_type = conn.get('connection_type', 'service_connection')
+        is_sdwan = conn.get('style', 'traditional') == 'sdwan'
 
-        # Toggle type with limit checks
-        if current_type == 'service_connection':
-            # Switching to ZTNA - check ZTNA limit
-            if ztna_count >= 10:
-                QMessageBox.warning(
-                    self, "Limit Reached",
-                    "Maximum of 10 ZTNA Connectors allowed."
-                )
-                return
-            conn['connection_type'] = 'ztna'
+        if is_sdwan:
+            # SD-WAN (ION) DCs: toggle none <-> service_connection (no ZTNA option)
+            if current_type == 'none':
+                if sc_count >= 5:
+                    QMessageBox.warning(
+                        self, "Limit Reached",
+                        "Maximum of 5 Service Connections allowed."
+                    )
+                    return
+                conn['connection_type'] = 'service_connection'
+            else:
+                conn['connection_type'] = 'none'
         else:
-            # Switching to SC - check SC limit
-            if sc_count >= 5:
-                QMessageBox.warning(
-                    self, "Limit Reached",
-                    "Maximum of 5 Service Connections allowed."
-                )
-                return
-            conn['connection_type'] = 'service_connection'
+            # Traditional DCs: toggle SC <-> ZTNA
+            if current_type == 'service_connection':
+                # Switching to ZTNA - check ZTNA limit
+                if ztna_count >= 10:
+                    QMessageBox.warning(
+                        self, "Limit Reached",
+                        "Maximum of 10 ZTNA Connectors allowed."
+                    )
+                    return
+                conn['connection_type'] = 'ztna'
+            else:
+                # Switching to SC - check SC limit
+                if sc_count >= 5:
+                    QMessageBox.warning(
+                        self, "Limit Reached",
+                        "Maximum of 5 Service Connections allowed."
+                    )
+                    return
+                conn['connection_type'] = 'service_connection'
 
         # Refresh display and update limits label
         self._refresh_private_app_connections_display()
@@ -5425,6 +5685,10 @@ class POVWorkflowWidget(QWidget):
                 else:
                     type_display = "Remote Network"
                     suffix = " (click to add ZTNA)"
+            elif conn_type == 'none':
+                icon = "\U0001f4e1" if conn.get('style') == 'sdwan' else "🏛️"  # 📡
+                type_display = "None"
+                suffix = " (click to enable SC)"
             elif conn_type == 'ztna':
                 icon = "🔗" if is_custom else "🏛️"
                 type_display = "ZTNA Connector"
@@ -6069,14 +6333,19 @@ class POVWorkflowWidget(QWidget):
             sc_count += 1
 
         # Add datacenters - preserve user's type if set, otherwise assign based on limits
+        # ION (SD-WAN) DCs default to 'none' — user must click to enable service connection
         for dc in locations.get('datacenters', []):
             existing = existing_connections.get(dc['name'])
+            dc_style = dc.get('style', 'traditional')
 
             if existing:
                 # Preserve user's choice
                 conn_type = existing.get('connection_type', 'service_connection')
+            elif dc_style == 'sdwan':
+                # SD-WAN (ION) DCs default to no connection — click to enable
+                conn_type = 'none'
             else:
-                # New datacenter - assign type based on limits
+                # Traditional datacenter - assign type based on limits
                 # First 5 get SC, next 10 get ZTNA, rest are skipped
                 if sc_count < 5:
                     conn_type = 'service_connection'
@@ -6098,6 +6367,7 @@ class POVWorkflowWidget(QWidget):
                 'connection_type': conn_type,
                 'locked': False,
                 'custom': False,
+                'style': dc_style,
             }
             connections.append(conn)
 
@@ -7699,6 +7969,12 @@ class POVWorkflowWidget(QWidget):
             self.save_state()
             self._log_activity(f"Saved Azure credentials to state: {self._azure_subscription.get('name')}")
 
+            # Check Azure CLI auth status (non-blocking, just warns if expired)
+            self._prime_azure_cli_auth()
+
+            # Fetch available VM sizes for the deployment location
+            self._fetch_available_vm_sizes()
+
         # Change button to allow re-authentication
         self.azure_auth_btn.setText("🔄 Change Subscription")
 
@@ -7798,18 +8074,39 @@ class POVWorkflowWidget(QWidget):
                     self._on_terraform_ready()
                     return
 
-            # Generate firewalls list from locations
-            # Each datacenter with service_connection needs a firewall
-            # Each branch (remote_network) needs a firewall
+            # Generate firewalls and ION devices lists from locations
+            # Style determines whether a DC gets a firewall or ION device(s)
             firewalls = []
+            ion_devices = []
             for dc in datacenters:
                 if dc.get('connection_type') == 'service_connection':
-                    firewalls.append({
-                        'name': f"fw-{dc['name'].lower().replace(' ', '-')}",
-                        'type': 'service_connection',
-                        'location_name': dc['name'],
-                        'region': dc.get('region', azure_region),
-                    })
+                    dc_style = dc.get('style', 'traditional')
+                    if dc_style == 'sdwan_ha':
+                        for i in range(1, 3):
+                            ion_devices.append({
+                                'name': f"{dc['name'].lower().replace(' ', '-')}-ion{i}",
+                                'type': 'service_connection',
+                                'location': dc['name'],
+                                'region': dc.get('region', azure_region),
+                                'style': 'sdwan_ha',
+                                'ha_peer': i,
+                                'availability_zone': str(i),
+                            })
+                    elif dc_style == 'sdwan':
+                        ion_devices.append({
+                            'name': f"{dc['name'].lower().replace(' ', '-')}-ion",
+                            'type': 'service_connection',
+                            'location': dc['name'],
+                            'region': dc.get('region', azure_region),
+                            'style': 'sdwan',
+                        })
+                    else:
+                        firewalls.append({
+                            'name': f"fw-{dc['name'].lower().replace(' ', '-')}",
+                            'type': 'service_connection',
+                            'location_name': dc['name'],
+                            'region': dc.get('region', azure_region),
+                        })
 
             for branch in locations.get('branches', []):
                 firewalls.append({
@@ -7818,6 +8115,57 @@ class POVWorkflowWidget(QWidget):
                     'location_name': branch['name'],
                     'region': branch.get('region', azure_region),
                 })
+
+            # Validate ION VM size availability per zone
+            if ion_devices:
+                ion_vm_size = self.cloud_resource_configs.get('cloud_deployment', {}).get('ion_vm_size', 'Standard_DS3_v2')
+                available_sizes = self.cloud_resource_configs.get('cloud_deployment', {}).get('available_vm_sizes', {})
+                if available_sizes:
+                    sku_info = available_sizes.get(ion_vm_size, {})
+                    sku_zones = sku_info.get('zones', [])
+                    for ion in ion_devices:
+                        az = ion.get('availability_zone', '')
+                        if az and sku_zones and az not in sku_zones:
+                            # SKU not available in this zone — find alternatives
+                            ion_name = ion.get('name', 'ion')
+                            self._log_activity(
+                                f"⚠ {ion_vm_size} is NOT available in zone {az} for {ion_name}",
+                                "warning"
+                            )
+                            # Suggest alternative zones for same SKU
+                            if sku_zones:
+                                self._log_activity(
+                                    f"  → {ion_vm_size} is available in zone(s): {', '.join(sku_zones)}",
+                                    "warning"
+                                )
+                            # Suggest alternative SKUs available in the needed zone
+                            alt_skus = []
+                            sku_vcpus = sku_info.get('vcpus', 0)
+                            for alt_name, alt_info in available_sizes.items():
+                                alt_zones = alt_info.get('zones', [])
+                                if az in alt_zones and alt_info.get('vcpus', 0) >= sku_vcpus:
+                                    mem_gb = alt_info.get('memory_mb', 0) // 1024
+                                    alt_skus.append((alt_name, alt_info.get('vcpus', 0), mem_gb))
+                            if alt_skus:
+                                # Sort by vCPU count (closest to original first)
+                                alt_skus.sort(key=lambda x: (x[1], x[2]))
+                                top_alts = alt_skus[:5]
+                                self._log_activity(
+                                    f"  → Alternative sizes available in zone {az}:",
+                                    "warning"
+                                )
+                                for alt_name, vcpus, mem_gb in top_alts:
+                                    self._log_activity(
+                                        f"    • {alt_name} ({vcpus} vCPU, {mem_gb}GB)",
+                                        "warning"
+                                    )
+                                # Auto-select the closest alternative
+                                best_alt = alt_skus[0][0]
+                                self._log_activity(
+                                    f"  → Auto-selecting {best_alt} for {ion_name} (zone {az})",
+                                    "warning"
+                                )
+                                ion['vm_size_override'] = best_alt
 
             # Generate terraform.tfvars.json directly (simpler approach without full CloudConfig)
             tfvars = {
@@ -7838,6 +8186,8 @@ class POVWorkflowWidget(QWidget):
                 'datacenters': datacenters,
                 'branches': locations.get('branches', []),
                 'firewalls': firewalls,
+                'ion_devices': ion_devices,
+                'ion_vm_size': self.cloud_resource_configs.get('cloud_deployment', {}).get('ion_vm_size', 'Standard_DS3_v2'),
                 'trust_devices': self.cloud_resource_configs.get('trust_devices', {}).get('devices', []),
             }
 
@@ -7851,6 +8201,32 @@ class POVWorkflowWidget(QWidget):
             main_tf_content = self._generate_main_tf(tfvars)
             with open(os.path.join(terraform_dir, 'main.tf'), 'w') as f:
                 f.write(main_tf_content)
+
+            # Generate cloud-init scripts for ServerVMs with services
+            services_config = self.cloud_resource_configs.get('services', {})
+            svc_domain = services_config.get('domain', '')
+            if svc_domain:
+                from gui.workflows.pov_services import CloudInitBuilder
+                trust_devs = tfvars.get('trust_devices', [])
+                customer_name_raw = tfvars.get('customer_name', 'POV')
+                server_ip_counter = 10
+                for dev in trust_devs:
+                    if dev.get('device_type') == 'ServerVM' and dev.get('subtype') == 'Linux':
+                        dev_file_name = dev.get('name', 'vm').lower().replace(' ', '-').replace('_', '-')
+                        server_ip = f"10.100.2.{server_ip_counter}"
+                        server_ip_counter += 1
+                        builder = CloudInitBuilder(
+                            domain=svc_domain,
+                            customer_name=customer_name_raw,
+                            server_ip=server_ip,
+                            pki_options=services_config.get('pki', {}),
+                            trust_devices=trust_devs,
+                        )
+                        cloud_init_script = builder.build_cloud_init()
+                        cloud_init_path = os.path.join(terraform_dir, f'cloud-init-{dev_file_name}.sh')
+                        with open(cloud_init_path, 'w') as f:
+                            f.write(cloud_init_script)
+                        self._log_activity(f"Generated cloud-init script: cloud-init-{dev_file_name}.sh")
 
             # Generate variables.tf
             variables_tf_content = self._generate_variables_tf()
@@ -8368,12 +8744,139 @@ resource "azurerm_linux_virtual_machine" "fw_{fw_name}" {{
 }}
 '''
 
+        # Add ION devices for SD-WAN datacenters
+        ion_devices = tfvars.get('ion_devices', [])
+        if ion_devices:
+            content += f'''
+# Accept Palo Alto Networks Prisma SD-WAN ION Marketplace Agreement
+resource "azurerm_marketplace_agreement" "ion" {{
+  publisher = "paloaltonetworks"
+  offer     = "prisma-sd-wan-ion-virtual-appliance"
+  plan      = "prisma-sdwan-ion-virtual-appliance"
+}}
+'''
+        ion_vm_size_default = tfvars.get('ion_vm_size', 'Standard_DS3_v2')
+        for ion in ion_devices:
+            ion_name = ion.get('name', 'ion').lower().replace(' ', '-').replace('_', '-')
+            location_name = ion.get('location', 'Datacenter')
+            resource_prefix = f"{customer}-{ion_name}"
+            dns_label = f"{resource_prefix}-wan".lower()
+            az = ion.get('availability_zone', '')
+            ion_vm_size = ion.get('vm_size_override', ion_vm_size_default)
+
+            # VM zone line (Standard SKU PIP is zone-redundant by default, no zones needed)
+            vm_zone_line = f'\n  zone                            = "{az}"' if az else ''
+
+            content += f'''
+# ION Device: {ion_name} (SD-WAN) for {location_name}
+# WAN Public IP for SD-WAN tunnels
+resource "azurerm_public_ip" "pip_{ion_name}" {{
+  name                = "{resource_prefix}-IP-public"
+  location            = azurerm_resource_group.pov.location
+  resource_group_name = azurerm_resource_group.pov.name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+  domain_name_label   = "{dns_label}"
+  tags = azurerm_resource_group.pov.tags
+}}
+
+# WAN NIC (untrust subnet, public IP, IP forwarding)
+resource "azurerm_network_interface" "nic_{ion_name}_wan" {{
+  name                 = "{resource_prefix}-nic-wan"
+  location             = azurerm_resource_group.pov.location
+  resource_group_name  = azurerm_resource_group.pov.name
+  enable_ip_forwarding = true
+
+  ip_configuration {{
+    name                          = "wan"
+    subnet_id                     = azurerm_subnet.untrust.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.pip_{ion_name}.id
+  }}
+
+  tags = azurerm_resource_group.pov.tags
+}}
+
+# LAN NIC (trust subnet, IP forwarding)
+resource "azurerm_network_interface" "nic_{ion_name}_lan" {{
+  name                 = "{resource_prefix}-nic-lan"
+  location             = azurerm_resource_group.pov.location
+  resource_group_name  = azurerm_resource_group.pov.name
+  enable_ip_forwarding = true
+
+  ip_configuration {{
+    name                          = "lan"
+    subnet_id                     = azurerm_subnet.trust.id
+    private_ip_address_allocation = "Dynamic"
+  }}
+
+  tags = azurerm_resource_group.pov.tags
+}}
+
+# SD-WAN ION Virtual Appliance
+resource "azurerm_linux_virtual_machine" "ion_{ion_name}" {{
+  name                            = "{resource_prefix}"
+  resource_group_name             = azurerm_resource_group.pov.name
+  location                        = azurerm_resource_group.pov.location
+  size                            = "{ion_vm_size}"{vm_zone_line}
+  admin_username                  = var.admin_username
+  admin_password                  = var.admin_password
+  disable_password_authentication = false
+  provision_vm_agent              = false
+  allow_extension_operations      = false
+
+  network_interface_ids = [
+    azurerm_network_interface.nic_{ion_name}_wan.id,
+    azurerm_network_interface.nic_{ion_name}_lan.id,
+  ]
+
+  os_disk {{
+    caching              = "ReadWrite"
+    storage_account_type = "Premium_LRS"
+  }}
+
+  plan {{
+    name      = "prisma-sdwan-ion-virtual-appliance"
+    publisher = "paloaltonetworks"
+    product   = "prisma-sd-wan-ion-virtual-appliance"
+  }}
+
+  source_image_reference {{
+    publisher = "paloaltonetworks"
+    offer     = "prisma-sd-wan-ion-virtual-appliance"
+    sku       = "prisma-sdwan-ion-virtual-appliance"
+    version   = "latest"
+  }}
+
+  # Managed boot diagnostics (enables Azure Serial Console)
+  boot_diagnostics {{}}
+
+  tags = azurerm_resource_group.pov.tags
+
+  # ION has no Azure guest agent — ignore provisioning attributes so
+  # terraform import after OSProvisioningTimedOut doesn't force replacement
+  lifecycle {{
+    ignore_changes = [provision_vm_agent, allow_extension_operations]
+  }}
+
+  depends_on = [azurerm_marketplace_agreement.ion]
+}}
+'''
+
         # Add trust devices (VMs)
         trust_devices = tfvars.get('trust_devices', [])
+        services_config = tfvars.get('services', {})
+        domain = services_config.get('domain', '')
+        server_ip_counter = 10  # Static IPs start at 10.100.2.10
+
         for device in trust_devices:
             device_name = device.get('name', 'vm').lower().replace(' ', '-').replace('_', '-')
             device_type = device.get('device_type', 'ServerVM')
             subtype = device.get('subtype', 'Linux')
+
+            # Skip ION devices here — they are generated above
+            if device_type == 'ION':
+                continue
 
             # Determine site prefix based on device location (default to DC for trust devices)
             device_site = device.get('site', 'datacenter')
@@ -8392,6 +8895,17 @@ resource "azurerm_linux_virtual_machine" "fw_{fw_name}" {{
                 offer = '0001-com-ubuntu-server-jammy'
                 sku = '22_04-lts-gen2'
 
+            # For ServerVMs with domain configured, use static IP and cloud-init
+            is_server_with_services = (device_type == 'ServerVM' and subtype == 'Linux' and domain)
+            if is_server_with_services:
+                server_ip = f"10.100.2.{server_ip_counter}"
+                server_ip_counter += 1
+                ip_allocation = "Static"
+                ip_address_line = f'\n    private_ip_address            = "{server_ip}"'
+            else:
+                ip_allocation = "Dynamic"
+                ip_address_line = ""
+
             content += f'''
 # {device.get('name', 'VM')} - {device_type}
 resource "azurerm_network_interface" "nic_{device_name}" {{
@@ -8402,7 +8916,7 @@ resource "azurerm_network_interface" "nic_{device_name}" {{
   ip_configuration {{
     name                          = "internal"
     subnet_id                     = azurerm_subnet.trust.id
-    private_ip_address_allocation = "Dynamic"
+    private_ip_address_allocation = "{ip_allocation}"{ip_address_line}
   }}
 
   tags = azurerm_resource_group.pov.tags
@@ -8416,7 +8930,14 @@ resource "azurerm_linux_virtual_machine" "vm_{device_name}" {{
   admin_username                  = var.admin_username
   admin_password                  = var.admin_password
   disable_password_authentication = false
+'''
+            # Add cloud-init custom_data for ServerVMs with services
+            if is_server_with_services:
+                content += f'''
+  custom_data = base64encode(file("${{path.module}}/cloud-init-{device_name}.sh"))
+'''
 
+            content += f'''
   network_interface_ids = [
     azurerm_network_interface.nic_{device_name}.id,
   ]
@@ -8761,6 +9282,7 @@ output "{device_name}_private_ip" {{
 
         self._log_activity("Starting Terraform deployment...")
         self._deploy_error_shown = False  # Reset error flag for new deployment
+        self._last_still_update = 0  # Reset throttle for "Still creating" messages
 
         if not hasattr(self, '_terraform_output_dir') or not self._terraform_output_dir:
             self._log_activity("No Terraform configuration available", "warning")
@@ -8795,6 +9317,10 @@ output "{device_name}_private_ip" {{
         if is_update:
             self._log_activity("Regenerating Terraform files for redeploy...")
             self._generate_terraform_from_pov(force_regenerate=True)
+
+        # Validate Azure CLI authentication before proceeding
+        if not self._ensure_azure_cli_auth():
+            return  # Auth failed or user cancelled
 
         # Get credentials
         credentials = self._get_terraform_credentials()
@@ -8840,10 +9366,236 @@ output "{device_name}_private_ip" {{
             'admin_password': cloud_deployment.get('admin_password', ''),
         }
 
+    def _ensure_azure_cli_auth(self) -> bool:
+        """
+        Validate Azure CLI token and re-authenticate if needed.
+
+        Must be called from the main thread (before starting TerraformWorker)
+        because az login requires browser interaction.
+
+        Returns:
+            True if CLI auth is valid and ready for Terraform.
+            False if auth failed or user cancelled.
+        """
+        from terraform.azure_cli_auth import (
+            check_azure_cli_installed,
+            validate_cli_token,
+            login_cli,
+        )
+        from PyQt6.QtWidgets import QApplication
+
+        # Get tenant and subscription from saved state
+        tenant_id = ''
+        subscription_id = ''
+        if hasattr(self, '_azure_subscription') and self._azure_subscription:
+            subscription_id = self._azure_subscription.get('id', '')
+            tenant_id = self._azure_subscription.get('tenant_id', '')
+        else:
+            subscription_id = self.deployment_config.get('azure_subscription_id', '')
+            tenant_id = self.deployment_config.get('azure_tenant_id', '')
+
+        self._log_activity(
+            f"Azure CLI auth check: subscription={subscription_id or '(none)'}, "
+            f"tenant={tenant_id or '(none)'}"
+        )
+
+        # Check if Azure CLI is installed
+        if not check_azure_cli_installed():
+            self._log_activity("Azure CLI (az) not found on this system", "error")
+            QMessageBox.critical(
+                self,
+                "Azure CLI Not Found",
+                "Azure CLI (az) is not installed or not in PATH.\n\n"
+                "Terraform requires Azure CLI for authentication.\n\n"
+                "Install from: https://aka.ms/installazurecli"
+            )
+            return False
+
+        self._log_activity("Azure CLI found, validating token...")
+
+        # Quick check: is the current CLI token valid?
+        is_valid, message = validate_cli_token(
+            subscription_id=subscription_id,
+            tenant_id=tenant_id,
+        )
+
+        if is_valid:
+            self._log_activity("Azure CLI token is valid")
+            return True
+
+        # Token is expired or invalid -- prompt user to re-authenticate
+        self._log_activity(f"Azure CLI token expired or invalid: {message}", "warning")
+
+        reply = QMessageBox.question(
+            self,
+            "Azure CLI Authentication Required",
+            "Your Azure CLI session has expired or is not logged in.\n\n"
+            "Terraform needs a valid Azure CLI token to deploy resources.\n\n"
+            "Sign in now? (A browser window will open)",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
+
+        if reply != QMessageBox.StandardButton.Yes:
+            self._log_activity("User cancelled Azure CLI re-authentication")
+            return False
+
+        # Show progress indicator during login
+        self._log_activity("Opening browser for Azure CLI sign-in...")
+        self.cloud_deploy_results.set_text(
+            "Waiting for Azure CLI sign-in...\n"
+            "Please complete authentication in your browser."
+        )
+        QApplication.processEvents()
+
+        # Perform az login (blocking -- opens browser)
+        success, login_message = login_cli(
+            tenant_id=tenant_id,
+            subscription_id=subscription_id,
+        )
+
+        # Bring window back to focus after browser auth
+        self.activateWindow()
+        self.raise_()
+
+        if not success:
+            self._log_activity(f"Azure CLI login failed: {login_message}", "error")
+            tenant_hint = f"\n  az login --tenant {tenant_id}" if tenant_id else "\n  az login"
+            QMessageBox.critical(
+                self,
+                "Azure CLI Login Failed",
+                f"Failed to authenticate with Azure CLI:\n\n{login_message}\n\n"
+                f"You can try manually running:{tenant_hint}"
+            )
+            self.cloud_deploy_results.set_text("")
+            return False
+
+        # Verify the new token works
+        is_valid, message = validate_cli_token(
+            subscription_id=subscription_id,
+            tenant_id=tenant_id,
+        )
+
+        if is_valid:
+            self._log_activity("Azure CLI re-authentication successful")
+            self.cloud_deploy_results.set_text("")
+            return True
+        else:
+            self._log_activity(f"Token still invalid after login: {message}", "error")
+            QMessageBox.critical(
+                self,
+                "Authentication Error",
+                f"Azure CLI login completed but token is still invalid:\n\n{message}\n\n"
+                "Please verify the correct subscription and tenant are set."
+            )
+            self.cloud_deploy_results.set_text("")
+            return False
+
+    def _prime_azure_cli_auth(self):
+        """
+        Check Azure CLI auth status after SDK auth completes.
+
+        Non-intrusive: only logs a warning if CLI token isn't valid.
+        The mandatory gate is _ensure_azure_cli_auth() at deploy time.
+        """
+        from terraform.azure_cli_auth import check_azure_cli_installed, validate_cli_token
+
+        if not check_azure_cli_installed():
+            self._log_activity(
+                "Azure CLI not installed - will need CLI auth at deploy time",
+                "warning"
+            )
+            return
+
+        tenant_id = self._azure_subscription.get('tenant_id', '')
+        subscription_id = self._azure_subscription.get('id', '')
+
+        is_valid, _ = validate_cli_token(
+            subscription_id=subscription_id,
+            tenant_id=tenant_id,
+        )
+
+        if not is_valid:
+            self._log_activity(
+                "Azure CLI token not valid - will prompt for CLI login at deploy time",
+                "warning"
+            )
+        else:
+            self._log_activity("Azure CLI token is valid for Terraform")
+
+    def _fetch_available_vm_sizes(self):
+        """Fetch available VM sizes with per-zone availability from Azure.
+
+        Uses the resource_skus API which includes zone restriction data,
+        so we can validate SKU+zone combinations before deploying.
+        """
+        try:
+            from azure.mgmt.compute import ComputeManagementClient
+
+            subscription_id = self._azure_subscription.get('id', '')
+            if not subscription_id or not hasattr(self, '_azure_credential'):
+                return
+
+            location = self.cloud_resource_configs.get('cloud_deployment', {}).get('location', 'eastus')
+            compute_client = ComputeManagementClient(self._azure_credential, subscription_id)
+
+            # Use resource_skus for zone-level availability
+            skus = compute_client.resource_skus.list(filter=f"location eq '{location}'")
+            available = {}
+            for sku in skus:
+                if sku.resource_type != 'virtualMachines':
+                    continue
+
+                # Get all zones for this location
+                all_zones = set()
+                if sku.location_info:
+                    for loc_info in sku.location_info:
+                        if loc_info.zones:
+                            all_zones.update(loc_info.zones)
+
+                # Subtract restricted zones
+                restricted_zones = set()
+                if sku.restrictions:
+                    for restriction in sku.restrictions:
+                        if restriction.type == 'Zone' and restriction.restriction_info:
+                            if restriction.restriction_info.zones:
+                                restricted_zones.update(restriction.restriction_info.zones)
+
+                available_zones = sorted(all_zones - restricted_zones)
+
+                # Get capabilities (vCPUs, memory)
+                vcpus = 0
+                memory_mb = 0
+                if sku.capabilities:
+                    for cap in sku.capabilities:
+                        if cap.name == 'vCPUs':
+                            vcpus = int(cap.value)
+                        elif cap.name == 'MemoryGB':
+                            memory_mb = int(float(cap.value) * 1024)
+
+                available[sku.name] = {
+                    'vcpus': vcpus,
+                    'memory_mb': memory_mb,
+                    'zones': available_zones,
+                }
+
+            if available:
+                self.cloud_resource_configs.setdefault('cloud_deployment', {})['available_vm_sizes'] = available
+                self._log_activity(f"Found {len(available)} VM SKUs in {location} (with zone availability)")
+                self.save_state()
+        except ImportError:
+            self._log_activity("azure-mgmt-compute not installed, using default VM sizes", "warning")
+        except Exception as e:
+            self._log_activity(f"Could not fetch available VM sizes: {e}", "warning")
+
     def _on_deploy_progress(self, message: str, percentage: int):
         """Handle deployment progress update."""
         self.cloud_deploy_progress.setValue(percentage)
         logger.debug(f"Deploy progress: {percentage}% - {message}")
+
+        # Surface resource creation progress to the results panel
+        if message and any(kw in message for kw in ('Creating ', 'Created ', 'Destroying ', 'Destroyed ', 'Modifying ', 'Modified ', 'Retrying', 'Apply complete')):
+            self.cloud_deploy_results.append_text(f"  {message}")
 
     def _on_deploy_phase_changed(self, phase: str):
         """Handle deployment phase change."""
@@ -8917,13 +9669,37 @@ output "{device_name}_private_ip" {{
             self._deploy_error_shown = True
 
     def _on_deploy_log(self, message: str):
-        """Handle deployment log message.
-
-        All terraform output goes to activity log only (for debugging).
-        The results window only shows the final success/failure from _on_deploy_complete.
-        """
-        # Log to activity log for debugging - raw terraform output stays hidden from user
+        """Handle deployment log message."""
+        import time as _time
         logger.debug(f"Deploy log: {message}")
+
+        # Surface key terraform messages to the results panel so the user
+        # can see that the deployment is actively working
+        if not message:
+            return
+
+        # Resource import messages
+        if '[import]' in message and ('Importing' in message or 'Successfully' in message or 'Failed' in message):
+            self.cloud_deploy_results.append_text(f"  {message}")
+        # Plan summary (e.g. "Plan: 12 to add, 0 to change, 0 to destroy")
+        elif message.startswith('Plan:') or 'Plan:' in message:
+            self.cloud_deploy_results.append_text(f"  {message}")
+        # Phase timing (helpful to show progress)
+        elif message.startswith('--- Phase:'):
+            self.cloud_deploy_results.append_text(f"  {message}")
+        # Deployment complete summary
+        elif 'Deployment complete' in message:
+            self.cloud_deploy_results.append_text(f"  {message}")
+        # Still creating / still destroying (throttled to ~30s intervals)
+        elif 'Still creating' in message or 'Still destroying' in message or 'Still modifying' in message:
+            now = _time.time()
+            last = getattr(self, '_last_still_update', 0)
+            if now - last >= 30:
+                self.cloud_deploy_results.append_text(f"  {message}")
+                self._last_still_update = now
+        # Error lines from terraform
+        elif message.startswith('ERROR:'):
+            self.cloud_deploy_results.append_text(f"  {message}")
 
     # ============================================================================
     # EVENT HANDLERS - DEPLOY POV CONFIG TAB (Tab 5)
@@ -9630,6 +10406,7 @@ output "{device_name}_private_ip" {{
             'api_client': self.api_client,
             'connection_name': self.connection_name,
             'infrastructure': self.cloud_resource_configs.get('infrastructure', {}),
+            'services': self.cloud_resource_configs.get('services', {}),
         }
 
         # Update UI for deployment
@@ -9696,23 +10473,27 @@ output "{device_name}_private_ip" {{
         folders_to_commit = set()
 
         # Service Connections (PA side goes to SCM, FW side goes after commit)
+        # SD-WAN (ION) DCs get PA side config but skip FW side (ION auto-establishes tunnels)
         sc_datacenters = [dc for dc in ctx.get('datacenters', [])
                         if dc.get('connection_type') == 'service_connection']
         for dc in sc_datacenters:
-            fw = self._find_firewall_for_location(dc.get('name'))
+            dc_style = dc.get('style', 'traditional')
             scm_phases.append({
                 'name': f"Service Connection: {dc['name']} (PA side)",
                 'type': 'service_connection_pa',
                 'datacenter': dc,
             })
             folders_to_commit.add('Service Connections')
-            if fw:
-                fw_side_phases.append({
-                    'name': f"Service Connection: {dc['name']} (FW side)",
-                    'type': 'service_connection_fw',
-                    'datacenter': dc,
-                    'firewall': fw,
-                })
+            # Only traditional (firewall) DCs need FW-side IPsec config
+            if dc_style != 'sdwan':
+                fw = self._find_firewall_for_location(dc.get('name'))
+                if fw:
+                    fw_side_phases.append({
+                        'name': f"Service Connection: {dc['name']} (FW side)",
+                        'type': 'service_connection_fw',
+                        'datacenter': dc,
+                        'firewall': fw,
+                    })
 
         # Remote Networks (PA side goes to SCM, FW side goes after commit)
         for branch in ctx.get('branches', []):
@@ -9788,6 +10569,15 @@ output "{device_name}_private_ip" {{
                 'firewall': fw,
             })
 
+        # SSL Decryption CA phase — upload decryption CA to SCM
+        services = ctx.get('services', {})
+        if services.get('domain') and services.get('pki', {}).get('decryption_ca', False):
+            phases.append({
+                'name': 'SSL Decryption CA Upload',
+                'type': 'ssl_decryption_ca',
+                'domain': services['domain'],
+            })
+
         return phases
 
     def _find_firewall_for_location(self, location_name: str) -> Optional[dict]:
@@ -9859,6 +10649,8 @@ output "{device_name}_private_ip" {{
             self._execute_adem_phase(phase)
         elif phase_type == 'firewall_objects_rules':
             self._execute_firewall_objects_rules_phase(phase)
+        elif phase_type == 'ssl_decryption_ca':
+            self._execute_ssl_decryption_ca_phase(phase)
         else:
             self._log_activity(f"Unknown phase type: {phase_type}", "warning")
             self._advance_to_next_phase(True, "Skipped unknown phase type")
@@ -10213,6 +11005,106 @@ output "{device_name}_private_ip" {{
 
         except Exception as e:
             self._log_activity(f"Failed to configure firewall objects/rules: {e}", "error")
+            self.pov_deploy_results.append_text(f"\n  [ERROR] {str(e)}")
+            self._advance_to_next_phase(False, str(e))
+
+    def _execute_ssl_decryption_ca_phase(self, phase: dict):
+        """Upload decryption CA certificate to SCM for SSL decryption."""
+        domain = phase.get('domain', '')
+        self.pov_deploy_results.append_text(f"\n  Generating decryption CA for {domain}...")
+
+        try:
+            import subprocess
+            import tempfile
+            import os
+
+            customer_info = self.cloud_resource_configs.get('customer_info', {})
+            customer_name = customer_info.get('customer_name', 'POV')
+
+            # Generate decryption CA cert locally using OpenSSL
+            with tempfile.TemporaryDirectory() as tmpdir:
+                root_key = os.path.join(tmpdir, 'root-ca.key')
+                root_crt = os.path.join(tmpdir, 'root-ca.crt')
+                dec_key = os.path.join(tmpdir, 'decryption-ca.key')
+                dec_csr = os.path.join(tmpdir, 'decryption-ca.csr')
+                dec_crt = os.path.join(tmpdir, 'decryption-ca.crt')
+
+                # Generate Root CA
+                subprocess.run([
+                    'openssl', 'genrsa', '-out', root_key, '4096'
+                ], capture_output=True, check=True)
+
+                subprocess.run([
+                    'openssl', 'req', '-new', '-x509', '-days', '3650', '-sha256',
+                    '-key', root_key, '-out', root_crt,
+                    '-subj', f'/C=US/ST=California/L=Santa Clara/O={customer_name}/OU=Security/CN={customer_name} Root CA'
+                ], capture_output=True, check=True)
+
+                # Generate Decryption CA
+                subprocess.run([
+                    'openssl', 'genrsa', '-out', dec_key, '4096'
+                ], capture_output=True, check=True)
+
+                subprocess.run([
+                    'openssl', 'req', '-new', '-sha256',
+                    '-key', dec_key, '-out', dec_csr,
+                    '-subj', f'/C=US/ST=California/L=Santa Clara/O={customer_name}/OU=Security/CN={customer_name} Decryption CA'
+                ], capture_output=True, check=True)
+
+                # Sign with Root CA
+                ext_file = os.path.join(tmpdir, 'ext.cnf')
+                with open(ext_file, 'w') as f:
+                    f.write(
+                        "basicConstraints = critical, CA:TRUE, pathlen:0\n"
+                        "keyUsage = critical, keyCertSign, cRLSign\n"
+                        "subjectKeyIdentifier = hash\n"
+                        "authorityKeyIdentifier = keyid:always, issuer\n"
+                    )
+
+                subprocess.run([
+                    'openssl', 'x509', '-req', '-days', '1825', '-sha256',
+                    '-in', dec_csr, '-CA', root_crt, '-CAkey', root_key,
+                    '-CAcreateserial', '-out', dec_crt, '-extfile', ext_file
+                ], capture_output=True, check=True)
+
+                # Read the generated certificate
+                with open(dec_crt, 'r') as f:
+                    cert_pem = f.read()
+
+                self.pov_deploy_results.append_text("\n  - Decryption CA cert generated locally")
+
+            # Upload to SCM
+            api_client = self._get_deploy_api_client()
+            if not api_client:
+                self.pov_deploy_results.append_text("\n  [SKIP] No SCM API client available")
+                self._advance_to_next_phase(True, "No API client - skipping SSL decryption CA upload")
+                return
+
+            cert_name = f"{customer_name}-Decryption-CA".replace(' ', '-')
+
+            try:
+                cert_payload = {
+                    'name': cert_name,
+                    'certificate': cert_pem,
+                    'format': 'pem',
+                    'folder': 'Shared',
+                }
+                api_client.post('/config/objects/v1/certificates', json=cert_payload)
+                self.pov_deploy_results.append_text(f"\n  - Uploaded '{cert_name}' to SCM")
+            except Exception as upload_err:
+                if 'already exists' in str(upload_err).lower():
+                    self.pov_deploy_results.append_text(f"\n  - '{cert_name}' already exists in SCM")
+                else:
+                    raise upload_err
+
+            self.pov_deploy_results.append_text("\n  [OK] SSL Decryption CA configured")
+            self._advance_to_next_phase(True, "SSL Decryption CA uploaded to SCM")
+
+        except FileNotFoundError:
+            self.pov_deploy_results.append_text("\n  [SKIP] OpenSSL not available on this system")
+            self._advance_to_next_phase(True, "OpenSSL not found - skipping decryption CA")
+        except Exception as e:
+            self._log_activity(f"SSL Decryption CA phase failed: {e}", "error")
             self.pov_deploy_results.append_text(f"\n  [ERROR] {str(e)}")
             self._advance_to_next_phase(False, str(e))
 
@@ -11677,15 +12569,35 @@ output "{device_name}_private_ip" {{
             if hasattr(self, '_update_password_strength'):
                 self._update_password_strength()
 
+        # Restore services & applications card
+        services_config = self.cloud_resource_configs.get('services', {})
+        if hasattr(self, 'services_domain_input') and services_config.get('domain'):
+            self.services_domain_input.setText(services_config['domain'])
+        pki_config = services_config.get('pki', {})
+        if hasattr(self, 'pki_server_cert_cb'):
+            self.pki_server_cert_cb.setChecked(pki_config.get('server_cert', True))
+        if hasattr(self, 'pki_device_certs_cb'):
+            self.pki_device_certs_cb.setChecked(pki_config.get('device_certs', True))
+        if hasattr(self, 'pki_user_certs_cb'):
+            self.pki_user_certs_cb.setChecked(pki_config.get('user_certs', True))
+        if hasattr(self, 'pki_decryption_ca_cb'):
+            self.pki_decryption_ca_cb.setChecked(pki_config.get('decryption_ca', True))
+        if hasattr(self, '_update_services_status'):
+            self._update_services_status()
+
         # Refresh other UI elements
         if hasattr(self, '_update_cloud_rg_preview'):
             self._update_cloud_rg_preview()
         if hasattr(self, '_update_cloud_deployment_status'):
             self._update_cloud_deployment_status()
-        if hasattr(self, '_refresh_locations_list'):
-            self._refresh_locations_list()
-        if hasattr(self, '_refresh_trust_devices_list'):
-            self._refresh_trust_devices_list()
+        if hasattr(self, '_refresh_datacenters_list'):
+            self._refresh_datacenters_list()
+        if hasattr(self, '_refresh_branches_list'):
+            self._refresh_branches_list()
+        if hasattr(self, '_refresh_devices_list'):
+            self._refresh_devices_list()
+        if hasattr(self, '_refresh_device_location_dropdown'):
+            self._refresh_device_location_dropdown()
 
         # Refresh Use Cases tab elements
         if hasattr(self, '_refresh_private_app_connections'):

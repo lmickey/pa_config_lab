@@ -94,6 +94,25 @@ variable "firewall_password" {
 {% endif %}
 
 # =============================================================================
+# ION Device Variables
+# =============================================================================
+
+{% if has_ion_devices %}
+variable "ion_username" {
+  description = "Admin username for ION devices"
+  type        = string
+  default     = "{{ deployment.customer_name }}admin"
+  sensitive   = true
+}
+
+variable "ion_password" {
+  description = "Admin password for ION devices"
+  type        = string
+  sensitive   = true
+}
+{% endif %}
+
+# =============================================================================
 # Panorama Variables
 # =============================================================================
 

@@ -16,6 +16,11 @@ from pathlib import Path
 from .generator import TerraformGenerator
 from .executor import TerraformExecutor, TerraformResult
 from .bootstrap import BootstrapConfig, BootstrapGenerator, generate_firewall_bootstrap
+from .azure_cli_auth import (
+    check_azure_cli_installed,
+    validate_cli_token,
+    login_cli,
+)
 
 
 def check_terraform_installed() -> bool:
@@ -104,4 +109,7 @@ __all__ = [
     'generate_firewall_bootstrap',
     'check_terraform_installed',
     'get_terraform_version',
+    'check_azure_cli_installed',
+    'validate_cli_token',
+    'login_cli',
 ]

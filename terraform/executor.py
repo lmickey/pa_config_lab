@@ -134,6 +134,8 @@ class TerraformExecutor:
         command_str = " ".join(cmd)
 
         logger.info(f"Running: {command_str}")
+        logger.info(f"Working directory: {self.working_dir}")
+        logger.debug(f"Terraform binary: {self.terraform_path}")
 
         try:
             if progress_callback and not capture_output:
@@ -171,7 +173,27 @@ class TerraformExecutor:
                 return_code = result.returncode
 
             status = TerraformStatus.SUCCESS if return_code == 0 else TerraformStatus.FAILED
-            error_message = stderr if return_code != 0 else None
+
+            if return_code != 0:
+                error_message = stderr or stdout or "Unknown error"
+                logger.error(f"Command failed with return code {return_code}: {command_str}")
+                if stderr:
+                    logger.error(f"STDERR:\n{stderr}")
+                if stdout:
+                    logger.error(f"STDOUT:\n{stdout}")
+                # Log working directory contents for debugging
+                try:
+                    tf_files = [f.name for f in self.working_dir.iterdir() if f.suffix in ('.tf', '.tfvars', '.json')]
+                    logger.debug(f"Terraform files in working directory: {tf_files}")
+                except Exception:
+                    pass
+            else:
+                error_message = None
+                logger.debug(f"Command succeeded (return code 0)")
+                if stdout:
+                    # Log first 500 chars of stdout for context
+                    preview = stdout[:500] + ('...' if len(stdout) > 500 else '')
+                    logger.debug(f"STDOUT preview: {preview}")
 
             return TerraformResult(
                 status=status,
@@ -183,15 +205,23 @@ class TerraformExecutor:
             )
 
         except subprocess.TimeoutExpired:
-            logger.error(f"Command timed out: {command_str}")
+            logger.error(f"Command timed out after {timeout}s: {command_str}")
             return TerraformResult(
                 status=TerraformStatus.FAILED,
                 command=command_str,
                 return_code=-1,
                 error_message=f"Command timed out after {timeout} seconds",
             )
+        except FileNotFoundError:
+            logger.error(f"Terraform binary not found at: {self.terraform_path}")
+            return TerraformResult(
+                status=TerraformStatus.FAILED,
+                command=command_str,
+                return_code=-1,
+                error_message=f"Terraform binary not found at: {self.terraform_path}",
+            )
         except Exception as e:
-            logger.error(f"Command failed: {command_str}: {e}")
+            logger.error(f"Command failed with exception: {command_str}: {e}", exc_info=True)
             return TerraformResult(
                 status=TerraformStatus.FAILED,
                 command=command_str,
@@ -277,6 +307,11 @@ class TerraformExecutor:
 
         result = self._run_command(args, capture_output=not progress_callback, progress_callback=progress_callback)
         logger.info(f"Terraform init: {result.status.value}")
+        if not result.success:
+            logger.error(f"Terraform init failed - stderr: {result.stderr}")
+            logger.error(f"Terraform init failed - stdout: {result.stdout}")
+        else:
+            logger.info(f"Terraform init succeeded in {self.working_dir}")
         return result
 
     def validate(self) -> TerraformResult:
@@ -333,6 +368,9 @@ class TerraformExecutor:
         if destroy:
             args.append("-destroy")
 
+        if var_file:
+            logger.info(f"Using var file: {var_file}")
+
         result = self._run_command(args, capture_output=not progress_callback, progress_callback=progress_callback)
 
         # Parse plan output for change counts
@@ -340,6 +378,9 @@ class TerraformExecutor:
             result.changes = self._parse_plan_changes(result.stdout)
 
         logger.info(f"Terraform plan: {result.status.value}, changes: {result.changes}")
+        if not result.success:
+            logger.error(f"Terraform plan failed - stderr: {result.stderr}")
+            logger.error(f"Terraform plan failed - stdout: {result.stdout}")
         return result
 
     def apply(
@@ -484,6 +525,31 @@ class TerraformExecutor:
             TerraformResult with resource list in stdout
         """
         return self._run_command(["state", "list"])
+
+    def import_resource(self, resource_address: str, resource_id: str) -> TerraformResult:
+        """
+        Import an existing Azure resource into Terraform state.
+
+        Args:
+            resource_address: The Terraform resource address (e.g. 'azurerm_linux_virtual_machine.ion_vm1')
+            resource_id: The Azure resource ID
+
+        Returns:
+            TerraformResult with operation output
+        """
+        return self._run_command(["import", resource_address, resource_id])
+
+    def state_rm(self, resource_address: str) -> TerraformResult:
+        """
+        Remove a resource from Terraform state (does not destroy the actual resource).
+
+        Args:
+            resource_address: The resource address to remove (e.g. 'azurerm_storage_account.bootstrap')
+
+        Returns:
+            TerraformResult with operation output
+        """
+        return self._run_command(["state", "rm", resource_address])
 
     def _parse_plan_changes(self, output: str) -> Dict[str, int]:
         """
