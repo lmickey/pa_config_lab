@@ -7966,9 +7966,6 @@ class POVWorkflowWidget(QWidget):
             # Check Azure CLI auth status (non-blocking, just warns if expired)
             self._prime_azure_cli_auth()
 
-            # Fetch available ION image versions from Azure Marketplace
-            self._fetch_ion_image_versions()
-
         # Change button to allow re-authentication
         self.azure_auth_btn.setText("🔄 Change Subscription")
 
@@ -8130,7 +8127,6 @@ class POVWorkflowWidget(QWidget):
                 'branches': locations.get('branches', []),
                 'firewalls': firewalls,
                 'ion_devices': ion_devices,
-                'ion_image_version': self.cloud_resource_configs.get('cloud_deployment', {}).get('ion_image_version', 'latest'),
                 'ion_vm_size': self.cloud_resource_configs.get('cloud_deployment', {}).get('ion_vm_size', 'Standard_DS3_v2'),
                 'trust_devices': self.cloud_resource_configs.get('trust_devices', {}).get('devices', []),
             }
@@ -8699,13 +8695,18 @@ resource "azurerm_marketplace_agreement" "ion" {{
   plan      = "prisma-sdwan-ion-virtual-appliance"
 }}
 '''
-        ion_version = tfvars.get('ion_image_version', 'latest')
         ion_vm_size = tfvars.get('ion_vm_size', 'Standard_DS3_v2')
         for ion in ion_devices:
             ion_name = ion.get('name', 'ion').lower().replace(' ', '-').replace('_', '-')
             location_name = ion.get('location', 'Datacenter')
             resource_prefix = f"{customer}-{location}-DC-{ion_name}"
             dns_label = f"{resource_prefix}-wan".lower()
+            az = ion.get('availability_zone', '')
+
+            # Public IP zones line (required for zone-aware VMs)
+            pip_zones_line = f'\n  zones               = ["{az}"]' if az else ''
+            # VM zone line
+            vm_zone_line = f'\n  zone                            = "{az}"' if az else ''
 
             content += f'''
 # ION Device: {ion_name} (SD-WAN) for {location_name}
@@ -8715,7 +8716,7 @@ resource "azurerm_public_ip" "pip_{ion_name}" {{
   location            = azurerm_resource_group.pov.location
   resource_group_name = azurerm_resource_group.pov.name
   allocation_method   = "Static"
-  sku                 = "Standard"
+  sku                 = "Standard"{pip_zones_line}
   domain_name_label   = "{dns_label}"
   tags = azurerm_resource_group.pov.tags
 }}
@@ -8758,7 +8759,7 @@ resource "azurerm_linux_virtual_machine" "ion_{ion_name}" {{
   name                            = "{resource_prefix}"
   resource_group_name             = azurerm_resource_group.pov.name
   location                        = azurerm_resource_group.pov.location
-  size                            = "{ion_vm_size}"
+  size                            = "{ion_vm_size}"{vm_zone_line}
   admin_username                  = var.admin_username
   admin_password                  = var.admin_password
   disable_password_authentication = false
@@ -8783,7 +8784,7 @@ resource "azurerm_linux_virtual_machine" "ion_{ion_name}" {{
     publisher = "paloaltonetworks"
     offer     = "prisma-sd-wan-ion-virtual-appliance"
     sku       = "prisma-sdwan-ion-virtual-appliance"
-    version   = "{ion_version}"
+    version   = "latest"
   }}
 
   tags = azurerm_resource_group.pov.tags
@@ -9450,39 +9451,6 @@ output "{device_name}_private_ip" {{
             )
         else:
             self._log_activity("Azure CLI token is valid for Terraform")
-
-    def _fetch_ion_image_versions(self):
-        """Fetch available Prisma SD-WAN ION image versions from Azure Marketplace."""
-        try:
-            from azure.mgmt.compute import ComputeManagementClient
-
-            subscription_id = self._azure_subscription.get('id', '')
-            if not subscription_id or not hasattr(self, '_azure_credential'):
-                return
-
-            location = self.cloud_resource_configs.get('cloud_deployment', {}).get('location', 'eastus')
-            compute_client = ComputeManagementClient(self._azure_credential, subscription_id)
-
-            images = compute_client.virtual_machine_images.list(
-                location=location,
-                publisher_name="paloaltonetworks",
-                offer="prisma-sd-wan-ion-virtual-appliance",
-                skus="prisma-sdwan-ion-virtual-appliance",
-            )
-
-            versions = sorted([img.name for img in images], reverse=True)
-
-            if versions:
-                self.cloud_resource_configs.setdefault('cloud_deployment', {})['ion_available_versions'] = versions
-                # Default to the latest actual version
-                if not self.cloud_resource_configs['cloud_deployment'].get('ion_image_version'):
-                    self.cloud_resource_configs['cloud_deployment']['ion_image_version'] = versions[0]
-                self._log_activity(f"Found {len(versions)} ION image versions: {', '.join(versions)}")
-                self.save_state()
-        except ImportError:
-            self._log_activity("azure-mgmt-compute not installed, using default ION version", "warning")
-        except Exception as e:
-            self._log_activity(f"Could not fetch ION image versions: {e}", "warning")
 
     def _on_deploy_progress(self, message: str, percentage: int):
         """Handle deployment progress update."""
