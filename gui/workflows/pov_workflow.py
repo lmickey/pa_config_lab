@@ -1230,24 +1230,25 @@ class POVWorkflowWidget(QWidget):
 
             card_layout.addWidget(summary_frame)
 
-            # Initialize config with default datacenter
-            default_region = self.cloud_region_combo.currentText() if hasattr(self, 'cloud_region_combo') else "eastus"
-            self.cloud_resource_configs['locations'] = {
-                'branches': [],
-                'datacenters': [
-                    {
-                        'name': 'Datacenter',
-                        'cloud': 'Azure',
-                        'region': default_region,
-                        'style': 'traditional',
-                        'bgp_enabled': True,
-                        'default_gateway': False,
-                        'connection_type': 'service_connection',
-                    }
-                ],
-            }
+            # Initialize config with default datacenter only if not restored from state
+            if 'locations' not in self.cloud_resource_configs:
+                default_region = self.cloud_region_combo.currentText() if hasattr(self, 'cloud_region_combo') else "eastus"
+                self.cloud_resource_configs['locations'] = {
+                    'branches': [],
+                    'datacenters': [
+                        {
+                            'name': 'Datacenter',
+                            'cloud': 'Azure',
+                            'region': default_region,
+                            'style': 'traditional',
+                            'bgp_enabled': True,
+                            'default_gateway': False,
+                            'connection_type': 'service_connection',
+                        }
+                    ],
+                }
 
-            # Populate the datacenters list with the default
+            # Populate the datacenters list from config
             self._refresh_datacenters_list()
             self._update_locations_status()
 
