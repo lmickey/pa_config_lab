@@ -12460,8 +12460,10 @@ output "{device_name}_private_ip" {{
             self._update_cloud_rg_preview()
         if hasattr(self, '_update_cloud_deployment_status'):
             self._update_cloud_deployment_status()
-        if hasattr(self, '_refresh_locations_list'):
-            self._refresh_locations_list()
+        if hasattr(self, '_refresh_datacenters_list'):
+            self._refresh_datacenters_list()
+        if hasattr(self, '_refresh_branches_list'):
+            self._refresh_branches_list()
         if hasattr(self, '_refresh_trust_devices_list'):
             self._refresh_trust_devices_list()
 
