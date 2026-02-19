@@ -2,7 +2,7 @@
 IONDevice model - SD-WAN ION appliance configuration.
 
 Represents a Prisma SD-WAN ION virtual appliance deployed in Azure:
-- Azure marketplace image (cloudgenix_ion BYOL)
+- Azure marketplace image (Prisma SD-WAN ION Virtual Appliance)
 - Two interfaces: WAN (untrust subnet, public IP) + LAN (trust subnet)
 - No bootstrap storage (ION bootstraps via SD-WAN cloud controller)
 - Used for datacenter service connections instead of VM-Series firewalls
@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 class IONImageConfig:
     """ION marketplace image configuration"""
     publisher: str = "paloaltonetworks"
-    offer: str = "cloudgenix_ion"
-    sku: str = "byol"
+    offer: str = "prisma-sd-wan-ion-virtual-appliance"
+    sku: str = "prisma-sdwan-ion-virtual-appliance"
     version: str = "latest"
 
     def to_dict(self) -> Dict[str, Any]:
@@ -41,8 +41,8 @@ class IONImageConfig:
     def from_dict(cls, data: Dict[str, Any]) -> 'IONImageConfig':
         return cls(
             publisher=data.get('publisher', 'paloaltonetworks'),
-            offer=data.get('offer', 'cloudgenix_ion'),
-            sku=data.get('sku', 'byol'),
+            offer=data.get('offer', 'prisma-sd-wan-ion-virtual-appliance'),
+            sku=data.get('sku', 'prisma-sdwan-ion-virtual-appliance'),
             version=data.get('version', 'latest'),
         )
 

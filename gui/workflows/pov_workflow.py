@@ -8687,11 +8687,11 @@ resource "azurerm_linux_virtual_machine" "fw_{fw_name}" {{
         ion_devices = tfvars.get('ion_devices', [])
         if ion_devices:
             content += f'''
-# Accept Palo Alto Networks CloudGenix ION Marketplace Agreement
+# Accept Palo Alto Networks Prisma SD-WAN ION Marketplace Agreement
 resource "azurerm_marketplace_agreement" "ion" {{
   publisher = "paloaltonetworks"
-  offer     = "cloudgenix_ion"
-  plan      = "byol"
+  offer     = "prisma-sd-wan-ion-virtual-appliance"
+  plan      = "prisma-sdwan-ion-virtual-appliance"
 }}
 '''
         for ion in ion_devices:
@@ -8767,15 +8767,15 @@ resource "azurerm_linux_virtual_machine" "ion_{ion_name}" {{
   }}
 
   plan {{
-    name      = "byol"
+    name      = "prisma-sdwan-ion-virtual-appliance"
     publisher = "paloaltonetworks"
-    product   = "cloudgenix_ion"
+    product   = "prisma-sd-wan-ion-virtual-appliance"
   }}
 
   source_image_reference {{
     publisher = "paloaltonetworks"
-    offer     = "cloudgenix_ion"
-    sku       = "byol"
+    offer     = "prisma-sd-wan-ion-virtual-appliance"
+    sku       = "prisma-sdwan-ion-virtual-appliance"
     version   = "latest"
   }}
 
