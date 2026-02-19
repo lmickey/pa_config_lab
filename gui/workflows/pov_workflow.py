@@ -7963,6 +7963,9 @@ class POVWorkflowWidget(QWidget):
             self.save_state()
             self._log_activity(f"Saved Azure credentials to state: {self._azure_subscription.get('name')}")
 
+            # Check Azure CLI auth status (non-blocking, just warns if expired)
+            self._prime_azure_cli_auth()
+
         # Change button to allow re-authentication
         self.azure_auth_btn.setText("🔄 Change Subscription")
 
@@ -9214,6 +9217,10 @@ output "{device_name}_private_ip" {{
             self._log_activity("Regenerating Terraform files for redeploy...")
             self._generate_terraform_from_pov(force_regenerate=True)
 
+        # Validate Azure CLI authentication before proceeding
+        if not self._ensure_azure_cli_auth():
+            return  # Auth failed or user cancelled
+
         # Get credentials
         credentials = self._get_terraform_credentials()
 
@@ -9257,6 +9264,157 @@ output "{device_name}_private_ip" {{
             'admin_username': cloud_deployment.get('admin_username', ''),
             'admin_password': cloud_deployment.get('admin_password', ''),
         }
+
+    def _ensure_azure_cli_auth(self) -> bool:
+        """
+        Validate Azure CLI token and re-authenticate if needed.
+
+        Must be called from the main thread (before starting TerraformWorker)
+        because az login requires browser interaction.
+
+        Returns:
+            True if CLI auth is valid and ready for Terraform.
+            False if auth failed or user cancelled.
+        """
+        from terraform.azure_cli_auth import (
+            check_azure_cli_installed,
+            validate_cli_token,
+            login_cli,
+        )
+        from PyQt6.QtWidgets import QApplication
+
+        # Get tenant and subscription from saved state
+        tenant_id = ''
+        subscription_id = ''
+        if hasattr(self, '_azure_subscription') and self._azure_subscription:
+            subscription_id = self._azure_subscription.get('id', '')
+            tenant_id = self._azure_subscription.get('tenant_id', '')
+        else:
+            subscription_id = self.deployment_config.get('azure_subscription_id', '')
+            tenant_id = self.deployment_config.get('azure_tenant_id', '')
+
+        # Check if Azure CLI is installed
+        if not check_azure_cli_installed():
+            QMessageBox.critical(
+                self,
+                "Azure CLI Not Found",
+                "Azure CLI (az) is not installed or not in PATH.\n\n"
+                "Terraform requires Azure CLI for authentication.\n\n"
+                "Install from: https://aka.ms/installazurecli"
+            )
+            return False
+
+        self._log_activity("Validating Azure CLI authentication...")
+
+        # Quick check: is the current CLI token valid?
+        is_valid, message = validate_cli_token(
+            subscription_id=subscription_id,
+            tenant_id=tenant_id,
+        )
+
+        if is_valid:
+            self._log_activity("Azure CLI token is valid")
+            return True
+
+        # Token is expired or invalid -- prompt user to re-authenticate
+        self._log_activity(f"Azure CLI token expired or invalid: {message}", "warning")
+
+        reply = QMessageBox.question(
+            self,
+            "Azure CLI Authentication Required",
+            "Your Azure CLI session has expired or is not logged in.\n\n"
+            "Terraform needs a valid Azure CLI token to deploy resources.\n\n"
+            "Sign in now? (A browser window will open)",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
+
+        if reply != QMessageBox.StandardButton.Yes:
+            self._log_activity("User cancelled Azure CLI re-authentication")
+            return False
+
+        # Show progress indicator during login
+        self._log_activity("Opening browser for Azure CLI sign-in...")
+        self.cloud_deploy_results.set_text(
+            "Waiting for Azure CLI sign-in...\n"
+            "Please complete authentication in your browser."
+        )
+        QApplication.processEvents()
+
+        # Perform az login (blocking -- opens browser)
+        success, login_message = login_cli(
+            tenant_id=tenant_id,
+            subscription_id=subscription_id,
+        )
+
+        # Bring window back to focus after browser auth
+        self.activateWindow()
+        self.raise_()
+
+        if not success:
+            self._log_activity(f"Azure CLI login failed: {login_message}", "error")
+            tenant_hint = f"\n  az login --tenant {tenant_id}" if tenant_id else "\n  az login"
+            QMessageBox.critical(
+                self,
+                "Azure CLI Login Failed",
+                f"Failed to authenticate with Azure CLI:\n\n{login_message}\n\n"
+                f"You can try manually running:{tenant_hint}"
+            )
+            self.cloud_deploy_results.set_text("")
+            return False
+
+        # Verify the new token works
+        is_valid, message = validate_cli_token(
+            subscription_id=subscription_id,
+            tenant_id=tenant_id,
+        )
+
+        if is_valid:
+            self._log_activity("Azure CLI re-authentication successful")
+            self.cloud_deploy_results.set_text("")
+            return True
+        else:
+            self._log_activity(f"Token still invalid after login: {message}", "error")
+            QMessageBox.critical(
+                self,
+                "Authentication Error",
+                f"Azure CLI login completed but token is still invalid:\n\n{message}\n\n"
+                "Please verify the correct subscription and tenant are set."
+            )
+            self.cloud_deploy_results.set_text("")
+            return False
+
+    def _prime_azure_cli_auth(self):
+        """
+        Check Azure CLI auth status after SDK auth completes.
+
+        Non-intrusive: only logs a warning if CLI token isn't valid.
+        The mandatory gate is _ensure_azure_cli_auth() at deploy time.
+        """
+        from terraform.azure_cli_auth import check_azure_cli_installed, validate_cli_token
+
+        if not check_azure_cli_installed():
+            self._log_activity(
+                "Azure CLI not installed - will need CLI auth at deploy time",
+                "warning"
+            )
+            return
+
+        tenant_id = self._azure_subscription.get('tenant_id', '')
+        subscription_id = self._azure_subscription.get('id', '')
+
+        is_valid, _ = validate_cli_token(
+            subscription_id=subscription_id,
+            tenant_id=tenant_id,
+        )
+
+        if not is_valid:
+            self._log_activity(
+                "Azure CLI token not valid - will prompt for CLI login at deploy time",
+                "warning"
+            )
+        else:
+            self._log_activity("Azure CLI token is valid for Terraform")
 
     def _on_deploy_progress(self, message: str, percentage: int):
         """Handle deployment progress update."""
