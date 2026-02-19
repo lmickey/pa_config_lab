@@ -9293,8 +9293,14 @@ output "{device_name}_private_ip" {{
             subscription_id = self.deployment_config.get('azure_subscription_id', '')
             tenant_id = self.deployment_config.get('azure_tenant_id', '')
 
+        self._log_activity(
+            f"Azure CLI auth check: subscription={subscription_id or '(none)'}, "
+            f"tenant={tenant_id or '(none)'}"
+        )
+
         # Check if Azure CLI is installed
         if not check_azure_cli_installed():
+            self._log_activity("Azure CLI (az) not found on this system", "error")
             QMessageBox.critical(
                 self,
                 "Azure CLI Not Found",
@@ -9304,7 +9310,7 @@ output "{device_name}_private_ip" {{
             )
             return False
 
-        self._log_activity("Validating Azure CLI authentication...")
+        self._log_activity("Azure CLI found, validating token...")
 
         # Quick check: is the current CLI token valid?
         is_valid, message = validate_cli_token(
