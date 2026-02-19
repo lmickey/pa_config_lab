@@ -7967,6 +7967,9 @@ class POVWorkflowWidget(QWidget):
             # Check Azure CLI auth status (non-blocking, just warns if expired)
             self._prime_azure_cli_auth()
 
+            # Fetch available VM sizes for the deployment location
+            self._fetch_available_vm_sizes()
+
         # Change button to allow re-authentication
         self.azure_auth_btn.setText("🔄 Change Subscription")
 
@@ -8762,6 +8765,8 @@ resource "azurerm_linux_virtual_machine" "ion_{ion_name}" {{
   admin_username                  = var.admin_username
   admin_password                  = var.admin_password
   disable_password_authentication = false
+  provision_vm_agent              = false
+  allow_extension_operations      = false
 
   network_interface_ids = [
     azurerm_network_interface.nic_{ion_name}_wan.id,
@@ -9450,6 +9455,36 @@ output "{device_name}_private_ip" {{
             )
         else:
             self._log_activity("Azure CLI token is valid for Terraform")
+
+    def _fetch_available_vm_sizes(self):
+        """Fetch available VM sizes for the deployment location from Azure."""
+        try:
+            from azure.mgmt.compute import ComputeManagementClient
+
+            subscription_id = self._azure_subscription.get('id', '')
+            if not subscription_id or not hasattr(self, '_azure_credential'):
+                return
+
+            location = self.cloud_resource_configs.get('cloud_deployment', {}).get('location', 'eastus')
+            compute_client = ComputeManagementClient(self._azure_credential, subscription_id)
+
+            # Query available VM sizes for the location
+            sizes = compute_client.virtual_machine_sizes.list(location)
+            available = {}
+            for s in sizes:
+                available[s.name] = {
+                    'vcpus': s.number_of_cores,
+                    'memory_mb': s.memory_in_mb,
+                }
+
+            if available:
+                self.cloud_resource_configs.setdefault('cloud_deployment', {})['available_vm_sizes'] = available
+                self._log_activity(f"Found {len(available)} available VM sizes in {location}")
+                self.save_state()
+        except ImportError:
+            self._log_activity("azure-mgmt-compute not installed, using default VM sizes", "warning")
+        except Exception as e:
+            self._log_activity(f"Could not fetch available VM sizes: {e}", "warning")
 
     def _on_deploy_progress(self, message: str, percentage: int):
         """Handle deployment progress update."""

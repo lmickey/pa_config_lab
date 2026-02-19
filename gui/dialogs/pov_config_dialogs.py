@@ -158,37 +158,44 @@ class CloudDeploymentDialog(POVConfigDialog):
         vm_group = QGroupBox("VM Sizing")
         vm_layout = QFormLayout()
 
-        self.fw_vm_size = QComboBox()
-        self.fw_vm_size.addItems([
-            "Standard_D3_v2 (4 vCPU, 14GB - Eval)",
-            "Standard_D4_v2 (8 vCPU, 28GB - Small)",
-            "Standard_D5_v2 (16 vCPU, 56GB - Medium)",
-            "Standard_D8s_v4 (8 vCPU, 32GB - Production)",
-            "Standard_D16s_v4 (16 vCPU, 64GB - Large)",
-        ])
+        # Default VM size suggestions (used when Azure sizes aren't cached)
+        fw_defaults = [
+            "Standard_D3_v2", "Standard_D4_v2", "Standard_D5_v2",
+            "Standard_D8s_v4", "Standard_D16s_v4",
+        ]
+        panorama_defaults = ["Standard_D4_v2", "Standard_D5_v2"]
+        trust_defaults = ["Standard_B2s", "Standard_D2s_v3", "Standard_D4s_v3"]
+        ion_defaults = ["Standard_DS3_v2", "Standard_DS4_v2", "Standard_DS5_v2"]
+
+        # Build display labels from Azure cached sizes or defaults
+        available = self.config.get('available_vm_sizes', {}) if self.config else {}
+
+        def make_vm_combo(defaults):
+            combo = QComboBox()
+            combo.setEditable(True)
+            if available:
+                # Show all available sizes with vCPU/memory, defaults first
+                items = []
+                for sku in defaults:
+                    if sku in available:
+                        info = available[sku]
+                        mem_gb = info['memory_mb'] // 1024
+                        items.append(f"{sku} ({info['vcpus']} vCPU, {mem_gb}GB)")
+                combo.addItems(items if items else defaults)
+            else:
+                combo.addItems(defaults)
+            return combo
+
+        self.fw_vm_size = make_vm_combo(fw_defaults)
         vm_layout.addRow("Firewall VM Size:", self.fw_vm_size)
 
-        self.panorama_vm_size = QComboBox()
-        self.panorama_vm_size.addItems([
-            "Standard_D4_v2 (8 vCPU, 28GB - Eval)",
-            "Standard_D5_v2 (16 vCPU, 56GB - Production)",
-        ])
+        self.panorama_vm_size = make_vm_combo(panorama_defaults)
         vm_layout.addRow("Panorama VM Size:", self.panorama_vm_size)
 
-        self.trust_vm_size = QComboBox()
-        self.trust_vm_size.addItems([
-            "Standard_B2s (2 vCPU, 4GB - Minimal)",
-            "Standard_D2s_v3 (2 vCPU, 8GB - Standard)",
-            "Standard_D4s_v3 (4 vCPU, 16GB - Enhanced)",
-        ])
+        self.trust_vm_size = make_vm_combo(trust_defaults)
         vm_layout.addRow("Trust Network VMs:", self.trust_vm_size)
 
-        self.ion_vm_size = QComboBox()
-        self.ion_vm_size.addItems([
-            "Standard_DS3_v2 (4 vCPU, 14GB - Eval)",
-            "Standard_DS4_v2 (8 vCPU, 28GB - Small)",
-            "Standard_DS5_v2 (16 vCPU, 56GB - Production)",
-        ])
+        self.ion_vm_size = make_vm_combo(ion_defaults)
         vm_layout.addRow("ION VM Size:", self.ion_vm_size)
 
         vm_group.setLayout(vm_layout)
@@ -242,13 +249,25 @@ class CloudDeploymentDialog(POVConfigDialog):
             self.untrust_subnet.setText(self.config.get('untrust_subnet', '10.100.1.0/24'))
             self.trust_subnet.setText(self.config.get('trust_subnet', '10.100.2.0/24'))
 
-            # ION VM size
-            saved_ion_size = self.config.get('ion_vm_size', '')
-            if saved_ion_size:
-                for i in range(self.ion_vm_size.count()):
-                    if self.ion_vm_size.itemText(i).startswith(saved_ion_size):
-                        self.ion_vm_size.setCurrentIndex(i)
-                        break
+            # Restore VM sizes
+            for key, combo in [
+                ('fw_vm_size', self.fw_vm_size),
+                ('panorama_vm_size', self.panorama_vm_size),
+                ('trust_vm_size', self.trust_vm_size),
+                ('ion_vm_size', self.ion_vm_size),
+            ]:
+                saved = self.config.get(key, '')
+                if saved:
+                    # Try to find matching item in dropdown
+                    found = False
+                    for i in range(combo.count()):
+                        if combo.itemText(i).startswith(saved):
+                            combo.setCurrentIndex(i)
+                            found = True
+                            break
+                    if not found:
+                        # Editable combo: set the text directly
+                        combo.setEditText(saved)
         self._update_rg_preview()
 
     def _save_config(self) -> Dict[str, Any]:
@@ -264,6 +283,9 @@ class CloudDeploymentDialog(POVConfigDialog):
             'untrust_subnet': self.untrust_subnet.text(),
             'trust_subnet': self.trust_subnet.text(),
         }
+        # Preserve cached available VM sizes from Azure query
+        if self.config and 'available_vm_sizes' in self.config:
+            config['available_vm_sizes'] = self.config['available_vm_sizes']
         return config
 
 
