@@ -3874,7 +3874,7 @@ class POVWorkflowWidget(QWidget):
                     # HA pair: deploy 2 IONs in separate availability zones
                     for i in range(1, 3):
                         ion_devices.append({
-                            'name': f"ion-{dc['name'].lower().replace(' ', '-')}-{i}",
+                            'name': f"{dc['name'].lower().replace(' ', '-')}-ion{i}",
                             'type': 'service_connection',
                             'location': dc['name'],
                             'region': dc.get('region', 'eastus'),
@@ -3884,7 +3884,7 @@ class POVWorkflowWidget(QWidget):
                         })
                 elif dc_style == 'sdwan':
                     ion_devices.append({
-                        'name': f"ion-{dc['name'].lower().replace(' ', '-')}",
+                        'name': f"{dc['name'].lower().replace(' ', '-')}-ion",
                         'type': 'service_connection',
                         'location': dc['name'],
                         'region': dc.get('region', 'eastus'),
@@ -5084,7 +5084,7 @@ class POVWorkflowWidget(QWidget):
             # ION HA pairs are managed at infrastructure level, not as trust devices
             dc_style = dc.get('style', 'traditional')
             if dc_style == 'sdwan':
-                ion_name = f"{dc['name']}-ION"
+                ion_name = f"{dc['name']}-ion"
                 auto_device_names.add(ion_name)
                 if not any(d['name'] == ion_name for d in current_devices):
                     new_devices.append({
@@ -8084,7 +8084,7 @@ class POVWorkflowWidget(QWidget):
                     if dc_style == 'sdwan_ha':
                         for i in range(1, 3):
                             ion_devices.append({
-                                'name': f"ion-{dc['name'].lower().replace(' ', '-')}-{i}",
+                                'name': f"{dc['name'].lower().replace(' ', '-')}-ion{i}",
                                 'type': 'service_connection',
                                 'location': dc['name'],
                                 'region': dc.get('region', azure_region),
@@ -8094,7 +8094,7 @@ class POVWorkflowWidget(QWidget):
                             })
                     elif dc_style == 'sdwan':
                         ion_devices.append({
-                            'name': f"ion-{dc['name'].lower().replace(' ', '-')}",
+                            'name': f"{dc['name'].lower().replace(' ', '-')}-ion",
                             'type': 'service_connection',
                             'location': dc['name'],
                             'region': dc.get('region', azure_region),
@@ -8759,7 +8759,7 @@ resource "azurerm_marketplace_agreement" "ion" {{
         for ion in ion_devices:
             ion_name = ion.get('name', 'ion').lower().replace(' ', '-').replace('_', '-')
             location_name = ion.get('location', 'Datacenter')
-            resource_prefix = f"{customer}-{location}-DC-{ion_name}"
+            resource_prefix = f"{customer}-{ion_name}"
             dns_label = f"{resource_prefix}-wan".lower()
             az = ion.get('availability_zone', '')
             ion_vm_size = ion.get('vm_size_override', ion_vm_size_default)
