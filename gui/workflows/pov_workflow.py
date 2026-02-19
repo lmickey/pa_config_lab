@@ -8703,9 +8703,7 @@ resource "azurerm_marketplace_agreement" "ion" {{
             dns_label = f"{resource_prefix}-wan".lower()
             az = ion.get('availability_zone', '')
 
-            # Public IP zones line (required for zone-aware VMs)
-            pip_zones_line = f'\n  zones               = ["{az}"]' if az else ''
-            # VM zone line
+            # VM zone line (Standard SKU PIP is zone-redundant by default, no zones needed)
             vm_zone_line = f'\n  zone                            = "{az}"' if az else ''
 
             content += f'''
@@ -8716,7 +8714,7 @@ resource "azurerm_public_ip" "pip_{ion_name}" {{
   location            = azurerm_resource_group.pov.location
   resource_group_name = azurerm_resource_group.pov.name
   allocation_method   = "Static"
-  sku                 = "Standard"{pip_zones_line}
+  sku                 = "Standard"
   domain_name_label   = "{dns_label}"
   tags = azurerm_resource_group.pov.tags
 }}
