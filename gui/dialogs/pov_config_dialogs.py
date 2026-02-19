@@ -183,6 +183,18 @@ class CloudDeploymentDialog(POVConfigDialog):
         ])
         vm_layout.addRow("Trust Network VMs:", self.trust_vm_size)
 
+        self.ion_vm_size = QComboBox()
+        self.ion_vm_size.addItems([
+            "Standard_DS3_v2 (4 vCPU, 14GB - Eval)",
+            "Standard_DS4_v2 (8 vCPU, 28GB - Small)",
+            "Standard_DS5_v2 (16 vCPU, 56GB - Production)",
+        ])
+        vm_layout.addRow("ION VM Size:", self.ion_vm_size)
+
+        self.ion_image_version = QComboBox()
+        self.ion_image_version.addItems(["latest"])
+        vm_layout.addRow("ION Image Version:", self.ion_image_version)
+
         vm_group.setLayout(vm_layout)
         self.layout.addWidget(vm_group)
 
@@ -233,20 +245,44 @@ class CloudDeploymentDialog(POVConfigDialog):
             self.mgmt_subnet.setText(self.config.get('mgmt_subnet', '10.100.0.0/24'))
             self.untrust_subnet.setText(self.config.get('untrust_subnet', '10.100.1.0/24'))
             self.trust_subnet.setText(self.config.get('trust_subnet', '10.100.2.0/24'))
+
+            # ION image versions (populate from cached Azure query before setting selection)
+            cached_versions = self.config.get('ion_available_versions', [])
+            if cached_versions:
+                self.ion_image_version.clear()
+                self.ion_image_version.addItems(["latest"] + cached_versions)
+            saved_ion_version = self.config.get('ion_image_version', 'latest')
+            idx = self.ion_image_version.findText(saved_ion_version)
+            if idx >= 0:
+                self.ion_image_version.setCurrentIndex(idx)
+
+            # ION VM size
+            saved_ion_size = self.config.get('ion_vm_size', '')
+            if saved_ion_size:
+                for i in range(self.ion_vm_size.count()):
+                    if self.ion_vm_size.itemText(i).startswith(saved_ion_size):
+                        self.ion_vm_size.setCurrentIndex(i)
+                        break
         self._update_rg_preview()
 
     def _save_config(self) -> Dict[str, Any]:
-        return {
+        config = {
             'customer_name': self.customer_name.text().lower().strip(),
             'location': self.location.currentText(),
             'fw_vm_size': self.fw_vm_size.currentText().split()[0],
             'panorama_vm_size': self.panorama_vm_size.currentText().split()[0],
             'trust_vm_size': self.trust_vm_size.currentText().split()[0],
+            'ion_vm_size': self.ion_vm_size.currentText().split()[0],
+            'ion_image_version': self.ion_image_version.currentText(),
             'vnet_cidr': self.vnet_cidr.text(),
             'mgmt_subnet': self.mgmt_subnet.text(),
             'untrust_subnet': self.untrust_subnet.text(),
             'trust_subnet': self.trust_subnet.text(),
         }
+        # Preserve cached available versions so they survive dialog round-trips
+        if self.config and 'ion_available_versions' in self.config:
+            config['ion_available_versions'] = self.config['ion_available_versions']
+        return config
 
 
 class DeviceConfigDialog(POVConfigDialog):
