@@ -8065,18 +8065,39 @@ class POVWorkflowWidget(QWidget):
                     self._on_terraform_ready()
                     return
 
-            # Generate firewalls list from locations
-            # Each datacenter with service_connection needs a firewall
-            # Each branch (remote_network) needs a firewall
+            # Generate firewalls and ION devices lists from locations
+            # Style determines whether a DC gets a firewall or ION device(s)
             firewalls = []
+            ion_devices = []
             for dc in datacenters:
                 if dc.get('connection_type') == 'service_connection':
-                    firewalls.append({
-                        'name': f"fw-{dc['name'].lower().replace(' ', '-')}",
-                        'type': 'service_connection',
-                        'location_name': dc['name'],
-                        'region': dc.get('region', azure_region),
-                    })
+                    dc_style = dc.get('style', 'traditional')
+                    if dc_style == 'sdwan_ha':
+                        for i in range(1, 3):
+                            ion_devices.append({
+                                'name': f"ion-{dc['name'].lower().replace(' ', '-')}-{i}",
+                                'type': 'service_connection',
+                                'location': dc['name'],
+                                'region': dc.get('region', azure_region),
+                                'style': 'sdwan_ha',
+                                'ha_peer': i,
+                                'availability_zone': str(i),
+                            })
+                    elif dc_style == 'sdwan':
+                        ion_devices.append({
+                            'name': f"ion-{dc['name'].lower().replace(' ', '-')}",
+                            'type': 'service_connection',
+                            'location': dc['name'],
+                            'region': dc.get('region', azure_region),
+                            'style': 'sdwan',
+                        })
+                    else:
+                        firewalls.append({
+                            'name': f"fw-{dc['name'].lower().replace(' ', '-')}",
+                            'type': 'service_connection',
+                            'location_name': dc['name'],
+                            'region': dc.get('region', azure_region),
+                        })
 
             for branch in locations.get('branches', []):
                 firewalls.append({
@@ -8105,6 +8126,7 @@ class POVWorkflowWidget(QWidget):
                 'datacenters': datacenters,
                 'branches': locations.get('branches', []),
                 'firewalls': firewalls,
+                'ion_devices': ion_devices,
                 'trust_devices': self.cloud_resource_configs.get('trust_devices', {}).get('devices', []),
             }
 
