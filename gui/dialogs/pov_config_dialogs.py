@@ -170,17 +170,21 @@ class CloudDeploymentDialog(POVConfigDialog):
         # Build display labels from Azure cached sizes or defaults
         available = self.config.get('available_vm_sizes', {}) if self.config else {}
 
-        def make_vm_combo(defaults):
+        def make_vm_combo(defaults, show_zones=False):
             combo = QComboBox()
             combo.setEditable(True)
             if available:
-                # Show all available sizes with vCPU/memory, defaults first
                 items = []
                 for sku in defaults:
                     if sku in available:
                         info = available[sku]
                         mem_gb = info['memory_mb'] // 1024
-                        items.append(f"{sku} ({info['vcpus']} vCPU, {mem_gb}GB)")
+                        label = f"{sku} ({info['vcpus']} vCPU, {mem_gb}GB"
+                        if show_zones and 'zones' in info:
+                            zones = info['zones']
+                            label += f" - zones: {','.join(zones)}" if zones else " - no zones"
+                        label += ")"
+                        items.append(label)
                 combo.addItems(items if items else defaults)
             else:
                 combo.addItems(defaults)
@@ -195,7 +199,7 @@ class CloudDeploymentDialog(POVConfigDialog):
         self.trust_vm_size = make_vm_combo(trust_defaults)
         vm_layout.addRow("Trust Network VMs:", self.trust_vm_size)
 
-        self.ion_vm_size = make_vm_combo(ion_defaults)
+        self.ion_vm_size = make_vm_combo(ion_defaults, show_zones=True)
         vm_layout.addRow("ION VM Size:", self.ion_vm_size)
 
         vm_group.setLayout(vm_layout)

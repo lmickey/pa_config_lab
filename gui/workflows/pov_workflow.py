@@ -8111,6 +8111,57 @@ class POVWorkflowWidget(QWidget):
                     'region': branch.get('region', azure_region),
                 })
 
+            # Validate ION VM size availability per zone
+            if ion_devices:
+                ion_vm_size = self.cloud_resource_configs.get('cloud_deployment', {}).get('ion_vm_size', 'Standard_DS3_v2')
+                available_sizes = self.cloud_resource_configs.get('cloud_deployment', {}).get('available_vm_sizes', {})
+                if available_sizes:
+                    sku_info = available_sizes.get(ion_vm_size, {})
+                    sku_zones = sku_info.get('zones', [])
+                    for ion in ion_devices:
+                        az = ion.get('availability_zone', '')
+                        if az and sku_zones and az not in sku_zones:
+                            # SKU not available in this zone — find alternatives
+                            ion_name = ion.get('name', 'ion')
+                            self._log_activity(
+                                f"⚠ {ion_vm_size} is NOT available in zone {az} for {ion_name}",
+                                "warning"
+                            )
+                            # Suggest alternative zones for same SKU
+                            if sku_zones:
+                                self._log_activity(
+                                    f"  → {ion_vm_size} is available in zone(s): {', '.join(sku_zones)}",
+                                    "warning"
+                                )
+                            # Suggest alternative SKUs available in the needed zone
+                            alt_skus = []
+                            sku_vcpus = sku_info.get('vcpus', 0)
+                            for alt_name, alt_info in available_sizes.items():
+                                alt_zones = alt_info.get('zones', [])
+                                if az in alt_zones and alt_info.get('vcpus', 0) >= sku_vcpus:
+                                    mem_gb = alt_info.get('memory_mb', 0) // 1024
+                                    alt_skus.append((alt_name, alt_info.get('vcpus', 0), mem_gb))
+                            if alt_skus:
+                                # Sort by vCPU count (closest to original first)
+                                alt_skus.sort(key=lambda x: (x[1], x[2]))
+                                top_alts = alt_skus[:5]
+                                self._log_activity(
+                                    f"  → Alternative sizes available in zone {az}:",
+                                    "warning"
+                                )
+                                for alt_name, vcpus, mem_gb in top_alts:
+                                    self._log_activity(
+                                        f"    • {alt_name} ({vcpus} vCPU, {mem_gb}GB)",
+                                        "warning"
+                                    )
+                                # Auto-select the closest alternative
+                                best_alt = alt_skus[0][0]
+                                self._log_activity(
+                                    f"  → Auto-selecting {best_alt} for {ion_name} (zone {az})",
+                                    "warning"
+                                )
+                                ion['vm_size_override'] = best_alt
+
             # Generate terraform.tfvars.json directly (simpler approach without full CloudConfig)
             tfvars = {
                 '_metadata': {
@@ -8699,13 +8750,14 @@ resource "azurerm_marketplace_agreement" "ion" {{
   plan      = "prisma-sdwan-ion-virtual-appliance"
 }}
 '''
-        ion_vm_size = tfvars.get('ion_vm_size', 'Standard_DS3_v2')
+        ion_vm_size_default = tfvars.get('ion_vm_size', 'Standard_DS3_v2')
         for ion in ion_devices:
             ion_name = ion.get('name', 'ion').lower().replace(' ', '-').replace('_', '-')
             location_name = ion.get('location', 'Datacenter')
             resource_prefix = f"{customer}-{location}-DC-{ion_name}"
             dns_label = f"{resource_prefix}-wan".lower()
             az = ion.get('availability_zone', '')
+            ion_vm_size = ion.get('vm_size_override', ion_vm_size_default)
 
             # VM zone line (Standard SKU PIP is zone-redundant by default, no zones needed)
             vm_zone_line = f'\n  zone                            = "{az}"' if az else ''
@@ -9457,7 +9509,11 @@ output "{device_name}_private_ip" {{
             self._log_activity("Azure CLI token is valid for Terraform")
 
     def _fetch_available_vm_sizes(self):
-        """Fetch available VM sizes for the deployment location from Azure."""
+        """Fetch available VM sizes with per-zone availability from Azure.
+
+        Uses the resource_skus API which includes zone restriction data,
+        so we can validate SKU+zone combinations before deploying.
+        """
         try:
             from azure.mgmt.compute import ComputeManagementClient
 
@@ -9468,18 +9524,49 @@ output "{device_name}_private_ip" {{
             location = self.cloud_resource_configs.get('cloud_deployment', {}).get('location', 'eastus')
             compute_client = ComputeManagementClient(self._azure_credential, subscription_id)
 
-            # Query available VM sizes for the location
-            sizes = compute_client.virtual_machine_sizes.list(location)
+            # Use resource_skus for zone-level availability
+            skus = compute_client.resource_skus.list(filter=f"location eq '{location}'")
             available = {}
-            for s in sizes:
-                available[s.name] = {
-                    'vcpus': s.number_of_cores,
-                    'memory_mb': s.memory_in_mb,
+            for sku in skus:
+                if sku.resource_type != 'virtualMachines':
+                    continue
+
+                # Get all zones for this location
+                all_zones = set()
+                if sku.location_info:
+                    for loc_info in sku.location_info:
+                        if loc_info.zones:
+                            all_zones.update(loc_info.zones)
+
+                # Subtract restricted zones
+                restricted_zones = set()
+                if sku.restrictions:
+                    for restriction in sku.restrictions:
+                        if restriction.type == 'Zone' and restriction.restriction_info:
+                            if restriction.restriction_info.zones:
+                                restricted_zones.update(restriction.restriction_info.zones)
+
+                available_zones = sorted(all_zones - restricted_zones)
+
+                # Get capabilities (vCPUs, memory)
+                vcpus = 0
+                memory_mb = 0
+                if sku.capabilities:
+                    for cap in sku.capabilities:
+                        if cap.name == 'vCPUs':
+                            vcpus = int(cap.value)
+                        elif cap.name == 'MemoryGB':
+                            memory_mb = int(float(cap.value) * 1024)
+
+                available[sku.name] = {
+                    'vcpus': vcpus,
+                    'memory_mb': memory_mb,
+                    'zones': available_zones,
                 }
 
             if available:
                 self.cloud_resource_configs.setdefault('cloud_deployment', {})['available_vm_sizes'] = available
-                self._log_activity(f"Found {len(available)} available VM sizes in {location}")
+                self._log_activity(f"Found {len(available)} VM SKUs in {location} (with zone availability)")
                 self.save_state()
         except ImportError:
             self._log_activity("azure-mgmt-compute not installed, using default VM sizes", "warning")
