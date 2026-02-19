@@ -316,6 +316,9 @@ class TerraformWorker(QThread):
         if self._cancelled:
             return
 
+        # Clean up stale bootstrap resources from state when switching to ION
+        self._cleanup_stale_bootstrap_state()
+
         # Plan
         phase_start = datetime.now()
         self.phase_changed.emit("planning")
@@ -467,6 +470,57 @@ class TerraformWorker(QThread):
             self.log_message.emit(summary)
 
         return True
+
+    def _cleanup_stale_bootstrap_state(self):
+        """Remove bootstrap storage resources from state if they're no longer in the config.
+
+        When switching from a traditional firewall DC to SD-WAN ION, the bootstrap
+        storage resources (account, container, blobs) are removed from main.tf but
+        may still exist in the Terraform state. Terraform can't refresh them during
+        plan because the storage account has network ACLs that block access, causing
+        403 errors. Removing them from state lets Terraform plan cleanly.
+        """
+        from terraform import TerraformExecutor
+
+        terraform_dir = os.path.join(self.output_dir, "terraform")
+        executor = TerraformExecutor(terraform_dir)
+
+        if not executor.has_state():
+            return
+
+        # Check if the new config still has bootstrap resources
+        main_tf_path = os.path.join(terraform_dir, "main.tf")
+        try:
+            with open(main_tf_path, 'r') as f:
+                main_tf_content = f.read()
+        except Exception:
+            return
+
+        if 'azurerm_storage_account' in main_tf_content and 'bootstrap' in main_tf_content:
+            # Config still has bootstrap resources, nothing to clean up
+            return
+
+        # Check state for bootstrap resources
+        result = executor.state_list()
+        if not result.success:
+            return
+
+        bootstrap_resources = [
+            addr.strip() for addr in result.stdout.strip().splitlines()
+            if 'bootstrap' in addr or 'storage_blob' in addr
+        ]
+
+        if not bootstrap_resources:
+            return
+
+        self.log_message.emit(f"Removing {len(bootstrap_resources)} stale bootstrap resource(s) from state...")
+        for addr in bootstrap_resources:
+            self.log_message.emit(f"  terraform state rm {addr}")
+            rm_result = executor.state_rm(addr)
+            if rm_result.success:
+                self.log_message.emit(f"  Removed: {addr}")
+            else:
+                self.log_message.emit(f"  Warning: failed to remove {addr}: {rm_result.error_message}")
 
     def _create_var_file(self) -> Optional[str]:
         """Create terraform.tfvars from credentials."""

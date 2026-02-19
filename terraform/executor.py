@@ -526,6 +526,18 @@ class TerraformExecutor:
         """
         return self._run_command(["state", "list"])
 
+    def state_rm(self, resource_address: str) -> TerraformResult:
+        """
+        Remove a resource from Terraform state (does not destroy the actual resource).
+
+        Args:
+            resource_address: The resource address to remove (e.g. 'azurerm_storage_account.bootstrap')
+
+        Returns:
+            TerraformResult with operation output
+        """
+        return self._run_command(["state", "rm", resource_address])
+
     def _parse_plan_changes(self, output: str) -> Dict[str, int]:
         """
         Parse plan output for change counts.
