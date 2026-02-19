@@ -8850,6 +8850,12 @@ resource "azurerm_linux_virtual_machine" "ion_{ion_name}" {{
 
   tags = azurerm_resource_group.pov.tags
 
+  # ION has no Azure guest agent — ignore provisioning attributes so
+  # terraform import after OSProvisioningTimedOut doesn't force replacement
+  lifecycle {{
+    ignore_changes = [provision_vm_agent, allow_extension_operations]
+  }}
+
   depends_on = [azurerm_marketplace_agreement.ion]
 }}
 '''
