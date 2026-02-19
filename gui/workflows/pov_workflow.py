@@ -9273,6 +9273,7 @@ output "{device_name}_private_ip" {{
 
         self._log_activity("Starting Terraform deployment...")
         self._deploy_error_shown = False  # Reset error flag for new deployment
+        self._last_still_update = 0  # Reset throttle for "Still creating" messages
 
         if not hasattr(self, '_terraform_output_dir') or not self._terraform_output_dir:
             self._log_activity("No Terraform configuration available", "warning")
@@ -9583,6 +9584,10 @@ output "{device_name}_private_ip" {{
         self.cloud_deploy_progress.setValue(percentage)
         logger.debug(f"Deploy progress: {percentage}% - {message}")
 
+        # Surface resource creation progress to the results panel
+        if message and any(kw in message for kw in ('Creating ', 'Created ', 'Destroying ', 'Destroyed ', 'Modifying ', 'Modified ', 'Retrying', 'Apply complete')):
+            self.cloud_deploy_results.append_text(f"  {message}")
+
     def _on_deploy_phase_changed(self, phase: str):
         """Handle deployment phase change."""
         phase_names = {
@@ -9655,13 +9660,37 @@ output "{device_name}_private_ip" {{
             self._deploy_error_shown = True
 
     def _on_deploy_log(self, message: str):
-        """Handle deployment log message.
-
-        All terraform output goes to activity log only (for debugging).
-        The results window only shows the final success/failure from _on_deploy_complete.
-        """
-        # Log to activity log for debugging - raw terraform output stays hidden from user
+        """Handle deployment log message."""
+        import time as _time
         logger.debug(f"Deploy log: {message}")
+
+        # Surface key terraform messages to the results panel so the user
+        # can see that the deployment is actively working
+        if not message:
+            return
+
+        # Resource import messages
+        if '[import]' in message and ('Importing' in message or 'Successfully' in message or 'Failed' in message):
+            self.cloud_deploy_results.append_text(f"  {message}")
+        # Plan summary (e.g. "Plan: 12 to add, 0 to change, 0 to destroy")
+        elif message.startswith('Plan:') or 'Plan:' in message:
+            self.cloud_deploy_results.append_text(f"  {message}")
+        # Phase timing (helpful to show progress)
+        elif message.startswith('--- Phase:'):
+            self.cloud_deploy_results.append_text(f"  {message}")
+        # Deployment complete summary
+        elif 'Deployment complete' in message:
+            self.cloud_deploy_results.append_text(f"  {message}")
+        # Still creating / still destroying (throttled to ~30s intervals)
+        elif 'Still creating' in message or 'Still destroying' in message or 'Still modifying' in message:
+            now = _time.time()
+            last = getattr(self, '_last_still_update', 0)
+            if now - last >= 30:
+                self.cloud_deploy_results.append_text(f"  {message}")
+                self._last_still_update = now
+        # Error lines from terraform
+        elif message.startswith('ERROR:'):
+            self.cloud_deploy_results.append_text(f"  {message}")
 
     # ============================================================================
     # EVENT HANDLERS - DEPLOY POV CONFIG TAB (Tab 5)
