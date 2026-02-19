@@ -143,6 +143,7 @@ class TerraformWorker(QThread):
     def _plan(self):
         """Run terraform plan."""
         from terraform import TerraformExecutor
+        import re
 
         self.phase_changed.emit("planning")
         self.progress.emit("Running terraform plan...", 20)
@@ -153,15 +154,36 @@ class TerraformWorker(QThread):
         # Create var file if credentials provided
         var_file = self._create_var_file()
 
+        self.log_message.emit(f"[plan] Terraform directory: {terraform_dir}")
+        if var_file:
+            self.log_message.emit(f"[plan] Using var file: {var_file}")
+
         result = executor.plan(var_file=var_file)
 
         if result.success:
             self.progress.emit("Plan complete", 100)
-            self.log_message.emit(result.stdout or "")
+            if result.stdout:
+                clean_stdout = re.sub(r'\x1b\[[0-9;]*m', '', result.stdout)
+                for line in clean_stdout.strip().splitlines():
+                    self.log_message.emit(f"[plan] {line}")
             self.finished.emit(True, "Plan completed successfully", {})
         else:
-            self.error.emit(result.error_message or "Plan failed")
-            self.finished.emit(False, result.error_message or "Plan failed", {})
+            error_msg = result.error_message or "Plan failed"
+            clean_error = re.sub(r'\x1b\[[0-9;]*m', '', error_msg)
+            self.log_message.emit(f"[plan] FAILED - Error: {clean_error}")
+            if result.stdout:
+                clean_stdout = re.sub(r'\x1b\[[0-9;]*m', '', result.stdout)
+                self.log_message.emit(f"[plan] === STDOUT ===")
+                for line in clean_stdout.strip().splitlines():
+                    self.log_message.emit(f"[plan] {line}")
+            if result.stderr:
+                clean_stderr = re.sub(r'\x1b\[[0-9;]*m', '', result.stderr)
+                self.log_message.emit(f"[plan] === STDERR ===")
+                for line in clean_stderr.strip().splitlines():
+                    self.log_message.emit(f"[plan] {line}")
+            self.log_message.emit(f"[plan] Return code: {result.return_code}")
+            self.error.emit(clean_error)
+            self.finished.emit(False, clean_error, {})
 
     def _apply(self):
         """Run terraform apply."""
@@ -264,49 +286,75 @@ class TerraformWorker(QThread):
 
     def _full_deployment(self):
         """Run full Terraform deployment (generate, init, plan, apply)."""
+        from datetime import datetime
+
+        start_time = datetime.now()
+        self.log_message.emit(f"=== Full deployment started at {start_time.strftime('%Y-%m-%d %H:%M:%S')} ===")
+        self.log_message.emit(f"Output directory: {self.output_dir}")
+
         # Generate
+        phase_start = datetime.now()
         self.phase_changed.emit("generating")
         self.progress.emit("Generating Terraform configuration...", 5)
-        self._generate_only()
+        self.log_message.emit(f"--- Phase: Generate (started {phase_start.strftime('%H:%M:%S')}) ---")
+        if not self._generate_only():
+            return
+        self.log_message.emit(f"--- Phase: Generate completed in {(datetime.now() - phase_start).total_seconds():.1f}s ---")
 
         if self._cancelled:
             return
 
         # Init
+        phase_start = datetime.now()
         self.phase_changed.emit("initializing")
         self.progress.emit("Initializing Terraform...", 25)
+        self.log_message.emit(f"--- Phase: Init (started {phase_start.strftime('%H:%M:%S')}) ---")
         if not self._init_only():
             return
+        self.log_message.emit(f"--- Phase: Init completed in {(datetime.now() - phase_start).total_seconds():.1f}s ---")
 
         if self._cancelled:
             return
 
         # Plan
+        phase_start = datetime.now()
         self.phase_changed.emit("planning")
         self.progress.emit("Planning deployment...", 45)
+        self.log_message.emit(f"--- Phase: Plan (started {phase_start.strftime('%H:%M:%S')}) ---")
         if not self._plan_only():
             return
+        self.log_message.emit(f"--- Phase: Plan completed in {(datetime.now() - phase_start).total_seconds():.1f}s ---")
 
         if self._cancelled:
             return
 
         # Apply
+        phase_start = datetime.now()
         self.phase_changed.emit("applying")
         self.progress.emit("Deploying infrastructure...", 65)
+        self.log_message.emit(f"--- Phase: Apply (started {phase_start.strftime('%H:%M:%S')}) ---")
         self._apply()
+        self.log_message.emit(f"--- Phase: Apply completed in {(datetime.now() - phase_start).total_seconds():.1f}s ---")
+        self.log_message.emit(f"=== Full deployment finished in {(datetime.now() - start_time).total_seconds():.1f}s ===")
 
     def _generate_only(self) -> bool:
         """Generate Terraform config without emitting finished."""
         from terraform import TerraformGenerator
 
         try:
+            self.log_message.emit(f"Generating Terraform config to: {self.output_dir}")
             generator = TerraformGenerator(
                 cloud_config=self.config,
                 output_dir=self.output_dir,
             )
-            generator.generate()
+            result = generator.generate()
+            files = result.get('files_created', result.get('files', []))
+            self.log_message.emit(f"Generated {len(files)} Terraform files:")
+            for f in files:
+                self.log_message.emit(f"  - {f}")
             return True
         except Exception as e:
+            logger.exception(f"Terraform generation failed: {e}")
             self.error.emit(f"Generation failed: {e}")
             self.finished.emit(False, str(e), {})
             return False
@@ -334,19 +382,29 @@ class TerraformWorker(QThread):
         def init_callback(line: str):
             """Process init output."""
             clean_line = re.sub(r'\x1b\[[0-9;]*m', '', line).strip()
-            if clean_line and not clean_line.startswith("-"):
-                self.log_message.emit(clean_line)
+            if clean_line:
+                self.log_message.emit(f"[init] {clean_line}")
                 if "Initializing" in clean_line:
                     self.progress.emit(clean_line, 30)
                 elif "Installing" in clean_line:
                     self.progress.emit(clean_line, 35)
 
+        self.log_message.emit(f"Terraform working directory: {terraform_dir}")
         result = executor.init(progress_callback=init_callback)
 
         if not result.success:
             # Clean ANSI codes from error
             error_msg = result.error_message or "Init failed"
             clean_error = re.sub(r'\x1b\[[0-9;]*m', '', error_msg)
+            self.log_message.emit(f"[init] FAILED - Error: {clean_error}")
+            if result.stdout:
+                clean_stdout = re.sub(r'\x1b\[[0-9;]*m', '', result.stdout)
+                for line in clean_stdout.strip().splitlines():
+                    self.log_message.emit(f"[init] stdout: {line}")
+            if result.stderr:
+                clean_stderr = re.sub(r'\x1b\[[0-9;]*m', '', result.stderr)
+                for line in clean_stderr.strip().splitlines():
+                    self.log_message.emit(f"[init] stderr: {line}")
             self.error.emit(clean_error)
             self.finished.emit(False, clean_error, {})
             return False
@@ -363,15 +421,18 @@ class TerraformWorker(QThread):
         executor = TerraformExecutor(terraform_dir)
         var_file = self._create_var_file()
 
+        self.log_message.emit(f"[plan] Terraform directory: {terraform_dir}")
+        if var_file:
+            self.log_message.emit(f"[plan] Using var file: {var_file}")
+        else:
+            self.log_message.emit("[plan] No var file specified")
+
         def plan_callback(line: str):
             """Process plan output."""
             clean_line = re.sub(r'\x1b\[[0-9;]*m', '', line).strip()
             if clean_line:
-                # Log resource plan lines
-                if "will be created" in clean_line or "will be updated" in clean_line:
-                    self.log_message.emit(clean_line)
-                elif "Plan:" in clean_line:
-                    self.log_message.emit(clean_line)
+                self.log_message.emit(f"[plan] {clean_line}")
+                if "Plan:" in clean_line:
                     self.progress.emit(clean_line, 55)
 
         result = executor.plan(var_file=var_file, progress_callback=plan_callback)
@@ -380,6 +441,21 @@ class TerraformWorker(QThread):
             # Clean ANSI codes from error
             error_msg = result.error_message or "Plan failed"
             clean_error = re.sub(r'\x1b\[[0-9;]*m', '', error_msg)
+            self.log_message.emit(f"[plan] FAILED - Error: {clean_error}")
+            # Log full stdout/stderr for debugging
+            if result.stdout:
+                clean_stdout = re.sub(r'\x1b\[[0-9;]*m', '', result.stdout)
+                self.log_message.emit(f"[plan] === STDOUT BEGIN ===")
+                for line in clean_stdout.strip().splitlines():
+                    self.log_message.emit(f"[plan] {line}")
+                self.log_message.emit(f"[plan] === STDOUT END ===")
+            if result.stderr:
+                clean_stderr = re.sub(r'\x1b\[[0-9;]*m', '', result.stderr)
+                self.log_message.emit(f"[plan] === STDERR BEGIN ===")
+                for line in clean_stderr.strip().splitlines():
+                    self.log_message.emit(f"[plan] {line}")
+                self.log_message.emit(f"[plan] === STDERR END ===")
+            self.log_message.emit(f"[plan] Return code: {result.return_code}")
             self.error.emit(clean_error)
             self.finished.emit(False, clean_error, {})
             return False
@@ -395,6 +471,7 @@ class TerraformWorker(QThread):
     def _create_var_file(self) -> Optional[str]:
         """Create terraform.tfvars from credentials."""
         if not self.credentials:
+            logger.debug("No credentials provided, skipping var file creation")
             return None
 
         try:
@@ -403,20 +480,25 @@ class TerraformWorker(QThread):
             )
 
             lines = []
+            var_names = []
             if 'admin_password' in self.credentials:
                 lines.append(f'admin_password = "{self.credentials["admin_password"]}"')
+                var_names.append('admin_password')
             if 'subscription_id' in self.credentials:
                 lines.append(f'subscription_id = "{self.credentials["subscription_id"]}"')
+                var_names.append('subscription_id')
 
             if lines:
                 with open(tfvars_path, 'w') as f:
                     f.write('\n'.join(lines))
+                logger.info(f"Created var file at {tfvars_path} with variables: {var_names}")
                 return tfvars_path
 
+            logger.debug("No credential variables to write")
             return None
 
         except Exception as e:
-            logger.error(f"Failed to create tfvars: {e}")
+            logger.error(f"Failed to create tfvars at {tfvars_path}: {e}")
             return None
 
 

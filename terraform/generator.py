@@ -153,6 +153,11 @@ class TerraformGenerator:
             fw_path = self._generate_firewalls()
             files_created.append(str(fw_path))
 
+        # Generate ION device resources
+        if self.cloud_config.ion_devices:
+            ion_path = self._generate_ion_devices()
+            files_created.append(str(ion_path))
+
         # Generate Panorama if present
         if self.cloud_config.panorama:
             pan_path = self._generate_panorama()
@@ -265,6 +270,23 @@ class TerraformGenerator:
 
         logger.debug(f"Generated {fw_path}")
         return fw_path
+
+    def _generate_ion_devices(self) -> Path:
+        """Generate ion.tf with SD-WAN ION device resources."""
+        template = self._get_template('ion.tf.j2')
+
+        content = template.render(
+            ion_devices=self.cloud_config.ion_devices,
+            deployment=self.cloud_config.deployment,
+            resource_group=self.cloud_config.deployment.resource_group,
+        )
+
+        ion_path = self.output_dir / "ion.tf"
+        with open(ion_path, 'w') as f:
+            f.write(content)
+
+        logger.debug(f"Generated {ion_path}")
+        return ion_path
 
     def _generate_panorama(self) -> Path:
         """Generate panorama.tf with Panorama VM resources."""
@@ -397,6 +419,7 @@ class TerraformGenerator:
 
         content = template.render(
             firewalls=self.cloud_config.firewalls,
+            ion_devices=self.cloud_config.ion_devices,
             panorama=self.cloud_config.panorama,
             servers=self.cloud_config.servers,
             clients=self.cloud_config.clients,
@@ -417,6 +440,7 @@ class TerraformGenerator:
         content = template.render(
             deployment=self.cloud_config.deployment,
             has_firewalls=bool(self.cloud_config.firewalls),
+            has_ion_devices=bool(self.cloud_config.ion_devices),
             has_panorama=self.cloud_config.panorama is not None,
             has_supporting_vms=bool(self.cloud_config.all_supporting_vms),
         )

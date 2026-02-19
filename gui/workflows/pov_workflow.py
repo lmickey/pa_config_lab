@@ -1187,7 +1187,7 @@ class POVWorkflowWidget(QWidget):
             dc_add_row.addWidget(self.dc_region_combo)
 
             self.dc_style_combo = QComboBox()
-            self.dc_style_combo.addItems(["Traditional (Firewall)", "SD-WAN (ION)"])
+            self.dc_style_combo.addItems(["Traditional (Firewall)", "SD-WAN (ION)", "SD-WAN (ION HA)"])
             self.dc_style_combo.setStyleSheet(
                 "QComboBox { padding: 3px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; }"
             )
@@ -3864,7 +3864,19 @@ class POVWorkflowWidget(QWidget):
         for dc in locations.get('datacenters', []):
             if dc.get('connection_type') == 'service_connection':
                 dc_style = dc.get('style', 'traditional')
-                if dc_style == 'sdwan':
+                if dc_style == 'sdwan_ha':
+                    # HA pair: deploy 2 IONs in separate availability zones
+                    for i in range(1, 3):
+                        ion_devices.append({
+                            'name': f"ion-{dc['name'].lower().replace(' ', '-')}-{i}",
+                            'type': 'service_connection',
+                            'location': dc['name'],
+                            'region': dc.get('region', 'eastus'),
+                            'style': 'sdwan_ha',
+                            'ha_peer': i,
+                            'availability_zone': str(i),
+                        })
+                elif dc_style == 'sdwan':
                     ion_devices.append({
                         'name': f"ion-{dc['name'].lower().replace(' ', '-')}",
                         'type': 'service_connection',
@@ -4846,7 +4858,12 @@ class POVWorkflowWidget(QWidget):
 
         # Determine style from dropdown
         style_text = self.dc_style_combo.currentText() if hasattr(self, 'dc_style_combo') else "Traditional (Firewall)"
-        style = 'sdwan' if 'SD-WAN' in style_text else 'traditional'
+        if 'ION HA' in style_text:
+            style = 'sdwan_ha'
+        elif 'SD-WAN' in style_text:
+            style = 'sdwan'
+        else:
+            style = 'traditional'
 
         # Create datacenter entry
         datacenter = {
@@ -4914,8 +4931,8 @@ class POVWorkflowWidget(QWidget):
 
         for dc in datacenters:
             style = dc.get('style', 'traditional')
-            icon = "\U0001f4e1" if style == 'sdwan' else "\U0001f525"  # 📡 or 🔥
-            style_label = "SD-WAN" if style == 'sdwan' else "FW"
+            icon = "\U0001f4e1" if style in ('sdwan', 'sdwan_ha') else "\U0001f525"  # 📡 or 🔥
+            style_label = "ION-HA" if style == 'sdwan_ha' else "SD-WAN" if style == 'sdwan' else "FW"
             item = QListWidgetItem(f"{icon} {dc['name']} ({dc['region']}) [{style_label}]")
             item.setData(Qt.ItemDataRole.UserRole, dc['name'])
             self.datacenters_list.addItem(item)
@@ -5057,7 +5074,8 @@ class POVWorkflowWidget(QWidget):
                     'auto_generated': True,
                 })
 
-            # For SD-WAN DCs, also create an ION device entry
+            # For single SD-WAN DCs, also create an ION device entry
+            # ION HA pairs are managed at infrastructure level, not as trust devices
             dc_style = dc.get('style', 'traditional')
             if dc_style == 'sdwan':
                 ion_name = f"{dc['name']}-ION"
