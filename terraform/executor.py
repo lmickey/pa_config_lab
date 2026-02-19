@@ -526,6 +526,19 @@ class TerraformExecutor:
         """
         return self._run_command(["state", "list"])
 
+    def import_resource(self, resource_address: str, resource_id: str) -> TerraformResult:
+        """
+        Import an existing Azure resource into Terraform state.
+
+        Args:
+            resource_address: The Terraform resource address (e.g. 'azurerm_linux_virtual_machine.ion_vm1')
+            resource_id: The Azure resource ID
+
+        Returns:
+            TerraformResult with operation output
+        """
+        return self._run_command(["import", resource_address, resource_id])
+
     def state_rm(self, resource_address: str) -> TerraformResult:
         """
         Remove a resource from Terraform state (does not destroy the actual resource).

@@ -259,9 +259,34 @@ class TerraformWorker(QThread):
             self.log_message.emit(f"Deployment complete! Created {self._resources_created} resources.")
             self.finished.emit(True, "Infrastructure deployed successfully", outputs)
         else:
-            # Clean up error message (remove ANSI codes)
+            # Check if the error is "already exists - needs to be imported"
             error_msg = result.error_message or "Apply failed"
             clean_error = re.sub(r'\x1b\[[0-9;]*m', '', error_msg)
+            full_output = re.sub(r'\x1b\[[0-9;]*m', '', (result.stdout or '') + '\n' + (result.stderr or ''))
+
+            imported = self._try_auto_import(executor, full_output)
+            if imported:
+                # Retry apply after importing
+                self.log_message.emit("Retrying apply after importing existing resources...")
+                self.progress.emit("Retrying deployment...", 50)
+                self._resources_created = 0
+                result = executor.apply(
+                    var_file=var_file,
+                    auto_approve=self.auto_approve,
+                    progress_callback=progress_callback
+                )
+                if result.success:
+                    self.progress.emit("Getting outputs...", 95)
+                    output_result = executor.output()
+                    outputs = output_result.outputs if output_result.success else {}
+                    self.progress.emit("Deployment complete", 100)
+                    self.log_message.emit(f"Deployment complete! Created {self._resources_created} resources.")
+                    self.finished.emit(True, "Infrastructure deployed successfully", outputs)
+                    return
+                # Retry also failed
+                error_msg = result.error_message or "Apply failed after import"
+                clean_error = re.sub(r'\x1b\[[0-9;]*m', '', error_msg)
+
             self.error.emit(clean_error)
             self.finished.emit(False, clean_error, {})
 
@@ -470,6 +495,41 @@ class TerraformWorker(QThread):
             self.log_message.emit(summary)
 
         return True
+
+    def _try_auto_import(self, executor, output: str) -> bool:
+        """Parse apply output for 'already exists' errors and auto-import resources.
+
+        When a previous apply partially succeeded (e.g. VM created but provisioning
+        timed out), the resource exists in Azure but not in Terraform state. This
+        detects those errors and imports the resources automatically.
+
+        Returns True if any resources were imported.
+        """
+        import re
+
+        # Pattern: 'A resource with the ID "..." already exists'
+        # followed by: 'with <resource_address>,'
+        pattern = r'A resource with the ID "([^"]+)" already exists.*?with ([^,\s]+),'
+        matches = re.findall(pattern, output, re.DOTALL)
+
+        if not matches:
+            return False
+
+        imported_any = False
+        for resource_id, resource_address in matches:
+            self.log_message.emit(f"[import] Resource exists in Azure but not in state: {resource_address}")
+            self.log_message.emit(f"[import] Azure ID: {resource_id}")
+            self.log_message.emit(f"[import] Importing into Terraform state...")
+
+            result = executor.import_resource(resource_address, resource_id)
+            if result.success:
+                self.log_message.emit(f"[import] Successfully imported {resource_address}")
+                imported_any = True
+            else:
+                clean_error = re.sub(r'\x1b\[[0-9;]*m', '', result.error_message or 'Import failed')
+                self.log_message.emit(f"[import] Failed to import {resource_address}: {clean_error}")
+
+        return imported_any
 
     def _cleanup_stale_bootstrap_state(self):
         """Remove bootstrap storage resources from state if they're no longer in the config.
