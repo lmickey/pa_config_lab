@@ -160,9 +160,11 @@ def validate_cli_token(
         return False, "Azure CLI (az) is not installed or not in PATH"
 
     args = ["account", "get-access-token", "--query", "accessToken", "-o", "tsv"]
+    # az account get-access-token only accepts one of --subscription or --tenant, not both.
+    # Prefer --subscription since we set it after login.
     if subscription_id:
         args.extend(["--subscription", subscription_id])
-    if tenant_id:
+    elif tenant_id:
         args.extend(["--tenant", tenant_id])
 
     logger.info(
