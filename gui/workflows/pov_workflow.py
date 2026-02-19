@@ -857,13 +857,14 @@ class POVWorkflowWidget(QWidget):
 
             card_layout.addLayout(host_row)
 
-            # Initialize config with defaults
-            self.cloud_resource_configs['device_config'] = {
-                'dns_primary': '8.8.8.8',
-                'dns_secondary': '8.8.4.4',
-                'ntp_primary': 'pool.ntp.org',
-                'ntp_secondary': 'time.google.com',
-                'hostname_prefix': 'fw',
+            # Initialize config with defaults only if not restored from state
+            if 'device_config' not in self.cloud_resource_configs:
+                self.cloud_resource_configs['device_config'] = {
+                    'dns_primary': '8.8.8.8',
+                    'dns_secondary': '8.8.4.4',
+                    'ntp_primary': 'pool.ntp.org',
+                    'ntp_secondary': 'time.google.com',
+                    'hostname_prefix': 'fw',
             }
 
             return card
@@ -934,14 +935,15 @@ class POVWorkflowWidget(QWidget):
             self.policy_outbound_nat.stateChanged.connect(self._on_policy_config_changed)
             card_layout.addWidget(self.policy_outbound_nat)
 
-            # Initialize config with defaults
-            self.cloud_resource_configs['policy_objects'] = {
-                'create_rfc1918': True,
-                'create_app_groups': True,
-                'allow_outbound': True,
-                'block_quic': True,
-                'create_outbound_nat': True,
-            }
+            # Initialize config with defaults only if not restored from state
+            if 'policy_objects' not in self.cloud_resource_configs:
+                self.cloud_resource_configs['policy_objects'] = {
+                    'create_rfc1918': True,
+                    'create_app_groups': True,
+                    'allow_outbound': True,
+                    'block_quic': True,
+                    'create_outbound_nat': True,
+                }
 
             return card
 
@@ -1046,14 +1048,15 @@ class POVWorkflowWidget(QWidget):
             ports_row.addStretch()
             card_layout.addLayout(ports_row)
 
-            # Initialize config and fetch public IP
-            self.cloud_resource_configs['cloud_security'] = {
-                'source_ips': '',
-                'allow_ssh': True,
-                'allow_https': True,
-                'create_mgmt_nsg': True,
-                'create_trust_nsg': False,
-            }
+            # Initialize config and fetch public IP only if not restored from state
+            if 'cloud_security' not in self.cloud_resource_configs:
+                self.cloud_resource_configs['cloud_security'] = {
+                    'source_ips': '',
+                    'allow_ssh': True,
+                    'allow_https': True,
+                    'create_mgmt_nsg': True,
+                    'create_trust_nsg': False,
+                }
 
             # Auto-fetch public IP on card creation
             self._fetch_and_set_public_ip()
@@ -1378,16 +1381,18 @@ class POVWorkflowWidget(QWidget):
             self.trust_devices_error_label.setWordWrap(True)
             card_layout.addWidget(self.trust_devices_error_label)
 
-            # Initialize config with empty devices list (will be populated by sync)
-            self.cloud_resource_configs['trust_devices'] = {
-                'devices': [],
-            }
+            # Initialize config with empty devices list only if not restored from state
+            if 'trust_devices' not in self.cloud_resource_configs:
+                self.cloud_resource_configs['trust_devices'] = {
+                    'devices': [],
+                }
 
             # Initialize location dropdown
             self._refresh_device_location_dropdown()
 
-            # Sync devices from locations (creates default ServerVM for default Datacenter)
-            self._sync_devices_from_locations()
+            # Sync devices from locations (only adds missing devices, preserves existing)
+            if not self.cloud_resource_configs['trust_devices'].get('devices'):
+                self._sync_devices_from_locations()
 
             # Prevent vertical stretching
             card_layout.addStretch()
@@ -12551,8 +12556,10 @@ output "{device_name}_private_ip" {{
             self._refresh_datacenters_list()
         if hasattr(self, '_refresh_branches_list'):
             self._refresh_branches_list()
-        if hasattr(self, '_refresh_trust_devices_list'):
-            self._refresh_trust_devices_list()
+        if hasattr(self, '_refresh_devices_list'):
+            self._refresh_devices_list()
+        if hasattr(self, '_refresh_device_location_dropdown'):
+            self._refresh_device_location_dropdown()
 
         # Refresh Use Cases tab elements
         if hasattr(self, '_refresh_private_app_connections'):
