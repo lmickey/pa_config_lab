@@ -8848,6 +8848,9 @@ resource "azurerm_linux_virtual_machine" "ion_{ion_name}" {{
     version   = "latest"
   }}
 
+  # Managed boot diagnostics (enables Azure Serial Console)
+  boot_diagnostics {{}}
+
   tags = azurerm_resource_group.pov.tags
 
   # ION has no Azure guest agent — ignore provisioning attributes so
