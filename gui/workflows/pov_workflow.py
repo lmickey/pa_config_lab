@@ -8769,7 +8769,7 @@ resource "azurerm_marketplace_agreement" "ion" {{
 
             content += f'''
 # ION Device: {ion_name} (SD-WAN) for {location_name}
-# WAN Public IP for SD-WAN tunnels
+# Controller Public IP (management interface - connects to SD-WAN controller)
 resource "azurerm_public_ip" "pip_{ion_name}" {{
   name                = "{resource_prefix}-IP-public"
   location            = azurerm_resource_group.pov.location
@@ -8780,7 +8780,23 @@ resource "azurerm_public_ip" "pip_{ion_name}" {{
   tags = azurerm_resource_group.pov.tags
 }}
 
-# WAN NIC (untrust subnet, public IP, IP forwarding)
+# Controller NIC (management subnet, public IP - NIC 0)
+resource "azurerm_network_interface" "nic_{ion_name}_ctrl" {{
+  name                 = "{resource_prefix}-nic-ctrl"
+  location             = azurerm_resource_group.pov.location
+  resource_group_name  = azurerm_resource_group.pov.name
+
+  ip_configuration {{
+    name                          = "controller"
+    subnet_id                     = azurerm_subnet.management.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.pip_{ion_name}.id
+  }}
+
+  tags = azurerm_resource_group.pov.tags
+}}
+
+# WAN NIC (untrust subnet, internet access - NIC 1)
 resource "azurerm_network_interface" "nic_{ion_name}_wan" {{
   name                 = "{resource_prefix}-nic-wan"
   location             = azurerm_resource_group.pov.location
@@ -8791,13 +8807,12 @@ resource "azurerm_network_interface" "nic_{ion_name}_wan" {{
     name                          = "wan"
     subnet_id                     = azurerm_subnet.untrust.id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = azurerm_public_ip.pip_{ion_name}.id
   }}
 
   tags = azurerm_resource_group.pov.tags
 }}
 
-# LAN NIC (trust subnet, IP forwarding)
+# LAN NIC (trust subnet, IP forwarding - NIC 2)
 resource "azurerm_network_interface" "nic_{ion_name}_lan" {{
   name                 = "{resource_prefix}-nic-lan"
   location             = azurerm_resource_group.pov.location
@@ -8826,6 +8841,7 @@ resource "azurerm_linux_virtual_machine" "ion_{ion_name}" {{
   allow_extension_operations      = false
 
   network_interface_ids = [
+    azurerm_network_interface.nic_{ion_name}_ctrl.id,
     azurerm_network_interface.nic_{ion_name}_wan.id,
     azurerm_network_interface.nic_{ion_name}_lan.id,
   ]
