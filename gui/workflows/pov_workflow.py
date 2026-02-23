@@ -8118,54 +8118,64 @@ class POVWorkflowWidget(QWidget):
 
             # Validate ION VM size availability per zone
             if ion_devices:
-                ion_vm_size = self.cloud_resource_configs.get('cloud_deployment', {}).get('ion_vm_size', 'Standard_DS3_v2')
-                available_sizes = self.cloud_resource_configs.get('cloud_deployment', {}).get('available_vm_sizes', {})
-                if available_sizes:
-                    sku_info = available_sizes.get(ion_vm_size, {})
-                    sku_zones = sku_info.get('zones', [])
-                    for ion in ion_devices:
-                        az = ion.get('availability_zone', '')
-                        if az and sku_zones and az not in sku_zones:
-                            # SKU not available in this zone — find alternatives
-                            ion_name = ion.get('name', 'ion')
+                deploy_cfg = self.cloud_resource_configs.get('cloud_deployment', {})
+                ion_vm_size = deploy_cfg.get('ion_vm_size', 'Standard_D8s_v4')
+                ion_fallbacks = deploy_cfg.get('ion_vm_size_fallbacks', [])
+                available_sizes = deploy_cfg.get('available_vm_sizes', {})
+
+                for ion in ion_devices:
+                    az = ion.get('availability_zone', '')
+                    if not az or not available_sizes:
+                        continue
+
+                    ion_name = ion.get('name', 'ion')
+                    # Check primary size first, then fallbacks from the same ION model
+                    candidates = [ion_vm_size] + ion_fallbacks
+                    selected = None
+                    for candidate in candidates:
+                        sku_info = available_sizes.get(candidate, {})
+                        sku_zones = sku_info.get('zones', [])
+                        if not sku_zones or az in sku_zones:
+                            selected = candidate
+                            break
+
+                    if selected and selected != ion_vm_size:
+                        self._log_activity(
+                            f"⚠ {ion_vm_size} not available in zone {az}, "
+                            f"using {selected} for {ion_name}",
+                            "warning"
+                        )
+                        ion['vm_size_override'] = selected
+                    elif not selected:
+                        # None of the model-specific sizes work — search all available
+                        self._log_activity(
+                            f"⚠ {ion_vm_size} is NOT available in zone {az} for {ion_name}",
+                            "warning"
+                        )
+                        sku_info = available_sizes.get(ion_vm_size, {})
+                        min_vcpus = sku_info.get('vcpus', 8)
+                        min_mem = sku_info.get('memory_mb', 32768)
+                        alt_skus = []
+                        for alt_name, alt_info in available_sizes.items():
+                            alt_zones = alt_info.get('zones', [])
+                            if (az in alt_zones
+                                    and alt_info.get('vcpus', 0) >= min_vcpus
+                                    and alt_info.get('memory_mb', 0) >= min_mem):
+                                mem_gb = alt_info.get('memory_mb', 0) // 1024
+                                alt_skus.append((alt_name, alt_info.get('vcpus', 0), mem_gb))
+                        if alt_skus:
+                            alt_skus.sort(key=lambda x: (x[1], x[2]))
+                            best_alt = alt_skus[0][0]
                             self._log_activity(
-                                f"⚠ {ion_vm_size} is NOT available in zone {az} for {ion_name}",
+                                f"  → Auto-selecting {best_alt} for {ion_name} (zone {az})",
                                 "warning"
                             )
-                            # Suggest alternative zones for same SKU
-                            if sku_zones:
-                                self._log_activity(
-                                    f"  → {ion_vm_size} is available in zone(s): {', '.join(sku_zones)}",
-                                    "warning"
-                                )
-                            # Suggest alternative SKUs available in the needed zone
-                            alt_skus = []
-                            sku_vcpus = sku_info.get('vcpus', 0)
-                            for alt_name, alt_info in available_sizes.items():
-                                alt_zones = alt_info.get('zones', [])
-                                if az in alt_zones and alt_info.get('vcpus', 0) >= sku_vcpus:
-                                    mem_gb = alt_info.get('memory_mb', 0) // 1024
-                                    alt_skus.append((alt_name, alt_info.get('vcpus', 0), mem_gb))
-                            if alt_skus:
-                                # Sort by vCPU count (closest to original first)
-                                alt_skus.sort(key=lambda x: (x[1], x[2]))
-                                top_alts = alt_skus[:5]
-                                self._log_activity(
-                                    f"  → Alternative sizes available in zone {az}:",
-                                    "warning"
-                                )
-                                for alt_name, vcpus, mem_gb in top_alts:
-                                    self._log_activity(
-                                        f"    • {alt_name} ({vcpus} vCPU, {mem_gb}GB)",
-                                        "warning"
-                                    )
-                                # Auto-select the closest alternative
-                                best_alt = alt_skus[0][0]
-                                self._log_activity(
-                                    f"  → Auto-selecting {best_alt} for {ion_name} (zone {az})",
-                                    "warning"
-                                )
-                                ion['vm_size_override'] = best_alt
+                            ion['vm_size_override'] = best_alt
+                        else:
+                            self._log_activity(
+                                f"  → No suitable VM size found in zone {az} — deployment may fail",
+                                "error"
+                            )
 
             # Generate terraform.tfvars.json directly (simpler approach without full CloudConfig)
             tfvars = {
@@ -8187,7 +8197,7 @@ class POVWorkflowWidget(QWidget):
                 'branches': locations.get('branches', []),
                 'firewalls': firewalls,
                 'ion_devices': ion_devices,
-                'ion_vm_size': self.cloud_resource_configs.get('cloud_deployment', {}).get('ion_vm_size', 'Standard_DS3_v2'),
+                'ion_vm_size': self.cloud_resource_configs.get('cloud_deployment', {}).get('ion_vm_size', 'Standard_D8s_v4'),
                 'trust_devices': self.cloud_resource_configs.get('trust_devices', {}).get('devices', []),
             }
 
@@ -8755,7 +8765,7 @@ resource "azurerm_marketplace_agreement" "ion" {{
   plan      = "prisma-sdwan-ion-virtual-appliance"
 }}
 '''
-        ion_vm_size_default = tfvars.get('ion_vm_size', 'Standard_DS3_v2')
+        ion_vm_size_default = tfvars.get('ion_vm_size', 'Standard_D8s_v4')
         for ion in ion_devices:
             ion_name = ion.get('name', 'ion').lower().replace(' ', '-').replace('_', '-')
             location_name = ion.get('location', 'Datacenter')
@@ -8849,6 +8859,7 @@ resource "azurerm_linux_virtual_machine" "ion_{ion_name}" {{
   os_disk {{
     caching              = "ReadWrite"
     storage_account_type = "Premium_LRS"
+    disk_size_gb         = 100
   }}
 
   plan {{

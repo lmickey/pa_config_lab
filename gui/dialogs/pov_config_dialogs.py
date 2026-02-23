@@ -165,7 +165,13 @@ class CloudDeploymentDialog(POVConfigDialog):
         ]
         panorama_defaults = ["Standard_D4_v2", "Standard_D5_v2"]
         trust_defaults = ["Standard_B2s", "Standard_D2s_v3", "Standard_D4s_v3"]
-        ion_defaults = ["Standard_DS3_v2", "Standard_DS4_v2", "Standard_DS5_v2"]
+        # ION model → Azure VM size mapping
+        # 7108: 8 vCPU, 32GB RAM, 100GB disk
+        # 7116: 16 vCPU, 64GB RAM, 100GB disk
+        self._ion_model_sizes = {
+            'ION 7108': ['Standard_D8s_v4', 'Standard_D8as_v4', 'Standard_D8s_v5', 'Standard_D8as_v5'],
+            'ION 7116': ['Standard_D16s_v4', 'Standard_D16as_v4', 'Standard_D16s_v5', 'Standard_D16as_v5'],
+        }
 
         # Build display labels from Azure cached sizes or defaults
         available = self.config.get('available_vm_sizes', {}) if self.config else {}
@@ -199,8 +205,21 @@ class CloudDeploymentDialog(POVConfigDialog):
         self.trust_vm_size = make_vm_combo(trust_defaults)
         vm_layout.addRow("Trust Network VMs:", self.trust_vm_size)
 
-        self.ion_vm_size = make_vm_combo(ion_defaults, show_zones=True)
-        vm_layout.addRow("ION VM Size:", self.ion_vm_size)
+        # ION Model selector (determines VM size automatically)
+        self.ion_model = QComboBox()
+        for model, sizes in self._ion_model_sizes.items():
+            primary = sizes[0]
+            if available and primary in available:
+                info = available[primary]
+                mem_gb = info['memory_mb'] // 1024
+                zones = info.get('zones', [])
+                zone_str = f" - zones: {','.join(zones)}" if zones else ""
+                label = f"{model} ({info['vcpus']} vCPU, {mem_gb}GB{zone_str})"
+            else:
+                specs = "8 vCPU, 32GB" if '7108' in model else "16 vCPU, 64GB"
+                label = f"{model} ({specs} → {primary})"
+            self.ion_model.addItem(label, model)
+        vm_layout.addRow("ION Model:", self.ion_model)
 
         vm_group.setLayout(vm_layout)
         self.layout.addWidget(vm_group)
@@ -258,7 +277,6 @@ class CloudDeploymentDialog(POVConfigDialog):
                 ('fw_vm_size', self.fw_vm_size),
                 ('panorama_vm_size', self.panorama_vm_size),
                 ('trust_vm_size', self.trust_vm_size),
-                ('ion_vm_size', self.ion_vm_size),
             ]:
                 saved = self.config.get(key, '')
                 if saved:
@@ -272,16 +290,30 @@ class CloudDeploymentDialog(POVConfigDialog):
                     if not found:
                         # Editable combo: set the text directly
                         combo.setEditText(saved)
+
+            # Restore ION model selection
+            saved_model = self.config.get('ion_model', 'ION 7108')
+            for i in range(self.ion_model.count()):
+                if self.ion_model.itemData(i) == saved_model:
+                    self.ion_model.setCurrentIndex(i)
+                    break
         self._update_rg_preview()
 
     def _save_config(self) -> Dict[str, Any]:
+        # Resolve ION model to Azure VM size
+        ion_model = self.ion_model.currentData() or 'ION 7108'
+        ion_sizes = self._ion_model_sizes.get(ion_model, ['Standard_D8s_v4'])
+        ion_vm_size = ion_sizes[0]  # Primary size for model
+
         config = {
             'customer_name': self.customer_name.text().lower().strip(),
             'location': self.location.currentText(),
             'fw_vm_size': self.fw_vm_size.currentText().split()[0],
             'panorama_vm_size': self.panorama_vm_size.currentText().split()[0],
             'trust_vm_size': self.trust_vm_size.currentText().split()[0],
-            'ion_vm_size': self.ion_vm_size.currentText().split()[0],
+            'ion_model': ion_model,
+            'ion_vm_size': ion_vm_size,
+            'ion_vm_size_fallbacks': ion_sizes[1:],
             'vnet_cidr': self.vnet_cidr.text(),
             'mgmt_subnet': self.mgmt_subnet.text(),
             'untrust_subnet': self.untrust_subnet.text(),
