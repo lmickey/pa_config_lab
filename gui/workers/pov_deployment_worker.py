@@ -499,16 +499,18 @@ class TerraformWorker(QThread):
     def _try_auto_import(self, executor, output: str) -> bool:
         """Parse apply output for recoverable errors and auto-import resources.
 
-        Handles two cases:
+        Handles three cases:
         1. 'already exists' - resource in Azure but not in Terraform state
-        2. 'OSProvisioningTimedOut' - VM created successfully but Azure guest
-           agent check timed out (expected for ION appliances with no agent)
+        2. 'OSProvisioningTimedOut' - VM created but Azure guest agent check
+           timed out (expected for ION appliances with no agent)
+        3. Terraform create timeout - our short timeout fires before Azure's
+           20-min provisioning check; the VM is already created and running
 
         Returns True if any resources were imported.
         """
         import re
 
-        imports_needed = []  # List of (resource_id, resource_address) tuples
+        imports_needed = []  # List of (resource_id, resource_address, reason)
 
         # Pattern 1: 'A resource with the ID "..." already exists'
         # followed by: 'with <resource_address>,'
@@ -517,35 +519,42 @@ class TerraformWorker(QThread):
         for resource_id, resource_address in matches:
             imports_needed.append((resource_id, resource_address, 'already exists'))
 
-        # Pattern 2: OSProvisioningTimedOut - VM was created but provisioning
-        # status check timed out. The VM is actually running fine.
-        # Extract subscription, resource group, and VM name from the error,
-        # plus the terraform resource address.
-        os_timeout_pattern = (
-            r'creating Linux Virtual Machine \('
+        # Pattern 2 & 3: VM creation errors (OSProvisioningTimedOut or
+        # Terraform create timeout). Both mean the VM was created in Azure
+        # but Terraform didn't record it in state.
+        # Match any "creating Linux Virtual Machine" error block.
+        vm_error_pattern = (
+            r'Error: creating Linux Virtual Machine \('
             r'Subscription:\s*"([^"]+)"\s+'
             r'Resource Group Name:\s*"([^"]+)"\s+'
             r'Virtual Machine Name:\s*"([^"]+)"\).*?'
-            r'OSProvisioningTimedOut.*?'
             r'with\s+([^,\s]+),'
         )
-        os_matches = re.findall(os_timeout_pattern, output, re.DOTALL)
-        for sub_id, rg_name, vm_name, resource_address in os_matches:
+        vm_matches = re.findall(vm_error_pattern, output, re.DOTALL)
+        for sub_id, rg_name, vm_name, resource_address in vm_matches:
+            # Only recover ION VMs (they have no guest agent)
+            if '.ion_' not in resource_address:
+                continue
             resource_id = (
                 f"/subscriptions/{sub_id}/resourceGroups/{rg_name}"
                 f"/providers/Microsoft.Compute/virtualMachines/{vm_name}"
             )
-            imports_needed.append((resource_id, resource_address, 'OSProvisioningTimedOut'))
+            # Determine reason for logging
+            if 'OSProvisioningTimedOut' in output:
+                reason = 'OSProvisioningTimedOut'
+            else:
+                reason = 'create timeout'
+            imports_needed.append((resource_id, resource_address, reason))
 
         if not imports_needed:
             return False
 
         imported_any = False
         for resource_id, resource_address, reason in imports_needed:
-            if reason == 'OSProvisioningTimedOut':
+            if reason in ('OSProvisioningTimedOut', 'create timeout'):
                 self.log_message.emit(
-                    f"[import] OS provisioning timed out for {resource_address} "
-                    f"(expected for ION - no Azure guest agent)"
+                    f"[import] ION VM creation timed out for {resource_address} "
+                    f"(expected - no Azure guest agent)"
                 )
             else:
                 self.log_message.emit(f"[import] Resource exists in Azure but not in state: {resource_address}")
