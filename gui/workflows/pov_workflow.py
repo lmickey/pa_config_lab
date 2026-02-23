@@ -1190,7 +1190,13 @@ class POVWorkflowWidget(QWidget):
             dc_add_row.addWidget(self.dc_region_combo)
 
             self.dc_style_combo = QComboBox()
-            self.dc_style_combo.addItems(["Traditional (Firewall)", "SD-WAN (ION)", "SD-WAN (ION HA)"])
+            self.dc_style_combo.addItems([
+                "Traditional (Firewall)",
+                "SD-WAN (ION)",
+                "SD-WAN (ION HA)",
+                "Hybrid (FW + ION)",
+                "Hybrid + Router (FW + ION)",
+            ])
             self.dc_style_combo.setStyleSheet(
                 "QComboBox { padding: 3px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; }"
             )
@@ -3890,6 +3896,22 @@ class POVWorkflowWidget(QWidget):
                         'region': dc.get('region', 'eastus'),
                         'style': 'sdwan',
                     })
+                elif dc_style in ('hybrid', 'hybrid_router'):
+                    firewalls.append({
+                        'name': f"fw-{dc['name'].lower().replace(' ', '-')}",
+                        'type': 'service_connection',
+                        'location': dc['name'],
+                        'region': dc.get('region', 'eastus'),
+                        'style': dc_style,
+                    })
+                    ion_devices.append({
+                        'name': f"{dc['name'].lower().replace(' ', '-')}-ion",
+                        'type': 'service_connection',
+                        'location': dc['name'],
+                        'region': dc.get('region', 'eastus'),
+                        'style': dc_style,
+                    })
+                    fw_index += 1
                 else:
                     firewalls.append({
                         'name': f"fw-{dc['name'].lower().replace(' ', '-')}",
@@ -4864,7 +4886,11 @@ class POVWorkflowWidget(QWidget):
 
         # Determine style from dropdown
         style_text = self.dc_style_combo.currentText() if hasattr(self, 'dc_style_combo') else "Traditional (Firewall)"
-        if 'ION HA' in style_text:
+        if 'Hybrid' in style_text and 'Router' in style_text:
+            style = 'hybrid_router'
+        elif 'Hybrid' in style_text:
+            style = 'hybrid'
+        elif 'ION HA' in style_text:
             style = 'sdwan_ha'
         elif 'SD-WAN' in style_text:
             style = 'sdwan'
@@ -4937,8 +4963,17 @@ class POVWorkflowWidget(QWidget):
 
         for dc in datacenters:
             style = dc.get('style', 'traditional')
-            icon = "\U0001f4e1" if style in ('sdwan', 'sdwan_ha') else "\U0001f525"  # 📡 or 🔥
-            style_label = "ION-HA" if style == 'sdwan_ha' else "SD-WAN" if style == 'sdwan' else "FW"
+            if style in ('hybrid', 'hybrid_router'):
+                icon = "\U0001f525\U0001f4e1"  # 🔥📡
+            elif style in ('sdwan', 'sdwan_ha'):
+                icon = "\U0001f4e1"  # 📡
+            else:
+                icon = "\U0001f525"  # 🔥
+            style_labels = {
+                'hybrid': 'Hybrid', 'hybrid_router': 'Hybrid+Rtr',
+                'sdwan_ha': 'ION-HA', 'sdwan': 'SD-WAN', 'traditional': 'FW',
+            }
+            style_label = style_labels.get(style, 'FW')
             item = QListWidgetItem(f"{icon} {dc['name']} ({dc['region']}) [{style_label}]")
             item.setData(Qt.ItemDataRole.UserRole, dc['name'])
             self.datacenters_list.addItem(item)
@@ -5080,10 +5115,10 @@ class POVWorkflowWidget(QWidget):
                     'auto_generated': True,
                 })
 
-            # For single SD-WAN DCs, also create an ION device entry
+            # For single SD-WAN and hybrid DCs, also create an ION device entry
             # ION HA pairs are managed at infrastructure level, not as trust devices
             dc_style = dc.get('style', 'traditional')
-            if dc_style == 'sdwan':
+            if dc_style in ('sdwan', 'hybrid', 'hybrid_router'):
                 ion_name = f"{dc['name']}-ion"
                 auto_device_names.add(ion_name)
                 if not any(d['name'] == ion_name for d in current_devices):
@@ -8100,6 +8135,21 @@ class POVWorkflowWidget(QWidget):
                             'region': dc.get('region', azure_region),
                             'style': 'sdwan',
                         })
+                    elif dc_style in ('hybrid', 'hybrid_router'):
+                        firewalls.append({
+                            'name': f"fw-{dc['name'].lower().replace(' ', '-')}",
+                            'type': 'service_connection',
+                            'location_name': dc['name'],
+                            'region': dc.get('region', azure_region),
+                            'style': dc_style,
+                        })
+                        ion_devices.append({
+                            'name': f"{dc['name'].lower().replace(' ', '-')}-ion",
+                            'type': 'service_connection',
+                            'location': dc['name'],
+                            'region': dc.get('region', azure_region),
+                            'style': dc_style,
+                        })
                     else:
                         firewalls.append({
                             'name': f"fw-{dc['name'].lower().replace(' ', '-')}",
@@ -8414,7 +8464,54 @@ resource "azurerm_subnet" "trust" {{
   virtual_network_name = azurerm_virtual_network.pov.name
   address_prefixes     = ["10.100.2.0/24"]
 }}
+'''
 
+        # Check for hybrid datacenter styles
+        dc_list = tfvars.get('datacenters', [])
+        has_hybrid = any(dc.get('style') == 'hybrid' for dc in dc_list)
+        has_hybrid_router = any(dc.get('style') == 'hybrid_router' for dc in dc_list)
+
+        # Direct hybrid: single shared transit subnet for FW 4th NIC + ION LAN
+        if has_hybrid:
+            content += f'''
+# SD-WAN Transit Subnet (shared by FW 4th NIC and ION LAN in hybrid mode)
+resource "azurerm_subnet" "sdwan_transit" {{
+  name                 = "sdwan-transit"
+  resource_group_name  = azurerm_resource_group.pov.name
+  virtual_network_name = azurerm_virtual_network.pov.name
+  address_prefixes     = ["10.100.3.0/24"]
+}}
+'''
+
+        # Routed hybrid: two transit subnets + RouteServerSubnet
+        if has_hybrid_router:
+            content += f'''
+# FW Transit Subnet (firewall trust-side connects here in hybrid+router mode)
+resource "azurerm_subnet" "fw_transit" {{
+  name                 = "fw-transit"
+  resource_group_name  = azurerm_resource_group.pov.name
+  virtual_network_name = azurerm_virtual_network.pov.name
+  address_prefixes     = ["10.100.4.0/24"]
+}}
+
+# ION Transit Subnet (ION LAN-side connects here in hybrid+router mode)
+resource "azurerm_subnet" "ion_transit" {{
+  name                 = "ion-transit"
+  resource_group_name  = azurerm_resource_group.pov.name
+  virtual_network_name = azurerm_virtual_network.pov.name
+  address_prefixes     = ["10.100.5.0/24"]
+}}
+
+# RouteServerSubnet (Azure-required exact name)
+resource "azurerm_subnet" "route_server" {{
+  name                 = "RouteServerSubnet"
+  resource_group_name  = azurerm_resource_group.pov.name
+  virtual_network_name = azurerm_virtual_network.pov.name
+  address_prefixes     = ["10.100.6.0/24"]
+}}
+'''
+
+        content += f'''
 # Network Security Group for Management
 resource "azurerm_network_security_group" "management" {{
   name                = "{customer}-{location}-mgmt-nsg"
@@ -8606,7 +8703,37 @@ resource "azurerm_storage_blob" "bootstrap_xml" {{
             </servers>
           </dns-setting>
         </system>
-      </deviceconfig>
+      </deviceconfig>'''
+
+        # For direct hybrid, add ethernet1/3 interface + sd-wan zone to bootstrap
+        if has_hybrid:
+            content += '''
+      <network>
+        <interface>
+          <ethernet>
+            <entry name="ethernet1/3">
+              <layer3>
+                <dhcp-client/>
+              </layer3>
+            </entry>
+          </ethernet>
+        </interface>
+      </network>
+      <vsys>
+        <entry name="vsys1">
+          <zone>
+            <entry name="sd-wan">
+              <network>
+                <layer3>
+                  <member>ethernet1/3</member>
+                </layer3>
+              </network>
+            </entry>
+          </zone>
+        </entry>
+      </vsys>'''
+
+        content += f'''
     </entry>
   </devices>
 </config>
@@ -8623,10 +8750,37 @@ resource "azurerm_marketplace_agreement" "paloalto" {{
   plan      = "byol"
 }}
 '''
+
+        # Azure Route Server for hybrid+router mode
+        if has_hybrid_router:
+            content += f'''
+# Azure Route Server
+resource "azurerm_public_ip" "route_server" {{
+  name                = "{customer}-{location}-routeserver-pip"
+  location            = azurerm_resource_group.pov.location
+  resource_group_name = azurerm_resource_group.pov.name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+  tags = azurerm_resource_group.pov.tags
+}}
+
+resource "azurerm_route_server" "pov" {{
+  name                             = "{customer}-{location}-routeserver"
+  resource_group_name              = azurerm_resource_group.pov.name
+  location                         = azurerm_resource_group.pov.location
+  sku                              = "Standard"
+  public_ip_address_id             = azurerm_public_ip.route_server.id
+  subnet_id                        = azurerm_subnet.route_server.id
+  branch_to_branch_traffic_enabled = true
+  tags = azurerm_resource_group.pov.tags
+}}
+'''
+
         for fw in firewalls:
             fw_name = fw.get('name', 'fw').lower().replace(' ', '-').replace('_', '-')
             fw_type = fw.get('type', 'service_connection')
             location_name = fw.get('location_name', 'Datacenter')
+            fw_style = fw.get('style', 'traditional')
 
             # Determine site prefix: DC for datacenter/service_connection, BR for branch
             site_prefix = "DC" if fw_type == 'service_connection' else "BR"
@@ -8636,6 +8790,9 @@ resource "azurerm_marketplace_agreement" "paloalto" {{
 
             # DNS label must be lowercase, alphanumeric and hyphens only
             dns_label = f"{resource_prefix}-mgmt".lower()
+
+            # Trust NIC subnet: hybrid_router uses fw-transit, others use trust
+            fw_trust_subnet = "azurerm_subnet.fw_transit.id" if fw_style == 'hybrid_router' else "azurerm_subnet.trust.id"
 
             content += f'''
 # Firewall: {fw_name} ({fw_type}) for {location_name}
@@ -8694,13 +8851,50 @@ resource "azurerm_network_interface" "nic_{fw_name}_trust" {{
 
   ip_configuration {{
     name                          = "trust"
-    subnet_id                     = azurerm_subnet.trust.id
+    subnet_id                     = {fw_trust_subnet}
     private_ip_address_allocation = "Dynamic"
   }}
 
   tags = azurerm_resource_group.pov.tags
 }}
+'''
 
+            # For direct hybrid: add 4th NIC on sdwan-transit subnet (ethernet1/3, sd-wan zone)
+            if fw_style == 'hybrid':
+                content += f'''
+# SD-WAN Transit NIC (ethernet1/3 - sd-wan zone)
+resource "azurerm_network_interface" "nic_{fw_name}_sdwan" {{
+  name                 = "{resource_prefix}-nic-sdwan"
+  location             = azurerm_resource_group.pov.location
+  resource_group_name  = azurerm_resource_group.pov.name
+  enable_ip_forwarding = true
+
+  ip_configuration {{
+    name                          = "sdwan"
+    subnet_id                     = azurerm_subnet.sdwan_transit.id
+    private_ip_address_allocation = "Dynamic"
+  }}
+
+  tags = azurerm_resource_group.pov.tags
+}}
+'''
+
+            # Build network_interface_ids based on style
+            if fw_style == 'hybrid':
+                nic_ids = f'''[
+    azurerm_network_interface.nic_{fw_name}_mgmt.id,
+    azurerm_network_interface.nic_{fw_name}_untrust.id,
+    azurerm_network_interface.nic_{fw_name}_trust.id,
+    azurerm_network_interface.nic_{fw_name}_sdwan.id,
+  ]'''
+            else:
+                nic_ids = f'''[
+    azurerm_network_interface.nic_{fw_name}_mgmt.id,
+    azurerm_network_interface.nic_{fw_name}_untrust.id,
+    azurerm_network_interface.nic_{fw_name}_trust.id,
+  ]'''
+
+            content += f'''
 # VM-Series Firewall
 resource "azurerm_linux_virtual_machine" "fw_{fw_name}" {{
   name                            = "{resource_prefix}"
@@ -8719,11 +8913,7 @@ resource "azurerm_linux_virtual_machine" "fw_{fw_name}" {{
     ",share-directory="
   ]))
 
-  network_interface_ids = [
-    azurerm_network_interface.nic_{fw_name}_mgmt.id,
-    azurerm_network_interface.nic_{fw_name}_untrust.id,
-    azurerm_network_interface.nic_{fw_name}_trust.id,
-  ]
+  network_interface_ids = {nic_ids}
 
   os_disk {{
     caching              = "ReadWrite"
@@ -8773,9 +8963,18 @@ resource "azurerm_marketplace_agreement" "ion" {{
             dns_label = f"{resource_prefix}-wan".lower()
             az = ion.get('availability_zone', '')
             ion_vm_size = ion.get('vm_size_override', ion_vm_size_default)
+            ion_style = ion.get('style', 'sdwan')
 
             # VM zone line (Standard SKU PIP is zone-redundant by default, no zones needed)
             vm_zone_line = f'\n  zone                            = "{az}"' if az else ''
+
+            # LAN NIC subnet: hybrid→sdwan-transit, hybrid_router→ion-transit, else→trust
+            if ion_style == 'hybrid':
+                ion_lan_subnet = "azurerm_subnet.sdwan_transit.id"
+            elif ion_style == 'hybrid_router':
+                ion_lan_subnet = "azurerm_subnet.ion_transit.id"
+            else:
+                ion_lan_subnet = "azurerm_subnet.trust.id"
 
             content += f'''
 # ION Device: {ion_name} (SD-WAN) for {location_name}
@@ -8822,7 +9021,7 @@ resource "azurerm_network_interface" "nic_{ion_name}_wan" {{
   tags = azurerm_resource_group.pov.tags
 }}
 
-# LAN NIC (trust subnet, IP forwarding - NIC 2)
+# LAN NIC (IP forwarding - NIC 2)
 resource "azurerm_network_interface" "nic_{ion_name}_lan" {{
   name                 = "{resource_prefix}-nic-lan"
   location             = azurerm_resource_group.pov.location
@@ -8831,7 +9030,7 @@ resource "azurerm_network_interface" "nic_{ion_name}_lan" {{
 
   ip_configuration {{
     name                          = "lan"
-    subnet_id                     = azurerm_subnet.trust.id
+    subnet_id                     = {ion_lan_subnet}
     private_ip_address_allocation = "Dynamic"
   }}
 
@@ -8891,6 +9090,36 @@ resource "azurerm_linux_virtual_machine" "ion_{ion_name}" {{
   }}
 
   depends_on = [azurerm_marketplace_agreement.ion]
+}}
+'''
+
+        # BGP peer connections for hybrid+router mode
+        if has_hybrid_router:
+            for fw in firewalls:
+                if fw.get('style') != 'hybrid_router':
+                    continue
+                fw_name = fw.get('name', 'fw').lower().replace(' ', '-').replace('_', '-')
+                content += f'''
+# BGP connection: Route Server <-> Firewall
+resource "azurerm_route_server_bgp_connection" "fw_{fw_name}" {{
+  name            = "fw-{fw_name}-bgp"
+  route_server_id = azurerm_route_server.pov.id
+  peer_asn        = 65501
+  peer_ip         = azurerm_network_interface.nic_{fw_name}_trust.private_ip_address
+}}
+'''
+
+            for ion in ion_devices:
+                if ion.get('style') != 'hybrid_router':
+                    continue
+                ion_name = ion.get('name', 'ion').lower().replace(' ', '-').replace('_', '-')
+                content += f'''
+# BGP connection: Route Server <-> ION
+resource "azurerm_route_server_bgp_connection" "ion_{ion_name}" {{
+  name            = "ion-{ion_name}-bgp"
+  route_server_id = azurerm_route_server.pov.id
+  peer_asn        = 65502
+  peer_ip         = azurerm_network_interface.nic_{ion_name}_lan.private_ip_address
 }}
 '''
 
