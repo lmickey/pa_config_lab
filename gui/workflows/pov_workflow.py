@@ -36,7 +36,7 @@ from PyQt6.QtWidgets import (
     QListWidgetItem,
     QSizePolicy,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QThread
+from PyQt6.QtCore import Qt, pyqtSignal, QThread, QTimer
 
 from gui.widgets import TenantSelectorWidget, ResultsPanel
 from gui.dialogs import CLOUD_RESOURCE_DIALOGS, USE_CASE_DIALOGS
@@ -156,10 +156,19 @@ class POVWorkflowWidget(QWidget):
         self._pov_deployment_phases_completed = []  # Track completed phases for resume
         self._deploy_tenant_name = None  # Track deploy tenant for auto-connect on tab switch
 
+        # Debounced auto-save: timer restarts on each change, fires after 5s of inactivity
+        self._autosave_timer = QTimer(self)
+        self._autosave_timer.setSingleShot(True)
+        self._autosave_timer.setInterval(5000)  # 5 seconds
+        self._autosave_timer.timeout.connect(self._autosave)
+
         self._init_ui()
 
         # Populate tenant dropdown from saved tenants
         self._populate_tenant_dropdown()
+
+        # Connect widget change signals for auto-save after UI is built
+        self._connect_autosave_signals()
 
         logger.info("POV Workflow initialized")
 
@@ -6479,8 +6488,52 @@ class POVWorkflowWidget(QWidget):
         for use_case_name in self.use_case_configs:
             self._update_use_case_status(use_case_name)
 
+    def _mark_dirty(self):
+        """Mark state as dirty — restarts the debounced auto-save timer."""
+        self._autosave_timer.start()  # (re)starts the 5-second countdown
+
+    def _autosave(self):
+        """Auto-save state after a period of inactivity."""
+        try:
+            self.save_state()
+            logger.debug("Auto-saved POV state")
+        except Exception as e:
+            logger.warning(f"Auto-save failed: {e}")
+
+    def _connect_autosave_signals(self):
+        """Connect widget change signals to the debounced auto-save timer."""
+        # Walk all child widgets and connect common change signals
+        from PyQt6.QtWidgets import (
+            QLineEdit, QComboBox, QCheckBox, QRadioButton,
+            QSpinBox, QDoubleSpinBox, QTextEdit, QPlainTextEdit,
+            QListWidget,
+        )
+        for widget in self.findChildren(QLineEdit):
+            widget.textChanged.connect(self._mark_dirty)
+        for widget in self.findChildren(QComboBox):
+            widget.currentIndexChanged.connect(self._mark_dirty)
+        for widget in self.findChildren(QCheckBox):
+            widget.stateChanged.connect(self._mark_dirty)
+        for widget in self.findChildren(QRadioButton):
+            widget.toggled.connect(self._mark_dirty)
+        for widget in self.findChildren(QSpinBox):
+            widget.valueChanged.connect(self._mark_dirty)
+        for widget in self.findChildren(QDoubleSpinBox):
+            widget.valueChanged.connect(self._mark_dirty)
+        for widget in self.findChildren(QTextEdit):
+            widget.textChanged.connect(self._mark_dirty)
+        for widget in self.findChildren(QPlainTextEdit):
+            widget.textChanged.connect(self._mark_dirty)
+        for widget in self.findChildren(QListWidget):
+            widget.model().rowsInserted.connect(self._mark_dirty)
+            widget.model().rowsRemoved.connect(self._mark_dirty)
+
     def _on_tab_changed(self, index: int):
-        """Handle tab change events."""
+        """Handle tab change events — saves state on every tab switch."""
+        # Save state immediately when leaving a tab (flush any pending autosave)
+        self._autosave_timer.stop()
+        self.save_state()
+
         tab_names = [
             "Tenant Info",
             "Cloud Resources",
