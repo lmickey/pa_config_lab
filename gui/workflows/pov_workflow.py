@@ -5099,7 +5099,8 @@ class POVWorkflowWidget(QWidget):
                     'auto_generated': True,
                 })
 
-        # 1 Linux ServerVM (DNS/WebApp) per datacenter + ION device entry for SD-WAN DCs
+        # 1 Linux ServerVM (DNS/WebApp) per datacenter
+        # ION devices are handled at infrastructure level, not as trust devices
         for dc in loc_config.get('datacenters', []):
             device_name = f"{dc['name']}-ServerVM"
             auto_device_names.add(device_name)
@@ -5114,24 +5115,6 @@ class POVWorkflowWidget(QWidget):
                     'services': ['DNS', 'WebApp'],
                     'auto_generated': True,
                 })
-
-            # For single SD-WAN and hybrid DCs, also create an ION device entry
-            # ION HA pairs are managed at infrastructure level, not as trust devices
-            dc_style = dc.get('style', 'traditional')
-            if dc_style in ('sdwan', 'hybrid', 'hybrid_router'):
-                ion_name = f"{dc['name']}-ion"
-                auto_device_names.add(ion_name)
-                if not any(d['name'] == ion_name for d in current_devices):
-                    new_devices.append({
-                        'id': str(uuid.uuid4()),
-                        'name': ion_name,
-                        'location': dc['name'],
-                        'location_type': 'datacenter',
-                        'device_type': 'ION',
-                        'subtype': 'SD-WAN',
-                        'services': [],
-                        'auto_generated': True,
-                    })
 
         # Keep existing devices (both auto-generated that still have locations and manually added)
         for device in current_devices:
