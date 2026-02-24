@@ -99,6 +99,7 @@ class SaaSReviewWorkflowWidget(QWidget):
         self._worker = None
         self._results = None
         self._init_ui()
+        self._populate_tenant_dropdown()
 
     # ------------------------------------------------------------------
     # UI construction
@@ -507,3 +508,12 @@ class SaaSReviewWorkflowWidget(QWidget):
         self.progress_bar.setVisible(False)
         self.tabs.setTabEnabled(1, False)
         self.tabs.setCurrentIndex(0)
+
+    def _populate_tenant_dropdown(self):
+        """Populate the tenant selector dropdown from saved tenants."""
+        try:
+            from config.tenant_manager import TenantManager
+            tenants = TenantManager.list_tenants()
+            self.tenant_selector.populate_tenants(tenants)
+        except Exception:
+            pass
