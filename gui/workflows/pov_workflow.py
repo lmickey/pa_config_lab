@@ -1200,11 +1200,10 @@ class POVWorkflowWidget(QWidget):
 
             self.dc_style_combo = QComboBox()
             self.dc_style_combo.addItems([
-                "Traditional (Firewall)",
-                "SD-WAN (ION)",
+                "Traditional Firewall (HA)",
                 "SD-WAN (ION HA)",
-                "Hybrid (FW + ION)",
-                "Hybrid + Router (FW + ION)",
+                "Hybrid (FW + ION HA)",
+                "Hybrid Routing (Hybrid HA w/Router)",
             ])
             self.dc_style_combo.setStyleSheet(
                 "QComboBox { padding: 3px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; }"
@@ -3881,54 +3880,59 @@ class POVWorkflowWidget(QWidget):
         ion_devices = []
         fw_index = 1
 
-        # Firewalls/ION for datacenters with service connections
+        # Firewalls/ION for datacenters with service connections (all HA)
         for dc in locations.get('datacenters', []):
             if dc.get('connection_type') == 'service_connection':
                 dc_style = dc.get('style', 'traditional')
+                dc_name = dc['name'].lower().replace(' ', '-')
+                dc_region = dc.get('region', 'eastus')
+
                 if dc_style == 'sdwan_ha':
-                    # HA pair: deploy 2 IONs in separate availability zones
+                    # ION HA pair: 2 IONs in separate availability zones
                     for i in range(1, 3):
                         ion_devices.append({
-                            'name': f"{dc['name'].lower().replace(' ', '-')}-ion{i}",
+                            'name': f"{dc_name}-ion{i}",
                             'type': 'service_connection',
                             'location': dc['name'],
-                            'region': dc.get('region', 'eastus'),
+                            'region': dc_region,
                             'style': 'sdwan_ha',
                             'ha_peer': i,
                             'availability_zone': str(i),
                         })
-                elif dc_style == 'sdwan':
-                    ion_devices.append({
-                        'name': f"{dc['name'].lower().replace(' ', '-')}-ion",
-                        'type': 'service_connection',
-                        'location': dc['name'],
-                        'region': dc.get('region', 'eastus'),
-                        'style': 'sdwan',
-                    })
                 elif dc_style in ('hybrid', 'hybrid_router'):
-                    firewalls.append({
-                        'name': f"fw-{dc['name'].lower().replace(' ', '-')}",
-                        'type': 'service_connection',
-                        'location': dc['name'],
-                        'region': dc.get('region', 'eastus'),
-                        'style': dc_style,
-                    })
-                    ion_devices.append({
-                        'name': f"{dc['name'].lower().replace(' ', '-')}-ion",
-                        'type': 'service_connection',
-                        'location': dc['name'],
-                        'region': dc.get('region', 'eastus'),
-                        'style': dc_style,
-                    })
-                    fw_index += 1
+                    # Hybrid HA: 2 FWs + 2 IONs in separate availability zones
+                    for i in range(1, 3):
+                        firewalls.append({
+                            'name': f"fw-{dc_name}-{i}",
+                            'type': 'service_connection',
+                            'location': dc['name'],
+                            'region': dc_region,
+                            'style': dc_style,
+                            'ha_peer': i,
+                            'availability_zone': str(i),
+                        })
+                        ion_devices.append({
+                            'name': f"{dc_name}-ion{i}",
+                            'type': 'service_connection',
+                            'location': dc['name'],
+                            'region': dc_region,
+                            'style': dc_style,
+                            'ha_peer': i,
+                            'availability_zone': str(i),
+                        })
+                    fw_index += 2
                 else:
-                    firewalls.append({
-                        'name': f"fw-{dc['name'].lower().replace(' ', '-')}",
-                        'type': 'service_connection',
-                        'location': dc['name'],
-                        'region': dc.get('region', 'eastus'),
-                    })
-                    fw_index += 1
+                    # Traditional HA: 2 FWs in separate availability zones
+                    for i in range(1, 3):
+                        firewalls.append({
+                            'name': f"fw-{dc_name}-{i}",
+                            'type': 'service_connection',
+                            'location': dc['name'],
+                            'region': dc_region,
+                            'ha_peer': i,
+                            'availability_zone': str(i),
+                        })
+                    fw_index += 2
 
         # Firewalls for branches (remote networks)
         for branch in locations.get('branches', []):
@@ -4895,14 +4899,12 @@ class POVWorkflowWidget(QWidget):
 
         # Determine style from dropdown
         style_text = self.dc_style_combo.currentText() if hasattr(self, 'dc_style_combo') else "Traditional (Firewall)"
-        if 'Hybrid' in style_text and 'Router' in style_text:
+        if 'Hybrid' in style_text and 'Routing' in style_text:
             style = 'hybrid_router'
         elif 'Hybrid' in style_text:
             style = 'hybrid'
-        elif 'ION HA' in style_text:
-            style = 'sdwan_ha'
         elif 'SD-WAN' in style_text:
-            style = 'sdwan'
+            style = 'sdwan_ha'
         else:
             style = 'traditional'
 
@@ -4974,13 +4976,13 @@ class POVWorkflowWidget(QWidget):
             style = dc.get('style', 'traditional')
             if style in ('hybrid', 'hybrid_router'):
                 icon = "\U0001f525\U0001f4e1"  # 🔥📡
-            elif style in ('sdwan', 'sdwan_ha'):
+            elif style == 'sdwan_ha':
                 icon = "\U0001f4e1"  # 📡
             else:
                 icon = "\U0001f525"  # 🔥
             style_labels = {
-                'hybrid': 'Hybrid', 'hybrid_router': 'Hybrid+Rtr',
-                'sdwan_ha': 'ION-HA', 'sdwan': 'SD-WAN', 'traditional': 'FW',
+                'hybrid': 'Hybrid-HA', 'hybrid_router': 'Hybrid+Rtr',
+                'sdwan_ha': 'ION-HA', 'traditional': 'FW-HA',
             }
             style_label = style_labels.get(style, 'FW')
             item = QListWidgetItem(f"{icon} {dc['name']} ({dc['region']}) [{style_label}]")
@@ -5554,10 +5556,10 @@ class POVWorkflowWidget(QWidget):
         ztna_count = sum(1 for c in connections if c.get('connection_type') == 'ztna')
 
         current_type = conn.get('connection_type', 'service_connection')
-        is_sdwan = conn.get('style', 'traditional') == 'sdwan'
+        is_sdwan = conn.get('style', 'traditional') == 'sdwan_ha'
 
         if is_sdwan:
-            # SD-WAN (ION) DCs: toggle none <-> service_connection (no ZTNA option)
+            # SD-WAN (ION HA) DCs: toggle none <-> service_connection (no ZTNA option)
             if current_type == 'none':
                 if sc_count >= 5:
                     QMessageBox.warning(
@@ -5713,7 +5715,7 @@ class POVWorkflowWidget(QWidget):
                     type_display = "Remote Network"
                     suffix = " (click to add ZTNA)"
             elif conn_type == 'none':
-                icon = "\U0001f4e1" if conn.get('style') == 'sdwan' else "🏛️"  # 📡
+                icon = "\U0001f4e1" if conn.get('style') == 'sdwan_ha' else "🏛️"  # 📡
                 type_display = "None"
                 suffix = " (click to enable SC)"
             elif conn_type == 'ztna':
@@ -6368,8 +6370,8 @@ class POVWorkflowWidget(QWidget):
             if existing:
                 # Preserve user's choice
                 conn_type = existing.get('connection_type', 'service_connection')
-            elif dc_style == 'sdwan':
-                # SD-WAN (ION) DCs default to no connection — click to enable
+            elif dc_style == 'sdwan_ha':
+                # SD-WAN (ION HA) DCs default to no connection — click to enable
                 conn_type = 'none'
             else:
                 # Traditional datacenter - assign type based on limits
@@ -8145,54 +8147,59 @@ class POVWorkflowWidget(QWidget):
                     self._on_terraform_ready()
                     return
 
-            # Generate firewalls and ION devices lists from locations
-            # Style determines whether a DC gets a firewall or ION device(s)
+            # Generate firewalls and ION devices lists from locations (all HA)
             firewalls = []
             ion_devices = []
             for dc in datacenters:
                 if dc.get('connection_type') == 'service_connection':
                     dc_style = dc.get('style', 'traditional')
+                    dc_name = dc['name'].lower().replace(' ', '-')
+                    dc_region = dc.get('region', azure_region)
+
                     if dc_style == 'sdwan_ha':
+                        # ION HA pair: 2 IONs in separate availability zones
                         for i in range(1, 3):
                             ion_devices.append({
-                                'name': f"{dc['name'].lower().replace(' ', '-')}-ion{i}",
+                                'name': f"{dc_name}-ion{i}",
                                 'type': 'service_connection',
                                 'location': dc['name'],
-                                'region': dc.get('region', azure_region),
+                                'region': dc_region,
                                 'style': 'sdwan_ha',
                                 'ha_peer': i,
                                 'availability_zone': str(i),
                             })
-                    elif dc_style == 'sdwan':
-                        ion_devices.append({
-                            'name': f"{dc['name'].lower().replace(' ', '-')}-ion",
-                            'type': 'service_connection',
-                            'location': dc['name'],
-                            'region': dc.get('region', azure_region),
-                            'style': 'sdwan',
-                        })
                     elif dc_style in ('hybrid', 'hybrid_router'):
-                        firewalls.append({
-                            'name': f"fw-{dc['name'].lower().replace(' ', '-')}",
-                            'type': 'service_connection',
-                            'location_name': dc['name'],
-                            'region': dc.get('region', azure_region),
-                            'style': dc_style,
-                        })
-                        ion_devices.append({
-                            'name': f"{dc['name'].lower().replace(' ', '-')}-ion",
-                            'type': 'service_connection',
-                            'location': dc['name'],
-                            'region': dc.get('region', azure_region),
-                            'style': dc_style,
-                        })
+                        # Hybrid HA: 2 FWs + 2 IONs in separate availability zones
+                        for i in range(1, 3):
+                            firewalls.append({
+                                'name': f"fw-{dc_name}-{i}",
+                                'type': 'service_connection',
+                                'location_name': dc['name'],
+                                'region': dc_region,
+                                'style': dc_style,
+                                'ha_peer': i,
+                                'availability_zone': str(i),
+                            })
+                            ion_devices.append({
+                                'name': f"{dc_name}-ion{i}",
+                                'type': 'service_connection',
+                                'location': dc['name'],
+                                'region': dc_region,
+                                'style': dc_style,
+                                'ha_peer': i,
+                                'availability_zone': str(i),
+                            })
                     else:
-                        firewalls.append({
-                            'name': f"fw-{dc['name'].lower().replace(' ', '-')}",
-                            'type': 'service_connection',
-                            'location_name': dc['name'],
-                            'region': dc.get('region', azure_region),
-                        })
+                        # Traditional HA: 2 FWs in separate availability zones
+                        for i in range(1, 3):
+                            firewalls.append({
+                                'name': f"fw-{dc_name}-{i}",
+                                'type': 'service_connection',
+                                'location_name': dc['name'],
+                                'region': dc_region,
+                                'ha_peer': i,
+                                'availability_zone': str(i),
+                            })
 
             for branch in locations.get('branches', []):
                 firewalls.append({
@@ -8817,6 +8824,7 @@ resource "azurerm_route_server" "pov" {{
             fw_type = fw.get('type', 'service_connection')
             location_name = fw.get('location_name', 'Datacenter')
             fw_style = fw.get('style', 'traditional')
+            fw_az = fw.get('availability_zone', '')
 
             # Determine site prefix: DC for datacenter/service_connection, BR for branch
             site_prefix = "DC" if fw_type == 'service_connection' else "BR"
@@ -8826,6 +8834,9 @@ resource "azurerm_route_server" "pov" {{
 
             # DNS label must be lowercase, alphanumeric and hyphens only
             dns_label = f"{resource_prefix}-mgmt".lower()
+
+            # VM zone line for HA pairs
+            fw_zone_line = f'\n  zone                            = "{fw_az}"' if fw_az else ''
 
             # Trust NIC subnet: hybrid_router uses fw-transit, others use trust
             fw_trust_subnet = "azurerm_subnet.fw_transit.id" if fw_style == 'hybrid_router' else "azurerm_subnet.trust.id"
@@ -8936,7 +8947,7 @@ resource "azurerm_linux_virtual_machine" "fw_{fw_name}" {{
   name                            = "{resource_prefix}"
   resource_group_name             = azurerm_resource_group.pov.name
   location                        = azurerm_resource_group.pov.location
-  size                            = "Standard_DS3_v2"
+  size                            = "Standard_DS3_v2"{fw_zone_line}
   admin_username                  = var.admin_username
   admin_password                  = var.admin_password
   disable_password_authentication = false
@@ -8999,7 +9010,7 @@ resource "azurerm_marketplace_agreement" "ion" {{
             dns_label = f"{resource_prefix}-wan".lower()
             az = ion.get('availability_zone', '')
             ion_vm_size = ion.get('vm_size_override', ion_vm_size_default)
-            ion_style = ion.get('style', 'sdwan')
+            ion_style = ion.get('style', 'sdwan_ha')
 
             # VM zone line (Standard SKU PIP is zone-redundant by default, no zones needed)
             vm_zone_line = f'\n  zone                            = "{az}"' if az else ''
@@ -10780,8 +10791,8 @@ output "{device_name}_private_ip" {{
                 'datacenter': dc,
             })
             folders_to_commit.add('Service Connections')
-            # Only traditional (firewall) DCs need FW-side IPsec config
-            if dc_style != 'sdwan':
+            # DCs with firewalls need FW-side IPsec config (not ION-only)
+            if dc_style != 'sdwan_ha':
                 fw = self._find_firewall_for_location(dc.get('name'))
                 if fw:
                     fw_side_phases.append({
