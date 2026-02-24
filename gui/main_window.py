@@ -22,9 +22,10 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QStackedWidget,
     QListWidget,
+    QListWidgetItem,
 )
 from PyQt6.QtCore import Qt, QSettings
-from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtGui import QAction, QColor, QIcon
 
 from gui.connection_dialog import ConnectionDialog
 from gui.logs_widget import LogsWidget
@@ -84,11 +85,44 @@ class PrismaConfigMainWindow(QMainWindow):
 
         self.workflow_list = QListWidget()
         self.workflow_list.addItem("🏠 Home")
-        self.workflow_list.addItem("🔧 POV Configuration")
-        self.workflow_list.addItem("🔄 Configuration Migration")
-        self.workflow_list.addItem("📋 Generate DoR Data")
-        self.workflow_list.addItem("🔍 SaaS Inline Review")
-        self.workflow_list.addItem("📊 Activity Logs")
+
+        # Section: POV & Configuration
+        section1 = QListWidgetItem("POV & Configuration")
+        section1.setFlags(Qt.ItemFlag.NoItemFlags)  # non-selectable header
+        section1.setForeground(QColor("#888888"))
+        font = section1.font()
+        font.setBold(True)
+        font.setPointSize(font.pointSize() - 1)
+        section1.setFont(font)
+        self.workflow_list.addItem(section1)
+
+        self.workflow_list.addItem("  🔧 POV Configuration")
+        self.workflow_list.addItem("  🔄 Configuration Migration")
+        self.workflow_list.addItem("  📋 Generate DoR Data")
+
+        # Section: Performance & Review
+        section2 = QListWidgetItem("Performance & Review")
+        section2.setFlags(Qt.ItemFlag.NoItemFlags)
+        section2.setForeground(QColor("#888888"))
+        section2.setFont(font)
+        self.workflow_list.addItem(section2)
+
+        self.workflow_list.addItem("  📊 Tenant Performance")
+        self.workflow_list.addItem("  🔍 SaaS Application Review")
+
+        self.workflow_list.addItem("📋 Activity Logs")
+
+        # Map sidebar row -> stacked widget page index
+        # Section headers (rows 1, 5) have no page
+        self._row_to_page = {
+            0: 0,   # Home
+            2: 1,   # POV Configuration
+            3: 2,   # Configuration Migration
+            4: 3,   # Generate DoR Data
+            6: 4,   # Tenant Performance
+            7: 5,   # SaaS Application Review
+            8: 6,   # Activity Logs
+        }
         sidebar_layout.addWidget(self.workflow_list)
 
         sidebar_layout.addStretch()
@@ -111,10 +145,12 @@ class PrismaConfigMainWindow(QMainWindow):
         self._create_pov_workflow_page()
         self._create_migration_workflow_page()
         self._create_dor_workflow_page()
+        self._create_tenant_performance_page()
         self._create_saas_review_page()
         self._create_logs_page()
 
         # Now connect the signal after everything is initialized
+        self._last_sidebar_row = 0
         self.workflow_list.currentRowChanged.connect(self._on_workflow_changed)
         self.workflow_list.setCurrentRow(0)
 
@@ -251,15 +287,14 @@ class PrismaConfigMainWindow(QMainWindow):
 
         layout.addStretch()
 
-        # Workflow cards
-        workflows_label = QLabel("<h2>Select a Workflow</h2>")
-        workflows_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(workflows_label)
+        # POV & Configuration cards
+        pov_label = QLabel("<h2>POV & Configuration</h2>")
+        pov_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(pov_label)
 
-        cards_layout = QHBoxLayout()
-        cards_layout.addStretch()
+        pov_cards = QHBoxLayout()
+        pov_cards.addStretch()
 
-        # POV Configuration card
         pov_card = self._create_workflow_card(
             "🔧 POV Configuration",
             "Configure new POV environments\n"
@@ -267,11 +302,10 @@ class PrismaConfigMainWindow(QMainWindow):
             "• Configure firewall settings\n"
             "• Set up service connections\n"
             "• Deploy to NGFW and Prisma Access",
-            lambda: self.workflow_list.setCurrentRow(1),
+            lambda: self.workflow_list.setCurrentRow(2),
         )
-        cards_layout.addWidget(pov_card)
+        pov_cards.addWidget(pov_card)
 
-        # Migration card
         migration_card = self._create_workflow_card(
             "🔄 Configuration Migration",
             "Migrate configurations between tenants\n"
@@ -279,11 +313,10 @@ class PrismaConfigMainWindow(QMainWindow):
             "• View and analyze\n"
             "• Detect conflicts\n"
             "• Push to target tenant",
-            lambda: self.workflow_list.setCurrentRow(2),
+            lambda: self.workflow_list.setCurrentRow(3),
         )
-        cards_layout.addWidget(migration_card)
+        pov_cards.addWidget(migration_card)
 
-        # DoR Data card
         dor_card = self._create_workflow_card(
             "📋 Generate DoR Data",
             "Generate Definition of Requirements\n"
@@ -291,24 +324,45 @@ class PrismaConfigMainWindow(QMainWindow):
             "• Answer environment questions\n"
             "• Fill technical details\n"
             "• Export DoR JSON",
-            lambda: self.workflow_list.setCurrentRow(3),
+            lambda: self.workflow_list.setCurrentRow(4),
         )
-        cards_layout.addWidget(dor_card)
+        pov_cards.addWidget(dor_card)
 
-        # SaaS Inline Review card
+        pov_cards.addStretch()
+        layout.addLayout(pov_cards)
+
+        # Performance & Review cards
+        perf_label = QLabel("<h2>Performance & Review</h2>")
+        perf_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(perf_label)
+
+        perf_cards = QHBoxLayout()
+        perf_cards.addStretch()
+
+        tenant_perf_card = self._create_workflow_card(
+            "📊 Tenant Performance",
+            "Monitor tenant performance metrics\n"
+            "• Application performance scores\n"
+            "• User experience analytics\n"
+            "• Network path quality\n"
+            "• Trend analysis",
+            lambda: self.workflow_list.setCurrentRow(6),
+        )
+        perf_cards.addWidget(tenant_perf_card)
+
         saas_card = self._create_workflow_card(
-            "🔍 SaaS Inline Review",
+            "🔍 SaaS Application Review",
             "Review SaaS application activity\n"
             "• Pull app activity & security policy\n"
             "• Identify ungoverned apps\n"
             "• Find missing security profiles\n"
             "• Get rule optimization suggestions",
-            lambda: self.workflow_list.setCurrentRow(4),
+            lambda: self.workflow_list.setCurrentRow(7),
         )
-        cards_layout.addWidget(saas_card)
+        perf_cards.addWidget(saas_card)
 
-        cards_layout.addStretch()
-        layout.addLayout(cards_layout)
+        perf_cards.addStretch()
+        layout.addLayout(perf_cards)
 
         layout.addStretch()
 
@@ -448,12 +502,38 @@ class PrismaConfigMainWindow(QMainWindow):
 
         self.stacked_widget.addWidget(page)
 
-    def _create_saas_review_page(self):
-        """Create the SaaS Inline Review workflow page."""
+    def _create_tenant_performance_page(self):
+        """Create the Tenant Performance workflow page."""
         page = QWidget()
         layout = QVBoxLayout(page)
 
-        title = QLabel("<h2>🔍 SaaS Inline Review</h2>")
+        title = QLabel("<h2>📊 Tenant Performance</h2>")
+        layout.addWidget(title)
+
+        subtitle = QLabel(
+            "Monitor application performance, user experience, and network path\n"
+            "quality across your SASE tenant."
+        )
+        subtitle.setWordWrap(True)
+        subtitle.setStyleSheet("color: gray; margin-bottom: 20px;")
+        layout.addWidget(subtitle)
+
+        placeholder = QLabel(
+            "<p style='font-size: 16px; color: #999; padding: 60px;'>"
+            "Tenant Performance workflow coming soon.</p>"
+        )
+        placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(placeholder)
+
+        layout.addStretch()
+        self.stacked_widget.addWidget(page)
+
+    def _create_saas_review_page(self):
+        """Create the SaaS Application Review workflow page."""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+
+        title = QLabel("<h2>🔍 SaaS Application Review</h2>")
         layout.addWidget(title)
 
         subtitle = QLabel(
@@ -487,28 +567,30 @@ class PrismaConfigMainWindow(QMainWindow):
 
     def _on_workflow_changed(self, index: int):
         """Handle workflow selection change with confirmation if work in progress."""
-        # Get current workflow index before switching
-        current_index = self.stacked_widget.currentIndex()
-        
-        # If switching to same workflow, do nothing
-        if current_index == index:
+        # Map sidebar row to stacked-widget page; skip section headers
+        page_index = self._row_to_page.get(index)
+        if page_index is None:
+            # Section header clicked — revert to previous selection
+            self.workflow_list.blockSignals(True)
+            self.workflow_list.setCurrentRow(self._last_sidebar_row)
+            self.workflow_list.blockSignals(False)
             return
-        
+
+        current_page = self.stacked_widget.currentIndex()
+        if current_page == page_index:
+            return
+
         # Check if workflow is locked (operation in progress)
         if self.workflow_lock.is_locked():
-            # Revert selection first
             self.workflow_list.blockSignals(True)
-            self.workflow_list.setCurrentRow(current_index)
+            self.workflow_list.setCurrentRow(self._last_sidebar_row)
             self.workflow_list.blockSignals(False)
-            
-            # Show warning and optionally allow cancellation
             if not self.workflow_lock.request_switch(self):
-                return  # User chose not to cancel or cancel failed
-        
+                return
+
         # Check if current workflow has unsaved work
-        current_widget = self.stacked_widget.widget(current_index)
+        current_widget = self.stacked_widget.widget(current_page)
         if hasattr(current_widget, 'has_unsaved_work') and current_widget.has_unsaved_work():
-            # Prompt for confirmation
             reply = QMessageBox.question(
                 self,
                 'Confirm Workflow Switch',
@@ -516,45 +598,43 @@ class PrismaConfigMainWindow(QMainWindow):
                 'loaded configurations, and connection states.\n\n'
                 'Are you sure you want to continue?',
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No  # Default to No for safety
+                QMessageBox.StandardButton.No,
             )
-            
             if reply == QMessageBox.StandardButton.No:
-                # User cancelled - revert selection
                 self.workflow_list.blockSignals(True)
-                self.workflow_list.setCurrentRow(current_index)
+                self.workflow_list.setCurrentRow(self._last_sidebar_row)
                 self.workflow_list.blockSignals(False)
                 return
-        
+
         # Clear state of current workflow before switching
         if hasattr(current_widget, 'clear_state'):
             try:
                 current_widget.clear_state()
             except Exception as e:
-                # Log error but continue with switch
                 import logging
                 logging.getLogger(__name__).warning(f"Error clearing workflow state: {e}")
-        
-        workflow_names = [
-            "Home",
-            "POV Configuration",
-            "Configuration Migration",
-            "Generate DoR Data",
-            "Logs & Monitoring",
-        ]
-        
-        # Log the workflow switch
+
+        workflow_names = {
+            0: "Home",
+            1: "POV Configuration",
+            2: "Configuration Migration",
+            3: "Generate DoR Data",
+            4: "Tenant Performance",
+            5: "SaaS Application Review",
+            6: "Activity Logs",
+        }
+
+        name = workflow_names.get(page_index, "")
         import logging
         logger = logging.getLogger(__name__)
-        if index < len(workflow_names):
-            logger.normal(f"[Navigation] Switched to: {workflow_names[index]}")
-        
-        # Switch to new workflow
-        self.stacked_widget.setCurrentIndex(index)
+        if name:
+            logger.normal(f"[Navigation] Switched to: {name}")
 
-        if index < len(workflow_names):
-            # Use statusBar() method instead of status_bar attribute
-            self.statusBar().showMessage(f"Switched to: {workflow_names[index]}")
+        self.stacked_widget.setCurrentIndex(page_index)
+        self._last_sidebar_row = index
+
+        if name:
+            self.statusBar().showMessage(f"Switched to: {name}")
 
     # Action handlers
 
@@ -745,19 +825,17 @@ class PrismaConfigMainWindow(QMainWindow):
 
     def _resume_pov_deployment(self):
         """Open the Resume POV Deployment dialog."""
-        # POV Builder is at index 1 in the workflow list
-        # (0=Home, 1=POV Builder, 2=Migration, 3=DoR, 4=Logs)
-        pov_builder_index = 1
+        pov_sidebar_row = 2   # sidebar row for POV Configuration
+        pov_page_index = 1    # stacked widget page index
 
         # Switch to POV Builder workflow if not already active
         if hasattr(self, 'workflow_list'):
-            current_index = self.workflow_list.currentRow()
-            if current_index != pov_builder_index:
-                # Switch to POV Builder - this triggers _on_workflow_changed
-                self.workflow_list.setCurrentRow(pov_builder_index)
+            current_row = self.workflow_list.currentRow()
+            if current_row != pov_sidebar_row:
+                self.workflow_list.setCurrentRow(pov_sidebar_row)
 
         # Get the POV Builder widget directly from stacked widget
-        pov_widget = self.stacked_widget.widget(pov_builder_index)
+        pov_widget = self.stacked_widget.widget(pov_page_index)
 
         # Check if it has the resume dialog method
         if pov_widget and hasattr(pov_widget, '_show_resume_pov_dialog'):
@@ -772,15 +850,13 @@ class PrismaConfigMainWindow(QMainWindow):
 
     def _resume_dor_questionnaire(self):
         """Open the Resume DoR Questionnaire dialog."""
-        # DoR workflow is at index 3 in the workflow list
-        # (0=Home, 1=POV Builder, 2=Migration, 3=DoR, 4=Logs)
-        dor_index = 3
+        dor_sidebar_row = 4  # sidebar row for Generate DoR Data
 
         # Switch to DoR workflow if not already active
         if hasattr(self, 'workflow_list'):
-            current_index = self.workflow_list.currentRow()
-            if current_index != dor_index:
-                self.workflow_list.setCurrentRow(dor_index)
+            current_row = self.workflow_list.currentRow()
+            if current_row != dor_sidebar_row:
+                self.workflow_list.setCurrentRow(dor_sidebar_row)
 
         # Show resume dialog
         if hasattr(self, 'dor_workflow'):
