@@ -87,6 +87,7 @@ class PrismaConfigMainWindow(QMainWindow):
         self.workflow_list.addItem("🔧 POV Configuration")
         self.workflow_list.addItem("🔄 Configuration Migration")
         self.workflow_list.addItem("📋 Generate DoR Data")
+        self.workflow_list.addItem("🔍 SaaS Inline Review")
         self.workflow_list.addItem("📊 Activity Logs")
         sidebar_layout.addWidget(self.workflow_list)
 
@@ -110,6 +111,7 @@ class PrismaConfigMainWindow(QMainWindow):
         self._create_pov_workflow_page()
         self._create_migration_workflow_page()
         self._create_dor_workflow_page()
+        self._create_saas_review_page()
         self._create_logs_page()
 
         # Now connect the signal after everything is initialized
@@ -293,6 +295,18 @@ class PrismaConfigMainWindow(QMainWindow):
         )
         cards_layout.addWidget(dor_card)
 
+        # SaaS Inline Review card
+        saas_card = self._create_workflow_card(
+            "🔍 SaaS Inline Review",
+            "Review SaaS application activity\n"
+            "• Pull app activity & security policy\n"
+            "• Identify ungoverned apps\n"
+            "• Find missing security profiles\n"
+            "• Get rule optimization suggestions",
+            lambda: self.workflow_list.setCurrentRow(4),
+        )
+        cards_layout.addWidget(saas_card)
+
         cards_layout.addStretch()
         layout.addLayout(cards_layout)
 
@@ -434,6 +448,30 @@ class PrismaConfigMainWindow(QMainWindow):
 
         self.stacked_widget.addWidget(page)
 
+    def _create_saas_review_page(self):
+        """Create the SaaS Inline Review workflow page."""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+
+        title = QLabel("<h2>🔍 SaaS Inline Review</h2>")
+        layout.addWidget(title)
+
+        subtitle = QLabel(
+            "Pull application activity and security policy, then get actionable\n"
+            "recommendations for ungoverned apps, missing profiles, and rule optimization."
+        )
+        subtitle.setWordWrap(True)
+        subtitle.setStyleSheet("color: gray; margin-bottom: 20px;")
+        layout.addWidget(subtitle)
+
+        from gui.workflows.saas_review_workflow import SaaSReviewWorkflowWidget
+
+        self.saas_review_workflow = SaaSReviewWorkflowWidget()
+        self.saas_review_workflow.connection_changed.connect(self._on_workflow_connection_changed)
+        layout.addWidget(self.saas_review_workflow)
+
+        self.stacked_widget.addWidget(page)
+
     def _create_logs_page(self):
         """Create the logs and monitoring page."""
         page = QWidget()
@@ -553,6 +591,7 @@ class PrismaConfigMainWindow(QMainWindow):
                     self.migration_workflow.set_api_client(self.api_client, connection_name)
                     self.pov_workflow.set_api_client(self.api_client, connection_name)
                     self.dor_workflow.set_api_client(self.api_client, connection_name)
+                    self.saas_review_workflow.set_api_client(self.api_client, connection_name)
 
                     # Log connection
                     self.logs_widget.log(f"Connected to {connection_name} (TSG: {tsg_id})", "success")

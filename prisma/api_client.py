@@ -3400,6 +3400,201 @@ class PrismaAccessAPIClient:
 
     # ==================== End CREATE/UPDATE/DELETE Methods ====================
 
+    # ========================================================================
+    # Insights API Methods (SASE v2.0 - POST queries)
+    # ========================================================================
+
+    @retry_on_failure(max_retries=3, backoff_factor=1.0)
+    def _make_insights_request(
+        self, url: str, query_body: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Make a POST request to the SASE Insights API.
+
+        The Insights API uses POST with JSON query bodies and requires
+        a Prisma-Tenant header with the TSG ID.
+
+        Args:
+            url: Full Insights API endpoint URL
+            query_body: JSON query body
+
+        Returns:
+            Response data dict
+        """
+        logger.detail(f"Insights API POST to {url}")
+
+        self.rate_limiter.wait_if_needed()
+
+        if not self._ensure_token():
+            raise AuthenticationError("Failed to authenticate for Insights API")
+
+        headers = build_headers(self.token)
+        headers["Prisma-Tenant"] = self.tsg_id
+
+        try:
+            start_time = datetime.now()
+            response = requests.post(
+                url,
+                headers=headers,
+                json=query_body,
+                timeout=self.timeout,
+            )
+            duration = (datetime.now() - start_time).total_seconds()
+            logger.info(f"Insights API response: {response.status_code} in {duration:.2f}s")
+
+            if not response.ok:
+                error = parse_api_error(response, response.status_code, url)
+                raise error
+
+            return response.json() if response.content else {}
+
+        except requests.RequestException as e:
+            raise NetworkError(
+                f"Insights API network error: {str(e)}",
+                details={"url": url},
+            )
+
+    def get_top_applications(
+        self, time_range: int = 30, limit: int = 500
+    ) -> List[Dict[str, Any]]:
+        """
+        Get top applications by total bytes from Insights API.
+
+        Args:
+            time_range: Number of days to look back (7 or 30)
+            limit: Max number of applications to return
+
+        Returns:
+            List of application dicts with app name, bytes, sessions
+        """
+        query = {
+            "properties": [
+                {"property": "app"},
+                {"property": "app_subcategory"},
+                {"property": "app_category"},
+                {"property": "app_technology"},
+                {"property": "risk_of_app", "alias": "risk"},
+                {"function": "sum", "property": "total_bytes", "alias": "total_bytes"},
+                {"function": "sum", "property": "num_sessions", "alias": "sessions"},
+            ],
+            "filter": {
+                "rules": [
+                    {
+                        "property": "event_time",
+                        "operator": "last_n_days",
+                        "values": [time_range],
+                    }
+                ]
+            },
+            "count": limit,
+            "sort": [{"property": "total_bytes", "order": "desc"}],
+        }
+        result = self._make_insights_request(
+            APIEndpoints.INSIGHTS_TOP_APPLICATIONS, query
+        )
+        return result.get("data", [])
+
+    def get_application_usage_details(
+        self, time_range: int = 30, limit: int = 500
+    ) -> List[Dict[str, Any]]:
+        """
+        Get application usage correlated with security rules.
+
+        Returns which apps are hitting which rules, with user counts.
+
+        Args:
+            time_range: Number of days to look back
+            limit: Max results
+
+        Returns:
+            List of dicts with app, rule, user count, bytes
+        """
+        query = {
+            "properties": [
+                {"property": "app"},
+                {"property": "rule_matched", "alias": "rule"},
+                {"function": "sum", "property": "total_bytes", "alias": "total_bytes"},
+                {"function": "count", "property": "users", "alias": "user_count"},
+            ],
+            "filter": {
+                "rules": [
+                    {
+                        "property": "event_time",
+                        "operator": "last_n_days",
+                        "values": [time_range],
+                    }
+                ]
+            },
+            "count": limit,
+            "sort": [{"property": "total_bytes", "order": "desc"}],
+        }
+        result = self._make_insights_request(
+            APIEndpoints.INSIGHTS_APP_USAGE, query
+        )
+        return result.get("data", [])
+
+    def get_rule_hit_counts(
+        self, time_range: int = 30
+    ) -> List[Dict[str, Any]]:
+        """
+        Get security rule hit counts and unique app counts.
+
+        Args:
+            time_range: Number of days to look back
+
+        Returns:
+            List of dicts with rule name, hit count, unique apps
+        """
+        query = {
+            "properties": [
+                {"property": "rule_matched", "alias": "rule"},
+                {"function": "sum", "property": "session_count", "alias": "hit_count"},
+                {"function": "count", "property": "app", "alias": "unique_apps"},
+            ],
+            "filter": {
+                "rules": [
+                    {
+                        "property": "event_time",
+                        "operator": "last_n_days",
+                        "values": [time_range],
+                    }
+                ]
+            },
+            "count": 1000,
+            "sort": [{"property": "hit_count", "order": "desc"}],
+        }
+        result = self._make_insights_request(
+            APIEndpoints.INSIGHTS_RULE_USAGE, query
+        )
+        return result.get("data", [])
+
+    def get_connected_user_count(self) -> Dict[str, Any]:
+        """
+        Get current connected user count.
+
+        Returns:
+            Dict with connected user count data
+        """
+        query = {
+            "properties": [
+                {"function": "count", "property": "user", "alias": "connected_users"},
+            ],
+            "filter": {
+                "rules": [
+                    {
+                        "property": "event_time",
+                        "operator": "last_n_hours",
+                        "values": [1],
+                    }
+                ]
+            },
+        }
+        result = self._make_insights_request(
+            APIEndpoints.INSIGHTS_CONNECTED_USERS, query
+        )
+        data = result.get("data", [])
+        return data[0] if data else {"connected_users": 0}
+
     def clear_cache(self):
         """Clear API response cache."""
         self.cache.clear()

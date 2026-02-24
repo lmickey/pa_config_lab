@@ -15,6 +15,7 @@ STRATA_BASE_URL = "https://api.strata.paloaltonetworks.com/config/v1"
 STRATA_SETUP_BASE_URL = "https://api.strata.paloaltonetworks.com/config/setup/v1"
 SASE_BASE_URL = "https://api.sase.paloaltonetworks.com/sse/config/v1"
 CIE_BASE_URL = "https://api.sase.paloaltonetworks.com/cie"
+INSIGHTS_BASE_URL = "https://api.sase.paloaltonetworks.com/api/sase/v2.0"
 
 # Authentication endpoint
 AUTH_URL = "https://auth.apps.paloaltonetworks.com/oauth2/access_token"
@@ -460,6 +461,20 @@ class APIEndpoints:
     def job(job_id: str) -> str:
         """Get endpoint for specific job."""
         return f"{APIEndpoints.JOBS}/{job_id}"
+
+    # Insights API - Application Activity & Rule Usage (POST queries)
+    INSIGHTS_TOP_APPLICATIONS = (
+        f"{INSIGHTS_BASE_URL}/resource/custom/query/applications/top_applications"
+    )
+    INSIGHTS_APP_USAGE = (
+        f"{INSIGHTS_BASE_URL}/resource/custom/query/applications/app_usage"
+    )
+    INSIGHTS_CONNECTED_USERS = (
+        f"{INSIGHTS_BASE_URL}/resource/query/connected_user_count"
+    )
+    INSIGHTS_RULE_USAGE = (
+        f"{INSIGHTS_BASE_URL}/resource/custom/query/threat/rule_usage"
+    )
 
 
 def build_folder_query(folder: str) -> str:
