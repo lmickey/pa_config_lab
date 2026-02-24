@@ -137,7 +137,6 @@ class SaaSReviewWorkflowWidget(QWidget):
         # Tenant selector
         self.tenant_selector = TenantSelectorWidget(
             title="Tenant Connection",
-            show_load_file=False,
         )
         self.tenant_selector.connection_changed.connect(self._on_tenant_connected)
         layout.addWidget(self.tenant_selector)
