@@ -518,14 +518,14 @@ class PrismaConfigMainWindow(QMainWindow):
         subtitle.setStyleSheet("color: gray; margin-bottom: 20px;")
         layout.addWidget(subtitle)
 
-        placeholder = QLabel(
-            "<p style='font-size: 16px; color: #999; padding: 60px;'>"
-            "Tenant Performance workflow coming soon.</p>"
-        )
-        placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(placeholder)
+        from gui.workflows.tenant_performance_workflow import TenantPerformanceWidget
 
-        layout.addStretch()
+        self.tenant_performance_workflow = TenantPerformanceWidget()
+        self.tenant_performance_workflow.connection_changed.connect(
+            self._on_workflow_connection_changed
+        )
+        layout.addWidget(self.tenant_performance_workflow)
+
         self.stacked_widget.addWidget(page)
 
     def _create_saas_review_page(self):
