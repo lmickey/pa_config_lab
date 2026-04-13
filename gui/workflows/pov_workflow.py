@@ -196,8 +196,12 @@ class POVWorkflowWidget(QWidget):
         self._create_cloud_resources_tab()  # Step 2: Cloud Resources
         self._create_pov_use_cases_tab()  # Step 3: POV Use Cases
         self._create_cloud_deployment_tab()  # Step 4: Cloud Resource Deployment
-        self._create_deploy_config_tab()  # Step 5: Deploy POV Configuration
-        self._create_review_tab()  # Step 6: Review & Execute
+        self._create_panorama_setup_tab()  # Step 5: Panorama Setup (Panorama-managed only)
+        self._create_deploy_config_tab()  # Step 6: Deploy POV Configuration
+        self._create_review_tab()  # Step 7: Review & Execute
+
+        # Panorama tab is hidden by default, shown when Panorama managed is selected
+        self.tabs.setTabVisible(4, False)
 
         layout.addWidget(self.tabs)
 
@@ -2834,15 +2838,251 @@ class POVWorkflowWidget(QWidget):
         self.tabs.addTab(tab, "4️⃣ Cloud Deployment")
 
     # ============================================================================
-    # TAB 5: DEPLOY POV CONFIGURATION
+    # TAB 5: PANORAMA SETUP (Panorama-managed only)
     # ============================================================================
 
-    def _create_deploy_config_tab(self):
-        """Create deploy POV configuration tab (Step 5)."""
+    def _create_panorama_setup_tab(self):
+        """Create Panorama initial setup tab (Step 5, Panorama-managed only).
+
+        This tab handles pre-licensing Panorama configuration:
+        - Connection to the deployed Panorama (IP from Terraform outputs)
+        - Base device config (hostname, DNS, NTP)
+        - Plugin download/install (Cloud Services Plugin, DLP)
+        - Status display indicating readiness for licensing
+        """
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        title = QLabel("<h3>Step 5: Deploy POV Configuration</h3>")
+        title = QLabel("<h3>Step 5: Panorama Initial Setup</h3>")
+        layout.addWidget(title)
+
+        info = QLabel(
+            "Configure the deployed Panorama with base settings and install required plugins. "
+            "After this step, license the Panorama through the support portal before proceeding to deploy Prisma Access configuration."
+        )
+        info.setWordWrap(True)
+        info.setStyleSheet("color: gray; margin-bottom: 15px;")
+        layout.addWidget(info)
+
+        # --- Connection Section ---
+        conn_group = QGroupBox("Panorama Connection")
+        conn_layout = QFormLayout()
+
+        self.pano_setup_host = QLineEdit()
+        self.pano_setup_host.setPlaceholderText("Auto-populated from cloud deployment")
+        conn_layout.addRow("Management IP:", self.pano_setup_host)
+
+        self.pano_setup_user = QLineEdit()
+        self.pano_setup_user.setText("admin")
+        conn_layout.addRow("Username:", self.pano_setup_user)
+
+        self.pano_setup_pass = QLineEdit()
+        self.pano_setup_pass.setEchoMode(QLineEdit.EchoMode.Password)
+        self.pano_setup_pass.setPlaceholderText("From cloud deployment credentials")
+        conn_layout.addRow("Password:", self.pano_setup_pass)
+
+        conn_btn_row = QHBoxLayout()
+        self.pano_setup_test_btn = QPushButton("Test Connection")
+        self.pano_setup_test_btn.setMaximumWidth(150)
+        self.pano_setup_test_btn.clicked.connect(self._test_panorama_setup_connection)
+        conn_btn_row.addWidget(self.pano_setup_test_btn)
+
+        self.pano_setup_conn_status = QLabel("")
+        conn_btn_row.addWidget(self.pano_setup_conn_status)
+        conn_btn_row.addStretch()
+        conn_layout.addRow("", conn_btn_row)
+
+        conn_group.setLayout(conn_layout)
+        layout.addWidget(conn_group)
+
+        # --- Base Configuration Section ---
+        config_group = QGroupBox("Base Device Configuration")
+        config_layout = QFormLayout()
+
+        self.pano_setup_hostname = QLineEdit()
+        self.pano_setup_hostname.setPlaceholderText("e.g. PA-Panorama-01")
+        config_layout.addRow("Hostname:", self.pano_setup_hostname)
+
+        self.pano_setup_dns1 = QLineEdit()
+        self.pano_setup_dns1.setText("8.8.8.8")
+        config_layout.addRow("Primary DNS:", self.pano_setup_dns1)
+
+        self.pano_setup_dns2 = QLineEdit()
+        self.pano_setup_dns2.setText("8.8.4.4")
+        config_layout.addRow("Secondary DNS:", self.pano_setup_dns2)
+
+        self.pano_setup_ntp1 = QLineEdit()
+        self.pano_setup_ntp1.setText("time.google.com")
+        config_layout.addRow("Primary NTP:", self.pano_setup_ntp1)
+
+        self.pano_setup_ntp2 = QLineEdit()
+        self.pano_setup_ntp2.setPlaceholderText("(Optional)")
+        config_layout.addRow("Secondary NTP:", self.pano_setup_ntp2)
+
+        config_group.setLayout(config_layout)
+        layout.addWidget(config_group)
+
+        # --- Plugin Installation Section ---
+        plugin_group = QGroupBox("Plugin Installation")
+        plugin_layout = QVBoxLayout()
+
+        plugin_info = QLabel(
+            "The following plugins are required for Prisma Access management. "
+            "They will be downloaded from the Palo Alto update servers and installed on the Panorama."
+        )
+        plugin_info.setWordWrap(True)
+        plugin_info.setStyleSheet("color: #555; font-size: 11px; margin-bottom: 8px;")
+        plugin_layout.addWidget(plugin_info)
+
+        # Plugin checklist
+        plugin_grid = QGridLayout()
+
+        self.pano_plugin_csp_cb = QCheckBox("Cloud Services Plugin (Prisma Access)")
+        self.pano_plugin_csp_cb.setChecked(True)
+        self.pano_plugin_csp_cb.setEnabled(False)  # Required, can't uncheck
+        plugin_grid.addWidget(self.pano_plugin_csp_cb, 0, 0)
+
+        self.pano_plugin_csp_status = QLabel("")
+        plugin_grid.addWidget(self.pano_plugin_csp_status, 0, 1)
+
+        self.pano_plugin_dlp_cb = QCheckBox("DLP Plugin (Data Loss Prevention)")
+        self.pano_plugin_dlp_cb.setChecked(True)
+        plugin_grid.addWidget(self.pano_plugin_dlp_cb, 1, 0)
+
+        self.pano_plugin_dlp_status = QLabel("")
+        plugin_grid.addWidget(self.pano_plugin_dlp_status, 1, 1)
+
+        plugin_layout.addLayout(plugin_grid)
+        plugin_group.setLayout(plugin_layout)
+        layout.addWidget(plugin_group)
+
+        # --- Action Buttons ---
+        actions_row = QHBoxLayout()
+        actions_row.addStretch()
+
+        self.pano_setup_configure_btn = QPushButton("🔧 Configure Panorama")
+        self.pano_setup_configure_btn.setMinimumWidth(200)
+        self.pano_setup_configure_btn.setStyleSheet(
+            "QPushButton { "
+            "  background-color: #1565C0; color: white; padding: 10px 20px; "
+            "  font-weight: bold; border-radius: 5px; "
+            "  border: 1px solid #0D47A1; border-bottom: 3px solid #0D47A1; "
+            "}"
+            "QPushButton:hover { background-color: #1976D2; border-bottom: 3px solid #0D47A1; }"
+            "QPushButton:pressed { background-color: #0D47A1; border-bottom: 1px solid #0D47A1; }"
+            "QPushButton:disabled { background-color: #BDBDBD; color: #9E9E9E; border: 1px solid #9E9E9E; border-bottom: 3px solid #757575; }"
+        )
+        self.pano_setup_configure_btn.clicked.connect(self._execute_panorama_setup)
+        actions_row.addWidget(self.pano_setup_configure_btn)
+
+        layout.addLayout(actions_row)
+
+        # --- Progress ---
+        self.pano_setup_progress = QProgressBar()
+        self.pano_setup_progress.setVisible(False)
+        layout.addWidget(self.pano_setup_progress)
+
+        # --- Status / Results ---
+        self.pano_setup_status_group = QGroupBox("Panorama Status")
+        status_layout = QVBoxLayout()
+
+        self.pano_setup_log = QTextEdit()
+        self.pano_setup_log.setReadOnly(True)
+        self.pano_setup_log.setMaximumHeight(150)
+        self.pano_setup_log.setStyleSheet(
+            "QTextEdit { font-family: monospace; font-size: 11px; "
+            "background-color: #263238; color: #B0BEC5; border-radius: 4px; padding: 6px; }"
+        )
+        status_layout.addWidget(self.pano_setup_log)
+
+        # Licensing reminder banner
+        self.pano_licensing_banner = QFrame()
+        self.pano_licensing_banner.setStyleSheet(
+            "QFrame { background-color: #FFF3E0; border: 2px solid #FF9800; "
+            "border-radius: 6px; padding: 10px; }"
+        )
+        banner_layout = QVBoxLayout(self.pano_licensing_banner)
+        banner_layout.setContentsMargins(10, 8, 10, 8)
+
+        banner_title = QLabel("<b>⏳ Panorama Ready for Licensing</b>")
+        banner_title.setStyleSheet("color: #E65100; font-size: 13px;")
+        banner_layout.addWidget(banner_title)
+
+        banner_text = QLabel(
+            "Base configuration and plugins have been installed. Before proceeding to "
+            "Step 6 (Deploy POV Config), license this Panorama through the Palo Alto "
+            "Networks support portal.\n\n"
+            "After licensing, the Cloud Services Plugin can be activated and Prisma Access "
+            "configuration will be pushed through the Panorama."
+        )
+        banner_text.setWordWrap(True)
+        banner_text.setStyleSheet("color: #BF360C; font-size: 11px;")
+        banner_layout.addWidget(banner_text)
+
+        self.pano_check_license_btn = QPushButton("🔑 Check License Status")
+        self.pano_check_license_btn.setMaximumWidth(200)
+        self.pano_check_license_btn.setStyleSheet(
+            "QPushButton { background-color: #FF9800; color: white; font-weight: bold; "
+            "border-radius: 4px; padding: 6px 12px; border: 1px solid #F57C00; }"
+            "QPushButton:hover { background-color: #FFB74D; }"
+        )
+        self.pano_check_license_btn.clicked.connect(self._check_panorama_license)
+        banner_layout.addWidget(self.pano_check_license_btn)
+
+        self.pano_license_status_label = QLabel("")
+        banner_layout.addWidget(self.pano_license_status_label)
+
+        self.pano_licensing_banner.setVisible(False)
+        status_layout.addWidget(self.pano_licensing_banner)
+
+        self.pano_setup_status_group.setLayout(status_layout)
+        layout.addWidget(self.pano_setup_status_group)
+
+        # --- Navigation ---
+        nav_layout = QHBoxLayout()
+
+        back_btn = QPushButton("← Back to Cloud Deployment")
+        back_btn.setStyleSheet(
+            "QPushButton { "
+            "  background-color: #757575; color: white; padding: 8px 16px; "
+            "  font-weight: bold; border-radius: 5px; "
+            "  border: 1px solid #616161; border-bottom: 3px solid #424242; "
+            "}"
+            "QPushButton:hover { background-color: #616161; border-bottom: 3px solid #212121; }"
+            "QPushButton:pressed { background-color: #616161; border-bottom: 1px solid #424242; }"
+        )
+        back_btn.clicked.connect(lambda: self.tabs.setCurrentIndex(3))
+        nav_layout.addWidget(back_btn)
+
+        nav_layout.addStretch()
+
+        next_btn = QPushButton("Continue to Deploy POV Config →")
+        next_btn.setStyleSheet(
+            "QPushButton { "
+            "  background-color: #4CAF50; color: white; padding: 8px 16px; "
+            "  font-weight: bold; border-radius: 5px; "
+            "  border: 1px solid #388E3C; border-bottom: 3px solid #2E7D32; "
+            "}"
+            "QPushButton:hover { background-color: #45a049; border-bottom: 3px solid #1B5E20; }"
+            "QPushButton:pressed { background-color: #388E3C; border-bottom: 1px solid #2E7D32; }"
+        )
+        next_btn.clicked.connect(lambda: self.tabs.setCurrentIndex(5))
+        nav_layout.addWidget(next_btn)
+
+        layout.addLayout(nav_layout)
+
+        self.tabs.addTab(tab, "5️⃣ Panorama Setup")
+
+    # ============================================================================
+    # TAB 6: DEPLOY POV CONFIGURATION
+    # ============================================================================
+
+    def _create_deploy_config_tab(self):
+        """Create deploy POV configuration tab (Step 6)."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        title = QLabel("<h3>Step 6: Deploy POV Configuration</h3>")
         layout.addWidget(title)
 
         info = QLabel(
@@ -2982,7 +3222,9 @@ class POVWorkflowWidget(QWidget):
             "QPushButton:hover { background-color: #616161; border-bottom: 3px solid #212121; }"
             "QPushButton:pressed { background-color: #616161; border-bottom: 1px solid #424242; }"
         )
-        back_btn.clicked.connect(lambda: self.tabs.setCurrentIndex(3))
+        back_btn.clicked.connect(lambda: self.tabs.setCurrentIndex(
+            4 if getattr(self, 'management_type', 'scm') == 'panorama' else 3
+        ))
         nav_layout.addWidget(back_btn)
 
         nav_layout.addStretch()
@@ -3004,7 +3246,7 @@ class POVWorkflowWidget(QWidget):
 
         layout.addLayout(nav_layout)
 
-        self.tabs.addTab(tab, "5️⃣ Deploy POV Config")
+        self.tabs.addTab(tab, "6️⃣ Deploy POV Config")
 
     # ============================================================================
     # EVENT HANDLERS - SOURCES TAB
@@ -6616,8 +6858,8 @@ class POVWorkflowWidget(QWidget):
             "Cloud Resources",
             "POV Use Cases",
             "Cloud Deployment",
+            "Panorama Setup",
             "Deploy POV Config",
-            "Review & Execute",
         ]
         if 0 <= index < len(tab_names):
             tab_name = tab_names[index]
@@ -6634,8 +6876,12 @@ class POVWorkflowWidget(QWidget):
                 self._refresh_private_app_connections()
                 self._auto_generate_security_objects()
 
-            # Auto-connect to saved deploy tenant when entering Deploy POV Config tab
+            # Auto-populate Panorama connection from deployment when entering Panorama Setup tab
             if index == 4:
+                self._auto_populate_panorama_setup()
+
+            # Auto-connect to saved deploy tenant when entering Deploy POV Config tab
+            if index == 5:
                 self._auto_connect_deploy_tenant()
 
     def _auto_connect_deploy_tenant(self):
@@ -10309,6 +10555,313 @@ output "{device_name}_private_ip" {{
             self.test_panorama_btn.setEnabled(True)
             self.test_panorama_btn.setText("Test Connection")
 
+    # ========== Panorama Setup Tab Handlers ==========
+
+    def _auto_populate_panorama_setup(self):
+        """Auto-populate Panorama Setup tab fields from cloud deployment outputs."""
+        # Try to get Panorama IP from terraform outputs
+        outputs = getattr(self, '_terraform_outputs', {}) or {}
+
+        # Search for Panorama management IP in terraform outputs
+        pano_ip = None
+        for key in ('panorama_management_ip', 'panorama_ip', 'panorama_public_ip',
+                     'pano_management_ip', 'pano_ip', 'pano_public_ip'):
+            if key in outputs and outputs[key]:
+                pano_ip = outputs[key]
+                break
+
+        # Fallback: search for any key containing 'panorama' and 'ip'
+        if not pano_ip:
+            for key, value in outputs.items():
+                if 'panorama' in key.lower() and 'ip' in key.lower() and value:
+                    pano_ip = value
+                    break
+
+        if pano_ip and not self.pano_setup_host.text().strip():
+            self.pano_setup_host.setText(pano_ip)
+
+        # Auto-populate credentials from deployment
+        creds = getattr(self, '_deployed_credentials', {}) or {}
+        if not self.pano_setup_pass.text():
+            # Try Panorama-specific creds, then fallback to firewall creds
+            pano_creds = creds.get('panorama', creds.get('firewall', {}))
+            if pano_creds.get('password'):
+                self.pano_setup_pass.setText(pano_creds['password'])
+            if pano_creds.get('username') and pano_creds['username'] != 'Not found':
+                self.pano_setup_user.setText(pano_creds['username'])
+
+        # Auto-populate hostname from customer name
+        if not self.pano_setup_hostname.text().strip():
+            customer = self.customer_name_input.text().strip() if hasattr(self, 'customer_name_input') else ""
+            if customer:
+                sanitized = self._sanitize_customer_name(customer)
+                self.pano_setup_hostname.setText(f"{sanitized}-panorama")
+
+        # Auto-populate DNS from infrastructure config
+        infra = self.cloud_resource_configs.get('infrastructure', {})
+        dns = infra.get('dns', {})
+        if dns.get('primary') and self.pano_setup_dns1.text() == '8.8.8.8':
+            self.pano_setup_dns1.setText(dns['primary'])
+        if dns.get('secondary') and self.pano_setup_dns2.text() == '8.8.4.4':
+            self.pano_setup_dns2.setText(dns['secondary'])
+
+    def _test_panorama_setup_connection(self):
+        """Test Panorama connection from the Panorama Setup tab."""
+        host = self.pano_setup_host.text().strip()
+        user = self.pano_setup_user.text().strip()
+        password = self.pano_setup_pass.text()
+
+        if not host or not user or not password:
+            QMessageBox.warning(
+                self, "Missing Information",
+                "Please enter Panorama IP, username, and password."
+            )
+            return
+
+        try:
+            from panorama.api_client import PanoramaAPIClient, PanoramaConnectionError
+
+            self.pano_setup_test_btn.setEnabled(False)
+            self.pano_setup_test_btn.setText("Testing...")
+            self.pano_setup_conn_status.setText("Connecting...")
+            self.pano_setup_conn_status.setStyleSheet("color: #FF9800;")
+
+            # Force UI update
+            from PyQt6.QtWidgets import QApplication
+            QApplication.processEvents()
+
+            client = PanoramaAPIClient(hostname=host, username=user, password=password)
+            client.connect()
+            info = client.get_device_info()
+            client.disconnect()
+
+            self.pano_setup_conn_status.setText(
+                f"✓ Connected — {info.hostname} ({info.model}, PAN-OS {info.sw_version})"
+            )
+            self.pano_setup_conn_status.setStyleSheet("color: #4CAF50; font-weight: bold;")
+
+            # Also sync connection info to the Deploy Config tab Panorama fields
+            if hasattr(self, 'panorama_host_input'):
+                self.panorama_host_input.setText(host)
+                self.panorama_user_input.setText(user)
+                self.panorama_pass_input.setText(password)
+
+        except Exception as e:
+            self.pano_setup_conn_status.setText(f"✗ Failed: {str(e)[:80]}")
+            self.pano_setup_conn_status.setStyleSheet("color: #f44336;")
+        finally:
+            self.pano_setup_test_btn.setEnabled(True)
+            self.pano_setup_test_btn.setText("Test Connection")
+
+    def _execute_panorama_setup(self):
+        """Execute Panorama initial setup: base config + plugin install."""
+        host = self.pano_setup_host.text().strip()
+        user = self.pano_setup_user.text().strip()
+        password = self.pano_setup_pass.text()
+
+        if not host or not user or not password:
+            QMessageBox.warning(
+                self, "Missing Information",
+                "Please enter Panorama connection details and test the connection first."
+            )
+            return
+
+        hostname = self.pano_setup_hostname.text().strip() or "panorama"
+        dns1 = self.pano_setup_dns1.text().strip() or "8.8.8.8"
+        dns2 = self.pano_setup_dns2.text().strip() or "8.8.4.4"
+        ntp1 = self.pano_setup_ntp1.text().strip() or "time.google.com"
+        ntp2 = self.pano_setup_ntp2.text().strip()
+
+        # Determine which plugins to install
+        plugins = []
+        if self.pano_plugin_csp_cb.isChecked():
+            plugins.append("cloud_services")
+        if self.pano_plugin_dlp_cb.isChecked():
+            plugins.append("dlp")
+
+        # Disable button and show progress
+        self.pano_setup_configure_btn.setEnabled(False)
+        self.pano_setup_configure_btn.setText("Configuring...")
+        self.pano_setup_progress.setVisible(True)
+        self.pano_setup_progress.setValue(0)
+        self.pano_setup_log.clear()
+
+        self._pano_setup_log("Starting Panorama initial setup...")
+        self._pano_setup_log(f"Target: {host} as {user}")
+
+        # Run in a thread to avoid blocking UI
+        from PyQt6.QtCore import QThread, pyqtSignal
+
+        class PanoramaSetupWorker(QThread):
+            progress = pyqtSignal(str, int)  # message, percentage
+            finished = pyqtSignal(bool, str)  # success, message
+
+            def __init__(self, host, user, password, hostname, dns1, dns2, ntp1, ntp2, plugins):
+                super().__init__()
+                self.host = host
+                self.user = user
+                self.password = password
+                self.hostname = hostname
+                self.dns1 = dns1
+                self.dns2 = dns2
+                self.ntp1 = ntp1
+                self.ntp2 = ntp2
+                self.plugins = plugins
+
+            def run(self):
+                try:
+                    from panorama.api_client import PanoramaAPIClient
+
+                    # Phase 1: Connect
+                    self.progress.emit("Connecting to Panorama...", 10)
+                    client = PanoramaAPIClient(
+                        hostname=self.host, username=self.user, password=self.password
+                    )
+                    client.connect()
+
+                    # Phase 2: Base config - hostname
+                    self.progress.emit(f"Setting hostname: {self.hostname}", 20)
+                    client.set_hostname(self.hostname)
+
+                    # Phase 3: DNS
+                    self.progress.emit(f"Setting DNS: {self.dns1}, {self.dns2}", 30)
+                    client.set_dns_servers(self.dns1, self.dns2 or None)
+
+                    # Phase 4: NTP
+                    self.progress.emit(f"Setting NTP: {self.ntp1}", 40)
+                    client.set_ntp_servers(self.ntp1, self.ntp2 or None)
+
+                    # Phase 5: Commit base config
+                    self.progress.emit("Committing base configuration...", 50)
+                    result = client.commit(
+                        description="Initial base configuration by pa_config_lab",
+                        sync=True,
+                    )
+                    if not result.success:
+                        self.finished.emit(False, f"Base config commit failed: {result.message}")
+                        return
+
+                    # Phase 6: Install plugins
+                    plugin_pct = 50
+                    plugin_step = 40 // max(len(self.plugins), 1)
+                    for plugin in self.plugins:
+                        plugin_pct += plugin_step // 2
+                        self.progress.emit(f"Downloading plugin: {plugin}...", plugin_pct)
+                        try:
+                            client.install_plugin(plugin)
+                            plugin_pct += plugin_step // 2
+                            self.progress.emit(f"Installed plugin: {plugin}", plugin_pct)
+                        except Exception as e:
+                            self.progress.emit(f"Warning: Plugin {plugin} install error: {e}", plugin_pct)
+
+                    # Phase 7: Final commit for plugins
+                    self.progress.emit("Committing plugin installation...", 95)
+                    client.commit(
+                        description="Plugin installation by pa_config_lab",
+                        sync=True,
+                    )
+
+                    client.disconnect()
+                    self.progress.emit("Panorama setup complete", 100)
+                    self.finished.emit(True, "Panorama configured and plugins installed successfully")
+
+                except Exception as e:
+                    self.finished.emit(False, str(e))
+
+        self._pano_setup_worker = PanoramaSetupWorker(
+            host, user, password, hostname, dns1, dns2, ntp1, ntp2, plugins
+        )
+        self._pano_setup_worker.progress.connect(self._on_panorama_setup_progress)
+        self._pano_setup_worker.finished.connect(self._on_panorama_setup_finished)
+        self._pano_setup_worker.start()
+
+    def _on_panorama_setup_progress(self, message: str, pct: int):
+        """Handle progress updates from Panorama setup worker."""
+        self.pano_setup_progress.setValue(pct)
+        self._pano_setup_log(message)
+
+    def _on_panorama_setup_finished(self, success: bool, message: str):
+        """Handle completion of Panorama setup."""
+        self.pano_setup_configure_btn.setEnabled(True)
+        self.pano_setup_configure_btn.setText("🔧 Configure Panorama")
+
+        if success:
+            self._pano_setup_log(f"\n✓ {message}")
+            self.pano_setup_progress.setValue(100)
+
+            # Update plugin status indicators
+            self.pano_plugin_csp_status.setText("✓ Installed")
+            self.pano_plugin_csp_status.setStyleSheet("color: #4CAF50; font-weight: bold;")
+            if self.pano_plugin_dlp_cb.isChecked():
+                self.pano_plugin_dlp_status.setText("✓ Installed")
+                self.pano_plugin_dlp_status.setStyleSheet("color: #4CAF50; font-weight: bold;")
+
+            # Show the licensing banner
+            self.pano_licensing_banner.setVisible(True)
+
+            # Store that Panorama setup is complete
+            self.deployment_config['panorama_setup_complete'] = True
+
+        else:
+            self._pano_setup_log(f"\n✗ Setup failed: {message}")
+            self.pano_setup_progress.setStyleSheet(
+                "QProgressBar::chunk { background-color: #f44336; }"
+            )
+
+    def _pano_setup_log(self, message: str):
+        """Append a message to the Panorama setup log."""
+        self.pano_setup_log.append(message)
+        # Auto-scroll to bottom
+        scrollbar = self.pano_setup_log.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+
+    def _check_panorama_license(self):
+        """Check if Panorama has been licensed."""
+        host = self.pano_setup_host.text().strip()
+        user = self.pano_setup_user.text().strip()
+        password = self.pano_setup_pass.text()
+
+        if not host or not user or not password:
+            self.pano_license_status_label.setText("Enter connection details first")
+            self.pano_license_status_label.setStyleSheet("color: #f44336;")
+            return
+
+        try:
+            from panorama.api_client import PanoramaAPIClient, LicenseStatus
+
+            self.pano_check_license_btn.setEnabled(False)
+            self.pano_check_license_btn.setText("Checking...")
+
+            from PyQt6.QtWidgets import QApplication
+            QApplication.processEvents()
+
+            client = PanoramaAPIClient(hostname=host, username=user, password=password)
+            client.connect()
+            status = client.check_license_status()
+            client.disconnect()
+
+            if status == LicenseStatus.LICENSED:
+                self.pano_license_status_label.setText(
+                    "✓ Panorama is licensed! You can proceed to Deploy POV Config."
+                )
+                self.pano_license_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+                self.deployment_config['panorama_licensed'] = True
+            elif status == LicenseStatus.EXPIRED:
+                self.pano_license_status_label.setText("⚠ License expired — please renew")
+                self.pano_license_status_label.setStyleSheet("color: #f44336;")
+            else:
+                self.pano_license_status_label.setText(
+                    "⏳ Not yet licensed — apply license through the support portal"
+                )
+                self.pano_license_status_label.setStyleSheet("color: #FF9800;")
+
+        except Exception as e:
+            self.pano_license_status_label.setText(f"Error checking license: {str(e)[:60]}")
+            self.pano_license_status_label.setStyleSheet("color: #f44336;")
+        finally:
+            self.pano_check_license_btn.setEnabled(True)
+            self.pano_check_license_btn.setText("🔑 Check License Status")
+
     def _review_pov_config(self):
         """Review comprehensive POV configuration before deployment."""
         from PyQt6.QtWidgets import (
@@ -12636,9 +13189,13 @@ output "{device_name}_private_ip" {{
 
     def _update_panorama_visibility(self):
         """Update Panorama section visibility based on management type."""
+        is_panorama = not self.scm_managed_radio.isChecked()
+
+        # Show/hide the Panorama Setup tab (index 4)
+        self.tabs.setTabVisible(4, is_panorama)
+
+        # Show/hide Panorama section in Deploy POV Config tab
         if hasattr(self, 'panorama_deploy_group'):
-            # Show Panorama section only if Panorama was selected in Tab 1
-            is_panorama = not self.scm_managed_radio.isChecked()
             self.panorama_deploy_group.setVisible(is_panorama)
 
     def _save_current_config(self):
@@ -13291,7 +13848,7 @@ output "{device_name}_private_ip" {{
         table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
 
-        tab_names = ["Tenant Info", "Cloud Resources", "Use Cases", "Cloud Deployment", "Deploy Config", "Review"]
+        tab_names = ["Tenant Info", "Cloud Resources", "Use Cases", "Cloud Deployment", "Panorama Setup", "Deploy Config"]
 
         for row, state in enumerate(states):
             table.setItem(row, 0, QTableWidgetItem(state['customer']))
