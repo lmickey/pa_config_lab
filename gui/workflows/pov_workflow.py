@@ -1162,9 +1162,9 @@ class POVWorkflowWidget(QWidget):
             card_layout.addLayout(branch_add_row)
 
             # Datacenters section
-            dc_label = QLabel("<b>Datacenters</b> (Service Connection)")
-            dc_label.setStyleSheet("font-size: 11px; color: #555; margin-top: 4px;")
-            card_layout.addWidget(dc_label)
+            self.dc_section_label = QLabel("<b>Datacenters</b> (Service Connection)")
+            self.dc_section_label.setStyleSheet("font-size: 11px; color: #555; margin-top: 4px;")
+            card_layout.addWidget(self.dc_section_label)
 
             self.datacenters_list = QListWidget()
             self.datacenters_list.setMinimumHeight(80)
@@ -3102,6 +3102,14 @@ class POVWorkflowWidget(QWidget):
                     self.infra_status_label.setText(f"Status: Panorama configuration required ({existing_count} system(s))")
                     self.infra_status_label.setStyleSheet("color: #FF9800; font-weight: bold;")
 
+        # Ensure Panorama mode has at least one datacenter (with firewall)
+        if not is_scm:
+            self._ensure_panorama_datacenter()
+        elif hasattr(self, 'datacenters_list'):
+            # Refresh to remove Panorama tags when switching back to SCM
+            self._refresh_datacenters_list()
+            self._update_locations_status()
+
         # Update Panorama visibility in Tab 5
         self._update_panorama_visibility()
 
@@ -4884,6 +4892,35 @@ class POVWorkflowWidget(QWidget):
 
         logger.info(f"Removed branch: {branch_name}")
 
+    def _ensure_panorama_datacenter(self):
+        """Ensure Panorama mode has at least one datacenter with a firewall.
+
+        Panorama POVs require a datacenter (service connection) with an associated
+        firewall. If no datacenters exist, a default traditional FW-HA datacenter
+        is added automatically.
+        """
+        loc_config = self.cloud_resource_configs.get('locations', {})
+        datacenters = loc_config.get('datacenters', [])
+
+        if not datacenters:
+            default_region = self.cloud_region_combo.currentText() if hasattr(self, 'cloud_region_combo') else "eastus"
+            default_dc = {
+                'name': 'Datacenter',
+                'cloud': 'Azure',
+                'region': default_region,
+                'style': 'traditional',
+                'bgp_enabled': True,
+                'default_gateway': False,
+                'connection_type': 'service_connection',
+            }
+            self.cloud_resource_configs.setdefault('locations', {}).setdefault('datacenters', []).append(default_dc)
+            logger.info("Panorama mode: auto-added default datacenter with FW-HA")
+
+        # Refresh UI if the list widget exists
+        if hasattr(self, 'datacenters_list'):
+            self._refresh_datacenters_list()
+            self._update_locations_status()
+
     def _add_datacenter(self):
         """Add a new datacenter location."""
         from PyQt6.QtWidgets import QListWidgetItem
@@ -4933,14 +4970,34 @@ class POVWorkflowWidget(QWidget):
 
     def _remove_datacenter(self):
         """Remove the selected datacenter."""
+        from PyQt6.QtWidgets import QMessageBox
+
         current_item = self.datacenters_list.currentItem()
         if not current_item:
             return
 
         dc_name = current_item.data(Qt.ItemDataRole.UserRole)
+        datacenters = self.cloud_resource_configs['locations']['datacenters']
+
+        # Warn if removing the last datacenter in Panorama mode
+        is_panorama = getattr(self, 'management_type', 'scm') == 'panorama'
+        if is_panorama and len(datacenters) <= 1:
+            reply = QMessageBox.warning(
+                self,
+                "Datacenter Required for Panorama",
+                "Panorama managed POVs require at least one datacenter with "
+                "an associated firewall for the service connection.\n\n"
+                "You can modify this datacenter's type (e.g. upgrade to "
+                "Hybrid HA or SD-WAN) by removing it and adding a new one "
+                "with the desired style.\n\n"
+                "Remove the last datacenter anyway?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
 
         # Remove from storage
-        datacenters = self.cloud_resource_configs['locations']['datacenters']
         self.cloud_resource_configs['locations']['datacenters'] = [
             d for d in datacenters if d['name'] != dc_name
         ]
@@ -4971,6 +5028,16 @@ class POVWorkflowWidget(QWidget):
 
         self.datacenters_list.clear()
         datacenters = self.cloud_resource_configs.get('locations', {}).get('datacenters', [])
+        is_panorama = getattr(self, 'management_type', 'scm') == 'panorama'
+
+        # Update section label to indicate requirement for Panorama
+        if hasattr(self, 'dc_section_label'):
+            if is_panorama:
+                self.dc_section_label.setText("<b>Datacenters</b> (Service Connection) — <i>Required for Panorama</i>")
+                self.dc_section_label.setStyleSheet("font-size: 11px; color: #1565C0; margin-top: 4px;")
+            else:
+                self.dc_section_label.setText("<b>Datacenters</b> (Service Connection)")
+                self.dc_section_label.setStyleSheet("font-size: 11px; color: #555; margin-top: 4px;")
 
         for dc in datacenters:
             style = dc.get('style', 'traditional')
@@ -4985,7 +5052,10 @@ class POVWorkflowWidget(QWidget):
                 'sdwan_ha': 'ION-HA', 'traditional': 'FW-HA',
             }
             style_label = style_labels.get(style, 'FW')
-            item = QListWidgetItem(f"{icon} {dc['name']} ({dc['region']}) [{style_label}]")
+
+            # Show Panorama association for datacenters in Panorama mode
+            panorama_tag = " \U0001f517Panorama" if is_panorama else ""  # 🔗
+            item = QListWidgetItem(f"{icon} {dc['name']} ({dc['region']}) [{style_label}]{panorama_tag}")
             item.setData(Qt.ItemDataRole.UserRole, dc['name'])
             self.datacenters_list.addItem(item)
 
@@ -5004,9 +5074,14 @@ class POVWorkflowWidget(QWidget):
         loc_config = self.cloud_resource_configs.get('locations', {})
         branch_count = len(loc_config.get('branches', []))
         dc_count = len(loc_config.get('datacenters', []))
+        is_panorama = getattr(self, 'management_type', 'scm') == 'panorama'
 
-        if branch_count > 0 or dc_count > 0:
-            self.locations_status.setText(f"✓ {branch_count} branch, {dc_count} DC")
+        if is_panorama and dc_count == 0:
+            self.locations_status.setText("⚠ Datacenter required for Panorama")
+            self.locations_status.setStyleSheet("color: #FF9800; font-size: 11px; font-weight: bold;")
+        elif branch_count > 0 or dc_count > 0:
+            panorama_hint = " (Panorama)" if is_panorama else ""
+            self.locations_status.setText(f"✓ {branch_count} branch, {dc_count} DC{panorama_hint}")
             self.locations_status.setStyleSheet("color: #4CAF50; font-size: 11px;")
         else:
             self.locations_status.setText("")
