@@ -151,6 +151,9 @@ class TerraformWorker(QThread):
         terraform_dir = os.path.join(self.output_dir, "terraform")
         executor = TerraformExecutor(terraform_dir)
 
+        # Pre-update storage account IP rules to prevent 403 during state refresh
+        self._update_storage_ip_rules(terraform_dir)
+
         # Create var file if credentials provided
         var_file = self._create_var_file()
 
