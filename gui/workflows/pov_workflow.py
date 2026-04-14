@@ -11256,6 +11256,15 @@ output "{device_name}_private_ip" {{
         pano_private_ip = self.infra_pano_private_ip.text().strip() if is_panorama else None
         pano_nat_port = self.infra_pano_nat_port.text().strip() if is_panorama else None
 
+        # Get firewall untrust public IP for NAT original destination
+        fw_untrust_ip = None
+        if is_panorama:
+            outputs = getattr(self, '_terraform_outputs', {}) or {}
+            for key, value in outputs.items():
+                if ('fw' in key.lower() or 'firewall' in key.lower()) and 'untrust_public_ip' in key.lower() and value:
+                    fw_untrust_ip = value
+                    break
+
         # Disable button and show progress immediately
         self.infra_fw_configure_btn.setEnabled(False)
         self.infra_fw_configure_btn.setText("Configuring...")
@@ -11277,7 +11286,7 @@ output "{device_name}_private_ip" {{
 
             def __init__(self, host, user, password, hostname, dns1, dns2, ntp1,
                          user_ip, additional_admin_ips, pano_private_ip, pano_nat_port,
-                         nsg_resource_group=None, nsg_name=None):
+                         fw_untrust_ip=None, nsg_resource_group=None, nsg_name=None):
                 super().__init__()
                 self.host = host
                 self.user = user
@@ -11290,6 +11299,7 @@ output "{device_name}_private_ip" {{
                 self.additional_admin_ips = additional_admin_ips
                 self.pano_private_ip = pano_private_ip
                 self.pano_nat_port = pano_nat_port
+                self.fw_untrust_ip = fw_untrust_ip
                 self.nsg_resource_group = nsg_resource_group
                 self.nsg_name = nsg_name
 
@@ -11423,13 +11433,26 @@ output "{device_name}_private_ip" {{
                         if '/' not in pano_ip_val:
                             pano_ip_val = f"{pano_ip_val}/32"
 
+                        # Create address object for firewall untrust public IP (NAT original destination)
+                        if self.fw_untrust_ip:
+                            self.progress.emit(f"Creating fw-untrust-ip address object ({self.fw_untrust_ip})...", 73)
+                            client.create_address_object(
+                                name="fw-untrust-ip",
+                                value=f"{self.fw_untrust_ip}/32",
+                                address_type="ip-netmask",
+                                description="Firewall untrust public IP for inbound NAT",
+                            )
+                            nat_dest = ["fw-untrust-ip"]
+                        else:
+                            nat_dest = ["any"]
+
                         self.progress.emit("Creating static NAT for Panorama inbound...", 75)
                         client.create_nat_rule(
                             name="panorama-inbound-nat",
                             source_zone=["untrust"],
                             destination_zone="untrust",
                             source=["admin-networks"],
-                            destination=["any"],
+                            destination=nat_dest,
                             service="service-https",
                             source_translation_type=None,
                             destination_translated_address=pano_ip_val.split('/')[0],
@@ -11513,7 +11536,7 @@ output "{device_name}_private_ip" {{
         self._fw_infra_worker = FirewallInfraWorker(
             host, user, password, hostname, dns1, dns2, ntp1,
             user_ip, additional_admin_ips, pano_private_ip, pano_nat_port,
-            nsg_resource_group=nsg_rg, nsg_name=nsg_name,
+            fw_untrust_ip=fw_untrust_ip, nsg_resource_group=nsg_rg, nsg_name=nsg_name,
         )
         self._fw_infra_worker.progress.connect(self._on_panorama_setup_progress)
         self._fw_infra_worker.finished.connect(self._on_fw_infra_setup_finished)
