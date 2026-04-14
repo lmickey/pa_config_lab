@@ -560,11 +560,16 @@ class PanoramaAPIClient:
 
         try:
             if sync:
-                result = self._panorama.commit(
-                    sync=True,
-                    timeout=timeout,
-                    description=description,
-                )
+                original_timeout = getattr(self._panorama, 'timeout', None)
+                if timeout:
+                    self._panorama.timeout = timeout
+                try:
+                    result = self._panorama.commit(
+                        sync=True,
+                    )
+                finally:
+                    if original_timeout is not None:
+                        self._panorama.timeout = original_timeout
                 return CommitResult(
                     success=True,
                     message="Commit successful",
@@ -572,7 +577,6 @@ class PanoramaAPIClient:
             else:
                 result = self._panorama.commit(
                     sync=False,
-                    description=description,
                 )
                 return CommitResult(
                     success=True,
