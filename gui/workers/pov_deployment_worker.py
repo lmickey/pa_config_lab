@@ -185,6 +185,65 @@ class TerraformWorker(QThread):
             self.error.emit(clean_error)
             self.finished.emit(False, clean_error, {})
 
+    def _update_storage_ip_rules(self, terraform_dir: str):
+        """Update bootstrap storage account IP rules with current public IP.
+
+        Terraform can't refresh storage container state if the storage account's
+        network rules don't include the current IP (e.g. IP changed since deploy).
+        Pre-update the rules via az CLI before running plan/apply.
+        """
+        import subprocess
+        import json as _json
+
+        try:
+            # Read terraform state to find storage account name and resource group
+            state_file = os.path.join(terraform_dir, "terraform.tfstate")
+            if not os.path.exists(state_file):
+                return
+
+            with open(state_file, 'r') as f:
+                state = _json.load(f)
+
+            # Find the storage account and resource group from state
+            storage_name = None
+            rg_name = None
+            for resource in state.get('resources', []):
+                if resource.get('type') == 'azurerm_storage_account':
+                    for instance in resource.get('instances', []):
+                        attrs = instance.get('attributes', {})
+                        storage_name = attrs.get('name')
+                        rg_name = attrs.get('resource_group_name')
+                        break
+
+            if not storage_name or not rg_name:
+                return
+
+            # Get current public IP
+            try:
+                result = subprocess.run(
+                    ['curl', '-s', '--connect-timeout', '5', 'https://api.ipify.org'],
+                    capture_output=True, text=True, timeout=10,
+                )
+                current_ip = result.stdout.strip() if result.returncode == 0 else None
+            except Exception:
+                return
+
+            if not current_ip:
+                return
+
+            # Update storage account network rules to include current IP
+            self.log_message.emit(f"Updating storage account IP rules with current IP ({current_ip})...")
+            subprocess.run(
+                ["az", "storage", "account", "network-rule", "add",
+                 "--resource-group", rg_name,
+                 "--account-name", storage_name,
+                 "--ip-address", current_ip],
+                capture_output=True, text=True, timeout=30,
+            )
+
+        except Exception as e:
+            self.log_message.emit(f"Warning: Could not update storage IP rules: {e}")
+
     def _apply(self):
         """Run terraform apply."""
         from terraform import TerraformExecutor
@@ -195,6 +254,9 @@ class TerraformWorker(QThread):
 
         terraform_dir = os.path.join(self.output_dir, "terraform")
         executor = TerraformExecutor(terraform_dir)
+
+        # Pre-update storage account IP rules to prevent 403 during state refresh
+        self._update_storage_ip_rules(terraform_dir)
 
         var_file = self._create_var_file()
 

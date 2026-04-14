@@ -9618,7 +9618,7 @@ resource "azurerm_route_server" "pov" {{
 # Firewall: {fw_name} ({fw_type}) for {location_name}
 # Public IP for management access (MGT interface, NSG protected)
 resource "azurerm_public_ip" "pip_{fw_name}" {{
-  name                = "{resource_prefix}-IP-mgmt"
+  name                = "{resource_prefix}-IP-public"
   location            = azurerm_resource_group.pov.location
   resource_group_name = azurerm_resource_group.pov.name
   allocation_method   = "Static"
