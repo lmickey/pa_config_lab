@@ -11088,7 +11088,7 @@ output "{device_name}_private_ip" {{
                     client.create_address_object(
                         name="admin-ip",
                         value=self.user_ip,
-                        addr_type="ip-netmask",
+                        address_type="ip-netmask",
                         description="Administrator public IP for management access",
                     )
 
@@ -11111,7 +11111,7 @@ output "{device_name}_private_ip" {{
                         client.create_address_object(
                             name="panorama-mgmt",
                             value=self.pano_private_ip,
-                            addr_type="ip-netmask" if '/' in self.pano_private_ip else "ip-netmask",
+                            address_type="ip-netmask" if '/' in self.pano_private_ip else "ip-netmask",
                             description="Panorama management private IP",
                         )
                         # Ensure IP has /32 suffix
