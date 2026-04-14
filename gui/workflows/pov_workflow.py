@@ -9301,7 +9301,6 @@ netmask=
 hostname={customer}-{location}-DC-fw
 dns-primary=8.8.8.8
 dns-secondary=8.8.4.4
-op-command-modes=mgmt-interface-swap
 dhcp-send-hostname=yes
 dhcp-send-client-id=yes
 dhcp-accept-server-hostname=yes
@@ -9443,32 +9442,43 @@ resource "azurerm_route_server" "pov" {{
             # Resource naming: {customer}-{location}-{site}-{fw_name}-{part}-{detail}
             resource_prefix = f"{customer}-{location}-{site_prefix}-{fw_name}"
 
-            # DNS label must be lowercase, alphanumeric and hyphens only
-            dns_label = f"{resource_prefix}-mgmt".lower()
-
             # VM zone line for HA pairs
             fw_zone_line = f'\n  zone                            = "{fw_az}"' if fw_az else ''
 
             # Trust NIC subnet: hybrid_router uses fw-transit, others use trust
             fw_trust_subnet = "azurerm_subnet.fw_transit.id" if fw_style == 'hybrid_router' else "azurerm_subnet.trust.id"
 
+            # DNS labels for FQDNs
+            dns_label_mgmt = f"{resource_prefix}-mgmt".lower()
+            dns_label_untrust = f"{resource_prefix}-untrust".lower()
+
             content += f'''
 # Firewall: {fw_name} ({fw_type}) for {location_name}
-# Public IP for management access
+# Public IP for management access (MGT interface, NSG protected)
 resource "azurerm_public_ip" "pip_{fw_name}" {{
-  name                = "{resource_prefix}-IP-public"
+  name                = "{resource_prefix}-IP-mgmt"
   location            = azurerm_resource_group.pov.location
   resource_group_name = azurerm_resource_group.pov.name
   allocation_method   = "Static"
   sku                 = "Standard"
-
-  # DNS label creates FQDN: {dns_label}.{{region}}.cloudapp.azure.com
-  domain_name_label   = "{dns_label}"
+  domain_name_label   = "{dns_label_mgmt}"
 
   tags = azurerm_resource_group.pov.tags
 }}
 
-# Management NIC
+# Public IP for untrust/data interface (no NSG restrictions)
+resource "azurerm_public_ip" "pip_{fw_name}_untrust" {{
+  name                = "{resource_prefix}-IP-untrust"
+  location            = azurerm_resource_group.pov.location
+  resource_group_name = azurerm_resource_group.pov.name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+  domain_name_label   = "{dns_label_untrust}"
+
+  tags = azurerm_resource_group.pov.tags
+}}
+
+# Management NIC (NSG protected - admin access only)
 resource "azurerm_network_interface" "nic_{fw_name}_mgmt" {{
   name                = "{resource_prefix}-nic-mgmt"
   location            = azurerm_resource_group.pov.location
@@ -9484,7 +9494,7 @@ resource "azurerm_network_interface" "nic_{fw_name}_mgmt" {{
   tags = azurerm_resource_group.pov.tags
 }}
 
-# Untrust NIC
+# Untrust NIC (data plane - IPsec, NAT, no restrictive NSG)
 resource "azurerm_network_interface" "nic_{fw_name}_untrust" {{
   name                 = "{resource_prefix}-nic-untrust"
   location             = azurerm_resource_group.pov.location
@@ -9495,6 +9505,7 @@ resource "azurerm_network_interface" "nic_{fw_name}_untrust" {{
     name                          = "untrust"
     subnet_id                     = azurerm_subnet.untrust.id
     private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.pip_{fw_name}_untrust.id
   }}
 
   tags = azurerm_resource_group.pov.tags
@@ -9974,19 +9985,29 @@ output "untrust_subnet_id" {
         for fw in firewalls:
             fw_name = fw.get('name', 'fw').lower().replace(' ', '-').replace('_', '-')
             content += f'''
-output "{fw_name}_public_ip" {{
-  description = "Public IP of firewall {fw_name}"
+output "{fw_name}_mgmt_public_ip" {{
+  description = "Management public IP of firewall {fw_name}"
   value       = azurerm_public_ip.pip_{fw_name}.ip_address
 }}
 
-output "{fw_name}_fqdn" {{
-  description = "DNS name for firewall {fw_name} management"
+output "{fw_name}_mgmt_fqdn" {{
+  description = "Management DNS name for firewall {fw_name}"
   value       = azurerm_public_ip.pip_{fw_name}.fqdn
 }}
 
 output "{fw_name}_mgmt_private_ip" {{
   description = "Management private IP of firewall {fw_name}"
   value       = azurerm_network_interface.nic_{fw_name}_mgmt.private_ip_address
+}}
+
+output "{fw_name}_untrust_public_ip" {{
+  description = "Untrust/data public IP of firewall {fw_name}"
+  value       = azurerm_public_ip.pip_{fw_name}_untrust.ip_address
+}}
+
+output "{fw_name}_untrust_fqdn" {{
+  description = "Untrust/data DNS name for firewall {fw_name}"
+  value       = azurerm_public_ip.pip_{fw_name}_untrust.fqdn
 }}
 '''
 
@@ -10896,20 +10917,33 @@ output "{device_name}_private_ip" {{
         sanitized = self._sanitize_customer_name(customer) if customer else "fw"
 
         # --- Firewall fields ---
-        # Find firewall public management IP
-        fw_ip = None
-        for key in ('fw-datacenter-1_public_ip', 'fw_public_ip', 'firewall_public_ip'):
+        # Find firewall management public IP (for SSH/HTTPS management)
+        fw_mgmt_ip = None
+        for key in ('fw-datacenter-1_mgmt_public_ip', 'fw_mgmt_public_ip', 'firewall_mgmt_public_ip'):
             if key in outputs and outputs[key]:
-                fw_ip = outputs[key]
+                fw_mgmt_ip = outputs[key]
                 break
-        if not fw_ip:
+        if not fw_mgmt_ip:
             for key, value in outputs.items():
-                if ('fw' in key.lower() or 'firewall' in key.lower()) and 'public_ip' in key.lower() and value:
-                    fw_ip = value
+                if ('fw' in key.lower() or 'firewall' in key.lower()) and 'mgmt_public_ip' in key.lower() and value:
+                    fw_mgmt_ip = value
+                    break
+        # Fallback to legacy output name
+        if not fw_mgmt_ip:
+            for key, value in outputs.items():
+                if ('fw' in key.lower() or 'firewall' in key.lower()) and 'public_ip' in key.lower() and 'untrust' not in key.lower() and value:
+                    fw_mgmt_ip = value
                     break
 
-        if fw_ip and not self.infra_fw_host.text().strip():
-            self.infra_fw_host.setText(fw_ip)
+        if fw_mgmt_ip and not self.infra_fw_host.text().strip():
+            self.infra_fw_host.setText(fw_mgmt_ip)
+
+        # Find firewall untrust public IP (for data plane / Panorama NAT)
+        fw_untrust_ip = None
+        for key, value in outputs.items():
+            if ('fw' in key.lower() or 'firewall' in key.lower()) and 'untrust_public_ip' in key.lower() and value:
+                fw_untrust_ip = value
+                break
 
         # Firewall credentials
         fw_creds = creds.get('firewall', {})
@@ -10953,9 +10987,10 @@ output "{device_name}_private_ip" {{
             if pano_private_ip and not self.infra_pano_private_ip.text().strip():
                 self.infra_pano_private_ip.setText(pano_private_ip)
 
-            # Panorama access IP = firewall public IP (accessed through NAT)
-            if fw_ip and not self.pano_setup_host.text().strip():
-                self.pano_setup_host.setText(fw_ip)
+            # Panorama access IP = firewall untrust public IP (accessed through NAT on data plane)
+            pano_access_ip = fw_untrust_ip or fw_mgmt_ip  # Prefer untrust, fallback to mgmt
+            if pano_access_ip and not self.pano_setup_host.text().strip():
+                self.pano_setup_host.setText(pano_access_ip)
 
             # Panorama credentials (same as firewall for cloud-deployed VMs)
             if not self.pano_setup_pass.text():
@@ -11743,32 +11778,38 @@ output "{device_name}_private_ip" {{
         """Update clickable management links on the firewall status banner and Panorama licensing banner."""
         outputs = getattr(self, '_terraform_outputs', {}) or {}
 
-        # Build firewall links
+        # Build firewall management links (mgmt interface)
         fw_links = []
         for key, value in outputs.items():
-            if value and 'fqdn' in key.lower() and ('fw' in key.lower() or 'firewall' in key.lower()):
-                label = key.replace('_fqdn', '').replace('_', ' ').title()
-                fw_links.append(f'<a href="https://{value}">{label}</a>')
-            elif value and 'fw' in key.lower() and 'public_ip' in key.lower():
-                label = key.replace('_public_ip', '').replace('_', ' ').title()
-                fw_links.append(f'<a href="https://{value}">{label} (IP)</a>')
+            if not value:
+                continue
+            if 'mgmt_fqdn' in key.lower() and ('fw' in key.lower() or 'firewall' in key.lower()):
+                label = key.replace('_mgmt_fqdn', '').replace('_', ' ').title()
+                fw_links.append(f'<a href="https://{value}">{label} Management</a>')
+
+        # Fallback to legacy fqdn output names
+        if not fw_links:
+            for key, value in outputs.items():
+                if value and 'fqdn' in key.lower() and ('fw' in key.lower() or 'firewall' in key.lower()) and 'untrust' not in key.lower():
+                    label = key.replace('_fqdn', '').replace('_', ' ').title()
+                    fw_links.append(f'<a href="https://{value}">{label} Management</a>')
 
         if fw_links and hasattr(self, 'infra_fw_links_label'):
             self.infra_fw_links_label.setText("Open: " + " &nbsp;|&nbsp; ".join(fw_links))
 
-        # Build Panorama link (accessed via firewall public IP / FQDN)
+        # Build Panorama link (accessed via firewall UNTRUST public IP through NAT)
         is_panorama = getattr(self, 'management_type', 'scm') == 'panorama'
         if is_panorama and hasattr(self, 'pano_mgmt_links_label'):
             pano_links = []
-            # Panorama is accessed through the firewall's untrust public IP via NAT
-            # Use the first firewall FQDN or public IP
+            # Prefer untrust FQDN (data plane with NAT to Panorama)
             for key, value in outputs.items():
-                if value and 'fqdn' in key.lower() and ('fw' in key.lower() or 'firewall' in key.lower()):
+                if value and 'untrust_fqdn' in key.lower() and ('fw' in key.lower() or 'firewall' in key.lower()):
                     pano_links.append(f'<a href="https://{value}">Panorama via {value}</a>')
                     break
+            # Fallback to untrust public IP
             if not pano_links:
                 for key, value in outputs.items():
-                    if value and 'fw' in key.lower() and 'public_ip' in key.lower():
+                    if value and 'untrust_public_ip' in key.lower() and ('fw' in key.lower() or 'firewall' in key.lower()):
                         pano_links.append(f'<a href="https://{value}">Panorama via {value}</a>')
                         break
 
