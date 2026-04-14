@@ -9405,34 +9405,6 @@ resource "azurerm_subnet_network_security_group_association" "management" {
   subnet_id                 = azurerm_subnet.management.id
   network_security_group_id = azurerm_network_security_group.management.id
 }
-
-# Untrust NSG - permissive (firewall handles security policy)
-# Required for Azure Standard SKU public IPs to allow inbound traffic
-resource "azurerm_network_security_group" "untrust" {{
-  name                = "{customer}-{location}-untrust-nsg"
-  location            = azurerm_resource_group.pov.location
-  resource_group_name = azurerm_resource_group.pov.name
-  tags                = azurerm_resource_group.pov.tags
-}}
-
-resource "azurerm_network_security_rule" "untrust_allow_all_inbound" {{
-  name                        = "Allow-All-Inbound"
-  priority                    = 100
-  direction                   = "Inbound"
-  access                      = "Allow"
-  protocol                    = "*"
-  source_port_range           = "*"
-  destination_port_range      = "*"
-  source_address_prefix       = "*"
-  destination_address_prefix  = "*"
-  resource_group_name         = azurerm_resource_group.pov.name
-  network_security_group_name = azurerm_network_security_group.untrust.name
-}}
-
-resource "azurerm_subnet_network_security_group_association" "untrust" {{
-  subnet_id                 = azurerm_subnet.untrust.id
-  network_security_group_id = azurerm_network_security_group.untrust.id
-}}
 '''
 
         # Add firewalls (VM-Series)
