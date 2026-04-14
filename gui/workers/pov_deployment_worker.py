@@ -259,15 +259,20 @@ class TerraformWorker(QThread):
             self.log_message.emit(f"Deployment complete! Created {self._resources_created} resources.")
             self.finished.emit(True, "Infrastructure deployed successfully", outputs)
         else:
-            # Check if the error is "already exists - needs to be imported"
-            error_msg = result.error_message or "Apply failed"
-            clean_error = re.sub(r'\x1b\[[0-9;]*m', '', error_msg)
-            full_output = re.sub(r'\x1b\[[0-9;]*m', '', (result.stdout or '') + '\n' + (result.stderr or ''))
+            # Auto-import loop: some Azure resources may already exist outside
+            # Terraform state. Import them and retry apply, up to 3 cycles
+            # (each cycle may discover new resources that depend on prior imports).
+            max_import_retries = 3
+            for attempt in range(max_import_retries):
+                error_msg = result.error_message or "Apply failed"
+                full_output = re.sub(r'\x1b\[[0-9;]*m', '', (result.stdout or '') + '\n' + (result.stderr or ''))
 
-            imported = self._try_auto_import(executor, full_output)
-            if imported:
+                imported = self._try_auto_import(executor, full_output)
+                if not imported:
+                    break  # No importable resources found, stop retrying
+
                 # Retry apply after importing
-                self.log_message.emit("Retrying apply after importing existing resources...")
+                self.log_message.emit(f"Retrying deployment after import (attempt {attempt + 1}/{max_import_retries})...")
                 self.progress.emit("Retrying deployment...", 50)
                 self._resources_created = 0
                 result = executor.apply(
@@ -283,12 +288,22 @@ class TerraformWorker(QThread):
                     self.log_message.emit(f"Deployment complete! Created {self._resources_created} resources.")
                     self.finished.emit(True, "Infrastructure deployed successfully", outputs)
                     return
-                # Retry also failed
-                error_msg = result.error_message or "Apply failed after import"
-                clean_error = re.sub(r'\x1b\[[0-9;]*m', '', error_msg)
 
-            self.error.emit(clean_error)
-            self.finished.emit(False, clean_error, {})
+            # All retries exhausted — extract a concise error summary
+            error_msg = result.error_message or "Apply failed"
+            clean_output = re.sub(r'\x1b\[[0-9;]*m', '', error_msg)
+            # Pull just the Error lines for a readable summary
+            error_lines = [
+                line.strip() for line in clean_output.splitlines()
+                if line.strip().startswith('Error:') or line.strip().startswith('│ Error:')
+            ]
+            if error_lines:
+                summary = "Deployment failed with errors:\n" + "\n".join(error_lines[:5])
+            else:
+                summary = f"Infrastructure deployment failed after {max_import_retries} import retries"
+
+            self.error.emit(summary)
+            self.finished.emit(False, summary, {})
 
     def _destroy(self):
         """Run terraform destroy."""
