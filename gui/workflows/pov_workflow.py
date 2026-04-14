@@ -2634,7 +2634,7 @@ class POVWorkflowWidget(QWidget):
 
         auth_row.addStretch()
 
-        self.azure_auth_btn = QPushButton("🔐 Authenticate with Azure")
+        self.azure_auth_btn = QPushButton("Authenticate with Azure")
         self.azure_auth_btn.setMinimumWidth(200)
         self.azure_auth_btn.setStyleSheet(
             "QPushButton { "
@@ -2649,7 +2649,29 @@ class POVWorkflowWidget(QWidget):
         self.azure_auth_btn.clicked.connect(self._authenticate_azure)
         auth_row.addWidget(self.azure_auth_btn)
 
+        self.azure_renew_btn = QPushButton("Renew Token")
+        self.azure_renew_btn.setMinimumWidth(120)
+        self.azure_renew_btn.setVisible(False)
+        self.azure_renew_btn.setStyleSheet(
+            "QPushButton { "
+            "  background-color: #4CAF50; color: white; padding: 10px 16px; "
+            "  font-weight: bold; border-radius: 5px; "
+            "  border: 1px solid #388E3C; border-bottom: 3px solid #2E7D32; "
+            "}"
+            "QPushButton:hover { background-color: #45a049; border-bottom: 3px solid #1B5E20; }"
+            "QPushButton:pressed { background-color: #388E3C; border-bottom: 1px solid #2E7D32; }"
+        )
+        self.azure_renew_btn.setToolTip("Re-authenticate with the same subscription (renew expired token)")
+        self.azure_renew_btn.clicked.connect(self._renew_azure_token)
+        auth_row.addWidget(self.azure_renew_btn)
+
         azure_auth_layout.addLayout(auth_row)
+
+        # Token expiry indicator (hidden until authenticated)
+        self.azure_token_expiry_label = QLabel("")
+        self.azure_token_expiry_label.setStyleSheet("color: #666; font-size: 11px;")
+        self.azure_token_expiry_label.setVisible(False)
+        azure_auth_layout.addWidget(self.azure_token_expiry_label)
 
         # Terraform generation status (hidden until authenticated)
         self.terraform_status_widget = QWidget()
@@ -7475,6 +7497,142 @@ class POVWorkflowWidget(QWidget):
         finally:
             self.azure_auth_btn.setEnabled(True)
 
+    def _renew_azure_token(self):
+        """Renew Azure authentication token using the existing tenant/subscription.
+
+        Re-authenticates without going through subscription selection — just
+        opens the browser for sign-in and refreshes the token.
+        """
+        import sys
+        import os
+
+        saved_tenant_id = self.deployment_config.get('azure_tenant_id', '')
+        saved_sub_id = self.deployment_config.get('azure_subscription_id', '')
+        saved_sub_name = self.deployment_config.get('azure_subscription_name', '')
+
+        if not saved_tenant_id or not saved_sub_id:
+            QMessageBox.warning(
+                self, "No Saved Credentials",
+                "No saved Azure credentials found. Use 'Authenticate with Azure' instead."
+            )
+            return
+
+        self._log_activity(f"Renewing Azure token for {saved_sub_name}...")
+        self.azure_renew_btn.setEnabled(False)
+        self.azure_renew_btn.setText("Renewing...")
+        self.azure_auth_status.setText("Renewing token...")
+        self.azure_auth_status.setStyleSheet("font-weight: bold; color: #FF9800;")
+
+        from PyQt6.QtWidgets import QApplication
+        QApplication.processEvents()
+
+        try:
+            from azure.identity import InteractiveBrowserCredential
+
+            original_stdout = sys.stdout
+            original_stderr = sys.stderr
+            devnull = open(os.devnull, 'w')
+            try:
+                sys.stdout = devnull
+                sys.stderr = devnull
+                credential = InteractiveBrowserCredential(
+                    redirect_uri="http://localhost:8400",
+                    tenant_id=saved_tenant_id,
+                )
+                token = credential.get_token("https://management.azure.com/.default")
+            finally:
+                sys.stdout = original_stdout
+                sys.stderr = original_stderr
+                devnull.close()
+
+            self._log_activity("Token renewed successfully")
+
+            # Bring window back to focus
+            self.activateWindow()
+            self.raise_()
+            QApplication.processEvents()
+
+            # Store renewed credential
+            self._azure_credential = credential
+            self._azure_subscription = {
+                'name': saved_sub_name,
+                'id': saved_sub_id,
+                'tenant_id': saved_tenant_id,
+            }
+
+            # Update status
+            self.azure_auth_status.setText(f"{saved_sub_name}")
+            self.azure_auth_status.setStyleSheet("font-weight: bold; color: #4CAF50;")
+
+            # Update token expiry display
+            self._update_azure_token_expiry()
+
+            # Re-prime CLI auth
+            self._prime_azure_cli_auth()
+
+            self._log_activity(f"Azure token renewed for: {saved_sub_name}")
+
+        except Exception as e:
+            self._log_activity(f"Token renewal failed: {e}", "error")
+            self.azure_auth_status.setText("Token expired — renew failed")
+            self.azure_auth_status.setStyleSheet("font-weight: bold; color: #F44336;")
+            QMessageBox.critical(
+                self,
+                "Token Renewal Failed",
+                f"Failed to renew Azure token:\n\n{str(e)}\n\n"
+                "You may need to use 'Change Subscription' to fully re-authenticate."
+            )
+        finally:
+            self.azure_renew_btn.setEnabled(True)
+            self.azure_renew_btn.setText("Renew Token")
+
+    def _update_azure_token_expiry(self):
+        """Update the token expiry indicator and start a refresh timer."""
+        import datetime
+
+        # Try to get token expiry from the credential
+        try:
+            if hasattr(self, '_azure_credential') and self._azure_credential:
+                token = self._azure_credential.get_token("https://management.azure.com/.default")
+                expiry_ts = token.expires_on
+                expiry_dt = datetime.datetime.fromtimestamp(expiry_ts)
+                now = datetime.datetime.now()
+                remaining = expiry_dt - now
+                minutes_left = int(remaining.total_seconds() / 60)
+
+                expiry_str = expiry_dt.strftime("%I:%M %p")
+                if minutes_left > 60:
+                    time_str = f"{minutes_left // 60}h {minutes_left % 60}m"
+                else:
+                    time_str = f"{minutes_left}m"
+
+                self.azure_token_expiry_label.setText(
+                    f"Token expires at {expiry_str} ({time_str} remaining)"
+                )
+                self.azure_token_expiry_label.setVisible(True)
+
+                if minutes_left <= 10:
+                    self.azure_token_expiry_label.setStyleSheet(
+                        "color: #F44336; font-size: 11px; font-weight: bold;"
+                    )
+                elif minutes_left <= 30:
+                    self.azure_token_expiry_label.setStyleSheet(
+                        "color: #FF9800; font-size: 11px; font-weight: bold;"
+                    )
+                else:
+                    self.azure_token_expiry_label.setStyleSheet(
+                        "color: #4CAF50; font-size: 11px;"
+                    )
+
+                # Schedule a refresh of this display every 60 seconds
+                if not hasattr(self, '_token_expiry_timer'):
+                    self._token_expiry_timer = QTimer(self)
+                    self._token_expiry_timer.timeout.connect(self._update_azure_token_expiry)
+                self._token_expiry_timer.start(60000)  # Update every minute
+
+        except Exception:
+            self.azure_token_expiry_label.setVisible(False)
+
     def _show_terraform_warning_dialog(self) -> bool:
         """Show a custom styled warning dialog for Terraform not deployed.
 
@@ -8659,8 +8817,12 @@ class POVWorkflowWidget(QWidget):
             # Fetch available VM sizes for the deployment location
             self._fetch_available_vm_sizes()
 
-        # Change button to allow re-authentication
-        self.azure_auth_btn.setText("🔄 Change Subscription")
+        # Change button to allow re-authentication and show renew
+        self.azure_auth_btn.setText("Change Subscription")
+        self.azure_renew_btn.setVisible(True)
+
+        # Track and display token expiry
+        self._update_azure_token_expiry()
 
         # Show terraform generation status
         self.terraform_status_widget.setVisible(True)
@@ -14637,14 +14799,16 @@ output "{device_name}_private_ip" {{
                     "Click 'Change Subscription' to re-authenticate."
                 )
 
-            # Update auth button to show change option
+            # Update auth button to show change option and renew button
             if hasattr(self, 'azure_auth_btn'):
-                self.azure_auth_btn.setText("🔄 Change Subscription")
+                self.azure_auth_btn.setText("Change Subscription")
                 self.azure_auth_btn.setStyleSheet(
                     "padding: 10px 20px; font-size: 14px; "
                     "background-color: #E3F2FD; color: #1565C0; "
                     "border: 1px solid #1565C0; border-radius: 5px;"
                 )
+            if hasattr(self, 'azure_renew_btn'):
+                self.azure_renew_btn.setVisible(True)
                 self.azure_auth_btn.setToolTip(
                     "Click to re-authenticate or select a different subscription"
                 )
