@@ -1085,7 +1085,6 @@ class FirewallAPIClient:
                 try:
                     result = self._firewall.commit(
                         sync=True,
-                        description=description or None,
                     )
                 finally:
                     # Restore original timeout

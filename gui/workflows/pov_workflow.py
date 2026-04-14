@@ -10980,12 +10980,14 @@ output "{device_name}_private_ip" {{
         pano_private_ip = self.infra_pano_private_ip.text().strip() if is_panorama else None
         pano_nat_port = self.infra_pano_nat_port.text().strip() if is_panorama else None
 
-        # Disable button and show progress
+        # Disable button and show progress immediately
         self.infra_fw_configure_btn.setEnabled(False)
         self.infra_fw_configure_btn.setText("Configuring...")
         self.pano_setup_progress.setVisible(True)
-        self.pano_setup_progress.setValue(0)
+        self.pano_setup_progress.setRange(0, 0)  # Indeterminate/pulsing mode while connecting
         self.pano_setup_progress.setStyleSheet("")  # Reset any error styling
+        from PyQt6.QtWidgets import QApplication
+        QApplication.processEvents()  # Force UI repaint before worker starts
         self.pano_setup_log.clear()
 
         self._pano_setup_log("Starting firewall infrastructure setup...")
@@ -11377,6 +11379,9 @@ output "{device_name}_private_ip" {{
 
     def _on_panorama_setup_progress(self, message: str, pct: int):
         """Handle progress updates from Panorama setup worker."""
+        # Switch from indeterminate to determinate mode on first real progress
+        if self.pano_setup_progress.maximum() == 0:
+            self.pano_setup_progress.setRange(0, 100)
         self.pano_setup_progress.setValue(pct)
         self._pano_setup_log(message)
 
