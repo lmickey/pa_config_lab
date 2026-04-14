@@ -11148,15 +11148,17 @@ output "{device_name}_private_ip" {{
                         )
 
                     # Phase 8: Commit
-                    self.progress.emit("Committing firewall configuration...", 90)
+                    self.progress.emit("Committing firewall configuration (this may take a minute)...", 90)
                     result = client.commit(
                         description="Infrastructure setup by pa_config_lab",
                         sync=True,
+                        timeout=600,
                     )
                     if not result.success:
                         self.finished.emit(False, f"Commit failed: {result.message}")
                         return
 
+                    self.progress.emit("Commit successful — configuration is now active", 98)
                     client.disconnect()
                     self.progress.emit("Firewall infrastructure setup complete", 100)
 
