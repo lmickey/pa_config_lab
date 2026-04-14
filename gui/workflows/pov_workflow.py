@@ -9429,10 +9429,12 @@ resource "azurerm_storage_account" "bootstrap" {{
   allow_nested_items_to_be_public = false
   shared_access_key_enabled       = true
 
-  # Bootstrap storage only contains PAN-OS init config (not sensitive)
+  # Network rules satisfy Azure policy while allowing Terraform access
   network_rules {{
-    default_action             = "Allow"
+    default_action             = "Deny"
     bypass                     = ["AzureServices"]
+    ip_rules                   = [data.http.my_ip.response_body]
+    virtual_network_subnet_ids = [azurerm_subnet.management.id]
   }}
 
   tags = azurerm_resource_group.pov.tags
