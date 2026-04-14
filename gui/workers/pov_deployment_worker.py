@@ -154,6 +154,17 @@ class TerraformWorker(QThread):
         # Pre-update storage account IP rules to prevent 403 during state refresh
         self._update_storage_ip_rules(terraform_dir)
 
+        # Proactively remove bootstrap storage resources from state on updates.
+        # They're only needed during initial VM creation and cause 403 errors
+        # when the user's IP changes (storage account network rules block access).
+        if executor.has_state():
+            state_result = executor.state_list()
+            if state_result.success and 'azurerm_storage_container.bootstrap' in (state_result.stdout or ''):
+                self.log_message.emit("[plan] Removing bootstrap storage from state (not needed for updates)...")
+                for resource in ('azurerm_storage_blob.init_cfg', 'azurerm_storage_blob.bootstrap_xml',
+                                 'azurerm_storage_container.bootstrap'):
+                    executor.state_rm(resource)
+
         # Create var file if credentials provided
         var_file = self._create_var_file()
 
@@ -162,17 +173,6 @@ class TerraformWorker(QThread):
             self.log_message.emit(f"[plan] Using var file: {var_file}")
 
         result = executor.plan(var_file=var_file)
-
-        # If plan fails with bootstrap storage 403, remove bootstrap resources
-        # from state and retry — they're only needed during initial VM creation
-        if not result.success:
-            full_output = re.sub(r'\x1b\[[0-9;]*m', '', (result.stdout or '') + '\n' + (result.error_message or ''))
-            if 'bootstrap' in full_output and '403' in full_output:
-                self.log_message.emit("[plan] Bootstrap storage 403 — removing from state and retrying...")
-                for resource in ('azurerm_storage_blob.init_cfg', 'azurerm_storage_blob.bootstrap_xml',
-                                 'azurerm_storage_container.bootstrap'):
-                    executor.state_rm(resource)
-                result = executor.plan(var_file=var_file)
 
         if result.success:
             self.progress.emit("Plan complete", 100)
