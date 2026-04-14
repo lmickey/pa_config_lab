@@ -289,18 +289,41 @@ class TerraformWorker(QThread):
                     self.finished.emit(True, "Infrastructure deployed successfully", outputs)
                     return
 
-            # All retries exhausted — extract a concise error summary
+            # Extract a concise error summary from the terraform output
             error_msg = result.error_message or "Apply failed"
-            clean_output = re.sub(r'\x1b\[[0-9;]*m', '', error_msg)
-            # Pull just the Error lines for a readable summary
-            error_lines = [
-                line.strip() for line in clean_output.splitlines()
-                if line.strip().startswith('Error:') or line.strip().startswith('│ Error:')
-            ]
+            # Also include stdout since streaming mode puts errors there
+            full_error = re.sub(r'\x1b\[[0-9;]*m', '', (result.stdout or '') + '\n' + error_msg)
+            # Strip terraform box-drawing characters for cleaner parsing
+            clean_output = re.sub(r'[â"‚â•·â•µâ"‚╷╵│╶╴]', '', full_error)
+
+            # Pull Error: lines and the line immediately after (which has the detail)
+            error_lines = []
+            lines = clean_output.splitlines()
+            for i, line in enumerate(lines):
+                stripped = line.strip()
+                if 'Error:' in stripped:
+                    # Clean up the error line
+                    err = stripped.replace('Error:', '').strip()
+                    if err:
+                        error_lines.append(f"Error: {err}")
+                    # Include next non-empty line for context (often has the reason)
+                    for j in range(i + 1, min(i + 4, len(lines))):
+                        next_line = lines[j].strip()
+                        if next_line and 'Error:' not in next_line and not next_line.startswith('with '):
+                            error_lines.append(f"  {next_line}")
+                            break
+
             if error_lines:
-                summary = "Deployment failed with errors:\n" + "\n".join(error_lines[:5])
+                # Deduplicate while preserving order
+                seen = set()
+                unique = []
+                for line in error_lines:
+                    if line not in seen:
+                        seen.add(line)
+                        unique.append(line)
+                summary = "Deployment failed:\n" + "\n".join(unique[:10])
             else:
-                summary = f"Infrastructure deployment failed after {max_import_retries} import retries"
+                summary = f"Infrastructure deployment failed"
 
             self.error.emit(summary)
             self.finished.emit(False, summary, {})
