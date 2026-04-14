@@ -412,8 +412,15 @@ class FirewallAPIClient:
     def _add_interface_to_vr(self, interface: str, vr_name: str):
         """Add interface to a virtual router."""
         vr = VirtualRouter(name=vr_name)
-        vr.interface = [interface]
         self._firewall.add(vr)
+        try:
+            vr.refresh()
+            existing = vr.interface or []
+        except Exception:
+            existing = []
+        if interface not in existing:
+            existing.append(interface)
+        vr.interface = existing
         vr.apply()
 
     def create_zone(self, name: str, interfaces: List[str] = None):
