@@ -10171,6 +10171,16 @@ output "{fw_name}_untrust_fqdn" {{
   description = "Untrust/data DNS name for firewall {fw_name}"
   value       = azurerm_public_ip.pip_{fw_name}_untrust.fqdn
 }}
+
+output "{fw_name}_untrust_private_ip" {{
+  description = "Untrust private IP of firewall {fw_name}"
+  value       = azurerm_network_interface.nic_{fw_name}_untrust.private_ip_address
+}}
+
+output "{fw_name}_trust_private_ip" {{
+  description = "Trust private IP of firewall {fw_name}"
+  value       = azurerm_network_interface.nic_{fw_name}_trust.private_ip_address
+}}
 '''
 
         # Add outputs for trust devices
@@ -11256,14 +11266,22 @@ output "{device_name}_private_ip" {{
         pano_private_ip = self.infra_pano_private_ip.text().strip() if is_panorama else None
         pano_nat_port = self.infra_pano_nat_port.text().strip() if is_panorama else None
 
-        # Get firewall untrust public IP for NAT original destination
+        # Get firewall IPs from terraform outputs for NAT and static interface config
+        outputs = getattr(self, '_terraform_outputs', {}) or {}
         fw_untrust_ip = None
-        if is_panorama:
-            outputs = getattr(self, '_terraform_outputs', {}) or {}
-            for key, value in outputs.items():
-                if ('fw' in key.lower() or 'firewall' in key.lower()) and 'untrust_public_ip' in key.lower() and value:
+        fw_untrust_private_ip = None
+        fw_trust_private_ip = None
+        for key, value in outputs.items():
+            if not value:
+                continue
+            key_lower = key.lower()
+            if ('fw' in key_lower or 'firewall' in key_lower):
+                if 'untrust_public_ip' in key_lower and not fw_untrust_ip:
                     fw_untrust_ip = value
-                    break
+                elif 'untrust_private_ip' in key_lower and not fw_untrust_private_ip:
+                    fw_untrust_private_ip = value
+                elif 'trust_private_ip' in key_lower and not fw_trust_private_ip:
+                    fw_trust_private_ip = value
 
         # Disable button and show progress immediately
         self.infra_fw_configure_btn.setEnabled(False)
@@ -11286,7 +11304,9 @@ output "{device_name}_private_ip" {{
 
             def __init__(self, host, user, password, hostname, dns1, dns2, ntp1,
                          user_ip, additional_admin_ips, pano_private_ip, pano_nat_port,
-                         fw_untrust_ip=None, nsg_resource_group=None, nsg_name=None):
+                         fw_untrust_ip=None, fw_untrust_private_ip=None,
+                         fw_trust_private_ip=None,
+                         nsg_resource_group=None, nsg_name=None):
                 super().__init__()
                 self.host = host
                 self.user = user
@@ -11300,6 +11320,8 @@ output "{device_name}_private_ip" {{
                 self.pano_private_ip = pano_private_ip
                 self.pano_nat_port = pano_nat_port
                 self.fw_untrust_ip = fw_untrust_ip
+                self.fw_untrust_private_ip = fw_untrust_private_ip
+                self.fw_trust_private_ip = fw_trust_private_ip
                 self.nsg_resource_group = nsg_resource_group
                 self.nsg_name = nsg_name
 
@@ -11324,20 +11346,52 @@ output "{device_name}_private_ip" {{
                     self.progress.emit(f"Setting NTP: {self.ntp1}", 20)
                     client.set_ntp_servers(self.ntp1)
 
-                    # Phase 3: Interfaces (DHCP from Azure)
-                    self.progress.emit("Configuring ethernet1/1 (untrust)...", 25)
-                    client.configure_interface(
-                        name="ethernet1/1", mode="layer3", dhcp=True,
-                        zone="untrust", virtual_router="default",
-                        comment="Untrust interface - Azure DHCP"
-                    )
+                    # Phase 3: Interfaces (static IPs from Azure deployment)
+                    if self.fw_untrust_private_ip:
+                        untrust_ip = f"{self.fw_untrust_private_ip}/24"
+                        self.progress.emit(f"Configuring ethernet1/1 (untrust) - {untrust_ip}...", 25)
+                        client.configure_interface(
+                            name="ethernet1/1", mode="layer3",
+                            ip_address=untrust_ip,
+                            zone="untrust", virtual_router="default",
+                            comment="Untrust interface - static IP from Azure"
+                        )
+                    else:
+                        self.progress.emit("Configuring ethernet1/1 (untrust) - DHCP...", 25)
+                        client.configure_interface(
+                            name="ethernet1/1", mode="layer3", dhcp=True,
+                            zone="untrust", virtual_router="default",
+                            comment="Untrust interface - Azure DHCP"
+                        )
 
-                    self.progress.emit("Configuring ethernet1/2 (trust)...", 30)
-                    client.configure_interface(
-                        name="ethernet1/2", mode="layer3", dhcp=True,
-                        zone="trust", virtual_router="default",
-                        comment="Trust interface - Azure DHCP"
-                    )
+                    if self.fw_trust_private_ip:
+                        trust_ip = f"{self.fw_trust_private_ip}/24"
+                        self.progress.emit(f"Configuring ethernet1/2 (trust) - {trust_ip}...", 30)
+                        client.configure_interface(
+                            name="ethernet1/2", mode="layer3",
+                            ip_address=trust_ip,
+                            zone="trust", virtual_router="default",
+                            comment="Trust interface - static IP from Azure"
+                        )
+                    else:
+                        self.progress.emit("Configuring ethernet1/2 (trust) - DHCP...", 30)
+                        client.configure_interface(
+                            name="ethernet1/2", mode="layer3", dhcp=True,
+                            zone="trust", virtual_router="default",
+                            comment="Trust interface - Azure DHCP"
+                        )
+
+                    # Phase 3b: Default route via untrust subnet gateway
+                    if self.fw_untrust_private_ip:
+                        # Azure subnet gateway is always .1 of the subnet
+                        untrust_gw = self.fw_untrust_private_ip.rsplit('.', 1)[0] + '.1'
+                        self.progress.emit(f"Creating default route via {untrust_gw}...", 33)
+                        client.create_static_route(
+                            name="default-route",
+                            destination="0.0.0.0/0",
+                            nexthop=untrust_gw,
+                            interface="ethernet1/1",
+                        )
 
                     # Phase 4: Zones
                     self.progress.emit("Creating trust zone...", 35)
@@ -11536,7 +11590,10 @@ output "{device_name}_private_ip" {{
         self._fw_infra_worker = FirewallInfraWorker(
             host, user, password, hostname, dns1, dns2, ntp1,
             user_ip, additional_admin_ips, pano_private_ip, pano_nat_port,
-            fw_untrust_ip=fw_untrust_ip, nsg_resource_group=nsg_rg, nsg_name=nsg_name,
+            fw_untrust_ip=fw_untrust_ip,
+            fw_untrust_private_ip=fw_untrust_private_ip,
+            fw_trust_private_ip=fw_trust_private_ip,
+            nsg_resource_group=nsg_rg, nsg_name=nsg_name,
         )
         self._fw_infra_worker.progress.connect(self._on_panorama_setup_progress)
         self._fw_infra_worker.finished.connect(self._on_fw_infra_setup_finished)
