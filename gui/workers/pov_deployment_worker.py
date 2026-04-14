@@ -566,6 +566,17 @@ class TerraformWorker(QThread):
 
         terraform_dir = os.path.join(self.output_dir, "terraform")
         executor = TerraformExecutor(terraform_dir)
+
+        # Pre-update storage IP rules and remove bootstrap from state
+        self._update_storage_ip_rules(terraform_dir)
+        if executor.has_state():
+            state_result = executor.state_list()
+            if state_result.success and 'azurerm_storage_container.bootstrap' in (state_result.stdout or ''):
+                self.log_message.emit("[plan] Removing bootstrap storage from state (not needed for updates)...")
+                for resource in ('azurerm_storage_blob.init_cfg', 'azurerm_storage_blob.bootstrap_xml',
+                                 'azurerm_storage_container.bootstrap'):
+                    executor.state_rm(resource)
+
         var_file = self._create_var_file()
 
         self.log_message.emit(f"[plan] Terraform directory: {terraform_dir}")
