@@ -2976,7 +2976,13 @@ class POVWorkflowWidget(QWidget):
         self.infra_user_ip = QLineEdit()
         self.infra_user_ip.setPlaceholderText("Your public IP/32 (from onboarding)")
         self.infra_user_ip.setMinimumWidth(250)
-        ip_row.addRow("Allowed Source IP:", self.infra_user_ip)
+        ip_row.addRow("Primary Admin IP:", self.infra_user_ip)
+
+        self.infra_additional_admin_ips = QLineEdit()
+        self.infra_additional_admin_ips.setPlaceholderText("Comma-separated, e.g. 10.0.0.0/8, 203.0.113.5/32")
+        self.infra_additional_admin_ips.setMinimumWidth(400)
+        ip_row.addRow("Additional Admin Networks:", self.infra_additional_admin_ips)
+
         fw_policy_layout.addLayout(ip_row)
 
         # Panorama NAT info (only relevant if Panorama managed)
@@ -10975,6 +10981,10 @@ output "{device_name}_private_ip" {{
         ntp1 = self.infra_fw_ntp1.text().strip() or "time.google.com"
         user_ip = self.infra_user_ip.text().strip() or "0.0.0.0/0"
 
+        # Parse additional admin networks (comma-separated)
+        additional_ips_text = self.infra_additional_admin_ips.text().strip() if hasattr(self, 'infra_additional_admin_ips') else ""
+        additional_admin_ips = [ip.strip() for ip in additional_ips_text.split(",") if ip.strip()] if additional_ips_text else []
+
         # Panorama NAT config (if Panorama managed)
         is_panorama = getattr(self, 'management_type', 'scm') == 'panorama'
         pano_private_ip = self.infra_pano_private_ip.text().strip() if is_panorama else None
@@ -11000,7 +11010,8 @@ output "{device_name}_private_ip" {{
             finished = pyqtSignal(bool, str)
 
             def __init__(self, host, user, password, hostname, dns1, dns2, ntp1,
-                         user_ip, pano_private_ip, pano_nat_port):
+                         user_ip, additional_admin_ips, pano_private_ip, pano_nat_port,
+                         nsg_resource_group=None, nsg_name=None):
                 super().__init__()
                 self.host = host
                 self.user = user
@@ -11010,8 +11021,11 @@ output "{device_name}_private_ip" {{
                 self.dns2 = dns2
                 self.ntp1 = ntp1
                 self.user_ip = user_ip
+                self.additional_admin_ips = additional_admin_ips
                 self.pano_private_ip = pano_private_ip
                 self.pano_nat_port = pano_nat_port
+                self.nsg_resource_group = nsg_resource_group
+                self.nsg_name = nsg_name
 
             def run(self):
                 try:
@@ -11085,20 +11099,33 @@ output "{device_name}_private_ip" {{
                         description="Allow all outbound from trust",
                     )
 
-                    self.progress.emit(f"Creating admin address object and group ({self.user_ip})...", 58)
-                    # Create address object for user IP
+                    self.progress.emit(f"Creating admin address objects ({self.user_ip})...", 56)
+                    # Create primary admin IP address object
                     client.create_address_object(
                         name="admin-ip",
                         value=self.user_ip,
                         address_type="ip-netmask",
-                        description="Administrator public IP for management access",
+                        description="Primary administrator public IP",
                     )
+                    admin_members = ["admin-ip"]
 
-                    # Create address group for admin networks (expandable for future IPs)
-                    self.progress.emit("Creating admin-networks address group...", 60)
+                    # Create additional admin network address objects
+                    for i, extra_ip in enumerate(self.additional_admin_ips, start=1):
+                        obj_name = f"admin-ip-{i}"
+                        self.progress.emit(f"Creating {obj_name} ({extra_ip})...", 57)
+                        client.create_address_object(
+                            name=obj_name,
+                            value=extra_ip,
+                            address_type="ip-netmask",
+                            description=f"Additional admin network {i}",
+                        )
+                        admin_members.append(obj_name)
+
+                    # Create address group for admin networks
+                    self.progress.emit(f"Creating admin-networks group ({len(admin_members)} members)...", 60)
                     client.create_address_group(
                         name="admin-networks",
-                        static_members=["admin-ip"],
+                        static_members=admin_members,
                         description="Admin networks allowed for inbound management access",
                     )
 
@@ -11169,11 +11196,38 @@ output "{device_name}_private_ip" {{
                         self.finished.emit(False, f"Commit failed: {result.message}")
                         return
 
-                    self.progress.emit("Commit successful — configuration is now active", 98)
+                    self.progress.emit("Commit successful — configuration is now active", 95)
                     client.disconnect()
+
+                    # Phase 9: Update Azure NSG rules with all admin IPs
+                    if self.additional_admin_ips and self.nsg_resource_group and self.nsg_name:
+                        self.progress.emit("Updating Azure NSG rules with additional admin IPs...", 97)
+                        all_ips = [self.user_ip.replace('/32', '') if '/32' in self.user_ip else self.user_ip]
+                        for ip in self.additional_admin_ips:
+                            clean_ip = ip.replace('/32', '') if '/32' in ip else ip
+                            all_ips.append(clean_ip)
+
+                        import subprocess
+                        for rule_name in ("Allow-HTTPS", "Allow-SSH"):
+                            try:
+                                ip_list = " ".join(all_ips)
+                                subprocess.run(
+                                    ["az", "network", "nsg", "rule", "update",
+                                     "--resource-group", self.nsg_resource_group,
+                                     "--nsg-name", self.nsg_name,
+                                     "--name", rule_name,
+                                     "--source-address-prefixes"] + all_ips,
+                                    capture_output=True, text=True, timeout=30,
+                                )
+                                self.progress.emit(f"Updated NSG rule: {rule_name}", 98)
+                            except Exception as e:
+                                self.progress.emit(f"Warning: NSG rule {rule_name} update failed: {e}", 98)
+
                     self.progress.emit("Firewall infrastructure setup complete", 100)
 
                     msg = "Firewall configured successfully: base config, interfaces, zones, outbound PAT, security policy"
+                    if len(self.additional_admin_ips) > 0:
+                        msg += f", {len(self.additional_admin_ips) + 1} admin networks"
                     if self.pano_private_ip:
                         msg += ", Panorama inbound NAT"
                     self.finished.emit(True, msg)
@@ -11181,9 +11235,19 @@ output "{device_name}_private_ip" {{
                 except Exception as e:
                     self.finished.emit(False, str(e))
 
+        # Get NSG info from terraform outputs for NSG rule updates
+        outputs = getattr(self, '_terraform_outputs', {}) or {}
+        nsg_rg = outputs.get('resource_group_name', '')
+        # Derive NSG name from terraform naming convention
+        customer = self.customer_name_input.text().strip() if hasattr(self, 'customer_name_input') else ""
+        region = self.cloud_region_combo.currentText() if hasattr(self, 'cloud_region_combo') else "eastus"
+        sanitized = self._sanitize_customer_name(customer) if customer else "pov"
+        nsg_name = f"{sanitized}-{region}-mgmt-nsg" if nsg_rg else ""
+
         self._fw_infra_worker = FirewallInfraWorker(
             host, user, password, hostname, dns1, dns2, ntp1,
-            user_ip, pano_private_ip, pano_nat_port
+            user_ip, additional_admin_ips, pano_private_ip, pano_nat_port,
+            nsg_resource_group=nsg_rg, nsg_name=nsg_name,
         )
         self._fw_infra_worker.progress.connect(self._on_panorama_setup_progress)
         self._fw_infra_worker.finished.connect(self._on_fw_infra_setup_finished)
