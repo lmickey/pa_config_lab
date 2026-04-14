@@ -3066,12 +3066,19 @@ class POVWorkflowWidget(QWidget):
             "QFrame { background-color: #E8F5E9; border: 2px solid #4CAF50; "
             "border-radius: 6px; padding: 8px; }"
         )
-        banner_row = QHBoxLayout(self.infra_fw_status_banner)
-        banner_row.setContentsMargins(10, 6, 10, 6)
+        fw_banner_layout = QVBoxLayout(self.infra_fw_status_banner)
+        fw_banner_layout.setContentsMargins(10, 6, 10, 6)
+        fw_banner_layout.setSpacing(4)
         self.infra_fw_status_label = QLabel("")
         self.infra_fw_status_label.setStyleSheet("color: #2E7D32; font-size: 12px; font-weight: bold;")
-        banner_row.addWidget(self.infra_fw_status_label)
-        banner_row.addStretch()
+        fw_banner_layout.addWidget(self.infra_fw_status_label)
+
+        self.infra_fw_links_label = QLabel("")
+        self.infra_fw_links_label.setOpenExternalLinks(True)
+        self.infra_fw_links_label.setStyleSheet("color: #1565C0; font-size: 12px;")
+        self.infra_fw_links_label.setTextFormat(Qt.TextFormat.RichText)
+        fw_banner_layout.addWidget(self.infra_fw_links_label)
+
         self.infra_fw_status_banner.setVisible(False)
         layout.addWidget(self.infra_fw_status_banner)
 
@@ -3265,6 +3272,12 @@ class POVWorkflowWidget(QWidget):
         banner_text.setWordWrap(True)
         banner_text.setStyleSheet("color: #BF360C; font-size: 12px;")
         banner_layout.addWidget(banner_text)
+
+        self.pano_mgmt_links_label = QLabel("")
+        self.pano_mgmt_links_label.setOpenExternalLinks(True)
+        self.pano_mgmt_links_label.setTextFormat(Qt.TextFormat.RichText)
+        self.pano_mgmt_links_label.setStyleSheet("color: #1565C0; font-size: 12px; margin-bottom: 4px;")
+        banner_layout.addWidget(self.pano_mgmt_links_label)
 
         license_row = QHBoxLayout()
         self.pano_check_license_btn = QPushButton("Check License Status")
@@ -10873,6 +10886,7 @@ output "{device_name}_private_ip" {{
             self.infra_fw_status_banner.setVisible(True)
             if not self.infra_fw_status_label.text():
                 self.infra_fw_status_label.setText("Firewall previously configured")
+            self._update_infra_mgmt_links()
 
         outputs = getattr(self, '_terraform_outputs', {}) or {}
         creds = getattr(self, '_deployed_credentials', {}) or {}
@@ -11497,6 +11511,7 @@ output "{device_name}_private_ip" {{
             self.infra_fw_status_label.setText(
                 f"Firewall configured successfully at {ts}"
             )
+            self._update_infra_mgmt_links()
 
             QMessageBox.information(
                 self,
@@ -11711,8 +11726,9 @@ output "{device_name}_private_ip" {{
                 self.pano_plugin_dlp_status.setText("✓ Installed")
                 self.pano_plugin_dlp_status.setStyleSheet("color: #4CAF50; font-weight: bold;")
 
-            # Show the licensing banner
+            # Show the licensing banner with management links
             self.pano_licensing_banner.setVisible(True)
+            self._update_infra_mgmt_links()
 
             # Store that Panorama setup is complete
             self.deployment_config['panorama_setup_complete'] = True
@@ -11722,6 +11738,42 @@ output "{device_name}_private_ip" {{
             self.pano_setup_progress.setStyleSheet(
                 "QProgressBar::chunk { background-color: #f44336; }"
             )
+
+    def _update_infra_mgmt_links(self):
+        """Update clickable management links on the firewall status banner and Panorama licensing banner."""
+        outputs = getattr(self, '_terraform_outputs', {}) or {}
+
+        # Build firewall links
+        fw_links = []
+        for key, value in outputs.items():
+            if value and 'fqdn' in key.lower() and ('fw' in key.lower() or 'firewall' in key.lower()):
+                label = key.replace('_fqdn', '').replace('_', ' ').title()
+                fw_links.append(f'<a href="https://{value}">{label}</a>')
+            elif value and 'fw' in key.lower() and 'public_ip' in key.lower():
+                label = key.replace('_public_ip', '').replace('_', ' ').title()
+                fw_links.append(f'<a href="https://{value}">{label} (IP)</a>')
+
+        if fw_links and hasattr(self, 'infra_fw_links_label'):
+            self.infra_fw_links_label.setText("Open: " + " &nbsp;|&nbsp; ".join(fw_links))
+
+        # Build Panorama link (accessed via firewall public IP / FQDN)
+        is_panorama = getattr(self, 'management_type', 'scm') == 'panorama'
+        if is_panorama and hasattr(self, 'pano_mgmt_links_label'):
+            pano_links = []
+            # Panorama is accessed through the firewall's untrust public IP via NAT
+            # Use the first firewall FQDN or public IP
+            for key, value in outputs.items():
+                if value and 'fqdn' in key.lower() and ('fw' in key.lower() or 'firewall' in key.lower()):
+                    pano_links.append(f'<a href="https://{value}">Panorama via {value}</a>')
+                    break
+            if not pano_links:
+                for key, value in outputs.items():
+                    if value and 'fw' in key.lower() and 'public_ip' in key.lower():
+                        pano_links.append(f'<a href="https://{value}">Panorama via {value}</a>')
+                        break
+
+            if pano_links:
+                self.pano_mgmt_links_label.setText("Open: " + " &nbsp;|&nbsp; ".join(pano_links))
 
     def _pano_setup_log(self, message: str):
         """Append a message to the Panorama setup log."""
