@@ -654,6 +654,8 @@ class FirewallAPIClient:
         service: str = "any",
         source_translation_type: str = "dynamic-ip-and-port",
         source_translation_interface: str = None,
+        destination_translated_address: str = None,
+        destination_translated_port: str = None,
         description: str = "",
     ):
         """
@@ -666,8 +668,10 @@ class FirewallAPIClient:
             source: Source addresses
             destination: Destination addresses
             service: Service
-            source_translation_type: dynamic-ip-and-port, dynamic-ip, static-ip
+            source_translation_type: dynamic-ip-and-port, dynamic-ip, static-ip, or None for dest-only NAT
             source_translation_interface: Interface for dynamic IP/port
+            destination_translated_address: Destination NAT translated address (for static inbound NAT)
+            destination_translated_port: Destination NAT translated port (e.g. "443")
             description: Rule description
         """
         self._ensure_connected()
@@ -689,6 +693,12 @@ class FirewallAPIClient:
         if source_translation_type == "dynamic-ip-and-port" and source_translation_interface:
             rule.source_translation_type = "dynamic-ip-and-port"
             rule.source_translation_interface = source_translation_interface
+
+        # Set destination translation (static inbound NAT)
+        if destination_translated_address:
+            rule.destination_translated_address = destination_translated_address
+            if destination_translated_port:
+                rule.destination_translated_port = destination_translated_port
 
         rulebase.add(rule)
         rule.apply()

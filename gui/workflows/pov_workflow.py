@@ -196,12 +196,9 @@ class POVWorkflowWidget(QWidget):
         self._create_cloud_resources_tab()  # Step 2: Cloud Resources
         self._create_pov_use_cases_tab()  # Step 3: POV Use Cases
         self._create_cloud_deployment_tab()  # Step 4: Cloud Resource Deployment
-        self._create_panorama_setup_tab()  # Step 5: Panorama Setup (Panorama-managed only)
+        self._create_panorama_setup_tab()  # Step 5: Infrastructure Setup (Firewall + Panorama)
         self._create_deploy_config_tab()  # Step 6: Deploy POV Configuration
         self._create_review_tab()  # Step 7: Review & Execute
-
-        # Panorama tab is hidden by default, shown when Panorama managed is selected
-        self.tabs.setTabVisible(4, False)
 
         layout.addWidget(self.tabs)
 
@@ -2838,108 +2835,292 @@ class POVWorkflowWidget(QWidget):
         self.tabs.addTab(tab, "4️⃣ Cloud Deployment")
 
     # ============================================================================
-    # TAB 5: PANORAMA SETUP (Panorama-managed only)
+    # TAB 5: INFRASTRUCTURE SETUP (Firewall + Panorama)
     # ============================================================================
 
     def _create_panorama_setup_tab(self):
-        """Create Panorama initial setup tab (Step 5, Panorama-managed only).
+        """Create infrastructure setup tab (Step 5).
 
-        This tab handles pre-licensing Panorama configuration:
-        - Connection to the deployed Panorama (IP from Terraform outputs)
-        - Base device config (hostname, DNS, NTP)
-        - Plugin download/install (Cloud Services Plugin, DLP)
-        - Status display indicating readiness for licensing
+        Handles post-deployment device configuration:
+        - Firewall: base config, interfaces, zones, outbound NAT, security policy,
+          static NAT inbound for Panorama management
+        - Panorama (if Panorama-managed): base config, plugin install, licensing status
         """
         tab = QWidget()
-        layout = QVBoxLayout(tab)
+        outer_layout = QVBoxLayout(tab)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
 
-        title = QLabel("<h3>Step 5: Panorama Initial Setup</h3>")
+        # Scrollable content area
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_widget = QWidget()
+        layout = QVBoxLayout(scroll_widget)
+        layout.setSpacing(16)
+        layout.setContentsMargins(16, 16, 16, 16)
+
+        title = QLabel("<h3>Step 5: Infrastructure Setup</h3>")
         layout.addWidget(title)
 
         info = QLabel(
-            "Configure the deployed Panorama with base settings and install required plugins. "
-            "After this step, license the Panorama through the support portal before proceeding to deploy Prisma Access configuration."
+            "Configure deployed firewalls and Panorama with base settings, "
+            "NAT rules, and security policies. Firewalls must be configured first "
+            "to provide network access to Panorama."
         )
         info.setWordWrap(True)
-        info.setStyleSheet("color: gray; margin-bottom: 15px;")
+        info.setStyleSheet("color: gray; margin-bottom: 10px;")
         layout.addWidget(info)
 
-        # --- Connection Section ---
-        conn_group = QGroupBox("Panorama Connection")
-        conn_layout = QFormLayout()
+        # ==================================================================
+        # SECTION 1: FIREWALL CONFIGURATION
+        # ==================================================================
+        fw_header = QLabel("<h4>Firewall Configuration</h4>")
+        fw_header.setStyleSheet("margin-top: 8px;")
+        layout.addWidget(fw_header)
+
+        # --- Firewall Connection ---
+        fw_conn_group = QGroupBox("Firewall Connection")
+        fw_conn_layout = QFormLayout()
+        fw_conn_layout.setSpacing(10)
+
+        self.infra_fw_host = QLineEdit()
+        self.infra_fw_host.setPlaceholderText("Public management IP (from cloud deployment)")
+        self.infra_fw_host.setMinimumWidth(300)
+        fw_conn_layout.addRow("Management IP:", self.infra_fw_host)
+
+        self.infra_fw_user = QLineEdit()
+        self.infra_fw_user.setText("admin")
+        fw_conn_layout.addRow("Username:", self.infra_fw_user)
+
+        self.infra_fw_pass = QLineEdit()
+        self.infra_fw_pass.setEchoMode(QLineEdit.EchoMode.Password)
+        self.infra_fw_pass.setPlaceholderText("From cloud deployment credentials")
+        fw_conn_layout.addRow("Password:", self.infra_fw_pass)
+
+        fw_test_row = QHBoxLayout()
+        self.infra_fw_test_btn = QPushButton("Test Connection")
+        self.infra_fw_test_btn.setMaximumWidth(150)
+        self.infra_fw_test_btn.clicked.connect(self._test_infra_fw_connection)
+        fw_test_row.addWidget(self.infra_fw_test_btn)
+
+        self.infra_fw_conn_status = QLabel("")
+        fw_test_row.addWidget(self.infra_fw_conn_status)
+        fw_test_row.addStretch()
+        fw_conn_layout.addRow("", fw_test_row)
+
+        fw_conn_group.setLayout(fw_conn_layout)
+        layout.addWidget(fw_conn_group)
+
+        # --- Firewall Base Config ---
+        fw_config_group = QGroupBox("Firewall Base Configuration")
+        fw_config_layout = QFormLayout()
+        fw_config_layout.setSpacing(10)
+
+        self.infra_fw_hostname = QLineEdit()
+        self.infra_fw_hostname.setPlaceholderText("e.g. DC-FW-01")
+        fw_config_layout.addRow("Hostname:", self.infra_fw_hostname)
+
+        self.infra_fw_dns1 = QLineEdit()
+        self.infra_fw_dns1.setText("8.8.8.8")
+        fw_config_layout.addRow("Primary DNS:", self.infra_fw_dns1)
+
+        self.infra_fw_dns2 = QLineEdit()
+        self.infra_fw_dns2.setText("8.8.4.4")
+        fw_config_layout.addRow("Secondary DNS:", self.infra_fw_dns2)
+
+        self.infra_fw_ntp1 = QLineEdit()
+        self.infra_fw_ntp1.setText("time.google.com")
+        fw_config_layout.addRow("Primary NTP:", self.infra_fw_ntp1)
+
+        fw_config_group.setLayout(fw_config_layout)
+        layout.addWidget(fw_config_group)
+
+        # --- Firewall Security & NAT ---
+        fw_policy_group = QGroupBox("Security Policy & NAT")
+        fw_policy_layout = QVBoxLayout()
+        fw_policy_layout.setSpacing(10)
+
+        fw_policy_info = QLabel(
+            "The firewall will be configured with interfaces (eth1/1 untrust, eth1/2 trust), "
+            "zones, outbound PAT for the trust network, and inbound security rules."
+        )
+        fw_policy_info.setWordWrap(True)
+        fw_policy_info.setStyleSheet("color: #555; font-size: 12px; margin-bottom: 6px;")
+        fw_policy_layout.addWidget(fw_policy_info)
+
+        # User IP for inbound access
+        ip_row = QFormLayout()
+        ip_row.setSpacing(10)
+        self.infra_user_ip = QLineEdit()
+        self.infra_user_ip.setPlaceholderText("Your public IP/32 (from onboarding)")
+        self.infra_user_ip.setMinimumWidth(250)
+        ip_row.addRow("Allowed Source IP:", self.infra_user_ip)
+        fw_policy_layout.addLayout(ip_row)
+
+        # Panorama NAT info (only relevant if Panorama managed)
+        self.infra_pano_nat_frame = QFrame()
+        self.infra_pano_nat_frame.setStyleSheet(
+            "QFrame { background-color: #E3F2FD; border: 1px solid #90CAF9; "
+            "border-radius: 4px; padding: 8px; }"
+        )
+        pano_nat_layout = QFormLayout(self.infra_pano_nat_frame)
+        pano_nat_layout.setSpacing(8)
+
+        pano_nat_title = QLabel("<b>Panorama Inbound NAT</b> (static NAT to Panorama management)")
+        pano_nat_title.setStyleSheet("color: #1565C0; font-size: 12px;")
+        pano_nat_layout.addRow(pano_nat_title)
+
+        self.infra_pano_private_ip = QLineEdit()
+        self.infra_pano_private_ip.setPlaceholderText("Panorama trust IP (from deployment)")
+        pano_nat_layout.addRow("Panorama Private IP:", self.infra_pano_private_ip)
+
+        self.infra_pano_nat_port = QLineEdit()
+        self.infra_pano_nat_port.setText("443")
+        self.infra_pano_nat_port.setMaximumWidth(80)
+        pano_nat_layout.addRow("HTTPS Port:", self.infra_pano_nat_port)
+
+        pano_nat_note = QLabel(
+            "A destination NAT rule will translate HTTPS traffic on the firewall's "
+            "untrust public IP to the Panorama's private trust IP."
+        )
+        pano_nat_note.setWordWrap(True)
+        pano_nat_note.setStyleSheet("color: #1565C0; font-size: 11px;")
+        pano_nat_layout.addRow(pano_nat_note)
+
+        self.infra_pano_nat_frame.setVisible(False)  # Shown when Panorama managed
+        fw_policy_layout.addWidget(self.infra_pano_nat_frame)
+
+        fw_policy_group.setLayout(fw_policy_layout)
+        layout.addWidget(fw_policy_group)
+
+        # --- Firewall Action Button ---
+        fw_actions = QHBoxLayout()
+        fw_actions.addStretch()
+
+        self.infra_fw_configure_btn = QPushButton("Configure Firewall")
+        self.infra_fw_configure_btn.setMinimumWidth(220)
+        self.infra_fw_configure_btn.setMinimumHeight(40)
+        self.infra_fw_configure_btn.setStyleSheet(
+            "QPushButton { "
+            "  background-color: #E65100; color: white; padding: 10px 24px; "
+            "  font-weight: bold; font-size: 13px; border-radius: 5px; "
+            "  border: 1px solid #BF360C; border-bottom: 3px solid #BF360C; "
+            "}"
+            "QPushButton:hover { background-color: #F57C00; border-bottom: 3px solid #BF360C; }"
+            "QPushButton:pressed { background-color: #BF360C; border-bottom: 1px solid #BF360C; }"
+            "QPushButton:disabled { background-color: #BDBDBD; color: #9E9E9E; border: 1px solid #9E9E9E; border-bottom: 3px solid #757575; }"
+        )
+        self.infra_fw_configure_btn.clicked.connect(self._execute_firewall_infra_setup)
+        fw_actions.addWidget(self.infra_fw_configure_btn)
+
+        layout.addLayout(fw_actions)
+
+        # ==================================================================
+        # SECTION 2: PANORAMA CONFIGURATION (shown only if Panorama managed)
+        # ==================================================================
+        self.infra_pano_section = QWidget()
+        pano_section_layout = QVBoxLayout(self.infra_pano_section)
+        pano_section_layout.setContentsMargins(0, 0, 0, 0)
+        pano_section_layout.setSpacing(16)
+
+        # Separator
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet("color: #ccc;")
+        pano_section_layout.addWidget(sep)
+
+        pano_header = QLabel("<h4>Panorama Configuration</h4>")
+        pano_header.setStyleSheet("margin-top: 4px;")
+        pano_section_layout.addWidget(pano_header)
+
+        pano_info = QLabel(
+            "After the firewall is configured with NAT rules, the Panorama is accessible "
+            "through the firewall's public IP. Configure base settings and install plugins below."
+        )
+        pano_info.setWordWrap(True)
+        pano_info.setStyleSheet("color: gray; margin-bottom: 6px;")
+        pano_section_layout.addWidget(pano_info)
+
+        # --- Panorama Connection ---
+        pano_conn_group = QGroupBox("Panorama Connection (via Firewall NAT)")
+        pano_conn_layout = QFormLayout()
+        pano_conn_layout.setSpacing(10)
 
         self.pano_setup_host = QLineEdit()
-        self.pano_setup_host.setPlaceholderText("Auto-populated from cloud deployment")
-        conn_layout.addRow("Management IP:", self.pano_setup_host)
+        self.pano_setup_host.setPlaceholderText("Firewall public IP (NAT to Panorama)")
+        self.pano_setup_host.setMinimumWidth(300)
+        pano_conn_layout.addRow("Access IP:", self.pano_setup_host)
 
         self.pano_setup_user = QLineEdit()
         self.pano_setup_user.setText("admin")
-        conn_layout.addRow("Username:", self.pano_setup_user)
+        pano_conn_layout.addRow("Username:", self.pano_setup_user)
 
         self.pano_setup_pass = QLineEdit()
         self.pano_setup_pass.setEchoMode(QLineEdit.EchoMode.Password)
         self.pano_setup_pass.setPlaceholderText("From cloud deployment credentials")
-        conn_layout.addRow("Password:", self.pano_setup_pass)
+        pano_conn_layout.addRow("Password:", self.pano_setup_pass)
 
-        conn_btn_row = QHBoxLayout()
+        pano_test_row = QHBoxLayout()
         self.pano_setup_test_btn = QPushButton("Test Connection")
         self.pano_setup_test_btn.setMaximumWidth(150)
         self.pano_setup_test_btn.clicked.connect(self._test_panorama_setup_connection)
-        conn_btn_row.addWidget(self.pano_setup_test_btn)
+        pano_test_row.addWidget(self.pano_setup_test_btn)
 
         self.pano_setup_conn_status = QLabel("")
-        conn_btn_row.addWidget(self.pano_setup_conn_status)
-        conn_btn_row.addStretch()
-        conn_layout.addRow("", conn_btn_row)
+        pano_test_row.addWidget(self.pano_setup_conn_status)
+        pano_test_row.addStretch()
+        pano_conn_layout.addRow("", pano_test_row)
 
-        conn_group.setLayout(conn_layout)
-        layout.addWidget(conn_group)
+        pano_conn_group.setLayout(pano_conn_layout)
+        pano_section_layout.addWidget(pano_conn_group)
 
-        # --- Base Configuration Section ---
-        config_group = QGroupBox("Base Device Configuration")
-        config_layout = QFormLayout()
+        # --- Panorama Base Config ---
+        pano_config_group = QGroupBox("Panorama Base Configuration")
+        pano_config_layout = QFormLayout()
+        pano_config_layout.setSpacing(10)
 
         self.pano_setup_hostname = QLineEdit()
         self.pano_setup_hostname.setPlaceholderText("e.g. PA-Panorama-01")
-        config_layout.addRow("Hostname:", self.pano_setup_hostname)
+        pano_config_layout.addRow("Hostname:", self.pano_setup_hostname)
 
         self.pano_setup_dns1 = QLineEdit()
         self.pano_setup_dns1.setText("8.8.8.8")
-        config_layout.addRow("Primary DNS:", self.pano_setup_dns1)
+        pano_config_layout.addRow("Primary DNS:", self.pano_setup_dns1)
 
         self.pano_setup_dns2 = QLineEdit()
         self.pano_setup_dns2.setText("8.8.4.4")
-        config_layout.addRow("Secondary DNS:", self.pano_setup_dns2)
+        pano_config_layout.addRow("Secondary DNS:", self.pano_setup_dns2)
 
         self.pano_setup_ntp1 = QLineEdit()
         self.pano_setup_ntp1.setText("time.google.com")
-        config_layout.addRow("Primary NTP:", self.pano_setup_ntp1)
+        pano_config_layout.addRow("Primary NTP:", self.pano_setup_ntp1)
 
         self.pano_setup_ntp2 = QLineEdit()
         self.pano_setup_ntp2.setPlaceholderText("(Optional)")
-        config_layout.addRow("Secondary NTP:", self.pano_setup_ntp2)
+        pano_config_layout.addRow("Secondary NTP:", self.pano_setup_ntp2)
 
-        config_group.setLayout(config_layout)
-        layout.addWidget(config_group)
+        pano_config_group.setLayout(pano_config_layout)
+        pano_section_layout.addWidget(pano_config_group)
 
-        # --- Plugin Installation Section ---
+        # --- Plugin Installation ---
         plugin_group = QGroupBox("Plugin Installation")
         plugin_layout = QVBoxLayout()
+        plugin_layout.setSpacing(8)
 
         plugin_info = QLabel(
             "The following plugins are required for Prisma Access management. "
             "They will be downloaded from the Palo Alto update servers and installed on the Panorama."
         )
         plugin_info.setWordWrap(True)
-        plugin_info.setStyleSheet("color: #555; font-size: 11px; margin-bottom: 8px;")
+        plugin_info.setStyleSheet("color: #555; font-size: 12px; margin-bottom: 4px;")
         plugin_layout.addWidget(plugin_info)
 
-        # Plugin checklist
         plugin_grid = QGridLayout()
+        plugin_grid.setSpacing(8)
 
         self.pano_plugin_csp_cb = QCheckBox("Cloud Services Plugin (Prisma Access)")
         self.pano_plugin_csp_cb.setChecked(True)
-        self.pano_plugin_csp_cb.setEnabled(False)  # Required, can't uncheck
+        self.pano_plugin_csp_cb.setEnabled(False)
         plugin_grid.addWidget(self.pano_plugin_csp_cb, 0, 0)
 
         self.pano_plugin_csp_status = QLabel("")
@@ -2954,18 +3135,19 @@ class POVWorkflowWidget(QWidget):
 
         plugin_layout.addLayout(plugin_grid)
         plugin_group.setLayout(plugin_layout)
-        layout.addWidget(plugin_group)
+        pano_section_layout.addWidget(plugin_group)
 
-        # --- Action Buttons ---
-        actions_row = QHBoxLayout()
-        actions_row.addStretch()
+        # --- Panorama Action Button ---
+        pano_actions = QHBoxLayout()
+        pano_actions.addStretch()
 
-        self.pano_setup_configure_btn = QPushButton("🔧 Configure Panorama")
-        self.pano_setup_configure_btn.setMinimumWidth(200)
+        self.pano_setup_configure_btn = QPushButton("Configure Panorama & Install Plugins")
+        self.pano_setup_configure_btn.setMinimumWidth(280)
+        self.pano_setup_configure_btn.setMinimumHeight(40)
         self.pano_setup_configure_btn.setStyleSheet(
             "QPushButton { "
-            "  background-color: #1565C0; color: white; padding: 10px 20px; "
-            "  font-weight: bold; border-radius: 5px; "
+            "  background-color: #1565C0; color: white; padding: 10px 24px; "
+            "  font-weight: bold; font-size: 13px; border-radius: 5px; "
             "  border: 1px solid #0D47A1; border-bottom: 3px solid #0D47A1; "
             "}"
             "QPushButton:hover { background-color: #1976D2; border-bottom: 3px solid #0D47A1; }"
@@ -2973,39 +3155,22 @@ class POVWorkflowWidget(QWidget):
             "QPushButton:disabled { background-color: #BDBDBD; color: #9E9E9E; border: 1px solid #9E9E9E; border-bottom: 3px solid #757575; }"
         )
         self.pano_setup_configure_btn.clicked.connect(self._execute_panorama_setup)
-        actions_row.addWidget(self.pano_setup_configure_btn)
+        pano_actions.addWidget(self.pano_setup_configure_btn)
 
-        layout.addLayout(actions_row)
+        pano_section_layout.addLayout(pano_actions)
 
-        # --- Progress ---
-        self.pano_setup_progress = QProgressBar()
-        self.pano_setup_progress.setVisible(False)
-        layout.addWidget(self.pano_setup_progress)
-
-        # --- Status / Results ---
-        self.pano_setup_status_group = QGroupBox("Panorama Status")
-        status_layout = QVBoxLayout()
-
-        self.pano_setup_log = QTextEdit()
-        self.pano_setup_log.setReadOnly(True)
-        self.pano_setup_log.setMaximumHeight(150)
-        self.pano_setup_log.setStyleSheet(
-            "QTextEdit { font-family: monospace; font-size: 11px; "
-            "background-color: #263238; color: #B0BEC5; border-radius: 4px; padding: 6px; }"
-        )
-        status_layout.addWidget(self.pano_setup_log)
-
-        # Licensing reminder banner
+        # --- Licensing Banner ---
         self.pano_licensing_banner = QFrame()
         self.pano_licensing_banner.setStyleSheet(
             "QFrame { background-color: #FFF3E0; border: 2px solid #FF9800; "
-            "border-radius: 6px; padding: 10px; }"
+            "border-radius: 6px; padding: 12px; }"
         )
         banner_layout = QVBoxLayout(self.pano_licensing_banner)
-        banner_layout.setContentsMargins(10, 8, 10, 8)
+        banner_layout.setContentsMargins(12, 10, 12, 10)
+        banner_layout.setSpacing(8)
 
-        banner_title = QLabel("<b>⏳ Panorama Ready for Licensing</b>")
-        banner_title.setStyleSheet("color: #E65100; font-size: 13px;")
+        banner_title = QLabel("<b>Panorama Ready for Licensing</b>")
+        banner_title.setStyleSheet("color: #E65100; font-size: 14px;")
         banner_layout.addWidget(banner_title)
 
         banner_text = QLabel(
@@ -3016,30 +3181,60 @@ class POVWorkflowWidget(QWidget):
             "configuration will be pushed through the Panorama."
         )
         banner_text.setWordWrap(True)
-        banner_text.setStyleSheet("color: #BF360C; font-size: 11px;")
+        banner_text.setStyleSheet("color: #BF360C; font-size: 12px;")
         banner_layout.addWidget(banner_text)
 
-        self.pano_check_license_btn = QPushButton("🔑 Check License Status")
-        self.pano_check_license_btn.setMaximumWidth(200)
+        license_row = QHBoxLayout()
+        self.pano_check_license_btn = QPushButton("Check License Status")
+        self.pano_check_license_btn.setMinimumWidth(180)
         self.pano_check_license_btn.setStyleSheet(
             "QPushButton { background-color: #FF9800; color: white; font-weight: bold; "
-            "border-radius: 4px; padding: 6px 12px; border: 1px solid #F57C00; }"
+            "border-radius: 4px; padding: 8px 16px; border: 1px solid #F57C00; font-size: 12px; }"
             "QPushButton:hover { background-color: #FFB74D; }"
         )
         self.pano_check_license_btn.clicked.connect(self._check_panorama_license)
-        banner_layout.addWidget(self.pano_check_license_btn)
+        license_row.addWidget(self.pano_check_license_btn)
 
         self.pano_license_status_label = QLabel("")
-        banner_layout.addWidget(self.pano_license_status_label)
+        license_row.addWidget(self.pano_license_status_label)
+        license_row.addStretch()
+        banner_layout.addLayout(license_row)
 
         self.pano_licensing_banner.setVisible(False)
-        status_layout.addWidget(self.pano_licensing_banner)
+        pano_section_layout.addWidget(self.pano_licensing_banner)
 
-        self.pano_setup_status_group.setLayout(status_layout)
-        layout.addWidget(self.pano_setup_status_group)
+        self.infra_pano_section.setVisible(False)  # Shown when Panorama managed
+        layout.addWidget(self.infra_pano_section)
 
-        # --- Navigation ---
+        # ==================================================================
+        # SHARED: Progress + Log
+        # ==================================================================
+        self.pano_setup_progress = QProgressBar()
+        self.pano_setup_progress.setVisible(False)
+        layout.addWidget(self.pano_setup_progress)
+
+        log_group = QGroupBox("Configuration Log")
+        log_layout = QVBoxLayout()
+        self.pano_setup_log = QTextEdit()
+        self.pano_setup_log.setReadOnly(True)
+        self.pano_setup_log.setMinimumHeight(180)
+        self.pano_setup_log.setStyleSheet(
+            "QTextEdit { font-family: monospace; font-size: 12px; "
+            "background-color: #263238; color: #B0BEC5; border-radius: 4px; padding: 8px; }"
+        )
+        log_layout.addWidget(self.pano_setup_log)
+        log_group.setLayout(log_layout)
+        layout.addWidget(log_group)
+
+        # Spacer at bottom of scroll area
+        layout.addStretch()
+
+        scroll.setWidget(scroll_widget)
+        outer_layout.addWidget(scroll)
+
+        # --- Navigation (outside scroll area, pinned to bottom) ---
         nav_layout = QHBoxLayout()
+        nav_layout.setContentsMargins(16, 8, 16, 8)
 
         back_btn = QPushButton("← Back to Cloud Deployment")
         back_btn.setStyleSheet(
@@ -3069,9 +3264,9 @@ class POVWorkflowWidget(QWidget):
         next_btn.clicked.connect(lambda: self.tabs.setCurrentIndex(5))
         nav_layout.addWidget(next_btn)
 
-        layout.addLayout(nav_layout)
+        outer_layout.addLayout(nav_layout)
 
-        self.tabs.addTab(tab, "5️⃣ Panorama Setup")
+        self.tabs.addTab(tab, "5️⃣ Infrastructure Setup")
 
     # ============================================================================
     # TAB 6: DEPLOY POV CONFIGURATION
@@ -6858,7 +7053,7 @@ class POVWorkflowWidget(QWidget):
             "Cloud Resources",
             "POV Use Cases",
             "Cloud Deployment",
-            "Panorama Setup",
+            "Infrastructure Setup",
             "Deploy POV Config",
         ]
         if 0 <= index < len(tab_names):
@@ -6876,7 +7071,7 @@ class POVWorkflowWidget(QWidget):
                 self._refresh_private_app_connections()
                 self._auto_generate_security_objects()
 
-            # Auto-populate Panorama connection from deployment when entering Panorama Setup tab
+            # Auto-populate Infrastructure Setup tab from deployment outputs
             if index == 4:
                 self._auto_populate_panorama_setup()
 
@@ -10588,52 +10783,381 @@ output "{device_name}_private_ip" {{
     # ========== Panorama Setup Tab Handlers ==========
 
     def _auto_populate_panorama_setup(self):
-        """Auto-populate Panorama Setup tab fields from cloud deployment outputs."""
-        # Try to get Panorama IP from terraform outputs
+        """Auto-populate Infrastructure Setup tab fields from cloud deployment outputs."""
         outputs = getattr(self, '_terraform_outputs', {}) or {}
-
-        # Search for Panorama management IP in terraform outputs
-        pano_ip = None
-        for key in ('panorama_management_ip', 'panorama_ip', 'panorama_public_ip',
-                     'pano_management_ip', 'pano_ip', 'pano_public_ip'):
-            if key in outputs and outputs[key]:
-                pano_ip = outputs[key]
-                break
-
-        # Fallback: search for any key containing 'panorama' and 'ip'
-        if not pano_ip:
-            for key, value in outputs.items():
-                if 'panorama' in key.lower() and 'ip' in key.lower() and value:
-                    pano_ip = value
-                    break
-
-        if pano_ip and not self.pano_setup_host.text().strip():
-            self.pano_setup_host.setText(pano_ip)
-
-        # Auto-populate credentials from deployment
         creds = getattr(self, '_deployed_credentials', {}) or {}
-        if not self.pano_setup_pass.text():
-            # Try Panorama-specific creds, then fallback to firewall creds
-            pano_creds = creds.get('panorama', creds.get('firewall', {}))
-            if pano_creds.get('password'):
-                self.pano_setup_pass.setText(pano_creds['password'])
-            if pano_creds.get('username') and pano_creds['username'] != 'Not found':
-                self.pano_setup_user.setText(pano_creds['username'])
-
-        # Auto-populate hostname from customer name
-        if not self.pano_setup_hostname.text().strip():
-            customer = self.customer_name_input.text().strip() if hasattr(self, 'customer_name_input') else ""
-            if customer:
-                sanitized = self._sanitize_customer_name(customer)
-                self.pano_setup_hostname.setText(f"{sanitized}-panorama")
-
-        # Auto-populate DNS from infrastructure config
         infra = self.cloud_resource_configs.get('infrastructure', {})
         dns = infra.get('dns', {})
-        if dns.get('primary') and self.pano_setup_dns1.text() == '8.8.8.8':
-            self.pano_setup_dns1.setText(dns['primary'])
-        if dns.get('secondary') and self.pano_setup_dns2.text() == '8.8.4.4':
-            self.pano_setup_dns2.setText(dns['secondary'])
+        customer = self.customer_name_input.text().strip() if hasattr(self, 'customer_name_input') else ""
+        sanitized = self._sanitize_customer_name(customer) if customer else "fw"
+
+        # --- Firewall fields ---
+        # Find firewall public management IP
+        fw_ip = None
+        for key in ('fw-datacenter-1_public_ip', 'fw_public_ip', 'firewall_public_ip'):
+            if key in outputs and outputs[key]:
+                fw_ip = outputs[key]
+                break
+        if not fw_ip:
+            for key, value in outputs.items():
+                if ('fw' in key.lower() or 'firewall' in key.lower()) and 'public_ip' in key.lower() and value:
+                    fw_ip = value
+                    break
+
+        if fw_ip and not self.infra_fw_host.text().strip():
+            self.infra_fw_host.setText(fw_ip)
+
+        # Firewall credentials
+        fw_creds = creds.get('firewall', {})
+        if not self.infra_fw_pass.text():
+            if fw_creds.get('password'):
+                self.infra_fw_pass.setText(fw_creds['password'])
+            if fw_creds.get('username') and fw_creds['username'] != 'Not found':
+                self.infra_fw_user.setText(fw_creds['username'])
+
+        # Firewall hostname
+        if not self.infra_fw_hostname.text().strip():
+            self.infra_fw_hostname.setText(f"{sanitized}-dc-fw-01")
+
+        # Firewall DNS
+        if dns.get('primary') and self.infra_fw_dns1.text() == '8.8.8.8':
+            self.infra_fw_dns1.setText(dns['primary'])
+        if dns.get('secondary') and self.infra_fw_dns2.text() == '8.8.4.4':
+            self.infra_fw_dns2.setText(dns['secondary'])
+
+        # User's public IP for security policy
+        if not self.infra_user_ip.text().strip():
+            user_ip = self.cloud_resource_configs.get('cloud_security', {}).get('source_ips', '')
+            if user_ip:
+                self.infra_user_ip.setText(user_ip)
+
+        # --- Panorama fields (only if Panorama managed) ---
+        is_panorama = getattr(self, 'management_type', 'scm') == 'panorama'
+        if is_panorama:
+            # Panorama private IP (for NAT destination)
+            pano_private_ip = None
+            for key in ('panorama_private_ip', 'panorama_ip', 'panorama_management_ip'):
+                if key in outputs and outputs[key]:
+                    pano_private_ip = outputs[key]
+                    break
+            if not pano_private_ip:
+                for key, value in outputs.items():
+                    if 'panorama' in key.lower() and 'ip' in key.lower() and value:
+                        pano_private_ip = value
+                        break
+
+            if pano_private_ip and not self.infra_pano_private_ip.text().strip():
+                self.infra_pano_private_ip.setText(pano_private_ip)
+
+            # Panorama access IP = firewall public IP (accessed through NAT)
+            if fw_ip and not self.pano_setup_host.text().strip():
+                self.pano_setup_host.setText(fw_ip)
+
+            # Panorama credentials (same as firewall for cloud-deployed VMs)
+            if not self.pano_setup_pass.text():
+                pano_creds = creds.get('panorama', fw_creds)
+                if pano_creds.get('password'):
+                    self.pano_setup_pass.setText(pano_creds['password'])
+                if pano_creds.get('username') and pano_creds['username'] != 'Not found':
+                    self.pano_setup_user.setText(pano_creds['username'])
+
+            # Panorama hostname
+            if not self.pano_setup_hostname.text().strip():
+                self.pano_setup_hostname.setText(f"{sanitized}-panorama")
+
+            # Panorama DNS
+            if dns.get('primary') and self.pano_setup_dns1.text() == '8.8.8.8':
+                self.pano_setup_dns1.setText(dns['primary'])
+            if dns.get('secondary') and self.pano_setup_dns2.text() == '8.8.4.4':
+                self.pano_setup_dns2.setText(dns['secondary'])
+
+    def _test_infra_fw_connection(self):
+        """Test firewall connection from the Infrastructure Setup tab."""
+        host = self.infra_fw_host.text().strip()
+        user = self.infra_fw_user.text().strip()
+        password = self.infra_fw_pass.text()
+
+        if not host or not user or not password:
+            QMessageBox.warning(
+                self, "Missing Information",
+                "Please enter firewall management IP, username, and password."
+            )
+            return
+
+        try:
+            from firewall.api_client import FirewallAPIClient
+
+            self.infra_fw_test_btn.setEnabled(False)
+            self.infra_fw_test_btn.setText("Testing...")
+            self.infra_fw_conn_status.setText("Connecting...")
+            self.infra_fw_conn_status.setStyleSheet("color: #FF9800;")
+
+            from PyQt6.QtWidgets import QApplication
+            QApplication.processEvents()
+
+            client = FirewallAPIClient(hostname=host, username=user, password=password)
+            client.connect()
+            info = client.get_device_info()
+            client.disconnect()
+
+            self.infra_fw_conn_status.setText(
+                f"Connected — {info.hostname} ({info.model}, PAN-OS {info.sw_version})"
+            )
+            self.infra_fw_conn_status.setStyleSheet("color: #4CAF50; font-weight: bold;")
+
+        except Exception as e:
+            self.infra_fw_conn_status.setText(f"Failed: {str(e)[:80]}")
+            self.infra_fw_conn_status.setStyleSheet("color: #f44336;")
+        finally:
+            self.infra_fw_test_btn.setEnabled(True)
+            self.infra_fw_test_btn.setText("Test Connection")
+
+    def _execute_firewall_infra_setup(self):
+        """Execute firewall infrastructure setup: base config + NAT + security policy."""
+        host = self.infra_fw_host.text().strip()
+        user = self.infra_fw_user.text().strip()
+        password = self.infra_fw_pass.text()
+
+        if not host or not user or not password:
+            QMessageBox.warning(
+                self, "Missing Information",
+                "Please enter firewall connection details and test the connection first."
+            )
+            return
+
+        hostname = self.infra_fw_hostname.text().strip() or "dc-fw-01"
+        dns1 = self.infra_fw_dns1.text().strip() or "8.8.8.8"
+        dns2 = self.infra_fw_dns2.text().strip() or "8.8.4.4"
+        ntp1 = self.infra_fw_ntp1.text().strip() or "time.google.com"
+        user_ip = self.infra_user_ip.text().strip() or "0.0.0.0/0"
+
+        # Panorama NAT config (if Panorama managed)
+        is_panorama = getattr(self, 'management_type', 'scm') == 'panorama'
+        pano_private_ip = self.infra_pano_private_ip.text().strip() if is_panorama else None
+        pano_nat_port = self.infra_pano_nat_port.text().strip() if is_panorama else None
+
+        # Disable button and show progress
+        self.infra_fw_configure_btn.setEnabled(False)
+        self.infra_fw_configure_btn.setText("Configuring...")
+        self.pano_setup_progress.setVisible(True)
+        self.pano_setup_progress.setValue(0)
+        self.pano_setup_progress.setStyleSheet("")  # Reset any error styling
+        self.pano_setup_log.clear()
+
+        self._pano_setup_log("Starting firewall infrastructure setup...")
+        self._pano_setup_log(f"Target: {host} as {user}")
+
+        from PyQt6.QtCore import QThread, pyqtSignal
+
+        class FirewallInfraWorker(QThread):
+            progress = pyqtSignal(str, int)
+            finished = pyqtSignal(bool, str)
+
+            def __init__(self, host, user, password, hostname, dns1, dns2, ntp1,
+                         user_ip, pano_private_ip, pano_nat_port):
+                super().__init__()
+                self.host = host
+                self.user = user
+                self.password = password
+                self.hostname = hostname
+                self.dns1 = dns1
+                self.dns2 = dns2
+                self.ntp1 = ntp1
+                self.user_ip = user_ip
+                self.pano_private_ip = pano_private_ip
+                self.pano_nat_port = pano_nat_port
+
+            def run(self):
+                try:
+                    from firewall.api_client import FirewallAPIClient
+
+                    # Phase 1: Connect
+                    self.progress.emit("Connecting to firewall...", 5)
+                    client = FirewallAPIClient(
+                        hostname=self.host, username=self.user, password=self.password
+                    )
+                    client.connect()
+
+                    # Phase 2: Base config
+                    self.progress.emit(f"Setting hostname: {self.hostname}", 10)
+                    client.set_hostname(self.hostname)
+
+                    self.progress.emit(f"Setting DNS: {self.dns1}, {self.dns2}", 15)
+                    client.set_dns_servers(self.dns1, self.dns2)
+
+                    self.progress.emit(f"Setting NTP: {self.ntp1}", 20)
+                    client.set_ntp_servers(self.ntp1)
+
+                    # Phase 3: Interfaces (DHCP from Azure)
+                    self.progress.emit("Configuring ethernet1/1 (untrust)...", 25)
+                    client.configure_interface(
+                        name="ethernet1/1", mode="layer3", dhcp=True,
+                        zone="untrust", virtual_router="default",
+                        comment="Untrust interface - Azure DHCP"
+                    )
+
+                    self.progress.emit("Configuring ethernet1/2 (trust)...", 30)
+                    client.configure_interface(
+                        name="ethernet1/2", mode="layer3", dhcp=True,
+                        zone="trust", virtual_router="default",
+                        comment="Trust interface - Azure DHCP"
+                    )
+
+                    # Phase 4: Zones
+                    self.progress.emit("Creating trust zone...", 35)
+                    client.create_zone(name="trust", mode="layer3", interfaces=["ethernet1/2"])
+
+                    self.progress.emit("Creating untrust zone...", 40)
+                    client.create_zone(name="untrust", mode="layer3", interfaces=["ethernet1/1"])
+
+                    # Phase 5: Outbound NAT (PAT)
+                    self.progress.emit("Creating outbound PAT rule...", 50)
+                    client.create_nat_rule(
+                        name="outbound-pat",
+                        source_zone=["trust"],
+                        destination_zone="untrust",
+                        source=["any"],
+                        destination=["any"],
+                        service="any",
+                        source_translation_type="dynamic-ip-and-port",
+                        source_translation_interface="ethernet1/1",
+                        description="Outbound PAT for trust network",
+                    )
+
+                    # Phase 6: Security rules
+                    self.progress.emit("Creating outbound allow rule...", 55)
+                    client.create_security_rule(
+                        name="allow-outbound",
+                        source_zone=["trust"],
+                        destination_zone=["untrust"],
+                        source=["any"],
+                        destination=["any"],
+                        application=["any"],
+                        service=["application-default"],
+                        action="allow",
+                        log_end=True,
+                        description="Allow all outbound from trust",
+                    )
+
+                    self.progress.emit(f"Creating inbound HTTPS allow from {self.user_ip}...", 60)
+                    # Create address object for user IP
+                    client.create_address_object(
+                        name="admin-ip",
+                        value=self.user_ip,
+                        addr_type="ip-netmask",
+                        description="Administrator public IP for management access",
+                    )
+
+                    client.create_security_rule(
+                        name="allow-inbound-mgmt",
+                        source_zone=["untrust"],
+                        destination_zone=["untrust"],
+                        source=["admin-ip"],
+                        destination=["any"],
+                        application=["ssl", "web-browsing"],
+                        service=["service-https"],
+                        action="allow",
+                        log_end=True,
+                        description="Allow HTTPS inbound from admin IP",
+                    )
+
+                    # Phase 7: Panorama static NAT (if applicable)
+                    if self.pano_private_ip:
+                        self.progress.emit(f"Creating Panorama address object ({self.pano_private_ip})...", 70)
+                        client.create_address_object(
+                            name="panorama-mgmt",
+                            value=self.pano_private_ip,
+                            addr_type="ip-netmask" if '/' in self.pano_private_ip else "ip-netmask",
+                            description="Panorama management private IP",
+                        )
+                        # Ensure IP has /32 suffix
+                        pano_ip_val = self.pano_private_ip
+                        if '/' not in pano_ip_val:
+                            pano_ip_val = f"{pano_ip_val}/32"
+
+                        self.progress.emit("Creating static NAT for Panorama inbound...", 75)
+                        client.create_nat_rule(
+                            name="panorama-inbound-nat",
+                            source_zone=["untrust"],
+                            destination_zone="untrust",
+                            source=["admin-ip"],
+                            destination=["any"],
+                            service="service-https",
+                            source_translation_type=None,
+                            destination_translated_address=pano_ip_val.split('/')[0],
+                            destination_translated_port=self.pano_nat_port or "443",
+                            description="Static NAT inbound HTTPS to Panorama",
+                        )
+
+                        self.progress.emit("Creating security rule for Panorama access...", 80)
+                        client.create_security_rule(
+                            name="allow-panorama-inbound",
+                            source_zone=["untrust"],
+                            destination_zone=["trust"],
+                            source=["admin-ip"],
+                            destination=["panorama-mgmt"],
+                            application=["ssl", "web-browsing"],
+                            service=["service-https"],
+                            action="allow",
+                            log_end=True,
+                            description="Allow HTTPS to Panorama from admin IP",
+                        )
+
+                    # Phase 8: Commit
+                    self.progress.emit("Committing firewall configuration...", 90)
+                    result = client.commit(
+                        description="Infrastructure setup by pa_config_lab",
+                        sync=True,
+                    )
+                    if not result.success:
+                        self.finished.emit(False, f"Commit failed: {result.message}")
+                        return
+
+                    client.disconnect()
+                    self.progress.emit("Firewall infrastructure setup complete", 100)
+
+                    msg = "Firewall configured successfully: base config, interfaces, zones, outbound PAT, security policy"
+                    if self.pano_private_ip:
+                        msg += ", Panorama inbound NAT"
+                    self.finished.emit(True, msg)
+
+                except Exception as e:
+                    self.finished.emit(False, str(e))
+
+        self._fw_infra_worker = FirewallInfraWorker(
+            host, user, password, hostname, dns1, dns2, ntp1,
+            user_ip, pano_private_ip, pano_nat_port
+        )
+        self._fw_infra_worker.progress.connect(self._on_panorama_setup_progress)
+        self._fw_infra_worker.finished.connect(self._on_fw_infra_setup_finished)
+        self._fw_infra_worker.start()
+
+    def _on_fw_infra_setup_finished(self, success: bool, message: str):
+        """Handle completion of firewall infrastructure setup."""
+        self.infra_fw_configure_btn.setEnabled(True)
+        self.infra_fw_configure_btn.setText("Configure Firewall")
+
+        if success:
+            self._pano_setup_log(f"\n{message}")
+            self.pano_setup_progress.setValue(100)
+            self.deployment_config['firewall_infra_configured'] = True
+
+            QMessageBox.information(
+                self,
+                "Firewall Configured",
+                f"{message}\n\n"
+                "You can now configure the Panorama (if applicable) or proceed to the next step."
+            )
+        else:
+            self._pano_setup_log(f"\nFirewall setup failed: {message}")
+            self.pano_setup_progress.setStyleSheet(
+                "QProgressBar::chunk { background-color: #f44336; }"
+            )
+            QMessageBox.critical(
+                self,
+                "Firewall Setup Failed",
+                f"Failed to configure firewall:\n\n{message[:500]}"
+            )
 
     def _test_panorama_setup_connection(self):
         """Test Panorama connection from the Panorama Setup tab."""
@@ -13218,11 +13742,18 @@ output "{device_name}_private_ip" {{
             )
 
     def _update_panorama_visibility(self):
-        """Update Panorama section visibility based on management type."""
+        """Update Panorama and infrastructure section visibility based on management type."""
         is_panorama = not self.scm_managed_radio.isChecked()
 
-        # Show/hide the Panorama Setup tab (index 4)
-        self.tabs.setTabVisible(4, is_panorama)
+        # Infrastructure Setup tab is always visible (firewalls always need config)
+        # but Panorama sections within it are conditional
+        self.tabs.setTabVisible(4, True)
+
+        # Show/hide Panorama section within Infrastructure Setup tab
+        if hasattr(self, 'infra_pano_section'):
+            self.infra_pano_section.setVisible(is_panorama)
+        if hasattr(self, 'infra_pano_nat_frame'):
+            self.infra_pano_nat_frame.setVisible(is_panorama)
 
         # Show/hide Panorama section in Deploy POV Config tab
         if hasattr(self, 'panorama_deploy_group'):
