@@ -163,6 +163,17 @@ class TerraformWorker(QThread):
 
         result = executor.plan(var_file=var_file)
 
+        # If plan fails with bootstrap storage 403, remove bootstrap resources
+        # from state and retry — they're only needed during initial VM creation
+        if not result.success:
+            full_output = re.sub(r'\x1b\[[0-9;]*m', '', (result.stdout or '') + '\n' + (result.error_message or ''))
+            if 'bootstrap' in full_output and '403' in full_output:
+                self.log_message.emit("[plan] Bootstrap storage 403 — removing from state and retrying...")
+                for resource in ('azurerm_storage_blob.init_cfg', 'azurerm_storage_blob.bootstrap_xml',
+                                 'azurerm_storage_container.bootstrap'):
+                    executor.state_rm(resource)
+                result = executor.plan(var_file=var_file)
+
         if result.success:
             self.progress.emit("Plan complete", 100)
             if result.stdout:
@@ -236,13 +247,18 @@ class TerraformWorker(QThread):
 
             # Update storage account network rules to include current IP
             self.log_message.emit(f"Updating storage account IP rules with current IP ({current_ip})...")
-            subprocess.run(
+            result = subprocess.run(
                 ["az", "storage", "account", "network-rule", "add",
                  "--resource-group", rg_name,
                  "--account-name", storage_name,
                  "--ip-address", current_ip],
                 capture_output=True, text=True, timeout=30,
             )
+            if result.returncode == 0:
+                # Azure storage IP rule propagation takes ~30-60s
+                import time
+                self.log_message.emit("Waiting for storage IP rule propagation (30s)...")
+                time.sleep(30)
 
         except Exception as e:
             self.log_message.emit(f"Warning: Could not update storage IP rules: {e}")
