@@ -10260,12 +10260,20 @@ output "{device_name}_private_ip" {{
             result_text = "\n" + "=" * 60 + "\n"
             result_text += "[OK] DEPLOYMENT SUCCESSFUL\n"
             result_text += "=" * 60 + "\n\n"
+
+            # Build a concise resource summary (skip long IDs)
+            key_outputs = {}
             if outputs:
-                result_text += "Deployed Resources:\n"
                 for key, value in outputs.items():
                     if value:
-                        result_text += f"  - {key}: {value}\n"
                         self._log_activity(f"  Deployed: {key} = {value}")
+                        key_outputs[key] = value
+
+                # Show IPs and FQDNs prominently, subnet IDs are less useful
+                result_text += "Deployed Resources:\n"
+                for key, value in key_outputs.items():
+                    if value:
+                        result_text += f"  - {key}: {value}\n"
 
             self.cloud_deploy_results.append_text(result_text)
 
@@ -10276,6 +10284,21 @@ output "{device_name}_private_ip" {{
 
             # Populate and show the credentials panel
             self._populate_deployment_credentials()
+
+            # Show a success notification dialog so the user knows it's done
+            resource_count = len(key_outputs)
+            ip_outputs = {k: v for k, v in key_outputs.items() if 'ip' in k.lower() or 'fqdn' in k.lower()}
+            summary_lines = [f"  {k}: {v}" for k, v in ip_outputs.items()]
+            summary_text = "\n".join(summary_lines[:8]) if summary_lines else "See results panel for details."
+
+            QMessageBox.information(
+                self,
+                "Deployment Successful",
+                f"Infrastructure deployed successfully!\n\n"
+                f"{resource_count} outputs available.\n\n"
+                f"Key resources:\n{summary_text}\n\n"
+                f"Click 'View Credentials' to see login details."
+            )
         else:
             self._log_activity(f"Infrastructure deployment failed: {message}", "error")
             # Append failure summary to results (don't clear existing output)
@@ -10285,6 +10308,13 @@ output "{device_name}_private_ip" {{
             result_text += f"Error: {message}\n"
             result_text += "\nReview the output above for details."
             self.cloud_deploy_results.append_text(result_text)
+
+            # Show a failure notification dialog
+            QMessageBox.critical(
+                self,
+                "Deployment Failed",
+                f"Infrastructure deployment failed.\n\n{message[:500]}"
+            )
 
     def _on_deploy_error(self, error: str):
         """Handle deployment error - shows in results window."""
