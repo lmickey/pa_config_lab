@@ -1201,6 +1201,7 @@ class POVWorkflowWidget(QWidget):
 
             self.dc_style_combo = QComboBox()
             self.dc_style_combo.addItems([
+                "Traditional Firewall",
                 "Traditional Firewall (HA)",
                 "SD-WAN (ION HA)",
                 "Hybrid (FW + ION HA)",
@@ -5495,13 +5496,15 @@ class POVWorkflowWidget(QWidget):
             region = self.cloud_region_combo.currentText() if hasattr(self, 'cloud_region_combo') else "eastus"
 
         # Determine style from dropdown
-        style_text = self.dc_style_combo.currentText() if hasattr(self, 'dc_style_combo') else "Traditional (Firewall)"
+        style_text = self.dc_style_combo.currentText() if hasattr(self, 'dc_style_combo') else "Traditional Firewall"
         if 'Hybrid' in style_text and 'Routing' in style_text:
             style = 'hybrid_router'
         elif 'Hybrid' in style_text:
             style = 'hybrid'
         elif 'SD-WAN' in style_text:
             style = 'sdwan_ha'
+        elif 'HA' in style_text:
+            style = 'traditional_ha'
         else:
             style = 'traditional'
 
@@ -5609,7 +5612,8 @@ class POVWorkflowWidget(QWidget):
                 icon = "\U0001f525"  # 🔥
             style_labels = {
                 'hybrid': 'Hybrid-HA', 'hybrid_router': 'Hybrid+Rtr',
-                'sdwan_ha': 'ION-HA', 'traditional': 'FW-HA',
+                'sdwan_ha': 'ION-HA', 'traditional_ha': 'FW-HA',
+                'traditional': 'FW',
             }
             style_label = style_labels.get(style, 'FW')
 
@@ -8968,7 +8972,7 @@ class POVWorkflowWidget(QWidget):
                                 'ha_peer': i,
                                 'availability_zone': str(i),
                             })
-                    else:
+                    elif dc_style == 'traditional_ha':
                         # Traditional HA: 2 FWs in separate availability zones
                         for i in range(1, 3):
                             firewalls.append({
@@ -8979,6 +8983,14 @@ class POVWorkflowWidget(QWidget):
                                 'ha_peer': i,
                                 'availability_zone': str(i),
                             })
+                    else:
+                        # Traditional single firewall (no HA)
+                        firewalls.append({
+                            'name': f"fw-{dc_name}",
+                            'type': 'service_connection',
+                            'location_name': dc['name'],
+                            'region': dc_region,
+                        })
 
             for branch in locations.get('branches', []):
                 firewalls.append({
