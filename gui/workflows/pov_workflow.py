@@ -10866,6 +10866,14 @@ output "{device_name}_private_ip" {{
 
     def _auto_populate_panorama_setup(self):
         """Auto-populate Infrastructure Setup tab fields from cloud deployment outputs."""
+        # Restore configured state UI if firewall was previously configured
+        if self.deployment_config.get('firewall_infra_configured'):
+            self.infra_fw_configure_btn.setText("Reconfigure Firewall")
+            self.infra_fw_update_admins_btn.setVisible(True)
+            self.infra_fw_status_banner.setVisible(True)
+            if not self.infra_fw_status_label.text():
+                self.infra_fw_status_label.setText("Firewall previously configured")
+
         outputs = getattr(self, '_terraform_outputs', {}) or {}
         creds = getattr(self, '_deployed_credentials', {}) or {}
         infra = self.cloud_resource_configs.get('infrastructure', {})
