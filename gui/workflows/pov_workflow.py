@@ -11085,7 +11085,7 @@ output "{device_name}_private_ip" {{
                         description="Allow all outbound from trust",
                     )
 
-                    self.progress.emit(f"Creating inbound HTTPS allow from {self.user_ip}...", 60)
+                    self.progress.emit(f"Creating admin address object and group ({self.user_ip})...", 58)
                     # Create address object for user IP
                     client.create_address_object(
                         name="admin-ip",
@@ -11094,17 +11094,26 @@ output "{device_name}_private_ip" {{
                         description="Administrator public IP for management access",
                     )
 
+                    # Create address group for admin networks (expandable for future IPs)
+                    self.progress.emit("Creating admin-networks address group...", 60)
+                    client.create_address_group(
+                        name="admin-networks",
+                        static_members=["admin-ip"],
+                        description="Admin networks allowed for inbound management access",
+                    )
+
+                    self.progress.emit("Creating inbound HTTPS allow rule...", 63)
                     client.create_security_rule(
                         name="allow-inbound-mgmt",
                         source_zone=["untrust"],
                         destination_zone=["untrust"],
-                        source=["admin-ip"],
+                        source=["admin-networks"],
                         destination=["any"],
                         application=["ssl", "web-browsing"],
                         service=["service-https"],
                         action="allow",
                         log_end=True,
-                        description="Allow HTTPS inbound from admin IP",
+                        description="Allow HTTPS inbound from admin networks",
                     )
 
                     # Phase 7: Panorama static NAT (if applicable)
@@ -11126,7 +11135,7 @@ output "{device_name}_private_ip" {{
                             name="panorama-inbound-nat",
                             source_zone=["untrust"],
                             destination_zone="untrust",
-                            source=["admin-ip"],
+                            source=["admin-networks"],
                             destination=["any"],
                             service="service-https",
                             source_translation_type=None,
@@ -11140,13 +11149,13 @@ output "{device_name}_private_ip" {{
                             name="allow-panorama-inbound",
                             source_zone=["untrust"],
                             destination_zone=["trust"],
-                            source=["admin-ip"],
+                            source=["admin-networks"],
                             destination=["panorama-mgmt"],
                             application=["ssl", "web-browsing"],
                             service=["service-https"],
                             action="allow",
                             log_end=True,
-                            description="Allow HTTPS to Panorama from admin IP",
+                            description="Allow HTTPS to Panorama from admin networks",
                         )
 
                     # Phase 8: Commit

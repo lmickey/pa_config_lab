@@ -699,6 +699,7 @@ class FirewallAPIClient:
         # Set source translation
         if source_translation_type == "dynamic-ip-and-port" and source_translation_interface:
             rule.source_translation_type = "dynamic-ip-and-port"
+            rule.source_translation_address_type = "interface-address"
             rule.source_translation_interface = source_translation_interface
 
         # Set destination translation (static inbound NAT)
