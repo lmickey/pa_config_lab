@@ -206,9 +206,9 @@ class PanoramaAPIClient:
 
         return PanoramaInfo(
             hostname=self._panorama.hostname or "",
-            serial=self._panorama.serial or "",
-            model=self._panorama.model or "",
-            sw_version=self._panorama.version or "",
+            serial=getattr(self._panorama, 'serial', "") or "",
+            model=getattr(self._panorama, 'model', "Panorama") or "Panorama",
+            sw_version=getattr(self._panorama, 'version', "") or "",
             uptime=getattr(self._panorama, 'uptime', "") or "",
             management_ip=self.hostname,
         )
