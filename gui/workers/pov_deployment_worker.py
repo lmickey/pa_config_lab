@@ -199,6 +199,68 @@ class TerraformWorker(QThread):
             self.error.emit(clean_error)
             self.finished.emit(False, clean_error, {})
 
+    def _remove_bootstrap_for_updates(self, terraform_dir: str, executor):
+        """Remove bootstrap storage resources from state and config on updates.
+
+        Bootstrap (storage account, container, blobs) is only needed during
+        initial VM creation. On updates, it causes persistent 403 errors because
+        the storage account's IP-restricted network rules block Terraform's
+        data-plane access when the user's IP changes. Remove from both state
+        and the generated main.tf so Terraform doesn't try to manage them.
+        """
+        import re as _re
+
+        if not executor.has_state():
+            return
+
+        # Check if VMs exist in state (meaning initial deploy is done)
+        state_result = executor.state_list()
+        if not state_result.success:
+            return
+        state_resources = state_result.stdout or ''
+        if 'azurerm_linux_virtual_machine.' not in state_resources:
+            return  # Initial deploy, keep bootstrap
+
+        # Remove from state
+        bootstrap_resources = [
+            'azurerm_storage_blob.init_cfg',
+            'azurerm_storage_blob.bootstrap_xml',
+            'azurerm_storage_container.bootstrap',
+            'azurerm_storage_account.bootstrap',
+        ]
+        removed_any = False
+        for resource in bootstrap_resources:
+            if resource in state_resources:
+                self.log_message.emit(f"[plan] Removing {resource} from state...")
+                executor.state_rm(resource)
+                removed_any = True
+
+        # Also comment out bootstrap resources in main.tf so terraform
+        # doesn't plan to recreate them
+        main_tf = os.path.join(terraform_dir, "main.tf")
+        if os.path.exists(main_tf) and removed_any:
+            with open(main_tf, 'r') as f:
+                content = f.read()
+
+            # Remove bootstrap resource blocks (storage account, container, blobs)
+            # Match: resource "azurerm_storage_*" "bootstrap*" { ... }
+            content = _re.sub(
+                r'# Bootstrap storage.*?(?=\n# (?!Bootstrap)|resource "(?!azurerm_storage)|output |$)',
+                '', content, flags=_re.DOTALL
+            )
+            # Also remove individual bootstrap resource blocks if not prefixed with comment
+            for res_type in ('azurerm_storage_account', 'azurerm_storage_container',
+                             'azurerm_storage_blob'):
+                content = _re.sub(
+                    rf'resource "{res_type}" "[^"]*bootstrap[^"]*" \{{.*?\n\}}\n',
+                    '', content, flags=_re.DOTALL
+                )
+
+            with open(main_tf, 'w') as f:
+                f.write(content)
+
+            self.log_message.emit("[plan] Removed bootstrap resources from main.tf")
+
     def _update_storage_ip_rules(self, terraform_dir: str):
         """Update bootstrap storage account IP rules with current public IP.
 
@@ -567,15 +629,9 @@ class TerraformWorker(QThread):
         terraform_dir = os.path.join(self.output_dir, "terraform")
         executor = TerraformExecutor(terraform_dir)
 
-        # Pre-update storage IP rules and remove bootstrap from state
+        # Pre-update storage IP rules and remove bootstrap from state + config
         self._update_storage_ip_rules(terraform_dir)
-        if executor.has_state():
-            state_result = executor.state_list()
-            if state_result.success and 'azurerm_storage_container.bootstrap' in (state_result.stdout or ''):
-                self.log_message.emit("[plan] Removing bootstrap storage from state (not needed for updates)...")
-                for resource in ('azurerm_storage_blob.init_cfg', 'azurerm_storage_blob.bootstrap_xml',
-                                 'azurerm_storage_container.bootstrap'):
-                    executor.state_rm(resource)
+        self._remove_bootstrap_for_updates(terraform_dir, executor)
 
         var_file = self._create_var_file()
 
