@@ -3007,6 +3007,12 @@ class POVWorkflowWidget(QWidget):
 
         fw_policy_layout.addLayout(ip_row)
 
+        # Save infra fields to deployment_config on any change
+        for field in (self.infra_fw_host, self.infra_fw_hostname,
+                      self.infra_fw_dns1, self.infra_fw_dns2, self.infra_fw_ntp1,
+                      self.infra_user_ip, self.infra_additional_admin_ips):
+            field.textChanged.connect(self._save_infra_fields_to_state)
+
         # Panorama NAT info (only relevant if Panorama managed)
         self.infra_pano_nat_frame = QFrame()
         self.infra_pano_nat_frame.setStyleSheet(
@@ -11070,8 +11076,45 @@ output "{device_name}_private_ip" {{
 
     # ========== Panorama Setup Tab Handlers ==========
 
+    def _save_infra_fields_to_state(self):
+        """Save Infrastructure Setup tab fields to deployment_config for persistence."""
+        self.deployment_config['infra_setup'] = {
+            'fw_host': self.infra_fw_host.text().strip(),
+            'fw_user': self.infra_fw_user.text().strip(),
+            'fw_hostname': self.infra_fw_hostname.text().strip(),
+            'fw_dns1': self.infra_fw_dns1.text().strip(),
+            'fw_dns2': self.infra_fw_dns2.text().strip(),
+            'fw_ntp1': self.infra_fw_ntp1.text().strip(),
+            'user_ip': self.infra_user_ip.text().strip(),
+            'additional_admin_ips': self.infra_additional_admin_ips.text().strip(),
+        }
+
+    def _restore_infra_fields_from_state(self):
+        """Restore Infrastructure Setup tab fields from saved state."""
+        saved = self.deployment_config.get('infra_setup', {})
+        if not saved:
+            return
+
+        field_map = {
+            'fw_host': self.infra_fw_host,
+            'fw_user': self.infra_fw_user,
+            'fw_hostname': self.infra_fw_hostname,
+            'fw_dns1': self.infra_fw_dns1,
+            'fw_dns2': self.infra_fw_dns2,
+            'fw_ntp1': self.infra_fw_ntp1,
+            'user_ip': self.infra_user_ip,
+            'additional_admin_ips': self.infra_additional_admin_ips,
+        }
+        for key, field in field_map.items():
+            value = saved.get(key, '')
+            if value and not field.text().strip():
+                field.setText(value)
+
     def _auto_populate_panorama_setup(self):
         """Auto-populate Infrastructure Setup tab fields from cloud deployment outputs."""
+        # Restore saved field values first (before auto-populate overwrites empty fields)
+        self._restore_infra_fields_from_state()
+
         # Restore configured state UI if firewall was previously configured
         if self.deployment_config.get('firewall_infra_configured'):
             self.infra_fw_configure_btn.setText("Reconfigure Firewall")
