@@ -3041,7 +3041,39 @@ class POVWorkflowWidget(QWidget):
         self.infra_fw_configure_btn.clicked.connect(self._execute_firewall_infra_setup)
         fw_actions.addWidget(self.infra_fw_configure_btn)
 
+        self.infra_fw_update_admins_btn = QPushButton("Update Admin Networks Only")
+        self.infra_fw_update_admins_btn.setMinimumWidth(220)
+        self.infra_fw_update_admins_btn.setMinimumHeight(40)
+        self.infra_fw_update_admins_btn.setVisible(False)  # Shown after initial config
+        self.infra_fw_update_admins_btn.setStyleSheet(
+            "QPushButton { "
+            "  background-color: #1565C0; color: white; padding: 10px 24px; "
+            "  font-weight: bold; font-size: 13px; border-radius: 5px; "
+            "  border: 1px solid #0D47A1; border-bottom: 3px solid #0D47A1; "
+            "}"
+            "QPushButton:hover { background-color: #1976D2; border-bottom: 3px solid #0D47A1; }"
+            "QPushButton:pressed { background-color: #0D47A1; border-bottom: 1px solid #0D47A1; }"
+            "QPushButton:disabled { background-color: #BDBDBD; color: #9E9E9E; border: 1px solid #9E9E9E; border-bottom: 3px solid #757575; }"
+        )
+        self.infra_fw_update_admins_btn.clicked.connect(self._execute_update_admin_networks)
+        fw_actions.addWidget(self.infra_fw_update_admins_btn)
+
         layout.addLayout(fw_actions)
+
+        # Firewall configured status banner (hidden until configured)
+        self.infra_fw_status_banner = QFrame()
+        self.infra_fw_status_banner.setStyleSheet(
+            "QFrame { background-color: #E8F5E9; border: 2px solid #4CAF50; "
+            "border-radius: 6px; padding: 8px; }"
+        )
+        banner_row = QHBoxLayout(self.infra_fw_status_banner)
+        banner_row.setContentsMargins(10, 6, 10, 6)
+        self.infra_fw_status_label = QLabel("")
+        self.infra_fw_status_label.setStyleSheet("color: #2E7D32; font-size: 12px; font-weight: bold;")
+        banner_row.addWidget(self.infra_fw_status_label)
+        banner_row.addStretch()
+        self.infra_fw_status_banner.setVisible(False)
+        layout.addWidget(self.infra_fw_status_banner)
 
         # ==================================================================
         # SECTION 2: PANORAMA CONFIGURATION (shown only if Panorama managed)
@@ -10964,6 +10996,21 @@ output "{device_name}_private_ip" {{
 
     def _execute_firewall_infra_setup(self):
         """Execute firewall infrastructure setup: base config + NAT + security policy."""
+        # Confirm if already configured
+        if self.deployment_config.get('firewall_infra_configured'):
+            reply = QMessageBox.question(
+                self,
+                "Firewall Already Configured",
+                "The firewall has already been configured. Running full setup again "
+                "will re-apply all settings.\n\n"
+                "If you only need to add admin networks, use 'Update Admin Networks Only' instead.\n\n"
+                "Proceed with full reconfiguration?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
         host = self.infra_fw_host.text().strip()
         user = self.infra_fw_user.text().strip()
         password = self.infra_fw_pass.text()
@@ -11253,23 +11300,205 @@ output "{device_name}_private_ip" {{
         self._fw_infra_worker.finished.connect(self._on_fw_infra_setup_finished)
         self._fw_infra_worker.start()
 
+    def _execute_update_admin_networks(self):
+        """Update admin networks on the firewall without full reconfiguration.
+
+        Creates any new address objects and updates the admin-networks group,
+        then commits only those changes. Also updates Azure NSG rules.
+        """
+        host = self.infra_fw_host.text().strip()
+        user = self.infra_fw_user.text().strip()
+        password = self.infra_fw_pass.text()
+
+        if not host or not user or not password:
+            QMessageBox.warning(
+                self, "Missing Information",
+                "Please enter firewall connection details."
+            )
+            return
+
+        user_ip = self.infra_user_ip.text().strip() or "0.0.0.0/0"
+        additional_ips_text = self.infra_additional_admin_ips.text().strip() if hasattr(self, 'infra_additional_admin_ips') else ""
+        additional_admin_ips = [ip.strip() for ip in additional_ips_text.split(",") if ip.strip()] if additional_ips_text else []
+
+        # Disable buttons and show progress
+        self.infra_fw_update_admins_btn.setEnabled(False)
+        self.infra_fw_update_admins_btn.setText("Updating...")
+        self.infra_fw_configure_btn.setEnabled(False)
+        self.pano_setup_progress.setVisible(True)
+        self.pano_setup_progress.setRange(0, 0)
+        self.pano_setup_progress.setStyleSheet("")
+        from PyQt6.QtWidgets import QApplication
+        QApplication.processEvents()
+
+        self._pano_setup_log("\nUpdating admin networks (incremental)...")
+
+        from PyQt6.QtCore import QThread, pyqtSignal
+
+        class AdminNetworkUpdateWorker(QThread):
+            progress = pyqtSignal(str, int)
+            finished = pyqtSignal(bool, str)
+
+            def __init__(self, host, user, password, user_ip, additional_admin_ips,
+                         nsg_resource_group, nsg_name):
+                super().__init__()
+                self.host = host
+                self.user = user
+                self.password = password
+                self.user_ip = user_ip
+                self.additional_admin_ips = additional_admin_ips
+                self.nsg_resource_group = nsg_resource_group
+                self.nsg_name = nsg_name
+
+            def run(self):
+                try:
+                    from firewall.api_client import FirewallAPIClient
+
+                    self.progress.emit("Connecting to firewall...", 10)
+                    client = FirewallAPIClient(
+                        hostname=self.host, username=self.user, password=self.password
+                    )
+                    client.connect()
+
+                    # Ensure primary admin-ip exists
+                    self.progress.emit(f"Ensuring admin-ip ({self.user_ip})...", 20)
+                    try:
+                        client.create_address_object(
+                            name="admin-ip",
+                            value=self.user_ip,
+                            address_type="ip-netmask",
+                            description="Primary administrator public IP",
+                        )
+                    except Exception:
+                        pass  # May already exist
+
+                    admin_members = ["admin-ip"]
+
+                    # Create additional address objects
+                    for i, extra_ip in enumerate(self.additional_admin_ips, start=1):
+                        obj_name = f"admin-ip-{i}"
+                        self.progress.emit(f"Creating {obj_name} ({extra_ip})...", 20 + (i * 5))
+                        try:
+                            client.create_address_object(
+                                name=obj_name,
+                                value=extra_ip,
+                                address_type="ip-netmask",
+                                description=f"Additional admin network {i}",
+                            )
+                        except Exception:
+                            pass  # May already exist
+                        admin_members.append(obj_name)
+
+                    # Update the admin-networks group
+                    self.progress.emit(f"Updating admin-networks group ({len(admin_members)} members)...", 60)
+                    client.create_address_group(
+                        name="admin-networks",
+                        static_members=admin_members,
+                        description="Admin networks allowed for inbound management access",
+                    )
+
+                    # Commit
+                    self.progress.emit("Committing changes...", 75)
+                    result = client.commit(sync=True, timeout=300)
+                    if not result.success:
+                        self.finished.emit(False, f"Commit failed: {result.message}")
+                        return
+
+                    client.disconnect()
+
+                    # Update NSG rules
+                    if self.additional_admin_ips and self.nsg_resource_group and self.nsg_name:
+                        self.progress.emit("Updating Azure NSG rules...", 90)
+                        all_ips = [self.user_ip.replace('/32', '') if '/32' in self.user_ip else self.user_ip]
+                        for ip in self.additional_admin_ips:
+                            all_ips.append(ip.replace('/32', '') if '/32' in ip else ip)
+
+                        import subprocess
+                        for rule_name in ("Allow-HTTPS", "Allow-SSH"):
+                            try:
+                                subprocess.run(
+                                    ["az", "network", "nsg", "rule", "update",
+                                     "--resource-group", self.nsg_resource_group,
+                                     "--nsg-name", self.nsg_name,
+                                     "--name", rule_name,
+                                     "--source-address-prefixes"] + all_ips,
+                                    capture_output=True, text=True, timeout=30,
+                                )
+                            except Exception as e:
+                                self.progress.emit(f"Warning: NSG {rule_name} update failed: {e}", 95)
+
+                    self.progress.emit("Admin networks updated", 100)
+                    self.finished.emit(True, f"Admin networks updated: {len(admin_members)} member(s) in admin-networks group")
+
+                except Exception as e:
+                    self.finished.emit(False, str(e))
+
+        outputs = getattr(self, '_terraform_outputs', {}) or {}
+        nsg_rg = outputs.get('resource_group_name', '')
+        customer = self.customer_name_input.text().strip() if hasattr(self, 'customer_name_input') else ""
+        region = self.cloud_region_combo.currentText() if hasattr(self, 'cloud_region_combo') else "eastus"
+        sanitized = self._sanitize_customer_name(customer) if customer else "pov"
+        nsg_name = f"{sanitized}-{region}-mgmt-nsg" if nsg_rg else ""
+
+        self._admin_update_worker = AdminNetworkUpdateWorker(
+            host, user, password, user_ip, additional_admin_ips,
+            nsg_resource_group=nsg_rg, nsg_name=nsg_name,
+        )
+        self._admin_update_worker.progress.connect(self._on_panorama_setup_progress)
+        self._admin_update_worker.finished.connect(self._on_admin_update_finished)
+        self._admin_update_worker.start()
+
+    def _on_admin_update_finished(self, success: bool, message: str):
+        """Handle completion of admin network update."""
+        self.infra_fw_update_admins_btn.setEnabled(True)
+        self.infra_fw_update_admins_btn.setText("Update Admin Networks Only")
+        self.infra_fw_configure_btn.setEnabled(True)
+
+        if success:
+            self._pano_setup_log(f"\n{message}")
+            self.pano_setup_progress.setRange(0, 100)
+            self.pano_setup_progress.setValue(100)
+            import datetime
+            ts = datetime.datetime.now().strftime("%I:%M %p")
+            self.infra_fw_status_label.setText(
+                f"Firewall configured — admin networks updated at {ts}"
+            )
+            QMessageBox.information(self, "Admin Networks Updated", message)
+        else:
+            self._pano_setup_log(f"\nAdmin network update failed: {message}")
+            self.pano_setup_progress.setStyleSheet(
+                "QProgressBar::chunk { background-color: #f44336; }"
+            )
+            QMessageBox.critical(self, "Update Failed", f"Failed to update admin networks:\n\n{message[:500]}")
+
     def _on_fw_infra_setup_finished(self, success: bool, message: str):
         """Handle completion of firewall infrastructure setup."""
         self.infra_fw_configure_btn.setEnabled(True)
-        self.infra_fw_configure_btn.setText("Configure Firewall")
 
         if success:
             self._pano_setup_log(f"\n{message}")
             self.pano_setup_progress.setValue(100)
             self.deployment_config['firewall_infra_configured'] = True
 
+            # Update UI to reflect configured state
+            self.infra_fw_configure_btn.setText("Reconfigure Firewall")
+            self.infra_fw_update_admins_btn.setVisible(True)
+            self.infra_fw_status_banner.setVisible(True)
+            import datetime
+            ts = datetime.datetime.now().strftime("%I:%M %p")
+            self.infra_fw_status_label.setText(
+                f"Firewall configured successfully at {ts}"
+            )
+
             QMessageBox.information(
                 self,
                 "Firewall Configured",
                 f"{message}\n\n"
-                "You can now configure the Panorama (if applicable) or proceed to the next step."
+                "You can now configure the Panorama (if applicable) or proceed to the next step.\n\n"
+                "Use 'Update Admin Networks Only' to add IPs without reconfiguring."
             )
         else:
+            self.infra_fw_configure_btn.setText("Configure Firewall")
             self._pano_setup_log(f"\nFirewall setup failed: {message}")
             self.pano_setup_progress.setStyleSheet(
                 "QProgressBar::chunk { background-color: #f44336; }"
