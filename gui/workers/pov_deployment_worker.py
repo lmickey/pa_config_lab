@@ -235,29 +235,47 @@ class TerraformWorker(QThread):
                 executor.state_rm(resource)
                 removed_any = True
 
-        # Also comment out bootstrap resources in main.tf so terraform
-        # doesn't plan to recreate them
+        # Remove ALL bootstrap-related blocks and references from main.tf
         main_tf = os.path.join(terraform_dir, "main.tf")
         if os.path.exists(main_tf) and removed_any:
             with open(main_tf, 'r') as f:
-                content = f.read()
+                lines = f.readlines()
 
-            # Remove bootstrap resource blocks (storage account, container, blobs)
-            # Match: resource "azurerm_storage_*" "bootstrap*" { ... }
-            content = _re.sub(
-                r'# Bootstrap storage.*?(?=\n# (?!Bootstrap)|resource "(?!azurerm_storage)|output |$)',
-                '', content, flags=_re.DOTALL
-            )
-            # Also remove individual bootstrap resource blocks if not prefixed with comment
-            for res_type in ('azurerm_storage_account', 'azurerm_storage_container',
-                             'azurerm_storage_blob'):
-                content = _re.sub(
-                    rf'resource "{res_type}" "[^"]*bootstrap[^"]*" \{{.*?\n\}}\n',
-                    '', content, flags=_re.DOTALL
-                )
+            # Filter out bootstrap resource blocks and their references
+            filtered = []
+            skip_depth = 0
+            skipping = False
+            for line in lines:
+                # Start skipping at bootstrap resource declarations
+                if _re.match(r'\s*resource\s+"azurerm_storage_(account|container|blob)"\s+"', line):
+                    skipping = True
+                    skip_depth = 0
+
+                if skipping:
+                    skip_depth += line.count('{') - line.count('}')
+                    if skip_depth <= 0 and '{' not in line and '}' in line:
+                        skipping = False
+                    continue
+
+                # Remove custom_data lines that reference bootstrap
+                if 'azurerm_storage_account.bootstrap' in line:
+                    continue
+                if 'azurerm_storage_blob.init_cfg' in line:
+                    continue
+                if 'azurerm_storage_blob.bootstrap_xml' in line:
+                    continue
+                if 'azurerm_storage_container.bootstrap' in line:
+                    continue
+
+                # Remove comment lines about bootstrap
+                stripped = line.strip()
+                if stripped.startswith('#') and 'bootstrap' in stripped.lower():
+                    continue
+
+                filtered.append(line)
 
             with open(main_tf, 'w') as f:
-                f.write(content)
+                f.writelines(filtered)
 
             self.log_message.emit("[plan] Removed bootstrap resources from main.tf")
 
